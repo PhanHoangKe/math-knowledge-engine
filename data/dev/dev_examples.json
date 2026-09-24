@@ -1,0 +1,27 @@
+[
+  {
+    "id": "DEV_01",
+    "name": "Simple linear equation",
+    "equation": "3 * x + 9 = 0",
+    "expected_roots": ["-3"]
+  },
+  {
+    "id": "DEV_02",
+    "name": "Quadratic with single double root",
+    "equation": "x^2 - 4*x + 4 = 0",
+    "expected_roots": ["2"]
+  },
+  {
+    "id": "DEV_03",
+    "name": "Biquadratic with four real roots",
+    "equation": "x^4 - 5*x^2 + 4 = 0",
+    "expected_roots": ["-2", "-1", "1", "2"]
+  },
+  {
+    "id": "DEV_04",
+    "name": "Rational equation with multiple excluded points",
+    "equation": "1 / (x - 1) + 1 / (x + 1) = 0",
+    "expected_domain": "R \\ {-1, 1}",
+    "expected_roots": ["0"]
+  }
+]

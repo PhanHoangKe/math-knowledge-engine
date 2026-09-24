@@ -1,0 +1,108 @@
+[
+  {
+    "id": "T1",
+    "name": "Standard quadratic equation",
+    "equation": "x^2 - 5*x + 6 = 0",
+    "expected_domain": "R",
+    "expected_method": "M2:QUADRATIC_FORMULA",
+    "expected_roots": ["2", "3"],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "rationale": "Degree 2 polynomial with Delta = 1 > 0. Two real roots {2, 3} verified."
+  },
+  {
+    "id": "T2",
+    "name": "Rational equation with extraneous root and unsafe transfer detection",
+    "equation": "(x^2 - 5*x + 6) / (x - 2) = 0",
+    "expected_domain": "R \\ {2}",
+    "expected_method": "M4:RATIONAL_EQUATION",
+    "expected_roots": ["3"],
+    "expected_extraneous_roots": ["2"],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "transfer_test": {
+      "source_id": "T1",
+      "copied_roots": ["2", "3"],
+      "expected_transfer_validity": "UNSAFE_COPY",
+      "rejected_transferred_root": "2"
+    },
+    "rationale": "Root 2 makes denominator zero; copying {2, 3} from T1 is an UNSAFE_COPY. Only x=3 is sound."
+  },
+  {
+    "id": "T3",
+    "name": "Rational identity with domain exclusion preservation",
+    "equation": "(x - 2) / (x - 2) = 1",
+    "expected_domain": "R \\ {2}",
+    "expected_method": "M4:RATIONAL_EQUATION",
+    "expected_is_identity_on_domain": true,
+    "expected_roots": [],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "rationale": "Reduces to 0=0 (identity), but domain is R \\ {2}. Solution is all real numbers except 2."
+  },
+  {
+    "id": "T4",
+    "name": "Zero-product factorization and division root-loss detection",
+    "equation": "x * (x - 1) = 0",
+    "expected_domain": "R",
+    "expected_method": "M3:FACTORIZATION",
+    "expected_roots": ["0", "1"],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "division_test": {
+      "divisor": "x",
+      "expected_obligation_status": "FAIL",
+      "lost_root": "0"
+    },
+    "rationale": "Zero product yields {0, 1}. Unconditional division by x loses the root x=0."
+  },
+  {
+    "id": "T5",
+    "name": "Quadratic with a=0 degeneracy rejection",
+    "equation": "0 * x^2 + 2 * x - 4 = 0",
+    "expected_domain": "R",
+    "m2_check": {
+      "method_id": "M2:QUADRATIC_FORMULA",
+      "expected_admissibility": "NOT_APPLICABLE",
+      "failed_guard": "NONZERO_LEADING_COEFFICIENT_A"
+    },
+    "m1_fallback": {
+      "method_id": "M1:LINEAR_EQUATION",
+      "expected_admissibility": "APPLICABLE",
+      "expected_roots": ["2"]
+    },
+    "expected_roots": ["2"],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "rationale": "Leading coefficient a=0 rejects M2. Equation reduces to linear 2x - 4 = 0 solved by M1."
+  },
+  {
+    "id": "T6",
+    "name": "Biquadratic substitution with sign constraint enforcement",
+    "equation": "x^4 + x^2 - 2 = 0",
+    "expected_domain": "R",
+    "expected_method": "M5:BIQUADRATIC_SUBSTITUTION",
+    "expected_t_roots": [
+      {"t": "1", "status": "VALID_GE_0"},
+      {"t": "-2", "status": "REJECTED_NEGATIVE"}
+    ],
+    "expected_roots": ["-1", "1"],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "rationale": "t = x^2 yields t=1 and t=-2. t=-2 is discarded because t >= 0. Real roots are {-1, 1}."
+  },
+  {
+    "id": "T7",
+    "name": "Quadratic formula with negative discriminant (empty real set)",
+    "equation": "x^2 + 1 = 0",
+    "expected_domain": "R",
+    "expected_method": "M2:QUADRATIC_FORMULA",
+    "expected_m2_admissibility": "APPLICABLE",
+    "expected_roots": [],
+    "expected_solution_status": "SOUND_AND_COMPLETE_IN_SCOPE",
+    "rationale": "M2 is applicable, leading coefficient a=1 != 0. Delta = -4 < 0, real solution set is empty set."
+  },
+  {
+    "id": "T8",
+    "name": "Out-of-scope radical equation safe rejection",
+    "equation": "sqrt(x + 2) = x",
+    "expected_domain": "UNKNOWN (OUT_OF_SCOPE)",
+    "expected_solution_status": "UNDETERMINED",
+    "expected_out_of_scope": true,
+    "rationale": "Square root function sqrt() is outside DEV-01 scope; rejected safely by parser."
+  }
+]
