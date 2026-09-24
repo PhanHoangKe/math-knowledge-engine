@@ -2,7 +2,7 @@ from fractions import Fraction
 from typing import List, Set, Tuple
 import sympy
 
-from mke.models.domain import is_proven_real_number
+from mke.models.domain import is_proven_real_number, verify_root_exact
 from mke.models.enums import TransferValidity
 from mke.parsing.normalizer import NormalizedEquation
 from mke.parsing.parser import Parser
@@ -67,13 +67,13 @@ def audit_solution_transfer(
             )
             continue
 
-        # Check equation satisfaction
-        sub_res = sympy.simplify(target_norm_eq.numerator_sym.subs(X_SYM, sym_r))
-        if sub_res == 0:
+        # Check equation satisfaction via exact proof gate
+        cert = verify_root_exact(target_norm_eq.numerator_sym, sym_r)
+        if cert.is_exact_pass:
             valid_roots.append(str(sym_r))
         else:
             rejected_roots.append(
-                f"Root x = {sym_r} does not satisfy target numerator: residue = {sub_res}"
+                f"Root x = {sym_r} does not satisfy target numerator: status={cert.status.value} (residue={cert.residue})"
             )
 
     if rejected_roots:

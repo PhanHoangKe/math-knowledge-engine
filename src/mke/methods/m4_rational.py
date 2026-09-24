@@ -4,8 +4,8 @@ from typing import List, Set
 import sympy
 
 from mke.methods.base import BaseMethod, MethodSolveOutput
-from mke.models.domain import is_proven_real_number, check_root_satisfaction
-from mke.models.enums import MethodAdmissibility, MethodId, ObligationId, ObligationStatus
+from mke.models.domain import is_proven_real_number, check_root_satisfaction, verify_root_exact
+from mke.models.enums import ExactVerificationStatus, MethodAdmissibility, MethodId, ObligationId, ObligationStatus
 from mke.models.evidence import GuardResult, ProofObligation
 from mke.parsing.normalizer import NormalizedEquation
 from mke.parsing.sympy_converter import X_SYM
@@ -212,19 +212,27 @@ class RationalEquationMethod(BaseMethod):
                 )
             )
 
-            # Check substitution
-            sub_passes, sub_res = check_root_satisfaction(norm_eq.numerator_sym, root)
+            # Check substitution via exact proof gate
+            cert = verify_root_exact(norm_eq.numerator_sym, root)
+            if cert.status == ExactVerificationStatus.EXACT_PASS:
+                sub_status = ObligationStatus.PASS
+            elif cert.status == ExactVerificationStatus.EXACT_FAIL:
+                sub_status = ObligationStatus.FAIL
+            else:
+                sub_status = ObligationStatus.UNRESOLVED
+
             obligations.append(
                 ProofObligation(
                     obligation_id=ObligationId.ROOT_SUBSTITUTION,
-                    status=ObligationStatus.PASS if sub_passes else ObligationStatus.FAIL,
+                    status=sub_status,
                     description=f"Substitute root x = {root} into cleared numerator",
-                    evidence=f"Numerator evaluated at {root} is {sub_res}",
+                    evidence=f"Exact verification status: {cert.status.value} (method={cert.method}, residue={cert.residue})",
+                    certificate=cert.model_dump(),
                 )
             )
 
-        # 3. COMPLETENESS
-        is_exhaustive = solve_output.parameters.get("is_exhaustive_enumeration", True)
+        # 3. COMPLETENESS (solver self-check; independent gate will audit)
+        is_exhaustive = solve_output.parameters.get("is_exhaustive_enumeration", False)
         if norm_eq.domain.is_undetermined:
             obligations.append(
                 ProofObligation(

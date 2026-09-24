@@ -19,6 +19,13 @@ class ObligationStatus(str, Enum):
     UNRESOLVED = "UNRESOLVED"
 
 
+class ExactVerificationStatus(str, Enum):
+    """Rigorous verification status of an individual candidate root against an equation."""
+    EXACT_PASS = "EXACT_PASS"
+    EXACT_FAIL = "EXACT_FAIL"
+    UNRESOLVED = "UNRESOLVED"
+
+
 class TransferValidity(str, Enum):
     """Validity status of transferring a solution from a source problem to a target."""
     REINSTANTIATED_VALID = "REINSTANTIATED_VALID"

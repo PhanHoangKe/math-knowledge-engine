@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from mke.models.enums import (
+    ExactVerificationStatus,
     MethodAdmissibility,
     MethodId,
     ObligationId,
@@ -23,6 +24,33 @@ class GuardResult(BaseModel):
     details: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ExactProofCertificate(BaseModel):
+    """Rigorous certificate verifying whether a candidate root satisfies an equation."""
+
+    status: ExactVerificationStatus
+    is_exact_pass: bool
+    candidate_root: str
+    residue: str
+    method: str
+    diagnostic: str = ""
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CompletenessCertificate(BaseModel):
+    """Structured certificate verifying completeness of a solution set."""
+
+    certificate_id: str
+    algorithm: str
+    polynomial_degree: int
+    coefficients: Dict[str, str] = Field(default_factory=dict)
+    canonical_roots: List[str] = Field(default_factory=list)
+    verified_roots: List[str] = Field(default_factory=list)
+    missing_roots: List[str] = Field(default_factory=list)
+    extraneous_roots: List[str] = Field(default_factory=list)
+    status: ObligationStatus
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ProofObligation(BaseModel):
     """Evaluation record of a mathematical proof obligation."""
 
@@ -31,6 +59,7 @@ class ProofObligation(BaseModel):
     description: str
     evidence: str
     counterexample: Optional[str] = None
+    certificate: Optional[Dict[str, Any]] = None
 
 
 class SolutionCandidate(BaseModel):
@@ -41,6 +70,7 @@ class SolutionCandidate(BaseModel):
     satisfies_equation: bool
     is_valid_root: bool
     evidence: str
+    exact_status: Optional[ExactVerificationStatus] = None
 
 
 class MethodInstance(BaseModel):
@@ -72,9 +102,11 @@ class VerificationResult(BaseModel):
     solution_status: SolutionProofStatus = SolutionProofStatus.UNDETERMINED
     candidate_solutions: List[SolutionCandidate] = Field(default_factory=list)
     verified_roots: List[str] = Field(default_factory=list)
+    unverified_candidates: List[str] = Field(default_factory=list)
     is_identity_on_domain: bool = False  # e.g., (x-2)/(x-2)=1 holds for all x in Domain
 
     obligations: List[ProofObligation] = Field(default_factory=list)
+    completeness_certificate: Optional[CompletenessCertificate] = None
     transfer_validity: Optional[TransferValidity] = None
     counterexample: Optional[str] = None
     explanation: str = ""

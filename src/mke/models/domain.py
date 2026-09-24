@@ -5,6 +5,9 @@ from fractions import Fraction
 from typing import Any, Dict, List, Set, Union
 import sympy
 
+from mke.models.enums import ExactVerificationStatus
+from mke.models.evidence import ExactProofCertificate
+
 
 def is_proven_real_number(sym_val: sympy.Basic) -> bool:
     """Verify strictly whether sym_val is a concrete real number with no free variables or imaginary part.
@@ -49,32 +52,201 @@ def is_proven_real_number(sym_val: sympy.Basic) -> bool:
         return False
 
 
-def check_root_satisfaction(
-    expr: sympy.Basic, r: sympy.Basic, var: sympy.Symbol | None = None
-) -> tuple[bool, sympy.Basic]:
-    """Check whether root r satisfies polynomial/expression expr == 0.
+def verify_root_exact(
+    expr: sympy.Basic, r: sympy.Basic | Fraction | int | float | str, var: sympy.Symbol | None = None
+) -> ExactProofCertificate:
+    """Rigorous verification gate deciding whether candidate root r satisfies expr == 0.
 
-    Uses exact evaluation and high-precision numerical zero detection (evalf(50) < 1e-25)
-    to avoid catastrophic hangs in sympy.simplify() on nested radicals (e.g. Ferrari quartic roots).
+    Requirements:
+    1. Zero epsilon tolerance for proof: |residual| < epsilon is NEVER sufficient for EXACT_PASS.
+    2. Rational arithmetic: exact decision in Q (e.g. Rational(1, 10**26) -> EXACT_FAIL).
+    3. Algebraic reduction: exact algebraic zero via substitution, cancel(), expand(), radsimp().
+    4. Provable numerical refutation: if |residual| > 1e-6, candidate is provably not a root (EXACT_FAIL).
+    5. Safe unresolved fallback: if numerical residue is small but algebraic proof cannot reduce to 0
+       within limits, returns UNRESOLVED (fail-closed).
     """
     if var is None:
         var = sympy.Symbol("x", real=True)
-    raw_sub = expr.subs(var, r)
-    if raw_sub == 0 or getattr(raw_sub, "is_zero", None) is True:
-        return True, sympy.Integer(0)
+
+    # 1. Normalize candidate r safely
+    if isinstance(r, int):
+        sym_r = sympy.Integer(r)
+    elif isinstance(r, Fraction):
+        sym_r = sympy.Rational(r.numerator, r.denominator)
+    elif isinstance(r, float):
+        try:
+            frac = Fraction(str(r))
+            sym_r = sympy.Rational(frac.numerator, frac.denominator)
+        except Exception:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_FAIL,
+                is_exact_pass=False,
+                candidate_root=str(r),
+                residue=str(r),
+                method="FLOAT_CONVERSION_FAILURE",
+                diagnostic="Float cannot be converted to exact rational",
+            )
+    elif isinstance(r, str):
+        try:
+            frac = Fraction(r.strip())
+            sym_r = sympy.Rational(frac.numerator, frac.denominator)
+        except Exception:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_FAIL,
+                is_exact_pass=False,
+                candidate_root=str(r),
+                residue=str(r),
+                method="STRING_PARSE_FAILURE",
+                diagnostic="String cannot be parsed as exact rational",
+            )
+    elif isinstance(r, sympy.Basic):
+        sym_r = r
+    else:
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.EXACT_FAIL,
+            is_exact_pass=False,
+            candidate_root=str(r),
+            residue=str(r),
+            method="UNSUPPORTED_TYPE",
+            diagnostic=f"Unsupported root type: {type(r)}",
+        )
+
+    # 2. Reject non-real numbers (complex units, free variables)
+    if not is_proven_real_number(sym_r):
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.EXACT_FAIL,
+            is_exact_pass=False,
+            candidate_root=str(sym_r),
+            residue=str(sym_r),
+            method="REJECT_NON_REAL",
+            diagnostic="Candidate is not a provably real concrete number (imaginary unit or free variable detected)",
+        )
+
+    # 3. Direct exact substitution
     try:
-        val = raw_sub.evalf(50)
-        if abs(val) < 1e-25:
-            return True, sympy.Integer(0)
+        raw_sub = expr.subs(var, sym_r)
+    except Exception as e:
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.UNRESOLVED,
+            is_exact_pass=False,
+            candidate_root=str(sym_r),
+            residue=str(e),
+            method="SUBSTITUTION_ERROR",
+            diagnostic=f"Error evaluating substitution: {str(e)}",
+        )
+
+    if raw_sub == 0 or getattr(raw_sub, "is_zero", None) is True:
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.EXACT_PASS,
+            is_exact_pass=True,
+            candidate_root=str(sym_r),
+            residue="0",
+            method="EXACT_ALGEBRAIC_ZERO",
+        )
+
+    # 4. Exact Rational Field Decision
+    if (sym_r.is_rational or isinstance(sym_r, (sympy.Integer, sympy.Rational))) and (
+        raw_sub.is_rational or isinstance(raw_sub, (sympy.Integer, sympy.Rational))
+    ):
+        if raw_sub == 0:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_PASS,
+                is_exact_pass=True,
+                candidate_root=str(sym_r),
+                residue="0",
+                method="RATIONAL_FIELD_EVAL",
+            )
+        else:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_FAIL,
+                is_exact_pass=False,
+                candidate_root=str(sym_r),
+                residue=str(raw_sub),
+                method="RATIONAL_FIELD_EVAL",
+                diagnostic=f"Exact rational non-zero residue: {raw_sub}",
+            )
+
+    # 5. Exact Algebraic Reduction (for radicals and algebraic numbers)
+    try:
+        canceled = sympy.cancel(raw_sub)
+        if canceled == 0 or getattr(canceled, "is_zero", None) is True:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_PASS,
+                is_exact_pass=True,
+                candidate_root=str(sym_r),
+                residue="0",
+                method="ALGEBRAIC_CANCEL_ZERO",
+            )
     except Exception:
         pass
+
     try:
-        simp = sympy.simplify(raw_sub)
-        if simp == 0 or getattr(simp, "is_zero", None) is True:
-            return True, sympy.Integer(0)
-        return False, simp
+        expanded = sympy.expand(raw_sub)
+        if expanded == 0 or getattr(expanded, "is_zero", None) is True:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_PASS,
+                is_exact_pass=True,
+                candidate_root=str(sym_r),
+                residue="0",
+                method="ALGEBRAIC_EXPAND_ZERO",
+            )
     except Exception:
-        return False, raw_sub
+        pass
+
+    try:
+        rad = sympy.radsimp(raw_sub)
+        if rad == 0 or getattr(rad, "is_zero", None) is True:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_PASS,
+                is_exact_pass=True,
+                candidate_root=str(sym_r),
+                residue="0",
+                method="ALGEBRAIC_RADSIMP_ZERO",
+            )
+    except Exception:
+        pass
+
+    # 6. Provable Numerical Refutation (EXACT_FAIL when |residue| > 1e-6)
+    try:
+        val = raw_sub.evalf(50)
+        if abs(val) > 1e-6:
+            return ExactProofCertificate(
+                status=ExactVerificationStatus.EXACT_FAIL,
+                is_exact_pass=False,
+                candidate_root=str(sym_r),
+                residue=str(raw_sub),
+                method="NUMERICAL_REFUTATION",
+                diagnostic=f"Provably non-zero residue by high-precision numerical evaluation: |{val}| > 1e-6",
+            )
+    except Exception:
+        pass
+
+    # 7. Fail-Closed Unresolved: Near-zero residual without exact symbolic certificate
+    return ExactProofCertificate(
+        status=ExactVerificationStatus.UNRESOLVED,
+        is_exact_pass=False,
+        candidate_root=str(sym_r),
+        residue=str(raw_sub),
+        method="UNRESOLVED_SYMBOLIC_RADICAL",
+        diagnostic="Residual is near zero, but exact symbolic reduction could not prove 0 within algebraic gate limits. Epsilon approximation is strictly prohibited from granting proof.",
+    )
+
+
+def check_root_satisfaction(
+    expr: sympy.Basic, r: sympy.Basic | Fraction | int | float | str, var: sympy.Symbol | None = None
+) -> tuple[bool, sympy.Basic]:
+    """Compatibility wrapper returning (bool, residue). Bool is True ONLY on EXACT_PASS."""
+    cert = verify_root_exact(expr, r, var)
+    if cert.is_exact_pass:
+        return True, sympy.Integer(0)
+    if isinstance(r, (int, Fraction, sympy.Integer, sympy.Rational)):
+        try:
+            raw_sub = expr.subs(var or sympy.Symbol("x", real=True), r)
+            return False, raw_sub
+        except Exception:
+            pass
+    return False, sympy.sympify(cert.residue) if isinstance(cert.residue, str) else cert.residue
+
 
 
 class DomainCondition:

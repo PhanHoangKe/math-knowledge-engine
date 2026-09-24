@@ -12,14 +12,17 @@ from mke.models.enums import (
     SolutionProofStatus,
     Split,
 )
-from mke.models.domain import is_proven_real_number, check_root_satisfaction
+from mke.models.domain import is_proven_real_number, check_root_satisfaction, verify_root_exact
 from mke.models.evidence import (
+    CompletenessCertificate,
+    ExactProofCertificate,
     MethodInstance,
     ProofObligation,
     SolutionCandidate,
     VerificationResult,
 )
 from mke.models.problem import ProblemRecord
+from mke.verification.completeness import audit_independent_completeness
 from mke.parsing.exceptions import (
     ASTDepthExceededError,
     CoefficientMagnitudeError,
@@ -255,17 +258,21 @@ class VerificationEngine:
         method_inst.parameters = solve_output.parameters
         obligations = method.check_proof_obligations(norm_eq, solve_output)
 
-        # Step 6: Evaluate Candidate Solutions
+        # Step 6: Evaluate Candidate Solutions via Exact Verification Gate
         candidate_evals: List[SolutionCandidate] = []
         verified_roots: List[str] = []
+        unverified_candidates: List[str] = []
 
         for r in solve_output.candidate_roots:
             in_dom = domain.contains(r)
-            sat_eq, sub_res = check_root_satisfaction(norm_eq.numerator_sym, r)
+            cert = verify_root_exact(norm_eq.numerator_sym, r)
+            sat_eq = cert.is_exact_pass
             is_valid = in_dom and sat_eq
 
             if is_valid:
                 verified_roots.append(str(r))
+            else:
+                unverified_candidates.append(str(r))
 
             candidate_evals.append(
                 SolutionCandidate(
@@ -273,17 +280,23 @@ class VerificationEngine:
                     in_domain=in_dom,
                     satisfies_equation=sat_eq,
                     is_valid_root=is_valid,
-                    evidence=f"InDomain={in_dom}, SatisfiesEq={sat_eq} (residue={sub_res})",
+                    exact_status=cert.status,
+                    evidence=f"InDomain={in_dom}, SatisfiesEq={sat_eq} (status={cert.status.value}, method={cert.method}, residue={cert.residue})",
                 )
             )
 
-        # Step 7: Synthesize Solution Proof Status
-        # Crucial Requirement: Distinguish VERIFIED_METHOD from VERIFIED_SOLUTION!
-        # Do not emit VERIFIED_SOLUTION without complete proof!
+        # Step 7: Independent Completeness Audit & Solution Proof Status
+        # Crucial Requirement: The solver's self-declaration is NOT trusted.
+        # The verification gate independently audits completeness against canonical mathematical ground truth!
+        indep_comp_ob, comp_cert = audit_independent_completeness(norm_eq, verified_roots, solve_output)
+
+        # Replace any solver-claimed completeness obligation with the gate's independent certificate
+        obligations = [ob for ob in obligations if ob.obligation_id != ObligationId.COMPLETENESS]
+        obligations.append(indep_comp_ob)
+
         has_failed_obligation = any(ob.status == ObligationStatus.FAIL for ob in obligations)
         has_unresolved_obligation = any(ob.status == ObligationStatus.UNRESOLVED for ob in obligations)
-        completeness_ob = next((ob for ob in obligations if ob.obligation_id == ObligationId.COMPLETENESS), None)
-        is_completeness_proven = completeness_ob is not None and completeness_ob.status == ObligationStatus.PASS
+        is_completeness_proven = (indep_comp_ob.status == ObligationStatus.PASS)
         if domain.is_undetermined:
             is_completeness_proven = False
 
@@ -296,12 +309,15 @@ class VerificationEngine:
         elif has_unresolved_obligation or not is_completeness_proven:
             if verified_roots or solve_output.is_identity_on_domain:
                 solution_status = SolutionProofStatus.SOUND_PARTIAL
-                explanation = "Roots are soundly verified by substitution, but completeness is UNRESOLVED."
+                if comp_cert.missing_roots:
+                    explanation = f"Roots verified by exact proof, but completeness audit FAILED: missing canonical root(s) {comp_cert.missing_roots}."
+                else:
+                    explanation = "Roots are soundly verified by exact proof, but completeness is UNRESOLVED."
             else:
                 solution_status = SolutionProofStatus.UNDETERMINED
-                explanation = "Proof obligations could not be completely resolved."
+                explanation = "Proof obligations could not be completely resolved by exact mathematical certificates."
         else:
-            # All obligations PASS, including COMPLETENESS
+            # All obligations PASS, including independent completeness!
             solution_status = SolutionProofStatus.SOUND_AND_COMPLETE_IN_SCOPE
             is_verified_solution = True
             if solve_output.is_identity_on_domain:
@@ -323,8 +339,10 @@ class VerificationEngine:
             solution_status=solution_status,
             candidate_solutions=candidate_evals,
             verified_roots=verified_roots,
+            unverified_candidates=unverified_candidates,
             is_identity_on_domain=solve_output.is_identity_on_domain,
             obligations=obligations,
+            completeness_certificate=comp_cert,
             explanation=explanation,
         )
 
