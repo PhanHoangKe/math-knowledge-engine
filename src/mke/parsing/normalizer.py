@@ -9,7 +9,7 @@ import sympy
 from mke.domain.extractor import extract_original_domain
 from mke.models.ast_nodes import EquationNode
 from mke.models.domain import OriginalDomain
-from mke.parsing.exceptions import OutOfScopeSyntaxError
+from mke.parsing.exceptions import CoefficientMagnitudeError, OutOfScopeSyntaxError
 from mke.parsing.limits import ParserLimits, DEFAULT_LIMITS
 from mke.parsing.sympy_converter import ast_to_sympy, X_SYM
 
@@ -52,6 +52,24 @@ def normalize_equation(
     if domain.conditions:
         for c in domain.conditions:
             trace.append(f"  Constraint: {c.condition_str} (excluded: {c.excluded_values})")
+
+    if domain.is_empty_domain:
+        trace.append("Domain is empty set (division by zero in expression); equation has no real solutions.")
+        return NormalizedEquation(
+            raw_input=raw_text or eq_ast.to_math_string(),
+            raw_ast=eq_ast,
+            domain=domain,
+            normalization_trace=trace,
+            numerator_sym=sympy.Integer(1),
+            denominator_sym=sympy.Integer(0),
+            numerator_poly=None,
+            denominator_poly=None,
+            is_rational=True,
+            degree=0,
+            is_identity=False,
+            is_contradiction=True,
+            coefficients={},
+        )
 
     # Step 2: Convert to SymPy using whitelisted constructors
     lhs_sym = ast_to_sympy(eq_ast.left)
@@ -107,6 +125,13 @@ def normalize_equation(
 
                 for deg, coef in enumerate(numer_poly.all_coeffs()[::-1]):
                     coeffs[deg] = coef
+                    try:
+                        if abs(float(coef)) > limits.max_coefficient_magnitude:
+                            raise CoefficientMagnitudeError(
+                                f"Coefficient {coef} for x^{deg} exceeds maximum allowed magnitude {limits.max_coefficient_magnitude}"
+                            )
+                    except (TypeError, ValueError):
+                        pass
             except sympy.PolynomialError as e:
                 raise OutOfScopeSyntaxError(f"Non-polynomial expression: {e}")
         else:

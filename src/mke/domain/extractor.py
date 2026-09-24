@@ -20,11 +20,54 @@ def extract_original_domain(unreduced_ast: ASTNode) -> OriginalDomain:
 
         # Check if denominator contains 'x'
         var_set = denom_ast.collect_variables()
-        denom_sympy = ast_to_sympy(denom_ast)
+        try:
+            denom_sympy = ast_to_sympy(denom_ast)
+        except Exception:
+            # Denominator cannot be converted (e.g. division by zero inside denominator)
+            conditions.append(
+                DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0",
+                    excluded_values=set(),
+                    source_description="unconvertible_denominator",
+                    is_undetermined=True,
+                )
+            )
+            continue
 
         if "x" in var_set:
-            # Denominator depends on x -> find its real roots
-            roots_sym = sympy.solveset(sympy.Eq(denom_sympy, 0), X_SYM, domain=sympy.S.Reals)
+            # Denominator depends on x
+            # 1. Check if algebraically identically zero (e.g. x - x)
+            try:
+                simplified_denom = sympy.simplify(denom_sympy)
+            except Exception:
+                simplified_denom = denom_sympy
+
+            if simplified_denom == 0 or simplified_denom.is_zero is True:
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0 (IDENTICALLY ZERO DENOMINATOR)",
+                    excluded_values=set(),
+                    source_description="algebraic_fraction_identically_zero",
+                    is_empty_domain=True,
+                )
+                conditions.append(cond)
+                continue
+
+            # 2. Find real roots of denominator
+            try:
+                roots_sym = sympy.solveset(sympy.Eq(denom_sympy, 0), X_SYM, domain=sympy.S.Reals)
+            except Exception:
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0",
+                    excluded_values=set(),
+                    source_description="algebraic_fraction_solveset_failed",
+                    is_undetermined=True,
+                )
+                conditions.append(cond)
+                continue
+
             excluded_vals: Set[Union[Fraction, sympy.Basic]] = set()
 
             if isinstance(roots_sym, sympy.FiniteSet):
@@ -34,32 +77,60 @@ def extract_original_domain(unreduced_ast: ASTNode) -> OriginalDomain:
                         excluded_vals.add(frac_r)
                     else:
                         excluded_vals.add(r)
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0",
+                    excluded_values=excluded_vals,
+                    source_description="algebraic_fraction_denominator",
+                )
+                conditions.append(cond)
             elif roots_sym == sympy.S.Reals:
-                # Denominator is identically zero for all real x!
-                # Entire domain is empty.
-                pass
-
-            cond = DomainCondition(
-                raw_expression_str=denom_str,
-                condition_str=f"{denom_str} != 0",
-                excluded_values=excluded_vals,
-                source_description="algebraic_fraction_denominator",
-            )
-            conditions.append(cond)
+                # Denominator is identically zero for all real x
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0 (IDENTICALLY ZERO DENOMINATOR)",
+                    excluded_values=set(),
+                    source_description="algebraic_fraction_identically_zero",
+                    is_empty_domain=True,
+                )
+                conditions.append(cond)
+            elif roots_sym == sympy.S.EmptySet:
+                # Denominator has no real zeros (e.g. x^2 + 1 != 0 for all real x)
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0",
+                    excluded_values=set(),
+                    source_description="algebraic_fraction_no_real_zeros",
+                )
+                conditions.append(cond)
+            else:
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0",
+                    excluded_values=set(),
+                    source_description="algebraic_fraction_undetermined",
+                    is_undetermined=True,
+                )
+                conditions.append(cond)
         else:
-            # Denominator is a constant
+            # Denominator is a constant (no 'x')
             try:
-                const_val = float(denom_sympy)
-                if abs(const_val) < 1e-12:
-                    # Division by zero constant! e.g. x / 0
-                    cond = DomainCondition(
-                        raw_expression_str=denom_str,
-                        condition_str=f"{denom_str} != 0 (CONSTANT ZERO DIVISION)",
-                        excluded_values={sympy.S.Reals},
-                        source_description="constant_division_by_zero",
-                    )
-                    conditions.append(cond)
+                simplified_denom = sympy.simplify(denom_sympy)
             except Exception:
+                simplified_denom = denom_sympy
+
+            if simplified_denom == 0 or simplified_denom.is_zero is True:
+                # Division by zero constant! e.g. x / 0 or 1 / (2 - 2)
+                cond = DomainCondition(
+                    raw_expression_str=denom_str,
+                    condition_str=f"{denom_str} != 0 (CONSTANT ZERO DIVISION)",
+                    excluded_values=set(),
+                    source_description="constant_division_by_zero",
+                    is_empty_domain=True,
+                )
+                conditions.append(cond)
+            else:
+                # Non-zero constant denominator (e.g. x / 2): no exclusion on x
                 pass
 
     return OriginalDomain(conditions)

@@ -1,11 +1,36 @@
-"""Solution transfer auditor to prevent unsafe copying of solutions across problems."""
-
+from fractions import Fraction
 from typing import List, Set, Tuple
 import sympy
 
 from mke.models.enums import TransferValidity
 from mke.parsing.normalizer import NormalizedEquation
-from mke.parsing.sympy_converter import X_SYM
+from mke.parsing.parser import Parser
+from mke.parsing.sympy_converter import ast_to_sympy, X_SYM
+
+
+def safe_parse_candidate_root(r_raw: sympy.Basic | str | int | float | Fraction) -> sympy.Basic:
+    """Parse candidate root safely using exact constructors or safe AST parsing without sympify()."""
+    if isinstance(r_raw, sympy.Basic):
+        return r_raw
+    if isinstance(r_raw, int):
+        return sympy.Integer(r_raw)
+    if isinstance(r_raw, Fraction):
+        return sympy.Rational(r_raw.numerator, r_raw.denominator)
+    if isinstance(r_raw, float):
+        frac = Fraction(str(r_raw))
+        return sympy.Rational(frac.numerator, frac.denominator)
+    if isinstance(r_raw, str):
+        s = r_raw.strip()
+        try:
+            frac = Fraction(s)
+            return sympy.Rational(frac.numerator, frac.denominator)
+        except Exception:
+            pass
+        # Parse expression safely via Parser and ast_to_sympy (NO sympify, eval, or exec)
+        parser = Parser.from_text(s)
+        expr_ast = parser.parse_expression()
+        return ast_to_sympy(expr_ast)
+    raise TypeError(f"Unsupported candidate root type: {type(r_raw)}")
 
 
 def audit_solution_transfer(
@@ -22,7 +47,11 @@ def audit_solution_transfer(
     rejected_roots: List[str] = []
 
     for r_raw in source_candidate_roots:
-        sym_r = sympy.sympify(r_raw)
+        try:
+            sym_r = safe_parse_candidate_root(r_raw)
+        except Exception as e:
+            rejected_roots.append(f"Candidate root '{r_raw}' rejected: unsafe or unparseable ({e})")
+            continue
         # Check domain constraint of target problem
         if not target_norm_eq.domain.contains(sym_r):
             rejected_roots.append(

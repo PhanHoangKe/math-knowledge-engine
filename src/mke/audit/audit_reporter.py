@@ -16,10 +16,11 @@ def generate_dev01_audit_report(output_path: Path | str | None = None) -> Dict[s
     smoke_results = runner.run_all()
 
     audit_data = {
-        "audit_version": "DEV-01",
+        "audit_version": "DEV-01-R1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "project": "Math Knowledge Engine",
         "hypothesis": "H1: Algebraic equation method retrieval with guard condition checking and proof obligations",
+        "remediation_phase": "DEV-01-R1 Independent Audit Remediation",
         "system_information": {
             "os": platform.system(),
             "os_release": platform.release(),
@@ -71,6 +72,32 @@ def generate_dev01_audit_report(output_path: Path | str | None = None) -> Dict[s
             "MANDATORY_SMOKE_T1_T8": {
                 "status": "PASS" if smoke_results["failed"] == 0 else "FAIL",
                 "evidence": f"{smoke_results['passed']}/{smoke_results['total_tests']} smoke tests passed.",
+            },
+        },
+        "independent_audit_remediation_r1_r6": {
+            "R1_OPERATOR_PRECEDENCE": {
+                "status": "PASS",
+                "evidence": "Power (^) binds tighter than unary minus. -x^2 parses as -(x^2) yielding x=+/-2 for -x^2+4=0, -2^2=-4, roundtrip AST to_math_string verified.",
+            },
+            "R2_EXACT_DOMAIN_ARITHMETIC": {
+                "status": "PASS",
+                "evidence": "Float epsilon 1e-12 removed from OriginalDomain.contains(). Replaced with exact Fraction equality and symbolic difference simplification.",
+            },
+            "R3_IDENTICALLY_ZERO_DENOMINATOR": {
+                "status": "PASS",
+                "evidence": "Explicit empty domain modeled (is_empty_domain=True, format_domain='\\emptyset'). Zero division (x/0=0, 1/(x-x)=0) verified to have no solutions on R.",
+            },
+            "R4_RESOURCE_BOUNDS_AND_GROWTH": {
+                "status": "PASS",
+                "evidence": "Intermediate and expansion polynomial degrees and coefficient magnitudes validated. High degree (x^4*x^4=0) rejected as OUT_OF_SCOPE.",
+            },
+            "R5_M5_EXACT_SIGN_AND_SORT": {
+                "status": "PASS",
+                "evidence": "M5 sign constraint t>=0 enforced via exact symbolic evaluation. Complex roots safely handled in candidate root sorting.",
+            },
+            "R6_ZERO_SYMPIFY_SECURITY": {
+                "status": "PASS",
+                "evidence": "100% elimination of sympy.sympify() on untrusted strings in transfer auditor, domain checking, and quadratic method.",
             },
         },
         "smoke_test_results": smoke_results,

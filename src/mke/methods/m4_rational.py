@@ -108,7 +108,15 @@ class RationalEquationMethod(BaseMethod):
         rejected: List[dict] = []
         notes = [f"Roots of cleared numerator: {[str(r) for r in raw_roots]}"]
 
-        for r in sorted(list(raw_roots), key=lambda val: float(val.evalf())):
+        def _safe_sort_key(val: sympy.Basic):
+            try:
+                if val.is_real:
+                    return (0, float(val.evalf()))
+            except Exception:
+                pass
+            return (1, str(val))
+
+        for r in sorted(list(raw_roots), key=_safe_sort_key):
             if norm_eq.domain.contains(r):
                 valid_roots.append(r)
                 notes.append(f"Root x = {r} ACCEPTED (in domain {norm_eq.domain.format_domain()})")
@@ -174,7 +182,16 @@ class RationalEquationMethod(BaseMethod):
             )
 
         # 3. COMPLETENESS
-        if solve_output.is_identity_on_domain:
+        if norm_eq.domain.is_undetermined:
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.COMPLETENESS,
+                    status=ObligationStatus.UNRESOLVED,
+                    description="Completeness of rational equation solution set",
+                    evidence="Original domain is undetermined; cannot prove completeness on R.",
+                )
+            )
+        elif solve_output.is_identity_on_domain:
             obligations.append(
                 ProofObligation(
                     obligation_id=ObligationId.COMPLETENESS,

@@ -95,21 +95,36 @@ class Parser:
             self.current_depth -= 1
 
     def _parse_term(self) -> ASTNode:
-        node = self._parse_power()
+        node = self._parse_unary()
         while self._current_token().kind in (TokenKind.STAR, TokenKind.SLASH):
             op_tok = self._advance()
             op = op_tok.value
-            right = self._parse_power()
+            right = self._parse_unary()
             node = BinaryOpNode(op, node, right)
             self._increment_nodes()
         return node
 
+    def _parse_unary(self) -> ASTNode:
+        tok = self._current_token()
+        if tok.kind in (TokenKind.PLUS, TokenKind.MINUS):
+            self._advance()
+            operand = self._parse_unary()
+            self._increment_nodes()
+            return UnaryOpNode(tok.value, operand)
+        return self._parse_power()
+
     def _parse_power(self) -> ASTNode:
-        node = self._parse_unary()
+        node = self._parse_primary()
         if self._current_token().kind == TokenKind.CARET:
             op_tok = self._advance()
             # Right operand of exponentiation must be a non-negative integer within limits
             exp_node = self._parse_unary()
+            if isinstance(exp_node, UnaryOpNode) and exp_node.op == "-" and isinstance(exp_node.operand, NumberNode):
+                exp_int = -exp_node.operand.value.numerator
+                raise InvalidExponentError(
+                    f"Negative exponent '^{exp_int}' is not supported in polynomial scope. Use division '/' instead.",
+                    position=op_tok.position,
+                )
             # Validate exponent
             if not isinstance(exp_node, NumberNode) or exp_node.value.denominator != 1:
                 raise InvalidExponentError(
@@ -130,15 +145,6 @@ class Parser:
             node = BinaryOpNode("^", node, exp_node)
             self._increment_nodes()
         return node
-
-    def _parse_unary(self) -> ASTNode:
-        tok = self._current_token()
-        if tok.kind in (TokenKind.PLUS, TokenKind.MINUS):
-            self._advance()
-            operand = self._parse_unary()
-            self._increment_nodes()
-            return UnaryOpNode(tok.value, operand)
-        return self._parse_primary()
 
     def _parse_primary(self) -> ASTNode:
         tok = self._current_token()

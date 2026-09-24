@@ -128,7 +128,11 @@ class UnaryOpNode(ASTNode):
 
     def to_math_string(self) -> str:
         operand_str = self.operand.to_math_string()
-        if isinstance(self.operand, (BinaryOpNode, UnaryOpNode)):
+        if isinstance(self.operand, BinaryOpNode):
+            if self.operand.op in ("+", "-", "*", "/"):
+                return f"{self.op}({operand_str})"
+            return f"{self.op}{operand_str}"
+        if isinstance(self.operand, UnaryOpNode):
             return f"{self.op}({operand_str})"
         return f"{self.op}{operand_str}"
 
@@ -180,14 +184,22 @@ class BinaryOpNode(ASTNode):
         right_str = self.right.to_math_string()
 
         # Add parens for precedence if needed
+        # Left operand:
         if isinstance(self.left, BinaryOpNode) and self._precedence(self.left.op) < self._precedence(self.op):
             left_str = f"({left_str})"
+        elif isinstance(self.left, UnaryOpNode) and self.op == "^":
+            # Power binds tighter than unary minus/plus: (-x)^2 must be parenthesized
+            left_str = f"({left_str})"
+
+        # Right operand:
         if isinstance(self.right, BinaryOpNode):
             # For right operand, equal precedence in non-associative ops also needs parens
             if self._precedence(self.right.op) < self._precedence(self.op) or (
                 self.op in ("-", "/", "^") and self._precedence(self.right.op) <= self._precedence(self.op)
             ):
                 right_str = f"({right_str})"
+        elif isinstance(self.right, UnaryOpNode) and self.op in ("*", "/", "^"):
+            right_str = f"({right_str})"
 
         return f"{left_str} {self.op} {right_str}"
 

@@ -127,7 +127,15 @@ class FactorizationMethod(BaseMethod):
                 all_factors_solvable = False
                 notes.append(f"Factor ({factor_poly.as_expr()}) has degree {deg} > 2; cannot solve in DEV-01.")
 
-        sorted_roots = sorted(list(candidate_roots), key=lambda val: float(val.evalf()))
+        def _safe_sort_key(val: sympy.Basic):
+            try:
+                if val.is_real:
+                    return (0, float(val.evalf()))
+            except Exception:
+                pass
+            return (1, str(val))
+
+        sorted_roots = sorted(list(candidate_roots), key=_safe_sort_key)
         return MethodSolveOutput(
             method_id=self.method_id,
             candidate_roots=sorted_roots,
@@ -192,22 +200,27 @@ class FactorizationMethod(BaseMethod):
             )
 
         # 4. COMPLETENESS
-        if all_solvable:
+        if all_solvable and not norm_eq.domain.is_undetermined:
             obligations.append(
                 ProofObligation(
                     obligation_id=ObligationId.COMPLETENESS,
                     status=ObligationStatus.PASS,
                     description="Verify completeness of solutions obtained by factorization",
-                    evidence=f"All irreducible factors over Q have degree <= 2 and were fully solved.",
+                    evidence="All irreducible factors over Q have degree <= 2 and were fully solved.",
                 )
             )
         else:
+            evidence_msg = (
+                "At least one irreducible factor has degree > 2; cannot prove completeness on R."
+                if not all_solvable
+                else "Domain status is undetermined; cannot prove completeness."
+            )
             obligations.append(
                 ProofObligation(
                     obligation_id=ObligationId.COMPLETENESS,
                     status=ObligationStatus.UNRESOLVED,
                     description="Verify completeness of solutions obtained by factorization",
-                    evidence="At least one irreducible factor has degree > 2; cannot prove completeness on R.",
+                    evidence=evidence_msg,
                 )
             )
 

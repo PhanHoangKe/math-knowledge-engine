@@ -125,16 +125,33 @@ class BiquadraticSubstitutionMethod(BaseMethod):
         t_status: List[dict] = []
 
         for t_val in t_candidates:
-            # Check numerical sign of t
+            # Check sign of t symbolically without float epsilon
             is_non_negative = False
-            try:
-                t_float = float(sympy.N(t_val))
-                if t_float >= -1e-12:
-                    is_non_negative = True
-            except Exception:
-                pass
+            is_negative = False
+            is_undecidable = False
 
-            if is_non_negative:
+            if t_val.is_real is False:
+                is_negative = True
+            elif t_val.is_nonnegative is True or t_val == 0:
+                is_non_negative = True
+            elif t_val.is_negative is True:
+                is_negative = True
+            else:
+                try:
+                    s = sympy.sign(t_val)
+                    if s in (0, 1):
+                        is_non_negative = True
+                    elif s == -1:
+                        is_negative = True
+                    else:
+                        is_undecidable = True
+                except Exception:
+                    is_undecidable = True
+
+            if is_undecidable:
+                t_status.append({"t": str(t_val), "status": "UNDECIDABLE"})
+                notes.append(f"Root t = {t_val}: sign is UNDECIDABLE symbolically.")
+            elif is_non_negative:
                 t_status.append({"t": str(t_val), "status": "VALID_GE_0"})
                 notes.append(f"Root t = {t_val} >= 0: ACCEPTED for real x reconstruction.")
                 # x = +/- sqrt(t)
@@ -152,7 +169,16 @@ class BiquadraticSubstitutionMethod(BaseMethod):
                     "reason": "t < 0 has no real square roots on R",
                 })
 
-        sorted_roots = sorted(list(valid_x_roots), key=lambda val: float(val.evalf()))
+        def _safe_sort_key(val: sympy.Basic):
+            try:
+                if val.is_real:
+                    return (0, float(val.evalf()))
+            except Exception:
+                pass
+            return (1, str(val))
+
+        real_x_roots = {r for r in valid_x_roots if r.is_real is not False}
+        sorted_roots = sorted(list(real_x_roots), key=_safe_sort_key)
         params["t_roots"] = t_status
         params["reconstructed_x_roots"] = [str(r) for r in sorted_roots]
 
@@ -183,15 +209,27 @@ class BiquadraticSubstitutionMethod(BaseMethod):
         )
 
         # 2. SIGN_CONSTRAINT (Mandatory check for t = x^2 >= 0)
+        has_undecidable = any(item.get("status") == "UNDECIDABLE" for item in t_roots)
         rejected_count = sum(1 for item in t_roots if item.get("status") == "REJECTED_NEGATIVE")
-        obligations.append(
-            ProofObligation(
-                obligation_id=ObligationId.SIGN_CONSTRAINT,
-                status=ObligationStatus.PASS,
-                description="Enforce sign constraint t = x^2 >= 0 for real solutions",
-                evidence=f"Evaluated all roots of t-equation: {t_roots}. Correctly rejected {rejected_count} negative t root(s).",
+
+        if has_undecidable:
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.SIGN_CONSTRAINT,
+                    status=ObligationStatus.UNRESOLVED,
+                    description="Enforce sign constraint t = x^2 >= 0 for real solutions",
+                    evidence=f"Could not conclusively evaluate sign of at least one t root: {t_roots}.",
+                )
             )
-        )
+        else:
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.SIGN_CONSTRAINT,
+                    status=ObligationStatus.PASS,
+                    description="Enforce sign constraint t = x^2 >= 0 for real solutions",
+                    evidence=f"Evaluated all roots of t-equation: {t_roots}. Correctly rejected {rejected_count} negative t root(s).",
+                )
+            )
 
         # 3. ORIGINAL_DOMAIN and ROOT_SUBSTITUTION for recovered x roots
         for root in solve_output.candidate_roots:
@@ -217,13 +255,23 @@ class BiquadraticSubstitutionMethod(BaseMethod):
             )
 
         # 4. COMPLETENESS
-        obligations.append(
-            ProofObligation(
-                obligation_id=ObligationId.COMPLETENESS,
-                status=ObligationStatus.PASS,
-                description="Completeness of biquadratic substitution solutions",
-                evidence="Mapping x -> x^2 maps R onto [0, inf). Every real root of ax^4+bx^2+c=0 corresponds bijectively to a non-negative root of at^2+bt+c=0.",
+        if has_undecidable or norm_eq.domain.is_undetermined:
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.COMPLETENESS,
+                    status=ObligationStatus.UNRESOLVED,
+                    description="Completeness of biquadratic substitution solutions",
+                    evidence="Cannot prove completeness: sign constraint or domain status is unresolved.",
+                )
             )
-        )
+        else:
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.COMPLETENESS,
+                    status=ObligationStatus.PASS,
+                    description="Completeness of biquadratic substitution solutions",
+                    evidence="Mapping x -> x^2 maps R onto [0, inf). Every real root of ax^4+bx^2+c=0 corresponds bijectively to a non-negative root of at^2+bt+c=0.",
+                )
+            )
 
         return obligations

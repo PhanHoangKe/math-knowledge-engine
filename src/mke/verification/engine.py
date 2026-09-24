@@ -102,6 +102,36 @@ class VerificationEngine:
 
         domain = norm_eq.domain
 
+        # If domain is empty set (division by zero in original expression), equation has no real solutions
+        if domain.is_empty_domain:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str=domain.format_domain(),
+                is_all_reals_domain=False,
+                excluded_points=[],
+                normalization_trace=norm_eq.normalization_trace,
+                is_verified_method=True,
+                is_verified_solution=True,
+                solution_status=SolutionProofStatus.SOUND_AND_COMPLETE_IN_SCOPE,
+                verified_roots=[],
+                candidate_solutions=[],
+                proof_obligations=[
+                    ProofObligation(
+                        obligation_id=ObligationId.ORIGINAL_DOMAIN,
+                        status=ObligationStatus.PASS,
+                        description="Check whether original domain contains any real numbers",
+                        evidence="Domain is empty set (division by zero detected in expression).",
+                    ),
+                    ProofObligation(
+                        obligation_id=ObligationId.COMPLETENESS,
+                        status=ObligationStatus.PASS,
+                        description="Completeness of empty solution set on empty domain",
+                        evidence="Since the domain has no real points, the solution set is strictly empty on R.",
+                    ),
+                ],
+                explanation="Proven complete on domain: original domain is empty (division by zero in expression), hence no real solutions exist.",
+            )
+
         # Step 3: Select Method
         target_method_id = self._select_method(norm_eq, method_id)
         if target_method_id is None:
@@ -188,6 +218,8 @@ class VerificationEngine:
         has_unresolved_obligation = any(ob.status == ObligationStatus.UNRESOLVED for ob in obligations)
         completeness_ob = next((ob for ob in obligations if ob.obligation_id == ObligationId.COMPLETENESS), None)
         is_completeness_proven = completeness_ob is not None and completeness_ob.status == ObligationStatus.PASS
+        if domain.is_undetermined:
+            is_completeness_proven = False
 
         is_verified_method = True
         is_verified_solution = False

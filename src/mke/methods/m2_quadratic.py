@@ -183,30 +183,44 @@ class QuadraticFormulaMethod(BaseMethod):
                 )
             )
         else:
-            try:
-                delta_val = sympy.sympify(delta_str)
-                if delta_val < 0:
-                    evidence_text = f"Delta = {delta_str} < 0; proved by algebra that no real roots exist."
-                elif delta_val == 0:
-                    evidence_text = "Delta = 0; exactly one double root exists by algebraic completeness."
-                else:
-                    evidence_text = "Delta > 0; exactly two real roots exist by Fundamental Theorem of Algebra."
-                obligations.append(
-                    ProofObligation(
-                        obligation_id=ObligationId.COMPLETENESS,
-                        status=ObligationStatus.PASS,
-                        description="Completeness of quadratic formula solutions on R",
-                        evidence=evidence_text,
-                    )
-                )
-            except Exception:
+            a_sym = norm_eq.coefficients.get(2, sympy.Integer(0))
+            b_sym = norm_eq.coefficients.get(1, sympy.Integer(0))
+            c_sym = norm_eq.coefficients.get(0, sympy.Integer(0))
+            delta_val = sympy.simplify(b_sym**2 - 4 * a_sym * c_sym)
+
+            if norm_eq.domain.is_undetermined:
                 obligations.append(
                     ProofObligation(
                         obligation_id=ObligationId.COMPLETENESS,
                         status=ObligationStatus.UNRESOLVED,
                         description="Completeness of quadratic formula solutions on R",
-                        evidence=f"Could not conclusively evaluate sign of discriminant Delta={delta_str}",
+                        evidence="Domain status is undetermined; cannot prove completeness on R.",
                     )
                 )
+            else:
+                try:
+                    if delta_val < 0:
+                        evidence_text = f"Delta = {delta_val} < 0; proved by algebra that no real roots exist."
+                    elif delta_val == 0:
+                        evidence_text = "Delta = 0; exactly one double root exists by algebraic completeness."
+                    else:
+                        evidence_text = "Delta > 0; exactly two real roots exist by Fundamental Theorem of Algebra."
+                    obligations.append(
+                        ProofObligation(
+                            obligation_id=ObligationId.COMPLETENESS,
+                            status=ObligationStatus.PASS,
+                            description="Completeness of quadratic formula solutions on R",
+                            evidence=evidence_text,
+                        )
+                    )
+                except Exception:
+                    obligations.append(
+                        ProofObligation(
+                            obligation_id=ObligationId.COMPLETENESS,
+                            status=ObligationStatus.UNRESOLVED,
+                            description="Completeness of quadratic formula solutions on R",
+                            evidence=f"Could not conclusively evaluate sign of discriminant Delta={delta_val}",
+                        )
+                    )
 
         return obligations
