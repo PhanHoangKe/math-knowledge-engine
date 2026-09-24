@@ -2,6 +2,7 @@ from fractions import Fraction
 from typing import List, Set, Tuple
 import sympy
 
+from mke.models.domain import is_proven_real_number
 from mke.models.enums import TransferValidity
 from mke.parsing.normalizer import NormalizedEquation
 from mke.parsing.parser import Parser
@@ -51,6 +52,13 @@ def audit_solution_transfer(
             sym_r = safe_parse_candidate_root(r_raw)
         except Exception as e:
             rejected_roots.append(f"Candidate root '{r_raw}' rejected: unsafe or unparseable ({e})")
+            continue
+
+        # Check if candidate root is a proven real number (reject complex, symbols, etc.)
+        if not is_proven_real_number(sym_r):
+            rejected_roots.append(
+                f"Candidate root x = {sym_r} is not a valid real number on R (imaginary unit or free variable detected)"
+            )
             continue
         # Check domain constraint of target problem
         if not target_norm_eq.domain.contains(sym_r):

@@ -151,7 +151,7 @@ class Parser:
         if tok.kind == TokenKind.NUMBER:
             self._advance()
             self._increment_nodes()
-            return NumberNode(tok.number_value)
+            return NumberNode(tok.number_value, raw_literal=tok.value)
         elif tok.kind == TokenKind.VARIABLE:
             self._advance()
             self._increment_nodes()

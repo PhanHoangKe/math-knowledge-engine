@@ -4,6 +4,7 @@ from typing import List, Set
 import sympy
 
 from mke.methods.base import BaseMethod, MethodSolveOutput
+from mke.models.domain import is_proven_real_number, check_root_satisfaction
 from mke.models.enums import MethodAdmissibility, MethodId, ObligationId, ObligationStatus
 from mke.models.evidence import GuardResult, ProofObligation
 from mke.parsing.normalizer import NormalizedEquation
@@ -82,10 +83,14 @@ class RationalEquationMethod(BaseMethod):
         deg = numer_poly.degree()
         raw_roots: Set[sympy.Basic] = set()
 
+        is_exhaustive_enumeration = True
+        solveset_type = "PolynomialFormulas"
+
         if deg == 1:
             a = numer_poly.coeff_monomial((1,))
             b = numer_poly.coeff_monomial((0,))
             raw_roots.add(sympy.simplify(-b / a))
+            is_exhaustive_enumeration = True
         elif deg == 2:
             a = numer_poly.coeff_monomial((2,))
             b = numer_poly.coeff_monomial((1,))
@@ -96,12 +101,48 @@ class RationalEquationMethod(BaseMethod):
             elif delta > 0:
                 raw_roots.add(sympy.simplify((-b + sympy.sqrt(delta)) / (2 * a)))
                 raw_roots.add(sympy.simplify((-b - sympy.sqrt(delta)) / (2 * a)))
+            is_exhaustive_enumeration = True
         else:
             # General polynomial solve via solveset for degree <= 4
             sym_sol = sympy.solveset(sympy.Eq(numer_poly.as_expr(), 0), X_SYM, domain=sympy.S.Reals)
-            if isinstance(sym_sol, sympy.FiniteSet):
+            solveset_type = type(sym_sol).__name__
+
+            if sym_sol is sympy.EmptySet or sym_sol == sympy.EmptySet:
+                raw_roots = set()
+                is_exhaustive_enumeration = True
+            elif isinstance(sym_sol, sympy.FiniteSet):
+                raw_roots = set()
+                all_proven_real = True
                 for r in sym_sol:
-                    raw_roots.add(r)
+                    if is_proven_real_number(r):
+                        raw_roots.add(r)
+                    else:
+                        all_proven_real = False
+                is_exhaustive_enumeration = all_proven_real
+            elif isinstance(sym_sol, sympy.Intersection):
+                # Symbolic intersection with Reals, e.g. Intersection(Reals, FiniteSet(...))
+                raw_roots = set()
+                for arg in sym_sol.args:
+                    if isinstance(arg, sympy.FiniteSet):
+                        for r in arg:
+                            if is_proven_real_number(r):
+                                raw_roots.add(r)
+                # Unresolved intersection: SymPy could not symbolically prove exhaustive real simplification
+                is_exhaustive_enumeration = False
+            elif isinstance(sym_sol, sympy.Union):
+                raw_roots = set()
+                for arg in sym_sol.args:
+                    if isinstance(arg, sympy.FiniteSet):
+                        for r in arg:
+                            if is_proven_real_number(r):
+                                raw_roots.add(r)
+                is_exhaustive_enumeration = False
+            elif isinstance(sym_sol, (sympy.ConditionSet, sympy.ImageSet, sympy.ComplexRegion)):
+                raw_roots = set()
+                is_exhaustive_enumeration = False
+            else:
+                raw_roots = set()
+                is_exhaustive_enumeration = False
 
         # Filter roots by original domain
         valid_roots: List[sympy.Basic] = []
@@ -134,6 +175,8 @@ class RationalEquationMethod(BaseMethod):
                 "cleared_numerator": str(numer_poly.as_expr()),
                 "unfiltered_roots": [str(r) for r in raw_roots],
                 "extraneous_roots": [rj["root"] for rj in rejected],
+                "is_exhaustive_enumeration": is_exhaustive_enumeration,
+                "solveset_type": solveset_type,
             },
             notes=notes,
             rejected_intermediates=rejected,
@@ -170,8 +213,7 @@ class RationalEquationMethod(BaseMethod):
             )
 
             # Check substitution
-            sub_res = sympy.simplify(norm_eq.numerator_sym.subs(X_SYM, root))
-            sub_passes = bool(sub_res == 0)
+            sub_passes, sub_res = check_root_satisfaction(norm_eq.numerator_sym, root)
             obligations.append(
                 ProofObligation(
                     obligation_id=ObligationId.ROOT_SUBSTITUTION,
@@ -182,6 +224,7 @@ class RationalEquationMethod(BaseMethod):
             )
 
         # 3. COMPLETENESS
+        is_exhaustive = solve_output.parameters.get("is_exhaustive_enumeration", True)
         if norm_eq.domain.is_undetermined:
             obligations.append(
                 ProofObligation(
@@ -189,6 +232,16 @@ class RationalEquationMethod(BaseMethod):
                     status=ObligationStatus.UNRESOLVED,
                     description="Completeness of rational equation solution set",
                     evidence="Original domain is undetermined; cannot prove completeness on R.",
+                )
+            )
+        elif not is_exhaustive:
+            solveset_type = solve_output.parameters.get("solveset_type", "Unknown")
+            obligations.append(
+                ProofObligation(
+                    obligation_id=ObligationId.COMPLETENESS,
+                    status=ObligationStatus.UNRESOLVED,
+                    description="Completeness of rational equation solution set",
+                    evidence=f"Polynomial solver returned symbolic representation '{solveset_type}' which could not be exhaustively proven complete over R. Found candidate roots may be incomplete.",
                 )
             )
         elif solve_output.is_identity_on_domain:

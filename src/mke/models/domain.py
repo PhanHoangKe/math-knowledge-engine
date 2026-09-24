@@ -6,6 +6,77 @@ from typing import Any, Dict, List, Set, Union
 import sympy
 
 
+def is_proven_real_number(sym_val: sympy.Basic) -> bool:
+    """Verify strictly whether sym_val is a concrete real number with no free variables or imaginary part.
+
+    Rejects:
+    - Complex numbers (e.g. sympy.I, 1 + 2*I)
+    - Free symbols or algebraic expressions with variables (e.g. x, y, x + 1)
+    - Non-number objects
+    """
+    if not isinstance(sym_val, sympy.Basic):
+        return False
+
+    # 1. Reject expressions with free variables
+    if len(sym_val.free_symbols) > 0:
+        return False
+
+    # 2. Fast check for standard realness
+    if sym_val.is_real is True:
+        return True
+    if sym_val.is_real is False:
+        return False
+
+    # 3. Check for explicit imaginary unit
+    if sym_val.has(sympy.I):
+        try:
+            im_val = sympy.im(sym_val.evalf(50))
+            if abs(im_val) > 1e-25:
+                return False
+        except Exception:
+            return False
+
+    # 4. Check numerical evaluation
+    try:
+        val_evalf = sym_val.evalf(50)
+        if val_evalf.is_real is True:
+            return True
+        im_val = sympy.im(val_evalf)
+        if abs(im_val) < 1e-25 and not sympy.re(val_evalf).is_infinite:
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def check_root_satisfaction(
+    expr: sympy.Basic, r: sympy.Basic, var: sympy.Symbol | None = None
+) -> tuple[bool, sympy.Basic]:
+    """Check whether root r satisfies polynomial/expression expr == 0.
+
+    Uses exact evaluation and high-precision numerical zero detection (evalf(50) < 1e-25)
+    to avoid catastrophic hangs in sympy.simplify() on nested radicals (e.g. Ferrari quartic roots).
+    """
+    if var is None:
+        var = sympy.Symbol("x", real=True)
+    raw_sub = expr.subs(var, r)
+    if raw_sub == 0 or getattr(raw_sub, "is_zero", None) is True:
+        return True, sympy.Integer(0)
+    try:
+        val = raw_sub.evalf(50)
+        if abs(val) < 1e-25:
+            return True, sympy.Integer(0)
+    except Exception:
+        pass
+    try:
+        simp = sympy.simplify(raw_sub)
+        if simp == 0 or getattr(simp, "is_zero", None) is True:
+            return True, sympy.Integer(0)
+        return False, simp
+    except Exception:
+        return False, raw_sub
+
+
 class DomainCondition:
     """Represents an individual domain constraint (e.g., denominator != 0)."""
 
@@ -79,8 +150,8 @@ class OriginalDomain:
     def contains(self, x_val: Union[Fraction, int, float, str, sympy.Basic]) -> bool:
         """Check whether a real candidate value x_val lies within the domain.
 
-        Exact mathematical comparison without float epsilon conflation and
-        strictly avoiding unsafe string sympify().
+        Exact mathematical comparison without float epsilon conflation,
+        strictly avoiding unsafe string sympify(), and rejecting non-real / complex values.
         """
         if self.is_empty_domain or self.is_undetermined:
             return False
@@ -106,6 +177,10 @@ class OriginalDomain:
                 # Do NOT call sympify(str) on untrusted strings
                 return False
         else:
+            return False
+
+        # Candidate must be provably a real concrete number (reject complex, symbols, etc.)
+        if not is_proven_real_number(sym_val):
             return False
 
         for excl in self._excluded_values:

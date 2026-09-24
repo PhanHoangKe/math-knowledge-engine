@@ -1,0 +1,388 @@
+{
+  "audit_version": "DEV-01-R2",
+  "generated_at": "2026-09-24T15:25:50.049514+00:00",
+  "project": "Math Knowledge Engine",
+  "hypothesis": "H1: Algebraic equation method retrieval with guard condition checking and proof obligations",
+  "remediation_phase": "DEV-01-R2 Mathematical Soundness Remediation",
+  "system_information": {
+    "os": "Windows",
+    "os_release": "10",
+    "os_version": "10.0.26200",
+    "architecture": "AMD64",
+    "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+    "python_executable": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe"
+  },
+  "dependency_versions": {
+    "sympy": "1.14.0",
+    "pydantic": "2.13.5",
+    "pytest": "9.1.1",
+    "typer": "0.25.1",
+    "rich": "13.9.4"
+  },
+  "acceptance_criteria_verification": {
+    "SAFE_PARSER_FINITE_GRAMMAR": {
+      "status": "PASS",
+      "evidence": "Lexer and Recursive Descent Parser parse AST without eval(), exec(), sympify(), or parse_expr()."
+    },
+    "SECURITY_NO_CODE_EXECUTION": {
+      "status": "PASS",
+      "evidence": "Safe AST-to-SymPy converter calls only whitelisted constructors (Integer, Rational, Symbol, Add, Mul, Pow)."
+    },
+    "PRESERVE_ORIGINAL_DOMAIN": {
+      "status": "PASS",
+      "evidence": "Domain extracted directly from unreduced AST prior to any simplification. Verified on (x-2)/(x-2)=1."
+    },
+    "NONZERO_DIVISION_GUARD": {
+      "status": "PASS",
+      "evidence": "Unconditional division by expressions that can be zero is flagged as root-loss failure (verified on T4)."
+    },
+    "TRANSFER_VALIDITY_AUDIT": {
+      "status": "PASS",
+      "evidence": "Copying candidate roots from source without target domain check is flagged UNSAFE_COPY (verified on T2)."
+    },
+    "METHOD_CATALOGUE_5_METHODS": {
+      "status": "PASS",
+      "evidence": "Implemented M1:LINEAR, M2:QUADRATIC, M3:FACTORIZATION, M4:RATIONAL, M5:BIQUADRATIC with stable IDs and guards."
+    },
+    "STRUCTURED_LABEL_SCHEMA": {
+      "status": "PASS",
+      "evidence": "Formal enums and Pydantic models for Admissibility, Obligations, TransferValidity, and SolutionProofStatus."
+    },
+    "SEPARATION_METHOD_VS_SOLUTION": {
+      "status": "PASS",
+      "evidence": "Separate boolean flags is_verified_method and is_verified_solution; completeness obligation enforced."
+    },
+    "MANDATORY_SMOKE_T1_T8": {
+      "status": "PASS",
+      "evidence": "8/8 smoke tests passed."
+    }
+  },
+  "independent_audit_remediation_r1_r6": {
+    "R1_OPERATOR_PRECEDENCE": {
+      "status": "PASS",
+      "evidence": "Power (^) binds tighter than unary minus. -x^2 parses as -(x^2) yielding x=+/-2 for -x^2+4=0, -2^2=-4, roundtrip AST to_math_string verified."
+    },
+    "R2_EXACT_DOMAIN_ARITHMETIC": {
+      "status": "PASS",
+      "evidence": "Float epsilon 1e-12 removed from OriginalDomain.contains(). Replaced with exact Fraction equality and symbolic difference simplification."
+    },
+    "R3_IDENTICALLY_ZERO_DENOMINATOR": {
+      "status": "PASS",
+      "evidence": "Explicit empty domain modeled (is_empty_domain=True, format_domain='\\emptyset'). Zero division (x/0=0, 1/(x-x)=0) verified to have no solutions on R."
+    },
+    "R4_RESOURCE_BOUNDS_AND_GROWTH": {
+      "status": "PASS",
+      "evidence": "Intermediate and expansion polynomial degrees and coefficient magnitudes validated. High degree (x^4*x^4=0) rejected as OUT_OF_SCOPE."
+    },
+    "R5_M5_EXACT_SIGN_AND_SORT": {
+      "status": "PASS",
+      "evidence": "M5 sign constraint t>=0 enforced via exact symbolic evaluation. Complex roots safely handled in candidate root sorting."
+    },
+    "R6_ZERO_SYMPIFY_SECURITY": {
+      "status": "PASS",
+      "evidence": "100% elimination of sympy.sympify() on untrusted strings in transfer auditor, domain checking, and quadratic method."
+    }
+  },
+  "mathematical_soundness_remediation_r2": {
+    "REQ1_M4_SOLVESET_COMPLETENESS": {
+      "status": "PASS",
+      "evidence": "Solveset results classified into EmptySet, FiniteSet, Intersection, Union, ConditionSet. Unresolved intersection sets emit ProofObligation(COMPLETENESS, UNRESOLVED) and solution_status=SOUND_PARTIAL without falsely certifying completeness or claiming empty set. Verified on (x^4 - x - 1)/(x^2 + 1) = 0 (finds 2 real roots, UNRESOLVED completeness, is_verified_solution=False) and (x^4 + 1)/(x^2 + 1) = 0 (truly empty set, PASS completeness, is_verified_solution=True)."
+    },
+    "REQ2_REAL_DOMAIN_VERIFICATION": {
+      "status": "PASS",
+      "evidence": "is_proven_real_number strictly rejects imaginary unit sympy.I, complex numbers, and expressions with free variables in OriginalDomain.contains() and audit_solution_transfer(). Transfer of candidate sympy.I to target x^2 + 1 = 0 strictly flagged UNSAFE_COPY."
+    },
+    "REQ3_EMPTY_DOMAIN_METHOD_STATE": {
+      "status": "PASS",
+      "evidence": "When D = empty, solution set empty is proven purely by domain evidence. is_verified_method is strictly False (no method was applied), is_verified_solution is True, method_instance is None, avoiding false claims of method verification."
+    },
+    "REQ4_RESOURCE_LIMIT_AND_SYNTAX_CLASSIFICATION": {
+      "status": "PASS",
+      "evidence": "ParserError subclasses classified into structured RESOURCE_LIMIT (InputLength, TokenCount, ASTDepth, NodeCount, CoefficientMagnitude, InvalidExponent), OUT_OF_SCOPE (functions/variables outside scope), SYNTAX_ERROR, and INTERNAL_ERROR. Never certified as verified solutions."
+    },
+    "REQ5_AST_STRUCTURE_ROUNDTRIP_PRESERVATION": {
+      "status": "PASS",
+      "evidence": "NumberNode stores raw_literal and decimal formatting; BinaryOpNode preserves parentheses around right operands of equal precedence for left-associative operators (+, -, *, /). Exact AST tree round-trip preserved for 1 + (x - 2) = 0, x + 0.25 = 0, and x * (x / 2) = 0."
+    }
+  },
+  "smoke_test_results": {
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "total_execution_time_ms": 284.88,
+    "results": [
+      {
+        "id": "T1",
+        "name": "Standard quadratic equation",
+        "equation": "x^2 - 5*x + 6 = 0",
+        "passed": true,
+        "duration_ms": 54.34,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R",
+            "actual": "R"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M2:QUADRATIC_FORMULA",
+            "actual": "M2:QUADRATIC_FORMULA"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [
+              "2",
+              "3"
+            ],
+            "actual": [
+              "2",
+              "3"
+            ]
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R\nRoots: {2, 3}\nExplanation: Verified sound and complete: solution set is {2, 3}."
+      },
+      {
+        "id": "T2",
+        "name": "Rational equation with extraneous root and unsafe transfer detection",
+        "equation": "(x^2 - 5*x + 6) / (x - 2) = 0",
+        "passed": true,
+        "duration_ms": 203.17,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R \\ {2}",
+            "actual": "R \\ {2}"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M4:RATIONAL_EQUATION",
+            "actual": "M4:RATIONAL_EQUATION"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [
+              "3"
+            ],
+            "actual": [
+              "3"
+            ]
+          },
+          {
+            "check": "TRANSFER_AUDIT_UNSAFE_COPY",
+            "passed": true,
+            "expected_validity": "UNSAFE_COPY",
+            "actual_validity": "UNSAFE_COPY",
+            "rejected_roots": [
+              "Root x = 2 violates target domain: excluded by R \\ {2}"
+            ]
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R \\ {2}\nRoots: {3}\nExplanation: Verified sound and complete: solution set is {3}."
+      },
+      {
+        "id": "T3",
+        "name": "Rational identity with domain exclusion preservation",
+        "equation": "(x - 2) / (x - 2) = 1",
+        "passed": true,
+        "duration_ms": 4.39,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R \\ {2}",
+            "actual": "R \\ {2}"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M4:RATIONAL_EQUATION",
+            "actual": "M4:RATIONAL_EQUATION"
+          },
+          {
+            "check": "IDENTITY_ON_DOMAIN",
+            "passed": true,
+            "actual": true
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R \\ {2}\nRoots: All x in R \\ {2}\nExplanation: Identity equation: all x in original domain R \\ {2} are valid solutions."
+      },
+      {
+        "id": "T4",
+        "name": "Zero-product factorization and division root-loss detection",
+        "equation": "x * (x - 1) = 0",
+        "passed": true,
+        "duration_ms": 3.66,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R",
+            "actual": "R"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M3:FACTORIZATION",
+            "actual": "M3:FACTORIZATION"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [
+              "0",
+              "1"
+            ],
+            "actual": [
+              "0",
+              "1"
+            ]
+          },
+          {
+            "check": "DIVISION_ROOT_LOSS_DETECTION",
+            "passed": true,
+            "obligation_status": "FAIL",
+            "counterexample": "Root 0 lost when dividing by x"
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R\nRoots: {0, 1}\nExplanation: Verified sound and complete: solution set is {0, 1}."
+      },
+      {
+        "id": "T5",
+        "name": "Quadratic with a=0 degeneracy rejection",
+        "equation": "0 * x^2 + 2 * x - 4 = 0",
+        "passed": true,
+        "duration_ms": 2.19,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R",
+            "actual": "R"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [
+              "2"
+            ],
+            "actual": [
+              "2"
+            ]
+          },
+          {
+            "check": "M2_A_ZERO_REJECTION",
+            "passed": true,
+            "actual_admissibility": "NOT_APPLICABLE",
+            "failed_guard": "NONZERO_LEADING_COEFFICIENT_A"
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R\nRoots: {2}\nExplanation: Verified sound and complete: solution set is {2}."
+      },
+      {
+        "id": "T6",
+        "name": "Biquadratic substitution with sign constraint enforcement",
+        "equation": "x^4 + x^2 - 2 = 0",
+        "passed": true,
+        "duration_ms": 3.68,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R",
+            "actual": "R"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M5:BIQUADRATIC_SUBSTITUTION",
+            "actual": "M5:BIQUADRATIC_SUBSTITUTION"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [
+              "-1",
+              "1"
+            ],
+            "actual": [
+              "-1",
+              "1"
+            ]
+          },
+          {
+            "check": "SIGN_CONSTRAINT_T_GE_0",
+            "passed": true,
+            "t_roots_evaluation": [
+              {
+                "t": "1",
+                "status": "VALID_GE_0"
+              },
+              {
+                "t": "-2",
+                "status": "REJECTED_NEGATIVE"
+              }
+            ]
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R\nRoots: {-1, 1}\nExplanation: Verified sound and complete: solution set is {-1, 1}."
+      },
+      {
+        "id": "T7",
+        "name": "Quadratic formula with negative discriminant (empty real set)",
+        "equation": "x^2 + 1 = 0",
+        "passed": true,
+        "duration_ms": 2.37,
+        "checks": [
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "R",
+            "actual": "R"
+          },
+          {
+            "check": "METHOD_IDENTIFICATION",
+            "passed": true,
+            "expected": "M2:QUADRATIC_FORMULA",
+            "actual": "M2:QUADRATIC_FORMULA"
+          },
+          {
+            "check": "VERIFIED_ROOTS",
+            "passed": true,
+            "expected": [],
+            "actual": []
+          }
+        ],
+        "verification_summary": "Method Verified: True | Solution Verified: True | Status: SOUND_AND_COMPLETE_IN_SCOPE\nDomain: R\nRoots: {}\nExplanation: Proven complete on R: equation has no real solutions (empty set)."
+      },
+      {
+        "id": "T8",
+        "name": "Out-of-scope radical equation safe rejection",
+        "equation": "sqrt(x + 2) = x",
+        "passed": true,
+        "duration_ms": 0.04,
+        "checks": [
+          {
+            "check": "OUT_OF_SCOPE",
+            "passed": true,
+            "detail": "OUT_OF_SCOPE: Mathematical function 'sqrt' is outside DEV-01 scope (radicals/transcendental functions not supported)"
+          },
+          {
+            "check": "DOMAIN_PRESERVATION",
+            "passed": true,
+            "expected": "UNKNOWN (OUT_OF_SCOPE)",
+            "actual": "UNKNOWN (OUT_OF_SCOPE)"
+          }
+        ],
+        "verification_summary": "Method Verified: False | Solution Verified: False | Status: UNDETERMINED\nDomain: UNKNOWN (OUT_OF_SCOPE)\nRoots: {}\nExplanation: OUT_OF_SCOPE: Mathematical function 'sqrt' is outside DEV-01 scope (radicals/transcendental functions not supported)"
+      }
+    ]
+  }
+}

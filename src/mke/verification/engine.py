@@ -12,6 +12,7 @@ from mke.models.enums import (
     SolutionProofStatus,
     Split,
 )
+from mke.models.domain import is_proven_real_number, check_root_satisfaction
 from mke.models.evidence import (
     MethodInstance,
     ProofObligation,
@@ -20,13 +21,29 @@ from mke.models.evidence import (
 )
 from mke.models.problem import ProblemRecord
 from mke.parsing.exceptions import (
+    ASTDepthExceededError,
+    CoefficientMagnitudeError,
+    InputLengthExceededError,
+    InvalidExponentError,
+    InvalidSyntaxError,
+    NodeCountExceededError,
     OutOfScopeSyntaxError,
     ParserError,
+    TokenCountExceededError,
 )
 from mke.parsing.limits import ParserLimits, DEFAULT_LIMITS
 from mke.parsing.normalizer import NormalizedEquation, normalize_equation
 from mke.parsing.parser import Parser
 from mke.parsing.sympy_converter import X_SYM
+
+RESOURCE_LIMIT_ERRORS = (
+    InputLengthExceededError,
+    TokenCountExceededError,
+    ASTDepthExceededError,
+    NodeCountExceededError,
+    CoefficientMagnitudeError,
+    InvalidExponentError,
+)
 
 
 class VerificationEngine:
@@ -45,6 +62,16 @@ class VerificationEngine:
         try:
             parser = Parser.from_text(equation_str, limits=self.limits)
             eq_ast = parser.parse_equation()
+        except RESOURCE_LIMIT_ERRORS as e:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str="UNKNOWN (RESOURCE_LIMIT)",
+                is_all_reals_domain=False,
+                is_verified_method=False,
+                is_verified_solution=False,
+                solution_status=SolutionProofStatus.UNDETERMINED,
+                explanation=f"RESOURCE_LIMIT: {e.__class__.__name__}: {e.message}",
+            )
         except OutOfScopeSyntaxError as e:
             return VerificationResult(
                 problem_raw=equation_str,
@@ -54,6 +81,16 @@ class VerificationEngine:
                 is_verified_solution=False,
                 solution_status=SolutionProofStatus.UNDETERMINED,
                 explanation=f"OUT_OF_SCOPE: {e.message}",
+            )
+        except InvalidSyntaxError as e:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str="UNKNOWN (SYNTAX_ERROR)",
+                is_all_reals_domain=False,
+                is_verified_method=False,
+                is_verified_solution=False,
+                solution_status=SolutionProofStatus.UNDETERMINED,
+                explanation=f"SYNTAX_ERROR: {e.message}",
             )
         except ParserError as e:
             return VerificationResult(
@@ -63,22 +100,32 @@ class VerificationEngine:
                 is_verified_method=False,
                 is_verified_solution=False,
                 solution_status=SolutionProofStatus.UNDETERMINED,
-                explanation=f"SYNTAX_OR_LIMIT_ERROR: {e.message}",
+                explanation=f"PARSER_ERROR: {e.message}",
             )
         except Exception as e:
             return VerificationResult(
                 problem_raw=equation_str,
-                domain_str="UNKNOWN",
+                domain_str="UNKNOWN (INTERNAL_ERROR)",
                 is_all_reals_domain=False,
                 is_verified_method=False,
                 is_verified_solution=False,
                 solution_status=SolutionProofStatus.UNDETERMINED,
-                explanation=f"INTERNAL_PARSER_ERROR: {type(e).__name__}: {str(e)}",
+                explanation=f"INTERNAL_ERROR: {type(e).__name__}: {str(e)}",
             )
 
         # Step 2: Normalization and Domain Extraction
         try:
             norm_eq = normalize_equation(eq_ast, raw_text=equation_str, limits=self.limits)
+        except RESOURCE_LIMIT_ERRORS as e:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str="UNKNOWN (RESOURCE_LIMIT)",
+                is_all_reals_domain=False,
+                is_verified_method=False,
+                is_verified_solution=False,
+                solution_status=SolutionProofStatus.UNDETERMINED,
+                explanation=f"RESOURCE_LIMIT: {e.__class__.__name__}: {e.message}",
+            )
         except OutOfScopeSyntaxError as e:
             return VerificationResult(
                 problem_raw=equation_str,
@@ -89,15 +136,35 @@ class VerificationEngine:
                 solution_status=SolutionProofStatus.UNDETERMINED,
                 explanation=f"OUT_OF_SCOPE: {e.message}",
             )
-        except Exception as e:
+        except InvalidSyntaxError as e:
             return VerificationResult(
                 problem_raw=equation_str,
-                domain_str="UNKNOWN",
+                domain_str="UNKNOWN (SYNTAX_ERROR)",
                 is_all_reals_domain=False,
                 is_verified_method=False,
                 is_verified_solution=False,
                 solution_status=SolutionProofStatus.UNDETERMINED,
-                explanation=f"NORMALIZATION_ERROR: {str(e)}",
+                explanation=f"SYNTAX_ERROR: {e.message}",
+            )
+        except ParserError as e:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str="UNKNOWN (PARSER_ERROR)",
+                is_all_reals_domain=False,
+                is_verified_method=False,
+                is_verified_solution=False,
+                solution_status=SolutionProofStatus.UNDETERMINED,
+                explanation=f"PARSER_ERROR: {e.message}",
+            )
+        except Exception as e:
+            return VerificationResult(
+                problem_raw=equation_str,
+                domain_str="UNKNOWN (INTERNAL_ERROR)",
+                is_all_reals_domain=False,
+                is_verified_method=False,
+                is_verified_solution=False,
+                solution_status=SolutionProofStatus.UNDETERMINED,
+                explanation=f"INTERNAL_ERROR: {type(e).__name__}: {str(e)}",
             )
 
         domain = norm_eq.domain
@@ -110,12 +177,12 @@ class VerificationEngine:
                 is_all_reals_domain=False,
                 excluded_points=[],
                 normalization_trace=norm_eq.normalization_trace,
-                is_verified_method=True,
+                is_verified_method=False,
                 is_verified_solution=True,
                 solution_status=SolutionProofStatus.SOUND_AND_COMPLETE_IN_SCOPE,
                 verified_roots=[],
                 candidate_solutions=[],
-                proof_obligations=[
+                obligations=[
                     ProofObligation(
                         obligation_id=ObligationId.ORIGINAL_DOMAIN,
                         status=ObligationStatus.PASS,
@@ -129,7 +196,7 @@ class VerificationEngine:
                         evidence="Since the domain has no real points, the solution set is strictly empty on R.",
                     ),
                 ],
-                explanation="Proven complete on domain: original domain is empty (division by zero in expression), hence no real solutions exist.",
+                explanation="Proven complete on domain: original domain is empty (division by zero detected in expression). Solution set is proven empty purely by domain evidence without applying any equation solving method.",
             )
 
         # Step 3: Select Method
@@ -194,8 +261,7 @@ class VerificationEngine:
 
         for r in solve_output.candidate_roots:
             in_dom = domain.contains(r)
-            sub_res = sympy.simplify(norm_eq.numerator_sym.subs(X_SYM, r))
-            sat_eq = bool(sub_res == 0)
+            sat_eq, sub_res = check_root_satisfaction(norm_eq.numerator_sym, r)
             is_valid = in_dom and sat_eq
 
             if is_valid:

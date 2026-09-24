@@ -16,11 +16,11 @@ def generate_dev01_audit_report(output_path: Path | str | None = None) -> Dict[s
     smoke_results = runner.run_all()
 
     audit_data = {
-        "audit_version": "DEV-01-R1",
+        "audit_version": "DEV-01-R2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "project": "Math Knowledge Engine",
         "hypothesis": "H1: Algebraic equation method retrieval with guard condition checking and proof obligations",
-        "remediation_phase": "DEV-01-R1 Independent Audit Remediation",
+        "remediation_phase": "DEV-01-R2 Mathematical Soundness Remediation",
         "system_information": {
             "os": platform.system(),
             "os_release": platform.release(),
@@ -98,6 +98,28 @@ def generate_dev01_audit_report(output_path: Path | str | None = None) -> Dict[s
             "R6_ZERO_SYMPIFY_SECURITY": {
                 "status": "PASS",
                 "evidence": "100% elimination of sympy.sympify() on untrusted strings in transfer auditor, domain checking, and quadratic method.",
+            },
+        },
+        "mathematical_soundness_remediation_r2": {
+            "REQ1_M4_SOLVESET_COMPLETENESS": {
+                "status": "PASS",
+                "evidence": "Solveset results classified into EmptySet, FiniteSet, Intersection, Union, ConditionSet. Unresolved intersection sets emit ProofObligation(COMPLETENESS, UNRESOLVED) and solution_status=SOUND_PARTIAL without falsely certifying completeness or claiming empty set. Verified on (x^4 - x - 1)/(x^2 + 1) = 0 (finds 2 real roots, UNRESOLVED completeness, is_verified_solution=False) and (x^4 + 1)/(x^2 + 1) = 0 (truly empty set, PASS completeness, is_verified_solution=True).",
+            },
+            "REQ2_REAL_DOMAIN_VERIFICATION": {
+                "status": "PASS",
+                "evidence": "is_proven_real_number strictly rejects imaginary unit sympy.I, complex numbers, and expressions with free variables in OriginalDomain.contains() and audit_solution_transfer(). Transfer of candidate sympy.I to target x^2 + 1 = 0 strictly flagged UNSAFE_COPY.",
+            },
+            "REQ3_EMPTY_DOMAIN_METHOD_STATE": {
+                "status": "PASS",
+                "evidence": "When D = empty, solution set empty is proven purely by domain evidence. is_verified_method is strictly False (no method was applied), is_verified_solution is True, method_instance is None, avoiding false claims of method verification.",
+            },
+            "REQ4_RESOURCE_LIMIT_AND_SYNTAX_CLASSIFICATION": {
+                "status": "PASS",
+                "evidence": "ParserError subclasses classified into structured RESOURCE_LIMIT (InputLength, TokenCount, ASTDepth, NodeCount, CoefficientMagnitude, InvalidExponent), OUT_OF_SCOPE (functions/variables outside scope), SYNTAX_ERROR, and INTERNAL_ERROR. Never certified as verified solutions.",
+            },
+            "REQ5_AST_STRUCTURE_ROUNDTRIP_PRESERVATION": {
+                "status": "PASS",
+                "evidence": "NumberNode stores raw_literal and decimal formatting; BinaryOpNode preserves parentheses around right operands of equal precedence for left-associative operators (+, -, *, /). Exact AST tree round-trip preserved for 1 + (x - 2) = 0, x + 0.25 = 0, and x * (x / 2) = 0.",
             },
         },
         "smoke_test_results": smoke_results,

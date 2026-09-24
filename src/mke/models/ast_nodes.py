@@ -41,13 +41,14 @@ class ASTNode(ABC):
 class NumberNode(ASTNode):
     """Represents an exact rational or integer constant."""
 
-    def __init__(self, value: Fraction | int):
+    def __init__(self, value: Fraction | int, raw_literal: str | None = None):
         if isinstance(value, int):
             self.value = Fraction(value, 1)
         elif isinstance(value, Fraction):
             self.value = value
         else:
             raise TypeError(f"NumberNode expects Fraction or int, got {type(value)}")
+        self.raw_literal = raw_literal
 
     def depth(self) -> int:
         return 1
@@ -60,12 +61,28 @@ class NumberNode(ASTNode):
             "type": "Number",
             "numerator": self.value.numerator,
             "denominator": self.value.denominator,
+            "raw_literal": self.raw_literal,
         }
 
     def to_math_string(self) -> str:
+        if self.raw_literal is not None:
+            return self.raw_literal
         if self.value.denominator == 1:
             return str(self.value.numerator)
+        # Check if terminating decimal
+        d = self.value.denominator
+        while d % 2 == 0:
+            d //= 2
+        while d % 5 == 0:
+            d //= 5
+        if d == 1:
+            from decimal import Decimal
+            dec = Decimal(self.value.numerator) / Decimal(self.value.denominator)
+            return str(dec)
         return f"{self.value.numerator}/{self.value.denominator}"
+
+    def to_display_string(self) -> str:
+        return self.to_math_string()
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, NumberNode) and self.value == other.value
@@ -92,6 +109,9 @@ class VariableNode(ASTNode):
         return {"type": "Variable", "name": self.name}
 
     def to_math_string(self) -> str:
+        return self.name
+
+    def to_display_string(self) -> str:
         return self.name
 
     def collect_variables(self) -> Set[str]:
@@ -135,6 +155,9 @@ class UnaryOpNode(ASTNode):
         if isinstance(self.operand, UnaryOpNode):
             return f"{self.op}({operand_str})"
         return f"{self.op}{operand_str}"
+
+    def to_display_string(self) -> str:
+        return self.to_math_string()
 
     def collect_divisions(self) -> List[BinaryOpNode]:
         return self.operand.collect_divisions()
@@ -193,15 +216,17 @@ class BinaryOpNode(ASTNode):
 
         # Right operand:
         if isinstance(self.right, BinaryOpNode):
-            # For right operand, equal precedence in non-associative ops also needs parens
-            if self._precedence(self.right.op) < self._precedence(self.op) or (
-                self.op in ("-", "/", "^") and self._precedence(self.right.op) <= self._precedence(self.op)
-            ):
+            # Equal or lower precedence on the right side always needs parentheses
+            # to preserve exact AST tree structure due to left-associativity.
+            if self._precedence(self.right.op) <= self._precedence(self.op):
                 right_str = f"({right_str})"
         elif isinstance(self.right, UnaryOpNode) and self.op in ("*", "/", "^"):
             right_str = f"({right_str})"
 
         return f"{left_str} {self.op} {right_str}"
+
+    def to_display_string(self) -> str:
+        return self.to_math_string()
 
     @staticmethod
     def _precedence(op: str) -> int:
