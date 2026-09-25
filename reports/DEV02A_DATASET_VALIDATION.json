@@ -1,0 +1,13 @@
+{
+  "is_valid": true,
+  "total_errors": 0,
+  "total_warnings": 0,
+  "issues": [],
+  "stats": {
+    "methods_count": 5,
+    "families_count": 15,
+    "problems_count": 41,
+    "annotations_count": 43,
+    "transfer_pairs_count": 4
+  }
+}
