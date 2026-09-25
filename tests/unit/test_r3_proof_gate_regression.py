@@ -175,3 +175,81 @@ def test_r3_s1_f4_negative_algebraic_number_numerical_observation_unresolved():
     assert cert.status == ExactVerificationStatus.UNRESOLVED
     assert cert.method == "NUMERICAL_OBSERVATION_UNRESOLVED"
     assert cert.is_exact_pass is False
+
+
+def test_r3_s2_f5_inexact_sympy_float_rejected_unresolved():
+    """F5: Inexact Float must fail closed as UNRESOLVED with INEXACT_FLOAT_UNSUPPORTED."""
+    x = sympy.Symbol("x", real=True)
+    expr = x - (1 + sympy.Rational(1, 10**30))
+    cand = sympy.Float("1.0", 15)
+
+    cert = verify_root_exact(expr, cand)
+    assert cert.is_exact_pass is False
+    assert cert.status == ExactVerificationStatus.UNRESOLVED
+    assert cert.method == "INEXACT_FLOAT_UNSUPPORTED"
+
+    # Float candidate on simple equation
+    cert_float = verify_root_exact(x - 1, 1.0)
+    assert cert_float.is_exact_pass is False
+    assert cert_float.status == ExactVerificationStatus.UNRESOLVED
+    assert cert_float.method == "INEXACT_FLOAT_UNSUPPORTED"
+
+    # Float inside expression
+    cert_expr_float = verify_root_exact(x - 1.0, 1)
+    assert cert_expr_float.is_exact_pass is False
+    assert cert_expr_float.status == ExactVerificationStatus.UNRESOLVED
+    assert cert_expr_float.method == "INEXACT_FLOAT_UNSUPPORTED"
+
+
+def test_r3_s2_f5_mixed_float_algebraic_rejected_unresolved():
+    """F5: Float mixed with algebraic expressions must fail closed as UNRESOLVED."""
+    x = sympy.Symbol("x", real=True)
+    cand = sympy.Float("1.0", 15) + sympy.sqrt(2)
+    cert = verify_root_exact(x - (1 + sympy.sqrt(2)), cand)
+    assert cert.is_exact_pass is False
+    assert cert.status == ExactVerificationStatus.UNRESOLVED
+    assert cert.method == "INEXACT_FLOAT_UNSUPPORTED"
+
+
+def test_r3_s2_f5_exact_control_rational_must_pass():
+    """F5 Control: Exact rational values must continue to pass cleanly."""
+    x = sympy.Symbol("x", real=True)
+    cert = verify_root_exact(x - sympy.Rational(1, 2), sympy.Rational(1, 2))
+    assert cert.is_exact_pass is True
+    assert cert.status == ExactVerificationStatus.EXACT_PASS
+
+
+def test_r3_s2_f6_mixed_correct_and_incorrect_root_cannot_pass():
+    """F6: Completeness audit with mixed valid and invalid roots cannot receive PASS."""
+    norm_eq = normalize_equation(Parser.from_text("x - 1 = 0").parse_equation())
+    ob, cert = audit_independent_completeness(norm_eq, ["1", "2"])
+    assert ob.status != ObligationStatus.PASS
+    assert cert.status != ObligationStatus.PASS
+    assert "2" not in cert.verified_roots
+    assert "1" in cert.verified_roots
+    assert "2" in cert.extraneous_roots or "2" in cert.details.get("rejected_candidates", [])
+
+
+def test_r3_s2_f6_mixed_correct_and_malformed_root_cannot_pass():
+    """F6: Completeness audit with mixed valid and malformed candidate cannot receive PASS."""
+    norm_eq = normalize_equation(Parser.from_text("x - 1 = 0").parse_equation())
+    ob, cert = audit_independent_completeness(norm_eq, ["1", "not_a_root"])
+    assert ob.status != ObligationStatus.PASS
+    assert cert.status != ObligationStatus.PASS
+    assert "not_a_root" not in cert.verified_roots
+    assert "1" in cert.verified_roots
+    assert (
+        "not_a_root" in cert.extraneous_roots
+        or "not_a_root" in cert.details.get("rejected_candidates", [])
+    )
+
+
+def test_r3_s2_f6_clean_valid_batch_must_pass():
+    """F6 Control: Valid batch matching canonical roots must receive PASS."""
+    norm_eq = normalize_equation(Parser.from_text("x - 1 = 0").parse_equation())
+    ob, cert = audit_independent_completeness(norm_eq, ["1"])
+    assert ob.status == ObligationStatus.PASS
+    assert cert.status == ObligationStatus.PASS
+    assert cert.verified_roots == ["1"]
+    assert len(cert.extraneous_roots) == 0
+

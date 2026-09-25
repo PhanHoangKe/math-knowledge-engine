@@ -9,6 +9,24 @@ from mke.models.enums import ExactVerificationStatus
 from mke.models.evidence import ExactProofCertificate
 
 
+def contains_inexact_float(obj: Any) -> bool:
+    """Check strictly whether obj is or contains an inexact floating-point number.
+
+    Detects Python float, sympy.Float, or any sympy.Basic expression containing sympy.Float or float.
+    Exact verification gate rejects inexact floats to prevent floating-point rounding errors
+    from granting false EXACT_PASS certificates.
+    """
+    if isinstance(obj, (float, sympy.Float)):
+        return True
+    if isinstance(obj, sympy.Basic):
+        if obj.has(sympy.Float):
+            return True
+        for a in obj.atoms():
+            if isinstance(a, (float, sympy.Float)):
+                return True
+    return False
+
+
 def is_proven_real_number(sym_val: sympy.Basic) -> bool:
     """Verify strictly whether sym_val is a concrete real number with no free variables or imaginary part.
 
@@ -59,33 +77,33 @@ def verify_root_exact(
 
     Requirements:
     1. Zero epsilon tolerance for proof: |residual| < epsilon is NEVER sufficient for EXACT_PASS.
-    2. Rational arithmetic: exact decision in Q (e.g. Rational(1, 10**26) -> EXACT_FAIL).
-    3. Algebraic reduction: exact algebraic zero via substitution, cancel(), expand(), radsimp().
-    4. Provable numerical refutation: if |residual| > 1e-6, candidate is provably not a root (EXACT_FAIL).
-    5. Safe unresolved fallback: if numerical residue is small but algebraic proof cannot reduce to 0
+    2. Inexact float policy: floating-point candidates and expressions containing Float are fail-closed
+       as UNRESOLVED (method="INEXACT_FLOAT_UNSUPPORTED").
+    3. Rational arithmetic: exact decision in Q (e.g. Rational(1, 10**26) -> EXACT_FAIL).
+    4. Algebraic reduction: exact algebraic zero via substitution, cancel(), expand(), radsimp().
+    5. Provable numerical refutation: if |residual| > 1e-6, candidate is provably not a root (EXACT_FAIL).
+    6. Safe unresolved fallback: if numerical residue is small but algebraic proof cannot reduce to 0
        within limits, returns UNRESOLVED (fail-closed).
     """
     if var is None:
         var = sympy.Symbol("x", real=True)
+
+    # 0. Reject inexact floating point values for both candidate r and expression expr
+    if contains_inexact_float(expr) or contains_inexact_float(r):
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.UNRESOLVED,
+            is_exact_pass=False,
+            candidate_root=str(r),
+            residue=str(r),
+            method="INEXACT_FLOAT_UNSUPPORTED",
+            diagnostic="Inexact floating-point values are strictly unsupported for exact verification. Only exact rationals and algebraic expressions are permitted.",
+        )
 
     # 1. Normalize candidate r safely
     if isinstance(r, int):
         sym_r = sympy.Integer(r)
     elif isinstance(r, Fraction):
         sym_r = sympy.Rational(r.numerator, r.denominator)
-    elif isinstance(r, float):
-        try:
-            frac = Fraction(str(r))
-            sym_r = sympy.Rational(frac.numerator, frac.denominator)
-        except Exception:
-            return ExactProofCertificate(
-                status=ExactVerificationStatus.EXACT_FAIL,
-                is_exact_pass=False,
-                candidate_root=str(r),
-                residue=str(r),
-                method="FLOAT_CONVERSION_FAILURE",
-                diagnostic="Float cannot be converted to exact rational",
-            )
     elif isinstance(r, str):
         try:
             frac = Fraction(r.strip())
@@ -111,6 +129,17 @@ def verify_root_exact(
             diagnostic=f"Unsupported root type: {type(r)}",
         )
 
+    # Check sym_r as extra guard against inexact float
+    if contains_inexact_float(sym_r):
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.UNRESOLVED,
+            is_exact_pass=False,
+            candidate_root=str(sym_r),
+            residue=str(sym_r),
+            method="INEXACT_FLOAT_UNSUPPORTED",
+            diagnostic="Inexact floating-point values are strictly unsupported for exact verification.",
+        )
+
     # 2. Reject non-real numbers (complex units, free variables)
     if not is_proven_real_number(sym_r):
         return ExactProofCertificate(
@@ -133,6 +162,16 @@ def verify_root_exact(
             residue=str(e),
             method="SUBSTITUTION_ERROR",
             diagnostic=f"Error evaluating substitution: {str(e)}",
+        )
+
+    if contains_inexact_float(raw_sub):
+        return ExactProofCertificate(
+            status=ExactVerificationStatus.UNRESOLVED,
+            is_exact_pass=False,
+            candidate_root=str(sym_r),
+            residue=str(raw_sub),
+            method="INEXACT_FLOAT_UNSUPPORTED",
+            diagnostic="Substitution residue contains inexact floating-point values; exact proof cannot be established.",
         )
 
     if raw_sub == 0 or getattr(raw_sub, "is_zero", None) is True:
@@ -239,8 +278,11 @@ def check_root_satisfaction(
 
     Bool is True ONLY on EXACT_PASS.
     Residue is computed directly from typed candidate or safe rational parsing.
-    Untrusted or ungrammatical inputs return (False, sympy.nan) without executing or sympifying code.
+    Untrusted, inexact float, or ungrammatical inputs return (False, sympy.nan) without executing or sympifying code.
     """
+    if contains_inexact_float(expr) or contains_inexact_float(r):
+        return False, sympy.nan
+
     cert = verify_root_exact(expr, r, var)
     if cert.is_exact_pass:
         return True, sympy.Integer(0)
@@ -251,12 +293,6 @@ def check_root_satisfaction(
         sym_r = sympy.Integer(r)
     elif isinstance(r, Fraction):
         sym_r = sympy.Rational(r.numerator, r.denominator)
-    elif isinstance(r, float):
-        try:
-            frac = Fraction(str(r))
-            sym_r = sympy.Rational(frac.numerator, frac.denominator)
-        except Exception:
-            sym_r = None
     elif isinstance(r, str):
         # Whitelisted parsing of integer / rational fraction ONLY.
         # NEVER call sympify, parse_expr, or eval!
@@ -266,12 +302,15 @@ def check_root_satisfaction(
         except (ValueError, ZeroDivisionError, TypeError):
             sym_r = None
     elif isinstance(r, sympy.Basic):
-        sym_r = r
+        if not contains_inexact_float(r):
+            sym_r = r
 
-    if sym_r is not None and is_proven_real_number(sym_r):
+    if sym_r is not None and not contains_inexact_float(sym_r) and is_proven_real_number(sym_r):
         try:
             target_var = var if var is not None else sympy.Symbol("x", real=True)
             raw_sub = expr.subs(target_var, sym_r)
+            if contains_inexact_float(raw_sub):
+                return False, sympy.nan
             if isinstance(raw_sub, sympy.Basic):
                 return False, raw_sub
             return False, sympy.Integer(raw_sub) if isinstance(raw_sub, int) else sympy.nan
@@ -357,9 +396,12 @@ class OriginalDomain:
         """Check whether a real candidate value x_val lies within the domain.
 
         Exact mathematical comparison without float epsilon conflation,
-        strictly avoiding unsafe string sympify(), and rejecting non-real / complex values.
+        strictly avoiding unsafe string sympify(), rejecting inexact floats, and rejecting non-real / complex values.
         """
         if self.is_empty_domain or self.is_undetermined:
+            return False
+
+        if contains_inexact_float(x_val):
             return False
 
         # Convert x_val safely to exact SymPy/Fraction representation
@@ -368,13 +410,9 @@ class OriginalDomain:
         elif isinstance(x_val, int):
             sym_val = sympy.Integer(x_val)
         elif isinstance(x_val, sympy.Basic):
-            sym_val = x_val
-        elif isinstance(x_val, float):
-            try:
-                frac = Fraction(str(x_val))
-                sym_val = sympy.Rational(frac.numerator, frac.denominator)
-            except Exception:
+            if contains_inexact_float(x_val):
                 return False
+            sym_val = x_val
         elif isinstance(x_val, str):
             try:
                 frac = Fraction(x_val.strip())
@@ -390,6 +428,8 @@ class OriginalDomain:
             return False
 
         for excl in self._excluded_values:
+            if contains_inexact_float(excl):
+                return False
             if isinstance(excl, Fraction):
                 sym_excl: sympy.Basic = sympy.Rational(excl.numerator, excl.denominator)
             elif isinstance(excl, int):
