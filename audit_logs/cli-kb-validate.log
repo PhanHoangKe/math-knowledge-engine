@@ -1,0 +1,15 @@
+<frozen runpy>:128: RuntimeWarning: 'mke.cli.main' found in sys.modules after import of package 'mke.cli', but prior to execution of 'mke.cli.main'; this may result in unpredictable behaviour
+Running Knowledge Base Validation...
+            Knowledge Base Validation Summary             
+┌──────────────────────┬────────┬────────────────────────┐
+│ Category             │ Status │ Details                │
+├──────────────────────┼────────┼────────────────────────┤
+│ Overall Status       │ VALID  │ Errors: 0, Warnings: 0 │
+│ methods_count        │ OK     │ 5                      │
+│ families_count       │ OK     │ 15                     │
+│ problems_count       │ OK     │ 41                     │
+│ annotations_count    │ OK     │ 43                     │
+│ transfer_pairs_count │ OK     │ 4                      │
+└──────────────────────┴────────┴────────────────────────┘
+
+[PASS] Knowledge Base and DEV_PILOT dataset are 100% valid!

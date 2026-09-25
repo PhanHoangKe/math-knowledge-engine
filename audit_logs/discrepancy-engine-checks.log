@@ -1,0 +1,7 @@
+5*x = 0 \n  UNDETERMINED [] False Method M3:FACTORIZATION is NOT_APPLICABLE for this equation instance.
+(1/2)*x + 3/4 = 0 \n  SOUND_AND_COMPLETE_IN_SCOPE ['-3/2'] True Verified sound and complete: solution set is {-3/2}.
+(2/3)*x - 4/5 = 0 \n  SOUND_AND_COMPLETE_IN_SCOPE ['6/5'] True Verified sound and complete: solution set is {6/5}.
+(1/2)*x + 3/4 = 1/4 \n  SOUND_AND_COMPLETE_IN_SCOPE ['-1'] True Verified sound and complete: solution set is {-1}.
+x*(x - 3) = 4 \n  SOUND_AND_COMPLETE_IN_SCOPE ['-1', '4'] True Verified sound and complete: solution set is {-1, 4}.
+x^2 + 9 = 0 \n  SOUND_AND_COMPLETE_IN_SCOPE [] True Proven complete on R: equation has no real solutions (empty set).
+(x - 1)*(x + 2) = 4 \n  SOUND_AND_COMPLETE_IN_SCOPE ['-3', '2'] True Verified sound and complete: solution set is {-3, 2}.

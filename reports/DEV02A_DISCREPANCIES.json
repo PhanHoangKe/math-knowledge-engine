@@ -1,0 +1,19 @@
+[
+  {
+    "transfer_pair_id": "PAIR_FAM09_V01_V03",
+    "type": "TRANSFER_DISCREPANCY",
+    "details": {
+      "pair_id": "PAIR_FAM09_V01_V03",
+      "source_problem_id": "PROB_FAM09_V01",
+      "target_problem_id": "PROB_FAM09_V03",
+      "proposed_status": "INAPPLICABLE_INSTANCE",
+      "audited_status": "UNSAFE_COPY",
+      "valid_transferred_roots": [],
+      "rejected_transferred_roots": [
+        "Root x = -2 does not satisfy target numerator: status=EXACT_FAIL (residue=-4)",
+        "Root x = 1 does not satisfy target numerator: status=EXACT_FAIL (residue=-4)"
+      ],
+      "has_discrepancy": true
+    }
+  }
+]

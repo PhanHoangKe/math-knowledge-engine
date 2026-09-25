@@ -57,9 +57,13 @@ venv.bak/
 # Archives
 *.zip
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
 
 # IDE
-.idea/
-.vscode/
 *.swp
 *.swo
+.idea/
+.vscode/

@@ -1,0 +1,19 @@
+{
+  "manifest_version": "1.0.0",
+  "dataset_name": "MKE_PILOT_DEV_DATASET",
+  "split": "DEV",
+  "file_hashes": {
+    "families.jsonl": "8048f48b518a5fff823357925d7d76e200b2b80ba8b618639be5db0c4467ec42",
+    "problems.jsonl": "3c46fb9c8d9560eb5f9f53a26bdfb07a70398579a174c84801a324a4dc58cb9c",
+    "annotations.jsonl": "bcf38b1bacafe2004b14f09d0ba2734b9ef4147add383cdd49beb6906ca9998e",
+    "transfer_pairs.jsonl": "791272671866cc4f34de9f39ef80f335ee5e33f22b67d4b1eda26698004cf18d"
+  },
+  "record_counts": {
+    "families": 15,
+    "problems": 41,
+    "annotations": 43,
+    "transfer_pairs": 4
+  },
+  "schema_version": "2.0.0",
+  "created_at": "2026-09-25T10:00:00Z"
+}
