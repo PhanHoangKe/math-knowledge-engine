@@ -136,6 +136,24 @@ def generate_dev01_audit_report(output_path: Path | str | None = None) -> Dict[s
                 "evidence": "All 7 independent gate tests pass: epsilon leak rejection, exact zero acceptance, missing root detection, quadratic coverage, negative discriminant empty set, complex candidate rejection, difficult symbolic quartic safe unresolved without hang.",
             },
         },
+        "patch_remediation_r3_s1": {
+            "F1_CHECK_ROOT_SATISFACTION_NO_SYMPIFY": {
+                "status": "PASS",
+                "evidence": "Completely eliminated sympy.sympify(cert.residue). Residues are computed directly from typed candidate or safe rational parsing via Fraction. Non-grammatical or untrusted strings return (False, sympy.nan) without code execution.",
+            },
+            "F2_COMPLETENESS_TRUST_BOUNDARY_AND_NO_SYMPIFY": {
+                "status": "PASS",
+                "evidence": "Eliminated sympy.sympify from completeness auditor. Added VerifiedRoot model and independent self-verification of candidate roots against equation domain and exact gate. Untrusted strings rejected without evaluation.",
+            },
+            "F3_EMPTY_DOMAIN_NONEMPTY_ROOTS_FAIL": {
+                "status": "PASS",
+                "evidence": "Completeness audit on empty domain strictly checks candidate root list. If verified_roots is non-empty, returns ObligationStatus.FAIL instead of PASS.",
+            },
+            "F4_SCIENTIFIC_EXACT_FAIL_SEMANTICS": {
+                "status": "PASS",
+                "evidence": "Unbounded numerical evalf > 1e-6 without certified algebraic proof or interval bounds returns UNRESOLVED with method NUMERICAL_OBSERVATION_UNRESOLVED, preserving EXACT_FAIL strictly for exact non-zero rational/algebraic proofs.",
+            },
+        },
         "smoke_test_results": smoke_results,
     }
 

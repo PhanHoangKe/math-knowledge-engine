@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from fractions import Fraction
-from typing import Any, Dict, List, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 import sympy
 
 from mke.models.enums import ExactVerificationStatus
@@ -206,17 +206,17 @@ def verify_root_exact(
     except Exception:
         pass
 
-    # 6. Provable Numerical Refutation (EXACT_FAIL when |residue| > 1e-6)
+    # 6. Unresolved Numerical Observation (evalf is for triage, not exact proof)
     try:
         val = raw_sub.evalf(50)
         if abs(val) > 1e-6:
             return ExactProofCertificate(
-                status=ExactVerificationStatus.EXACT_FAIL,
+                status=ExactVerificationStatus.UNRESOLVED,
                 is_exact_pass=False,
                 candidate_root=str(sym_r),
                 residue=str(raw_sub),
-                method="NUMERICAL_REFUTATION",
-                diagnostic=f"Provably non-zero residue by high-precision numerical evaluation: |{val}| > 1e-6",
+                method="NUMERICAL_OBSERVATION_UNRESOLVED",
+                diagnostic=f"Numerical evaluation suggests non-zero residue (|{val}| > 1e-6), but without certified algebraic proof or bounded interval error, exact proof status is UNRESOLVED.",
             )
     except Exception:
         pass
@@ -235,17 +235,51 @@ def verify_root_exact(
 def check_root_satisfaction(
     expr: sympy.Basic, r: sympy.Basic | Fraction | int | float | str, var: sympy.Symbol | None = None
 ) -> tuple[bool, sympy.Basic]:
-    """Compatibility wrapper returning (bool, residue). Bool is True ONLY on EXACT_PASS."""
+    """Compatibility wrapper returning (bool, residue).
+
+    Bool is True ONLY on EXACT_PASS.
+    Residue is computed directly from typed candidate or safe rational parsing.
+    Untrusted or ungrammatical inputs return (False, sympy.nan) without executing or sympifying code.
+    """
     cert = verify_root_exact(expr, r, var)
     if cert.is_exact_pass:
         return True, sympy.Integer(0)
-    if isinstance(r, (int, Fraction, sympy.Integer, sympy.Rational)):
+
+    # Safely convert r to typed candidate for direct evaluation without sympify(str)
+    sym_r: Optional[sympy.Basic] = None
+    if isinstance(r, int):
+        sym_r = sympy.Integer(r)
+    elif isinstance(r, Fraction):
+        sym_r = sympy.Rational(r.numerator, r.denominator)
+    elif isinstance(r, float):
         try:
-            raw_sub = expr.subs(var or sympy.Symbol("x", real=True), r)
-            return False, raw_sub
+            frac = Fraction(str(r))
+            sym_r = sympy.Rational(frac.numerator, frac.denominator)
         except Exception:
-            pass
-    return False, sympy.sympify(cert.residue) if isinstance(cert.residue, str) else cert.residue
+            sym_r = None
+    elif isinstance(r, str):
+        # Whitelisted parsing of integer / rational fraction ONLY.
+        # NEVER call sympify, parse_expr, or eval!
+        try:
+            frac = Fraction(r.strip())
+            sym_r = sympy.Rational(frac.numerator, frac.denominator)
+        except (ValueError, ZeroDivisionError, TypeError):
+            sym_r = None
+    elif isinstance(r, sympy.Basic):
+        sym_r = r
+
+    if sym_r is not None and is_proven_real_number(sym_r):
+        try:
+            target_var = var if var is not None else sympy.Symbol("x", real=True)
+            raw_sub = expr.subs(target_var, sym_r)
+            if isinstance(raw_sub, sympy.Basic):
+                return False, raw_sub
+            return False, sympy.Integer(raw_sub) if isinstance(raw_sub, int) else sympy.nan
+        except Exception:
+            return False, sympy.nan
+
+    # Non-grammatical string or unsupported type: return non-executable sentinel
+    return False, sympy.nan
 
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from mke.models.enums import (
     ExactVerificationStatus,
@@ -34,6 +34,17 @@ class ExactProofCertificate(BaseModel):
     method: str
     diagnostic: str = ""
     details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class VerifiedRoot(BaseModel):
+    """Independently verified real root bound to a specific equation."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    value: Any
+    value_str: str
+    equation_fingerprint: str
+    certificate: ExactProofCertificate
 
 
 class CompletenessCertificate(BaseModel):

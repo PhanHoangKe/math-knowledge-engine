@@ -5,13 +5,13 @@ directly from normalized equation polynomials and domain constraints, strictly
 verifying candidate root coverage without trusting solver self-declarations.
 """
 
-from __future__ import annotations
+from fractions import Fraction
 from typing import Any, Dict, List, Optional, Set, Tuple
 import sympy
 
-from mke.models.domain import is_proven_real_number
+from mke.models.domain import is_proven_real_number, verify_root_exact
 from mke.models.enums import ObligationId, ObligationStatus
-from mke.models.evidence import CompletenessCertificate, ProofObligation
+from mke.models.evidence import CompletenessCertificate, ProofObligation, VerifiedRoot
 from mke.parsing.normalizer import NormalizedEquation
 
 
@@ -39,13 +39,15 @@ def _roots_match(set_a: Set[sympy.Basic], set_b: Set[sympy.Basic]) -> bool:
 
 def audit_independent_completeness(
     norm_eq: NormalizedEquation,
-    verified_roots: List[str],
+    verified_roots: List[Any],
     solve_output: Optional[Any] = None,
 ) -> Tuple[ProofObligation, CompletenessCertificate]:
     """Independently audit completeness of verified roots against canonical mathematical truth.
 
     Rules:
-    1. If original domain is empty (D = empty), canonical roots = empty -> PASS.
+    1. If original domain is empty (D = empty):
+       - If verified_roots is empty -> PASS.
+       - If verified_roots is non-empty -> FAIL (empty domain cannot have solutions).
     2. If original domain is undetermined, cannot prove completeness -> UNRESOLVED.
     3. If equation is an identity (0 = 0 on D), all D is solution -> PASS if solver recognized identity.
     4. If equation is a contradiction (c = 0, c != 0), canonical roots = empty -> PASS if verified_roots is empty.
@@ -59,26 +61,49 @@ def audit_independent_completeness(
        - If irreducible with complex/symbolic roots that cannot be verified complete by canonical formula -> UNRESOLVED.
     """
     domain = norm_eq.domain
+    verified_roots_str_list: List[str] = [
+        r.value_str if isinstance(r, VerifiedRoot) else str(r) for r in verified_roots
+    ]
 
     # Case 1: Empty Domain
     if domain.is_empty_domain:
-        cert = CompletenessCertificate(
-            certificate_id="CERT_EMPTY_DOMAIN",
-            algorithm="EMPTY_DOMAIN_CANONICAL_PROOF",
-            polynomial_degree=0,
-            canonical_roots=[],
-            verified_roots=verified_roots,
-            status=ObligationStatus.PASS,
-            details={"explanation": "Original domain is empty set; no real points exist in D."},
-        )
-        ob = ProofObligation(
-            obligation_id=ObligationId.COMPLETENESS,
-            status=ObligationStatus.PASS,
-            description="Independent completeness audit on empty domain",
-            evidence="Domain has no real points; solution set is strictly empty on R.",
-            certificate=cert.model_dump(),
-        )
-        return ob, cert
+        if len(verified_roots) > 0:
+            cert = CompletenessCertificate(
+                certificate_id="CERT_EMPTY_DOMAIN_FAIL",
+                algorithm="EMPTY_DOMAIN_CANONICAL_PROOF",
+                polynomial_degree=0,
+                canonical_roots=[],
+                verified_roots=verified_roots_str_list,
+                extraneous_roots=verified_roots_str_list,
+                status=ObligationStatus.FAIL,
+                details={"explanation": "Original domain is empty set; no real points exist in D, but non-empty roots were claimed."},
+            )
+            ob = ProofObligation(
+                obligation_id=ObligationId.COMPLETENESS,
+                status=ObligationStatus.FAIL,
+                description="Independent completeness audit on empty domain with non-empty roots",
+                evidence="Domain has no real points; claimed roots are extraneous.",
+                certificate=cert.model_dump(),
+            )
+            return ob, cert
+        else:
+            cert = CompletenessCertificate(
+                certificate_id="CERT_EMPTY_DOMAIN",
+                algorithm="EMPTY_DOMAIN_CANONICAL_PROOF",
+                polynomial_degree=0,
+                canonical_roots=[],
+                verified_roots=[],
+                status=ObligationStatus.PASS,
+                details={"explanation": "Original domain is empty set; no real points exist in D."},
+            )
+            ob = ProofObligation(
+                obligation_id=ObligationId.COMPLETENESS,
+                status=ObligationStatus.PASS,
+                description="Independent completeness audit on empty domain",
+                evidence="Domain has no real points; solution set is strictly empty on R.",
+                certificate=cert.model_dump(),
+            )
+            return ob, cert
 
     # Case 2: Undetermined Domain
     if domain.is_undetermined:
@@ -125,7 +150,7 @@ def audit_independent_completeness(
             algorithm="NON_ZERO_CONSTANT_NUMERATOR",
             polynomial_degree=0,
             canonical_roots=[],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             status=ObligationStatus.PASS if passed else ObligationStatus.FAIL,
         )
         ob = ProofObligation(
@@ -142,13 +167,48 @@ def audit_independent_completeness(
     deg = poly.degree()
     coeffs: Dict[str, str] = {f"c{k}": str(poly.coeff_monomial((k,))) for k in range(deg + 1)}
 
-    # Parse verified_roots to SymPy expressions
+    eq_expr = norm_eq.numerator_sym
+    var = norm_eq.numerator_poly.gen if (norm_eq.numerator_poly is not None and getattr(norm_eq.numerator_poly, "gen", None) is not None) else sympy.Symbol("x", real=True)
+
+    # Safely extract and re-verify candidates: NO sympify, NO eval, NO parse_expr!
     parsed_verified: Set[sympy.Basic] = set()
-    for vr_str in verified_roots:
-        try:
-            parsed_verified.add(sympy.sympify(vr_str))
-        except Exception:
-            pass
+    for item in verified_roots:
+        cand_sym: Optional[sympy.Basic] = None
+        if isinstance(item, VerifiedRoot):
+            # Check equation fingerprint and re-verify soundness
+            if item.equation_fingerprint == str(eq_expr) and item.certificate.is_exact_pass:
+                val = item.value
+                cand_sym = (
+                    sympy.Integer(val)
+                    if isinstance(val, int)
+                    else (
+                        sympy.Rational(val.numerator, val.denominator)
+                        if isinstance(val, Fraction)
+                        else val
+                    )
+                )
+        elif isinstance(item, (int, Fraction, sympy.Integer, sympy.Rational, sympy.Basic)):
+            cand_sym = (
+                sympy.Integer(item)
+                if isinstance(item, int)
+                else (
+                    sympy.Rational(item.numerator, item.denominator)
+                    if isinstance(item, Fraction)
+                    else item
+                )
+            )
+        elif isinstance(item, str):
+            # Whitelisted rational parser adapter ONLY (Fraction)
+            try:
+                frac = Fraction(item.strip())
+                cand_sym = sympy.Rational(frac.numerator, frac.denominator)
+            except (ValueError, ZeroDivisionError, TypeError):
+                cand_sym = None
+
+        if cand_sym is not None and is_proven_real_number(cand_sym) and domain.contains(cand_sym):
+            c = verify_root_exact(eq_expr, cand_sym, var)
+            if c.is_exact_pass:
+                parsed_verified.add(cand_sym)
 
     # Degree 1: P(x) = ax + b
     if deg == 1:
@@ -176,7 +236,7 @@ def audit_independent_completeness(
             polynomial_degree=1,
             coefficients=coeffs,
             canonical_roots=[str(r) for r in sorted(list(canonical_roots), key=str)],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             missing_roots=missing,
             extraneous_roots=extraneous,
             status=status,
@@ -231,7 +291,7 @@ def audit_independent_completeness(
             polynomial_degree=2,
             coefficients=coeffs,
             canonical_roots=[str(r) for r in sorted(list(canonical_roots), key=str)],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             missing_roots=missing,
             extraneous_roots=extraneous,
             status=status,
@@ -281,7 +341,7 @@ def audit_independent_completeness(
             polynomial_degree=4,
             coefficients=coeffs,
             canonical_roots=[str(r) for r in sorted(list(canonical_domain_roots), key=str)],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             missing_roots=missing,
             extraneous_roots=extraneous,
             status=status,
@@ -315,7 +375,7 @@ def audit_independent_completeness(
             polynomial_degree=deg,
             coefficients=coeffs,
             canonical_roots=[],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             status=status,
         )
         ob = ProofObligation(
@@ -366,7 +426,7 @@ def audit_independent_completeness(
             polynomial_degree=deg,
             coefficients=coeffs,
             canonical_roots=[str(r) for r in sorted(list(canonical_domain_roots), key=str)],
-            verified_roots=verified_roots,
+            verified_roots=verified_roots_str_list,
             missing_roots=missing,
             extraneous_roots=extraneous,
             status=status,
@@ -391,7 +451,7 @@ def audit_independent_completeness(
         polynomial_degree=deg,
         coefficients=coeffs,
         canonical_roots=[],
-        verified_roots=verified_roots,
+        verified_roots=verified_roots_str_list,
         status=ObligationStatus.UNRESOLVED,
         details={
             "reason": f"Polynomial of degree {deg} is irreducible with degree >= 3 factors over Q; cannot be exhaustively proven complete over R."

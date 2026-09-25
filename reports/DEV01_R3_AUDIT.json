@@ -1,6 +1,6 @@
 {
   "audit_version": "DEV-01-R3",
-  "generated_at": "2026-09-24T16:12:46.079649+00:00",
+  "generated_at": "2026-09-25T01:22:06.339927+00:00",
   "project": "Math Knowledge Engine",
   "hypothesis": "H1: Algebraic equation method retrieval with guard condition checking and proof obligations",
   "remediation_phase": "DEV-01-R3 Exact Proof Gate & Independent Completeness Remediation",
@@ -119,19 +119,37 @@
       "evidence": "All 7 independent gate tests pass: epsilon leak rejection, exact zero acceptance, missing root detection, quadratic coverage, negative discriminant empty set, complex candidate rejection, difficult symbolic quartic safe unresolved without hang."
     }
   },
+  "patch_remediation_r3_s1": {
+    "F1_CHECK_ROOT_SATISFACTION_NO_SYMPIFY": {
+      "status": "PASS",
+      "evidence": "Completely eliminated sympy.sympify(cert.residue). Residues are computed directly from typed candidate or safe rational parsing via Fraction. Non-grammatical or untrusted strings return (False, sympy.nan) without code execution."
+    },
+    "F2_COMPLETENESS_TRUST_BOUNDARY_AND_NO_SYMPIFY": {
+      "status": "PASS",
+      "evidence": "Eliminated sympy.sympify from completeness auditor. Added VerifiedRoot model and independent self-verification of candidate roots against equation domain and exact gate. Untrusted strings rejected without evaluation."
+    },
+    "F3_EMPTY_DOMAIN_NONEMPTY_ROOTS_FAIL": {
+      "status": "PASS",
+      "evidence": "Completeness audit on empty domain strictly checks candidate root list. If verified_roots is non-empty, returns ObligationStatus.FAIL instead of PASS."
+    },
+    "F4_SCIENTIFIC_EXACT_FAIL_SEMANTICS": {
+      "status": "PASS",
+      "evidence": "Unbounded numerical evalf > 1e-6 without certified algebraic proof or interval bounds returns UNRESOLVED with method NUMERICAL_OBSERVATION_UNRESOLVED, preserving EXACT_FAIL strictly for exact non-zero rational/algebraic proofs."
+    }
+  },
   "smoke_test_results": {
     "total_tests": 8,
     "passed": 8,
     "failed": 0,
     "skipped": 0,
-    "total_execution_time_ms": 220.87,
+    "total_execution_time_ms": 201.64,
     "results": [
       {
         "id": "T1",
         "name": "Standard quadratic equation",
         "equation": "x^2 - 5*x + 6 = 0",
         "passed": true,
-        "duration_ms": 46.05,
+        "duration_ms": 41.82,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -165,7 +183,7 @@
         "name": "Rational equation with extraneous root and unsafe transfer detection",
         "equation": "(x^2 - 5*x + 6) / (x - 2) = 0",
         "passed": true,
-        "duration_ms": 135.94,
+        "duration_ms": 127.96,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -206,7 +224,7 @@
         "name": "Rational identity with domain exclusion preservation",
         "equation": "(x - 2) / (x - 2) = 1",
         "passed": true,
-        "duration_ms": 5.62,
+        "duration_ms": 4.16,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -233,7 +251,7 @@
         "name": "Zero-product factorization and division root-loss detection",
         "equation": "x * (x - 1) = 0",
         "passed": true,
-        "duration_ms": 6.7,
+        "duration_ms": 3.73,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -273,7 +291,7 @@
         "name": "Quadratic with a=0 degeneracy rejection",
         "equation": "0 * x^2 + 2 * x - 4 = 0",
         "passed": true,
-        "duration_ms": 4.82,
+        "duration_ms": 3.27,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -305,7 +323,7 @@
         "name": "Biquadratic substitution with sign constraint enforcement",
         "equation": "x^4 + x^2 - 2 = 0",
         "passed": true,
-        "duration_ms": 5.78,
+        "duration_ms": 4.83,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -353,7 +371,7 @@
         "name": "Quadratic formula with negative discriminant (empty real set)",
         "equation": "x^2 + 1 = 0",
         "passed": true,
-        "duration_ms": 2.59,
+        "duration_ms": 2.37,
         "checks": [
           {
             "check": "DOMAIN_PRESERVATION",
@@ -381,7 +399,7 @@
         "name": "Out-of-scope radical equation safe rejection",
         "equation": "sqrt(x + 2) = x",
         "passed": true,
-        "duration_ms": 0.03,
+        "duration_ms": 0.02,
         "checks": [
           {
             "check": "OUT_OF_SCOPE",

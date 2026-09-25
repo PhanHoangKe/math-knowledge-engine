@@ -90,3 +90,88 @@ def test_r3_complex_input_i_rejected():
     assert len(valid) == 0
     assert len(rejected) == 1
     assert "not a valid real number" in rejected[0]
+
+
+def test_r3_s1_f1_negative_untrusted_strings_check_root_satisfaction():
+    """F1: Malformed and untrusted strings must return (False, sympy.nan) without evaluation."""
+    x = sympy.Symbol("x", real=True)
+    payloads = [
+        "__import__('builtins').sum((1, 2, 3))",
+        "lambda: 42",
+        "import os; os.system('echo hi')",
+        "x + 1",
+        "invalid_syntax_!!!",
+    ]
+    for p in payloads:
+        accepted, residue = check_root_satisfaction(x, p, x)
+        assert accepted is False
+        assert residue is sympy.nan or str(residue) == "nan"
+
+
+def test_r3_s1_f2_negative_untrusted_roots_completeness():
+    """F2: Completeness auditor rejects untrusted and malformed root strings."""
+    eq = normalize_equation(Parser.from_text("x - 10 = 0").parse_equation())
+    untrusted = [
+        "__import__('builtins').len('hello')",
+        "10.0; import sys",
+        "not_a_number",
+    ]
+    ob, cert = audit_independent_completeness(eq, untrusted)
+    assert ob.status != ObligationStatus.PASS
+    assert cert.status != ObligationStatus.PASS
+    assert "10" in cert.missing_roots
+
+
+def test_r3_s1_f2_negative_forged_verified_root_certificate():
+    """F2: Forged VerifiedRoot with mismatched equation or false certificate is rejected."""
+    from mke.models.evidence import ExactProofCertificate, VerifiedRoot
+
+    eq = normalize_equation(Parser.from_text("x - 5 = 0").parse_equation())
+    fake_cert = ExactProofCertificate(
+        status=ExactVerificationStatus.EXACT_PASS,
+        is_exact_pass=True,
+        candidate_root="5",
+        residue="0",
+        method="FORGED",
+    )
+    # 1. Wrong equation fingerprint
+    forged_wrong_fingerprint = VerifiedRoot(
+        value=sympy.Integer(5),
+        value_str="5",
+        equation_fingerprint="x - 999",
+        certificate=fake_cert,
+    )
+    ob, cert = audit_independent_completeness(eq, [forged_wrong_fingerprint])
+    assert ob.status != ObligationStatus.PASS
+    assert "5" in cert.missing_roots
+
+    # 2. Forged root that does not satisfy equation
+    forged_invalid_val = VerifiedRoot(
+        value=sympy.Integer(99),
+        value_str="99",
+        equation_fingerprint=str(eq.numerator_sym),
+        certificate=fake_cert,
+    )
+    ob2, cert2 = audit_independent_completeness(eq, [forged_invalid_val])
+    assert ob2.status != ObligationStatus.PASS
+
+
+def test_r3_s1_f3_negative_empty_domain_nonempty_roots():
+    """F3: Empty domain equation with non-empty claimed roots must return FAIL."""
+    eq = normalize_equation(Parser.from_text("x / (x - x) = 0").parse_equation())
+    assert eq.domain.is_empty_domain
+    ob, cert = audit_independent_completeness(eq, ["0", "1"])
+    assert ob.status == ObligationStatus.FAIL
+    assert cert.status == ObligationStatus.FAIL
+    assert cert.extraneous_roots == ["0", "1"]
+
+
+def test_r3_s1_f4_negative_algebraic_number_numerical_observation_unresolved():
+    """F4: Unbounded evalf non-zero observation must be UNRESOLVED, never EXACT_FAIL."""
+    x = sympy.Symbol("x", real=True)
+    z = sympy.Symbol("z")
+    algebraic_root = sympy.CRootOf(z**3 - z - 1, 0)
+    cert = verify_root_exact(x - 2, algebraic_root, x)
+    assert cert.status == ExactVerificationStatus.UNRESOLVED
+    assert cert.method == "NUMERICAL_OBSERVATION_UNRESOLVED"
+    assert cert.is_exact_pass is False

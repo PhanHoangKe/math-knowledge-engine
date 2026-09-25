@@ -20,6 +20,7 @@ from mke.models.evidence import (
     ProofObligation,
     SolutionCandidate,
     VerificationResult,
+    VerifiedRoot,
 )
 from mke.models.problem import ProblemRecord
 from mke.verification.completeness import audit_independent_completeness
@@ -261,16 +262,26 @@ class VerificationEngine:
         # Step 6: Evaluate Candidate Solutions via Exact Verification Gate
         candidate_evals: List[SolutionCandidate] = []
         verified_roots: List[str] = []
+        verified_roots_typed: List[VerifiedRoot] = []
         unverified_candidates: List[str] = []
 
+        var = norm_eq.numerator_poly.gen if norm_eq.numerator_poly is not None else sympy.Symbol("x", real=True)
         for r in solve_output.candidate_roots:
             in_dom = domain.contains(r)
-            cert = verify_root_exact(norm_eq.numerator_sym, r)
+            cert = verify_root_exact(norm_eq.numerator_sym, r, var)
             sat_eq = cert.is_exact_pass
             is_valid = in_dom and sat_eq
 
             if is_valid:
                 verified_roots.append(str(r))
+                verified_roots_typed.append(
+                    VerifiedRoot(
+                        value=r,
+                        value_str=str(r),
+                        equation_fingerprint=str(norm_eq.numerator_sym),
+                        certificate=cert,
+                    )
+                )
             else:
                 unverified_candidates.append(str(r))
 
@@ -288,7 +299,7 @@ class VerificationEngine:
         # Step 7: Independent Completeness Audit & Solution Proof Status
         # Crucial Requirement: The solver's self-declaration is NOT trusted.
         # The verification gate independently audits completeness against canonical mathematical ground truth!
-        indep_comp_ob, comp_cert = audit_independent_completeness(norm_eq, verified_roots, solve_output)
+        indep_comp_ob, comp_cert = audit_independent_completeness(norm_eq, verified_roots_typed, solve_output)
 
         # Replace any solver-claimed completeness obligation with the gate's independent certificate
         obligations = [ob for ob in obligations if ob.obligation_id != ObligationId.COMPLETENESS]
