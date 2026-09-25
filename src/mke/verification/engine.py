@@ -380,6 +380,7 @@ class VerificationEngine:
             and norm_eq.raw_ast.left.op == "*"
             and isinstance(norm_eq.raw_ast.right, NumberNode)
             and norm_eq.raw_ast.right.value == 0
+            and norm_eq.degree >= 2
         ):
             return MethodId.M3_FACTORIZATION
 

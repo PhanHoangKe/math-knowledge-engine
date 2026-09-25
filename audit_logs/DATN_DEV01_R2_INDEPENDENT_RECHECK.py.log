@@ -1,0 +1,25 @@
+================================================================================
+DATN DEV-01-R2: INDEPENDENT MATHEMATICAL SOUNDNESS RECHECK
+================================================================================
+
+[CHECK 1/6] M4 Solveset Handling: (x^4 - x - 1) / (x^2 + 1) = 0
+  PASS: Found 2 real roots, COMPLETENESS=UNRESOLVED, is_verified_solution=False, status=SOUND_PARTIAL.
+
+[CHECK 2/6] M4 Truly Empty Root Proof: (x^4 + 1) / (x^2 + 1) = 0
+  PASS: Formally proved empty set on R, COMPLETENESS=PASS, is_verified_solution=True.
+
+[CHECK 3/6] Real Domain & Transfer Rejection: target x^2 + 1 = 0, candidate sympy.I
+  PASS: sympy.I and free variables strictly rejected as UNSAFE_COPY. OriginalDomain.contains() returns False.
+
+[CHECK 4/6] Empty Domain State Consistency: x / 0 = 0
+  PASS: is_verified_method=False, is_verified_solution=True, method_instance=None. Proven purely by domain evidence.
+
+[CHECK 5/6] Resource Limits & Error Classification
+  PASS: Structured classification for RESOURCE_LIMIT, OUT_OF_SCOPE, and SYNTAX_ERROR verified without false verification.
+
+[CHECK 6/6] AST Round-trip Structure Preservation
+  PASS: All round-trip cases preserved exact AST trees: ['1 + (x - 2) = 0', 'x + 0.25 = 0', 'x * (x / 2) = 0']
+
+================================================================================
+SUMMARY: 6/6 independent recheck suites PASSED.
+================================================================================

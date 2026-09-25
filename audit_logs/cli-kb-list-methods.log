@@ -1,0 +1,42 @@
+<frozen runpy>:128: RuntimeWarning: 'mke.cli.main' found in sys.modules after import of package 'mke.cli', but prior to execution of 'mke.cli.main'; this may result in unpredictable behaviour
+                    Method Templates Catalogue (5 methods)                     
+┌─────────────────┬─────────────────┬─────────────────┬─────────┬─────────────┐
+│ Method ID       │ Name (VI / EN)  │ Classes         │ Version │ Obligations │
+├─────────────────┼─────────────────┼─────────────────┼─────────┼─────────────┤
+│ M1:LINEAR_EQUA… │ Phương pháp     │ LINEAR          │ 1.0.0   │ 3           │
+│                 │ giải phương     │                 │         │             │
+│                 │ trình bậc nhất  │                 │         │             │
+│                 │ (Linear         │                 │         │             │
+│                 │ Equation        │                 │         │             │
+│                 │ Isolation       │                 │         │             │
+│                 │ Method)         │                 │         │             │
+│ M2:QUADRATIC_F… │ Công thức       │ QUADRATIC       │ 1.0.0   │ 4           │
+│                 │ nghiệm phương   │                 │         │             │
+│                 │ trình bậc hai   │                 │         │             │
+│                 │ (Quadratic      │                 │         │             │
+│                 │ Formula Method) │                 │         │             │
+│ M3:FACTORIZATI… │ Phương pháp     │ FACTORIZATION,  │ 1.0.0   │ 3           │
+│                 │ phân tích đa    │ QUADRATIC,      │         │             │
+│                 │ thức thành nhân │ BIQUADRATIC     │         │             │
+│                 │ tử (Polynomial  │                 │         │             │
+│                 │ Factorization   │                 │         │             │
+│                 │ Method)         │                 │         │             │
+│ M4:RATIONAL_EQ… │ Phương pháp     │ RATIONAL        │ 1.0.0   │ 4           │
+│                 │ giải phương     │                 │         │             │
+│                 │ trình phân thức │                 │         │             │
+│                 │ hữu tỉ          │                 │         │             │
+│                 │ (Rational       │                 │         │             │
+│                 │ Equation        │                 │         │             │
+│                 │ Clearing        │                 │         │             │
+│                 │ Denominator     │                 │         │             │
+│                 │ Method)         │                 │         │             │
+│ M5:BIQUADRATIC… │ Phương pháp đặt │ BIQUADRATIC     │ 1.0.0   │ 4           │
+│                 │ ẩn phụ giải     │                 │         │             │
+│                 │ phương trình    │                 │         │             │
+│                 │ trùng phương    │                 │         │             │
+│                 │ (Biquadratic    │                 │         │             │
+│                 │ Auxiliary       │                 │         │             │
+│                 │ Variable        │                 │         │             │
+│                 │ Substitution    │                 │         │             │
+│                 │ Method)         │                 │         │             │
+└─────────────────┴─────────────────┴─────────────────┴─────────┴─────────────┘

@@ -1,0 +1,28 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\Math Knowledge Engine
+configfile: pyproject.toml
+testpaths: tests
+collected 166 items
+
+tests\integration\test_pipeline.py ...                                   [  1%]
+tests\knowledge\test_adapter.py ....                                     [  4%]
+tests\knowledge\test_adjustments.py .......                              [  8%]
+tests\knowledge\test_leakage.py ....                                     [ 10%]
+tests\knowledge\test_repository.py .....                                 [ 13%]
+tests\knowledge\test_schema.py ........                                  [ 18%]
+tests\knowledge\test_validation.py ...                                   [ 20%]
+tests\property\test_properties.py .........................              [ 35%]
+tests\security\test_security.py ............                             [ 42%]
+tests\smoke\test_smoke_cases.py .........                                [ 48%]
+tests\unit\test_audit_counter_cases.py .......                           [ 52%]
+tests\unit\test_domain.py ...                                            [ 54%]
+tests\unit\test_lexer.py .........                                       [ 59%]
+tests\unit\test_methods.py .....                                         [ 62%]
+tests\unit\test_obligations.py ...                                       [ 64%]
+tests\unit\test_parser.py ......                                         [ 68%]
+tests\unit\test_r1_r6_regression.py ...............                      [ 77%]
+tests\unit\test_r2_soundness_regression.py ......................        [ 90%]
+tests\unit\test_r3_proof_gate_regression.py ................             [100%]
+
+============================= 166 passed in 5.63s =============================

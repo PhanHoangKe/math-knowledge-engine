@@ -34,6 +34,7 @@ class NormalizedEquation:
     is_identity: bool
     is_contradiction: bool
     coefficients: Dict[int, sympy.Basic] = field(default_factory=dict)
+    has_variable_denominator: bool = False
 
 
 def normalize_equation(
@@ -69,6 +70,7 @@ def normalize_equation(
             is_identity=False,
             is_contradiction=True,
             coefficients={},
+            has_variable_denominator=True,
         )
 
     # Step 2: Convert to SymPy using whitelisted constructors
@@ -85,9 +87,20 @@ def normalize_equation(
     numer, denom = sympy.fraction(combined)
     trace.append(f"Rational canonical form: ({numer}) / ({denom}) = 0")
 
-    # Step 5: Check denominator
+    # Step 5: Check denominator and distinguish constant non-zero denominators from variable denominators
     denom_has_x = X_SYM in denom.free_symbols
-    is_rational = denom_has_x or len(eq_ast.collect_divisions()) > 0
+    orig_divs = eq_ast.collect_divisions()
+    orig_denom_has_x = any("x" in d.right.collect_variables() for d in orig_divs)
+
+    # Strictly preserve domain exclusions and variable denominators even after algebraic cancellation
+    has_variable_denominator = (
+        denom_has_x
+        or orig_denom_has_x
+        or len(domain.excluded_values) > 0
+        or len(domain.conditions) > 0
+        or domain.is_empty_domain
+    )
+    is_rational = has_variable_denominator
 
     denom_poly: Optional[sympy.Poly] = None
     if denom_has_x:
@@ -159,4 +172,5 @@ def normalize_equation(
         is_identity=is_identity,
         is_contradiction=is_contradiction,
         coefficients=coeffs,
+        has_variable_denominator=has_variable_denominator,
     )

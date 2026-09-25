@@ -1,0 +1,13 @@
+<frozen runpy>:128: RuntimeWarning: 'mke.cli.main' found in sys.modules after import of package 'mke.cli', but prior to execution of 'mke.cli.main'; this may result in unpredictable behaviour
+Running DEV-01 Verification Adapter on DEV_PILOT...
+ DEV-01 Adapter Execution Summary  
+┌─────────────────────────┬───────┐
+│ Metric                  │ Value │
+├─────────────────────────┼───────┤
+│ Total Problems          │ 41    │
+│ Normalizable Count      │ 41    │
+│ Method Verified Count   │ 39    │
+│ Solution Verified Count │ 39    │
+│ Matches Ground Truth    │ 37    │
+│ Discrepancies Count     │ 7     │
+└─────────────────────────┴───────┘

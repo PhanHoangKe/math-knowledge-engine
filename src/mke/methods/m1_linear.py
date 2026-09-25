@@ -18,7 +18,7 @@ class LinearEquationMethod(BaseMethod):
     version = "1.0.0"
     name = "Linear Equation Method"
     description = "Solves linear equation ax + b = 0 over real numbers with degeneracy handling."
-    scope_limits = "Degree <= 1 polynomial equation in one variable x."
+    scope_limits = "Degree <= 1 polynomial equation in one variable x with exact rational or integer coefficients and non-zero constant denominators."
 
     def check_structural_guards(self, norm_eq: NormalizedEquation) -> List[GuardResult]:
         guards: List[GuardResult] = []
@@ -33,13 +33,14 @@ class LinearEquationMethod(BaseMethod):
             )
         )
 
-        not_rational = not norm_eq.is_rational
+        has_var_denom = getattr(norm_eq, "has_variable_denominator", norm_eq.is_rational)
+        not_rational = not (norm_eq.is_rational or has_var_denom or len(norm_eq.domain.excluded_values) > 0)
         guards.append(
             GuardResult(
                 guard_name="STRUCTURAL_NON_RATIONAL",
                 passed=not_rational,
-                message="Equation does not contain algebraic fractions in x" if not_rational else "Equation contains fractions; M4:RATIONAL_EQUATION should precede M1",
-                details={"is_rational": norm_eq.is_rational},
+                message="Equation does not contain algebraic fractions with variable denominators" if not_rational else "Equation contains fractions with variable denominators; M4:RATIONAL_EQUATION should precede M1",
+                details={"is_rational": norm_eq.is_rational, "has_variable_denominator": has_var_denom},
             )
         )
 
@@ -57,6 +58,7 @@ class LinearEquationMethod(BaseMethod):
             b = sympy.Integer(0)
         elif norm_eq.is_contradiction:
             a = sympy.Integer(0)
+            b = norm_eq.numerator_sym if (norm_eq.numerator_sym.is_number and norm_eq.numerator_sym != 0) else sympy.Integer(1)
 
         is_nonzero_a = a != 0
         guards.append(
@@ -71,8 +73,9 @@ class LinearEquationMethod(BaseMethod):
         return guards
 
     def evaluate_admissibility(self, norm_eq: NormalizedEquation) -> MethodAdmissibility:
-        # Degree must be <= 1 and not rational
-        if norm_eq.degree > 1 or norm_eq.is_rational:
+        has_var_denom = getattr(norm_eq, "has_variable_denominator", norm_eq.is_rational)
+        # Degree must be <= 1 and equation must not contain variable denominators or domain exclusions
+        if norm_eq.degree > 1 or norm_eq.is_rational or has_var_denom or len(norm_eq.domain.excluded_values) > 0:
             return MethodAdmissibility.NOT_APPLICABLE
 
         a = norm_eq.coefficients.get(1, sympy.Integer(0))
@@ -86,6 +89,16 @@ class LinearEquationMethod(BaseMethod):
         a = norm_eq.coefficients.get(1, sympy.Integer(0))
         b = norm_eq.coefficients.get(0, sympy.Integer(0))
 
+        if norm_eq.is_contradiction or (a == 0 and b != 0):
+            contradiction_b = b if b != 0 else (norm_eq.numerator_sym if norm_eq.numerator_sym.is_number else sympy.Integer(1))
+            return MethodSolveOutput(
+                method_id=self.method_id,
+                candidate_roots=[],
+                parameters={"a": "0", "b": str(contradiction_b)},
+                is_contradiction=True,
+                notes=[f"Degenerate linear contradiction 0*x + ({contradiction_b}) = 0; empty solution set."],
+            )
+
         if norm_eq.is_identity or (a == 0 and b == 0):
             return MethodSolveOutput(
                 method_id=self.method_id,
@@ -93,15 +106,6 @@ class LinearEquationMethod(BaseMethod):
                 parameters={"a": "0", "b": "0"},
                 is_identity_on_domain=True,
                 notes=["Degenerate linear identity 0*x = 0; all domain elements are solutions."],
-            )
-
-        if norm_eq.is_contradiction or (a == 0 and b != 0):
-            return MethodSolveOutput(
-                method_id=self.method_id,
-                candidate_roots=[],
-                parameters={"a": "0", "b": str(b)},
-                is_contradiction=True,
-                notes=[f"Degenerate linear contradiction 0*x + ({b}) = 0; empty solution set."],
             )
 
         # Standard linear solution: x = -b / a

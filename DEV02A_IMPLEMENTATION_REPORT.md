@@ -173,3 +173,41 @@ git push -u origin dev02a-method-knowledge-base
 - Toàn bộ mục tiêu kỹ thuật và khoa học của phân hệ **DEV-02A** đã được hoàn thành trọn vẹn, vượt qua tất cả các bài kiểm tra tự động và các cổng kiểm toán độc lập.
 - Không xâm phạm phạm vi ngoài quy định (không triển khai vector database, không dùng LLM, không dùng BM25/reranker, không mở rộng sang DEV-02B).
 - Trân trọng kính trình Người điều phối nghiên cứu tiến hành kiểm toán độc lập nghiệm thu phân hệ DEV-02A.
+
+---
+
+## VII. PHỤ LỤC: KẾT QUẢ KHẮC PHỤC KIỂM TOÁN ĐỘC LẬP (DEV-02A REPAIR R1)
+
+- **Mốc kiểm toán gốc**: Commit `ef0276a6e161b48b2d7ee069f1e646bd965d0c58` (PR #1).
+- **Mốc nghiệm thu DEV-01 so sánh**: Commit `c9199abf3148b4983d3f29cd214e164cef0aad9e` (nhánh `dev01-accepted`).
+- **Phạm vi sửa chữa**: Đúng 4 nhóm nguyên nhân đã được Người điều phối nghiên cứu và Kiểm toán viên độc lập xác nhận trong `DEV02A_FINAL_ACCEPTANCE_EVIDENCE.md` và `DEV02A_INDEPENDENT_AUDIT.md`.
+
+### 1. Bảng Đối Chiếu Chi Tiết 7 Bản Ghi Bất Đồng (Before vs After)
+
+| Mã Bản Ghi | Phân Loại Kiểm Toán | Hiện Tượng Ban Đầu (Baseline `ef0276a`) | Biện Pháp Khắc Phục Kỹ Thuật (R1) | Trạng Thái Sau Sửa (R1) |
+|---|---|---|---|---|
+| `PROB_FAM02_V03` (`5*x = 0`) | **IMPLEMENTATION_BUG** | Heuristic tích thô nhận diện vế trái `*` và vế phải `0` nên chuyển M3; M3 yêu cầu bậc $\ge 2$ nên từ chối $\rightarrow$ verifier ra rỗng (`UNDETERMINED`) | Thêm ràng buộc bậc `norm_eq.degree >= 2` trong `_select_method` (`engine.py`). Phương trình bậc 1 rơi xuống M1, giải nghiệm chính xác `{0}` với chứng chỉ hoàn thành | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PROB_FAM03_V01` (`(1/2)*x + 3/4 = 0`) | **VERIFIER_LIMITATION** | M1 trả về `NOT_APPLICABLE` vì cờ `is_rational = True` do parser phát hiện có phép chia số học `1/2` trong AST gốc | Mở rộng M1 có giới hạn: phân biệt mẫu số hằng số khác 0 với mẫu số chứa biến. Giữ nguyên tính chất đa thức hệ số $\mathbb{Q}$, nghiệm exact `{-3/2}` | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PROB_FAM03_V02` (`(2/3)*x - 4/5 = 0`) | **VERIFIER_LIMITATION** | Tương tự V01, M1 từ chối do nhầm lẫn phân thức đại số với hệ số hữu tỉ | Phân biệt mẫu hằng số khác 0; nghiệm exact `{6/5}` qua M1 | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PROB_FAM03_V03` (`(1/2)*x + 3/4 = 1/4`) | **VERIFIER_LIMITATION** | Tương tự V01, M1 từ chối do cờ `is_rational` | Phân biệt mẫu hằng số khác 0; chuyển vế rút gọn cho nghiệm exact `{-1}` qua M1 | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PROB_FAM07_V03` (`x*(x-3) = 4`) | **PROVISIONAL_LABEL_ERROR** | Nhãn gán nhầm M3 `NOT_APPLICABLE` do lẫn lộn giữa việc không thể sao chép trực tiếp nhân tử vế trái khi VP $\ne 0$ với việc giải trực tiếp bài toán đích | Cập nhật nhãn M3 `APPLICABLE` vì sau khi chuyển vế $x^2 - 3x - 4 = 0$, đa thức phân tích được thành $(x-4)(x+1) = 0$ trên $\mathbb{Q}$, nghiệm `{-1, 4}`; giữ `review_status = PROVISIONAL` | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PROB_FAM08_V03` (`x^2 + 9 = 0`) | **PROVISIONAL_LABEL_ERROR** | Nhãn gán nhầm M3 `APPLICABLE` dù $x^2 + 9$ bất khả quy trên $\mathbb{Q}$ | Cập nhật nhãn M3 `NOT_APPLICABLE` phù hợp với guard phân tích nhân tử hữu tỉ (nghiệm rỗng trên $\mathbb{R}$ vẫn giữ nguyên); giữ `review_status = PROVISIONAL` | **ĐÃ GIẢI QUYẾT (PASS)** |
+| `PAIR_FAM09_V01_V03` | **INTENDED_NEAR_MISS** | Đề xuất `INAPPLICABLE_INSTANCE`, verifier báo `UNSAFE_COPY` (phần dư -4 cho cả 2 nghiệm nguồn `{-2, 1}`) | Bảo tồn nguyên trạng phân biệt ngữ nghĩa; không đổi enum; giữ làm 1 bất đồng chuyển giao có chủ đích phục vụ nghiên cứu | **BẢO TỒN NGUYÊN TRẠNG (1 DISCREPANCY)** |
+
+### 2. Tổng Hợp Kết Quả Thực Thi Sau Bản Vá R1
+
+- **Tổng số bài kiểm thử Pytest**: **180/180 PASSED** (toàn bộ 166 bài kiểm thử cũ + 14 bài kiểm thử hồi quy mới tại `tests/knowledge/test_r1_repair.py`).
+- **Cổng kiểm thử độc lập DEV-02A (`DATN_DEV02A_INDEPENDENT_GATES.py`)**: **10/10 PASS**.
+- **Cổng kiểm thử độc lập toán học DEV-01 R2/R3**: ĐẠT 100% (7/7 Gate, 6/6 Recheck, 7/7 R3 Gate, 5/5 R3-S1 Edge Gate).
+- **Kết quả Adapter DEV-01 (`kb run-dev-validation`)**:
+  - Tổng số bài toán: 41.
+  - Chuẩn hoá thành công: 41.
+  - Nghiệm được chứng minh (Solution Verified): 41/41 (100%).
+  - Khớp nhãn kỳ vọng (Ground Truth Matches): 43/43 (100%).
+  - Số lượng bất đồng (Discrepancies): **Chính xác 1** (duy nhất ca chuyển giao near-miss `PAIR_FAM09_V01_V03`).
+- **Mã băm SHA-256 các tệp dữ liệu đã đồng bộ trong `data/dev_pilot/manifest.json` và `reports/SHA256SUMS.txt`**:
+  - `data/dev_pilot/annotations.jsonl`: `bcf38b1bacafe2004b14f09d0ba2734b9ef4147add383cdd49beb6906ca9998e`
+  - `data/dev_pilot/families.jsonl`: `8048f48b518a5fff823357925d7d76e200b2b80ba8b618639be5db0c4467ec42`
+  - `data/dev_pilot/problems.jsonl`: `3c46fb9c8d9560eb5f9f53a26bdfb07a70398579a174c84801a324a4dc58cb9c`
+  - `data/dev_pilot/transfer_pairs.jsonl`: `791272671866cc4f34de9f39ef80f335ee5e33f22b67d4b1eda26698004cf18d`
+
