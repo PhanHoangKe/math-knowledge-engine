@@ -20,7 +20,7 @@ from .ast import (
     Equation,
 )
 from .lexer import tokenize, MAX_INPUT_LENGTH, MAX_TOKEN_COUNT
-from .parser import Parser, parse, MAX_NESTING_DEPTH
+from .parser import Parser, parse, parse_equation, parse_expression, MAX_NESTING_DEPTH
 
 __all__ = [
     "Token",
@@ -41,6 +41,8 @@ __all__ = [
     "Equation",
     "tokenize",
     "parse",
+    "parse_equation",
+    "parse_expression",
     "Parser",
     "MAX_INPUT_LENGTH",
     "MAX_TOKEN_COUNT",

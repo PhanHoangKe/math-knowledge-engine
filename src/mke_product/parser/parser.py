@@ -203,3 +203,22 @@ def parse(text: str) -> Equation:
     tokens = tokenize(text)
     parser = Parser(tokens, source_text=text)
     return parser.parse_equation()
+
+
+def parse_equation(text: str) -> Equation:
+    """Convenience entry point: tokenize and parse an equation string."""
+    return parse(text)
+
+
+def parse_expression(text: str) -> ASTNode:
+    """Convenience entry point: tokenize and parse an expression string."""
+    tokens = tokenize(text)
+    parser = Parser(tokens, source_text=text)
+    node = parser.parse_expression()
+    if parser.current.type != TokenType.EOF:
+        raise ParserError(
+            f"Unexpected token {parser.current.value!r} after expression at position {parser.current.span.start}.",
+            parser.current.span,
+        )
+    return node
+
