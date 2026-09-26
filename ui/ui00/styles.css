@@ -205,19 +205,29 @@ body {
   font-weight: 600;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.lang-control,
 .theme-control {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
+.control-label,
 .theme-label {
   font-size: 0.8125rem;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
+.control-select,
 .theme-select {
-  padding: 0.35rem 0.65rem;
+  padding: 0.35rem 0.6rem;
   font-size: 0.8125rem;
   background-color: var(--bg-surface-elevated);
   border: 1px solid var(--border-subtle);
@@ -225,8 +235,11 @@ body {
   border-radius: 6px;
   cursor: pointer;
   outline: none;
+  font-family: inherit;
+  transition: border-color var(--transition-speed) ease, background-color var(--transition-speed) ease;
 }
 
+.control-select:focus-visible,
 .theme-select:focus-visible {
   border-color: var(--border-accent);
 }

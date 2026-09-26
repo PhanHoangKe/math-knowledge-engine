@@ -1,53 +1,55 @@
-# MKE PRODUCT-UI-00 Implementation Report
+# MKE PRODUCT-UI-00-R1 Implementation Report
 
-**Milestone:** PRODUCT-UI-00 (Standalone Visual Prototype)  
+**Milestone:** PRODUCT-UI-00-R1 (Bilingual Localization & Prototype Refinement)  
 **Branch:** `design/ui00-light-dark`  
-**Base Commit:** `813c242d77aaf05ee9886fd5196de5cbd1943e21`  
+**Base Commit:** `20de3318670298c3764040b21d60f91ae8cf6281`  
 **Frozen Specification:** `31cdb61cc84a21b8ebe093765f0a71a606776196`  
-**Scope Restriction:** Pure UI prototype only. Zero solver integration, zero external dependencies/CDNs.
+**Scope Restriction:** Pure UI prototype only. Zero solver integration, zero backend API, zero external dependencies/CDNs.
 
 ---
 
-## 1. Token Decisions
-- **Color Palette:**
-  - *Light Theme:* Clean white background (`#f8f9fc`), crisp pure-white surface cards (`#ffffff`), slate borders (`#e2e8f0`), deep navy typography (`#0f172a`), and signature mathematical violet focus/accent (`#6366f1`).
-  - *Dark Theme:* Obsidian background (`#090d16`), deep navy surface cards (`#111827`), subtle borders (`#1f2937`), bright readable text (`#f1f5f9`), and glowing electric violet focus/accent (`#818cf8`).
-  - *Status Accents:* Emerald `#10b981` (certified valid), Amber `#f59e0b` (scope limit / warning), Rose `#ef4444` (syntax error), Cobalt `#3b82f6` (information).
-- **Typography Scale:** System font stack (`system-ui, -apple-system, Segoe UI, Roboto`) with mathematical serif fallback (`Cambria Math, KaTeX_Math, STIX Two Math, serif`) for mathematical notations, and monospace (`ui-monospace, Cascadia Code, Menlo`) for formal AST / exact rational representations.
-- **Accessibility:** Minimum contrast ratio exceeds WCAG 2.1 AA (4.5:1 text, 3:1 UI boundaries). Full `:focus-visible` styling and `@media (prefers-reduced-motion: reduce)` compliance.
+## 1. Bilingual Localization Decisions
+- **Default Language:** Vietnamese (`vi`) is the default language per Owner directive.
+- **English Support:** English (`en`) is fully supported across all user-facing views (Home, Results, Syntax Guide, Header, Advisory Banner, Footer).
+- **Mathematical Integrity:** Mathematical expressions (`2*x + 3 = 7`, `-x^2 = 1`, `(x-1)/(x-1) = 1`, `\(\mathbb{R}\)`, `\(\mathbb{Q}\)`), AST representations (`Equation(...)`, `BinaryOp(...)`), and technical identifiers are preserved without translation.
+- **Instant Language Switching:** Switching via the header `<select>` dropdown updates the interface instantly without page reloads using safe DOM APIs (`textContent`, `setAttribute`).
+- **Structured Localization Engine:**
+  - Translations are organized in a structured dictionary `I18N = { vi: {...}, en: {...} }`.
+  - Fallback hierarchy: Requested Language $\rightarrow$ Vietnamese (`vi`) $\rightarrow$ English (`en`) $\rightarrow$ translation key.
+  - Dynamically updates `<html lang="...">` attribute to ensure proper browser rendering and font fallback for Vietnamese tonal diacritics.
+- **Persistence & URL Synchronization:**
+  - Persisted independently in `localStorage` under `mke_language_preference`.
+  - URL overrides via `?lang=vi` and `?lang=en` are supported.
+  - Manual changes in the dropdown update `localStorage` and synchronize the URL parameter via `window.history.replaceState` without reloading.
+- **Decoupled Theme & Language:** Theme selection (Auto, Light, Dark) and Language selection (Tiếng Việt, English) operate with complete independence.
+- **Honest Demo Labeling:**
+  - Removed misleading placeholder cryptographic hashes (`e3b0c442...`) from the verification card.
+  - Replaced with clear, explicit disclaimers: `BẢN MẪU MÔ PHỎNG (DEMO)` / `DEMO / MOCK SPECIMEN` and interface specimen notes.
 
 ---
 
-## 2. Layout Choices
-- **Centered Prominent Search Bar:** Generous vertical padding and whitespace, prominent centered equation input with subtle violet glowing border on focus, with companion mathematical quick-insert buttons (`^`, `/`, `*`, `(`, `)`, `=`, `x`).
-- **4-Column Desktop Grid:** 4-column balanced grid on viewports $\ge 1024\text{px}$, transitioning to 2 columns on tablets and 1 column on mobile screens ($<768\text{px}$).
-- **Domain Topic Cards:**
-  1. *Algebraic Foundations (P02A)* — Emerald accent, active.
-  2. *Rational Field Arithmetic* — Blue accent, active.
-  3. *Univariate Quadratics* — Violet accent, planned R1.
-  4. *Classroom & Step Verifier* — Amber accent, planned R2.
-- **Multi-Card Result Stack:**
-  - Card 1: Input Interpretation & Formal Normalized Form.
-  - Card 2: Solution Set & Step-by-Step Method Breakdown tabs.
-  - Card 3: Exact Domain Verification & Cryptographic / Hash Receipt.
-- **Explicit Demo Watermark:** Unobtrusive banner and badges marking all computed data as `DEMO / MOCK DATA`.
+## 2. Technology & Architecture Decisions
+- **UI-00 Prototype:** Strictly zero-dependency native HTML5, CSS3, and vanilla ES6+ JavaScript. Offline capable with zero network requests.
+- **Future Production Frontend:** React + TypeScript + Vite with CSS Modules and CSS Variables. UI-00 is kept in vanilla web technologies and not migrated yet.
+- **Backend Mathematical Kernel:** Python.
+- **Backend API:** FastAPI (only when separately authorized).
+- **Source Code Conventions:** Identifiers in source code remain in English. User-facing text is sourced exclusively through the localization resource dictionary.
 
 ---
 
-## 3. Verification Results
-1. **Light / Dark Theme Switching:**
-   - 3-state toggle (Auto, Light, Dark) verified.
-   - Preference persisted across reloads in `localStorage`.
-   - URL override via `?theme=light` and `?theme=dark` verified.
-2. **Responsive Breakpoints:**
-   - Desktop 1280x900: 4-column layout verified without horizontal overflow.
-   - Mobile 390x844: Single-column linear stack verified, responsive toolbar and touch-friendly controls ($44\text{px}+$ tap targets).
-3. **Headless Chrome Artifact Capture:**
-   - `desktop-light.png`: Verified (115,442 bytes).
-   - `desktop-dark.png`: Verified (96,843 bytes).
-   - `mobile-light.png`: Verified (52,532 bytes).
-   - `mobile-dark.png`: Verified (51,542 bytes).
-4. **Zero-Dependency Check:** Zero script/font/stylesheet CDN calls; zero npm packages; fully functional offline.
+## 3. Verification & Testing Results
+Anty conducted full automated headless Chrome tests (`test_ui00_i18n.py`) and visual screenshot captures:
+1. **Default Language (`vi`):** PASS — Verified `<html lang="vi">`, Vietnamese diacritics, hero title, button labels, and topic cards.
+2. **English Override (`?lang=en`):** PASS — Verified `<html lang="en">`, English strings across all views.
+3. **Result View (Bilingual):** PASS — Verified input interpretation, exact solution box, method selector, and step-by-step trace in both languages.
+4. **Mock Integrity:** PASS — Verified that placeholder hashes are absent and mock data is explicitly labeled DEMO.
+5. **Syntax Error Handling:** PASS — Verified `1/2x = 1` demo displays explicit multiplication error message in active language.
+6. **Theme Independence:** PASS — Verified Light and Dark themes render correctly in both languages.
+7. **Artifact Captures:**
+   - `desktop-light.png`: 124,584 bytes (Vietnamese default, Light theme, 1280x900)
+   - `desktop-dark.png`: 125,860 bytes (Vietnamese default, Dark theme, 1280x900)
+   - `mobile-light.png`: 53,516 bytes (Vietnamese default, Light theme, 390x844)
+   - `mobile-dark.png`: 53,524 bytes (Vietnamese default, Dark theme, 390x844)
 
 ---
 
@@ -55,8 +57,9 @@
 ```bash
 # Option A: Local HTTP server
 python -m http.server -d ui/ui00 8080
-# Visit: http://localhost:8080
+# Visit: http://localhost:8080 (default: Vietnamese)
+# Or visit: http://localhost:8080?lang=en (English)
 
-# Option B: Direct file opening
+# Option B: Direct file open
 start ui/ui00/index.html
 ```

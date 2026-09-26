@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
   <!-- Header & Navigation -->
   <header class="app-header">
     <div class="header-container">
-      <div class="brand" id="brand-logo" role="button" tabindex="0" aria-label="Math Knowledge Engine Home">
+      <div class="brand" id="brand-logo" role="button" tabindex="0" aria-label="MKE Home" data-i18n-attr="aria-label:brand_home_aria">
         <svg class="brand-icon" viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="16" cy="16" r="13" />
           <path d="M10 16h12M16 10v12" />
@@ -18,24 +18,34 @@
         </svg>
         <div class="brand-text">
           <span class="brand-title">MKE</span>
-          <span class="brand-sub">Math Knowledge Engine</span>
+          <span class="brand-sub" data-i18n="brand_subtitle">Math Knowledge Engine</span>
         </div>
-        <span class="prototype-badge" title="Visual Prototype Only">UI-00 PROTOTYPE</span>
+        <span class="prototype-badge" data-i18n="prototype_badge" data-i18n-attr="title:prototype_badge_title" title="Bản mẫu trực quan (Chưa kết nối backend)">UI-00 BẢN MẪU</span>
       </div>
 
-      <nav class="nav-links" aria-label="Main Navigation">
-        <button type="button" class="nav-btn active" id="nav-home">Home</button>
-        <button type="button" class="nav-btn" id="nav-demo-result">Sample Result</button>
-        <button type="button" class="nav-btn" id="nav-syntax">Syntax Guide</button>
+      <nav class="nav-links" aria-label="Main Navigation" data-i18n-attr="aria-label:nav_main_aria">
+        <button type="button" class="nav-btn active" id="nav-home" data-i18n="nav_home">Trang chủ</button>
+        <button type="button" class="nav-btn" id="nav-demo-result" data-i18n="nav_sample">Kết quả mẫu</button>
+        <button type="button" class="nav-btn" id="nav-syntax" data-i18n="nav_syntax">Cú pháp</button>
       </nav>
 
-      <div class="theme-control">
-        <label for="theme-select" class="theme-label">Theme:</label>
-        <select id="theme-select" class="theme-select" aria-label="Select Color Theme">
-          <option value="auto">Auto (System)</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
+      <div class="header-controls">
+        <div class="lang-control">
+          <label for="lang-select" class="control-label" data-i18n="lang_label">Ngôn ngữ:</label>
+          <select id="lang-select" class="control-select" aria-label="Chọn ngôn ngữ / Select Language" data-i18n-attr="aria-label:lang_select_aria">
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+
+        <div class="theme-control">
+          <label for="theme-select" class="control-label" data-i18n="theme_label">Giao diện:</label>
+          <select id="theme-select" class="control-select" aria-label="Chọn chủ đề màu / Select Color Theme" data-i18n-attr="aria-label:theme_select_aria">
+            <option value="auto" data-i18n="theme_auto">Tự động (Hệ thống)</option>
+            <option value="light" data-i18n="theme_light">Sáng</option>
+            <option value="dark" data-i18n="theme_dark">Tối</option>
+          </select>
+        </div>
       </div>
     </div>
   </header>
@@ -43,8 +53,8 @@
   <!-- Prototype Advisory Banner -->
   <div class="disclaimer-banner" role="status">
     <div class="banner-inner">
-      <span class="banner-tag">DEMO / MOCK DATA</span>
-      <span class="banner-msg">This is a standalone visual prototype. Mathematical outputs are simulated illustrative fixtures; no backend or production solver is connected.</span>
+      <span class="banner-tag" data-i18n="banner_tag">BẢN MẪU / DỮ LIỆU DEMO</span>
+      <span class="banner-msg" data-i18n="banner_msg">Đây là bản mẫu giao diện trực quan độc lập. Mọi kết quả toán học hiển thị chỉ mang tính chất minh họa giả lập; chưa kết nối với bộ giải hay backend chính thức.</span>
     </div>
   </div>
 
@@ -52,8 +62,8 @@
     <!-- Screen 1: Home View -->
     <section class="screen-view active" id="screen-home" aria-label="Equation Input and Topics">
       <div class="hero-section">
-        <h1 class="hero-title">Exact Mathematical Knowledge &amp; Verifiable Computation</h1>
-        <p class="hero-subtitle">Deterministic symbolic reasoning over the real domain \(\mathbb{R}\) with exact rational arithmetic over \(\mathbb{Q}\).</p>
+        <h1 class="hero-title" data-i18n="hero_title">Tri thức Toán học Chuẩn xác &amp; Tính toán Kiểm chứng được</h1>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">Suy luận ký hiệu tất định trên miền số thực \(\mathbb{R}\) với số học hữu tỉ chuẩn xác trên \(\mathbb{Q}\).</p>
       </div>
 
       <!-- Prominent Equation Search Field -->
@@ -70,15 +80,16 @@
               type="text" 
               id="math-input" 
               class="math-input" 
-              placeholder="Enter equation (e.g., 2*x + 3 = 7, -x^2 = 1, x^0 = 1)..." 
+              placeholder="Nhập phương trình (ví dụ: 2*x + 3 = 7, -x^2 = 1, x^0 = 1)..." 
               value="2*x + 3 = 7"
               autocomplete="off" 
               spellcheck="false"
-              aria-label="Mathematical expression input"
+              aria-label="Nhập biểu thức toán học"
+              data-i18n-attr="placeholder:input_placeholder,aria-label:input_aria"
             >
-            <button type="button" class="clear-btn" id="btn-clear" aria-label="Clear input" title="Clear input">&times;</button>
-            <button type="submit" class="compute-btn" id="btn-compute" aria-label="Compute expression">
-              <span class="btn-text">Compute</span>
+            <button type="button" class="clear-btn" id="btn-clear" aria-label="Xóa nội dung nhập" title="Xóa nội dung nhập" data-i18n-attr="aria-label:clear_aria,title:clear_title">&times;</button>
+            <button type="submit" class="compute-btn" id="btn-compute" aria-label="Tính toán biểu thức" data-i18n-attr="aria-label:compute_aria">
+              <span class="btn-text" data-i18n="compute_btn">Tính toán</span>
               <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
@@ -87,9 +98,9 @@
           </div>
 
           <!-- Quick Math Insertion Toolbar -->
-          <div class="math-keyboard" aria-label="Quick Math Symbols">
-            <span class="kb-hint">Insert:</span>
-            <button type="button" class="sym-btn" data-sym="*">* (explicit mult)</button>
+          <div class="math-keyboard" aria-label="Phím chèn ký hiệu toán học" data-i18n-attr="aria-label:keyboard_aria">
+            <span class="kb-hint" data-i18n="kb_hint">Chèn nhanh:</span>
+            <button type="button" class="sym-btn" data-sym="*" data-i18n="sym_mult">* (nhân tường minh)</button>
             <button type="button" class="sym-btn" data-sym="x">x</button>
             <button type="button" class="sym-btn" data-sym="^2">^2</button>
             <button type="button" class="sym-btn" data-sym="^0">^0</button>
@@ -100,21 +111,21 @@
         </form>
 
         <!-- Suggested Prompt Chips -->
-        <div class="sample-chips" aria-label="Representative Examples">
-          <span class="chips-label">Examples:</span>
+        <div class="sample-chips" aria-label="Các ví dụ tiêu biểu" data-i18n-attr="aria-label:chips_aria">
+          <span class="chips-label" data-i18n="chips_label">Ví dụ:</span>
           <button type="button" class="chip" data-query="2*x + 3 = 7">2*x + 3 = 7</button>
           <button type="button" class="chip" data-query="-x^2 = 1">-x^2 = 1</button>
           <button type="button" class="chip" data-query="(-x)^2 = 1">(-x)^2 = 1</button>
           <button type="button" class="chip" data-query="x^0 = 1">x^0 = 1</button>
           <button type="button" class="chip" data-query="0*x = 0">0*x = 0</button>
           <button type="button" class="chip" data-query="(x-1)/(x-1) = 1">(x-1)/(x-1) = 1</button>
-          <button type="button" class="chip chip-syntax" data-query="1/2x = 1" title="Syntax error demonstration">1/2x = 1 (Syntax Error Demo)</button>
+          <button type="button" class="chip chip-syntax" data-query="1/2x = 1" title="Minh họa lỗi cú pháp" data-i18n="chip_syntax_demo" data-i18n-attr="title:chip_syntax_title">1/2x = 1 (Lỗi Cú pháp Demo)</button>
         </div>
       </div>
 
       <!-- 4-Column Mathematical Topic Grid -->
-      <section class="topics-section" aria-label="Mathematical Domains">
-        <h2 class="section-title">Mathematical Topics &amp; Capabilities</h2>
+      <section class="topics-section" aria-label="Chuyên đề toán học" data-i18n-attr="aria-label:topics_section_aria">
+        <h2 class="section-title" data-i18n="topics_title">Chuyên đề Toán học &amp; Năng lực Xử lý</h2>
         <div class="topic-grid">
           <!-- Card 1: Linear Algebra -->
           <article class="topic-card card-algebra">
@@ -126,14 +137,14 @@
                   <circle cx="17" cy="8" r="2"></circle>
                 </svg>
               </span>
-              <span class="card-badge active-badge">PHASE P02A ACTIVE</span>
+              <span class="card-badge active-badge" data-i18n="badge_p02a_active">GIAI ĐOẠN P02A HOẠT ĐỘNG</span>
             </div>
-            <h3 class="card-title">Algebra &amp; Linear Equations</h3>
-            <p class="card-desc">Exact affine linear equations \(ax + b = 0\) over domain \(\mathbb{R}\) with rational coefficients \(\mathbb{Q}\). Handles identities and contradictions.</p>
+            <h3 class="card-title" data-i18n="card_algebra_title">Đại số &amp; Phương trình Tuyến tính</h3>
+            <p class="card-desc" data-i18n="card_algebra_desc">Phương trình tuyến tính affine chuẩn xác \(ax + b = 0\) trên miền thực \(\mathbb{R}\) với hệ số hữu tỉ \(\mathbb{Q}\). Xử lý chính xác đồng nhất thức và mâu thuẫn.</p>
             <ul class="card-prompts">
               <li><button type="button" class="prompt-link" data-query="3*x - 5 = 10">3*x - 5 = 10</button></li>
               <li><button type="button" class="prompt-link" data-query="4*x + 2 = 2*x + 8">4*x + 2 = 2*x + 8</button></li>
-              <li><button type="button" class="prompt-link" data-query="0*x = 0">0*x = 0 (Identity over \(\mathbb{R}\))</button></li>
+              <li><button type="button" class="prompt-link" data-query="0*x = 0" data-i18n="prompt_algebra_identity">0*x = 0 (Đồng nhất thức trên \(\mathbb{R}\))</button></li>
             </ul>
           </article>
 
@@ -145,14 +156,14 @@
                   <path d="M4 19h16M7 14l5-9 5 9"></path>
                 </svg>
               </span>
-              <span class="card-badge active-badge">CORE ACTIVE</span>
+              <span class="card-badge active-badge" data-i18n="badge_core_active">CỐT LÕI HOẠT ĐỘNG</span>
             </div>
-            <h3 class="card-title">Rational Field Arithmetic</h3>
-            <p class="card-desc">Arbitrary-precision exact arithmetic over \(\mathbb{Q}\). Canonical Euclidean GCD reduction with zero floating-point approximation drift.</p>
+            <h3 class="card-title" data-i18n="card_rational_title">Số học Trường Số Hữu tỉ</h3>
+            <p class="card-desc" data-i18n="card_rational_desc">Số học chính xác độ chính xác tùy ý trên \(\mathbb{Q}\). Rút gọn GCD Euclid chuẩn tắc, triệt tiêu sai số trôi của số thực dấu phẩy động.</p>
             <ul class="card-prompts">
               <li><button type="button" class="prompt-link" data-query="1/3 + 1/6 = 1/2">1/3 + 1/6 = 1/2</button></li>
-              <li><button type="button" class="prompt-link" data-query="(x-1)/(x-1) = 1">Domain Exclusions: (x-1)/(x-1)</button></li>
-              <li><button type="button" class="prompt-link" data-query="10^100 / 10^99 = 10">Large Integers (10^100)</button></li>
+              <li><button type="button" class="prompt-link" data-query="(x-1)/(x-1) = 1" data-i18n="prompt_rational_domain">Điều kiện xác định: (x-1)/(x-1)</button></li>
+              <li><button type="button" class="prompt-link" data-query="10^100 / 10^99 = 10" data-i18n="prompt_rational_bigint">Số nguyên lớn (10^100)</button></li>
             </ul>
           </article>
 
@@ -164,14 +175,14 @@
                   <path d="M4 18c4-12 12-12 16 0"></path>
                 </svg>
               </span>
-              <span class="card-badge planned-badge">PLANNED (R1)</span>
+              <span class="card-badge planned-badge" data-i18n="badge_planned_r1">DỰ KIẾN (R1)</span>
             </div>
-            <h3 class="card-title">Quadratics &amp; Factoring</h3>
-            <p class="card-desc">Non-linear equations \(ax^2 + bx + c = 0\), discriminant analysis, completing the square, and independent candidate checking.</p>
+            <h3 class="card-title" data-i18n="card_quad_title">Phương trình Bậc hai &amp; Phân tích Nhân tử</h3>
+            <p class="card-desc" data-i18n="card_quad_desc">Phương trình phi tuyến \(ax^2 + bx + c = 0\), tính biệt thức, khai triển bình phương và kiểm tra nghiệm ứng viên độc lập.</p>
             <ul class="card-prompts">
-              <li><button type="button" class="prompt-link" data-query="x^2 - 4 = 0">x^2 - 4 = 0 (Check Candidate)</button></li>
-              <li><button type="button" class="prompt-link disabled" tabindex="-1">Factoring Methods (Planned)</button></li>
-              <li><button type="button" class="prompt-link disabled" tabindex="-1">Radical Field Extensions (Planned)</button></li>
+              <li><button type="button" class="prompt-link" data-query="x^2 - 4 = 0" data-i18n="prompt_quad_candidate">x^2 - 4 = 0 (Kiểm tra nghiệm ứng viên)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1" data-i18n="prompt_quad_factoring">Phương pháp phân tích nhân tử (Dự kiến)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1" data-i18n="prompt_quad_radicals">Mở rộng trường căn thức (Dự kiến)</button></li>
             </ul>
           </article>
 
@@ -186,14 +197,14 @@
                   <line x1="16" y1="17" x2="8" y2="17"></line>
                 </svg>
               </span>
-              <span class="card-badge planned-badge">PLANNED (R2)</span>
+              <span class="card-badge planned-badge" data-i18n="badge_planned_r2">DỰ KIẾN (R2)</span>
             </div>
-            <h3 class="card-title">Classroom &amp; Document Ingestion</h3>
-            <p class="card-desc">Step-by-step diagnostic tutoring, student error categorization, and separately gated manual PDF/image math ingestion.</p>
+            <h3 class="card-title" data-i18n="card_classroom_title">Lớp học &amp; Tiếp nhận Tài liệu</h3>
+            <p class="card-desc" data-i18n="card_classroom_desc">Chẩn đoán sư phạm từng bước, phân loại lỗi học sinh và tiếp nhận tài liệu toán PDF/hình ảnh có kiểm soát riêng biệt.</p>
             <ul class="card-prompts">
-              <li><button type="button" class="prompt-link disabled" tabindex="-1">Step Guidance Tree (Planned)</button></li>
-              <li><button type="button" class="prompt-link disabled" tabindex="-1">Manual PDF Ingestion (Planned)</button></li>
-              <li><button type="button" class="prompt-link disabled" tabindex="-1">Classroom Roster Grading (Planned)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1" data-i18n="prompt_class_tree">Cây hướng dẫn từng bước (Dự kiến)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1" data-i18n="prompt_class_pdf">Tiếp nhận tài liệu PDF thủ công (Dự kiến)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1" data-i18n="prompt_class_grade">Chấm điểm danh sách lớp (Dự kiến)</button></li>
             </ul>
           </article>
         </div>
@@ -204,9 +215,9 @@
     <section class="screen-view" id="screen-result" aria-label="Equation Solution and Verification">
       <!-- Result Screen Top Header -->
       <div class="result-header">
-        <button type="button" class="back-link" id="btn-back-home">&larr; Back to Home</button>
+        <button type="button" class="back-link" id="btn-back-home" data-i18n="btn_back_home">&larr; Quay lại Trang chủ</button>
         <div class="result-query-badge">
-          <span class="query-label">Active Query:</span>
+          <span class="query-label" data-i18n="active_query_label">Biểu thức đang chọn:</span>
           <code class="query-code" id="result-query-text">2*x + 3 = 7</code>
         </div>
       </div>
@@ -216,20 +227,20 @@
         <!-- 1. Input Interpretation Card -->
         <article class="result-card">
           <div class="res-card-header">
-            <h3 class="res-card-title">Input Interpretation</h3>
-            <span class="syntax-status status-valid">SYNTACTICALLY VALID</span>
+            <h3 class="res-card-title" data-i18n="card_input_title">Phân tích Biểu thức Đầu vào</h3>
+            <span class="syntax-status status-valid" id="res-syntax-status" data-i18n="status_syntax_valid">CÚ PHÁP HỢP LỆ</span>
           </div>
           <div class="res-card-body">
             <div class="math-display-large" id="res-math-display">
               \(2x + 3 = 7\)
             </div>
             <div class="ast-meta">
-              <span class="meta-item"><strong>Grammar Standard:</strong> PRODUCT-01 EBNF (rev0.3.1)</span>
-              <span class="meta-item"><strong>Multiplication:</strong> Explicit (<code>*</code> confirmed)</span>
-              <span class="meta-item"><strong>AST Nodes:</strong> 7 nodes preserved</span>
+              <span class="meta-item"><strong data-i18n="meta_grammar_label">Chuẩn ngữ pháp:</strong> PRODUCT-01 EBNF (rev0.3.1)</span>
+              <span class="meta-item"><strong data-i18n="meta_mult_label">Phép nhân:</strong> <span id="res-meta-mult" data-i18n="meta_mult_val">Tường minh (đã xác nhận *)</span></span>
+              <span class="meta-item"><strong data-i18n="meta_ast_nodes_label">Nút AST:</strong> <span id="res-meta-nodes" data-i18n="meta_ast_nodes_val">7 nút được bảo toàn</span></span>
             </div>
             <details class="ast-details">
-              <summary class="ast-summary">View Parsed AST Structure</summary>
+              <summary class="ast-summary" data-i18n="ast_summary">Xem Cấu trúc Cây Cú pháp (AST)</summary>
               <pre class="ast-code" id="res-ast-json">
 Equation(
   left=BinaryOp("+",
@@ -244,35 +255,35 @@ Equation(
         <!-- 2. Exact Solution & Method Card -->
         <article class="result-card card-primary-solution">
           <div class="res-card-header">
-            <h3 class="res-card-title">Exact Solution</h3>
-            <div class="method-selector" role="tablist" aria-label="Solution Methods">
-              <button type="button" class="tab-btn active" role="tab" aria-selected="true">Linear Field Algebra</button>
-              <button type="button" class="tab-btn" role="tab" aria-selected="false" title="Planned for Release 1">Factoring (Planned)</button>
-              <button type="button" class="tab-btn" role="tab" aria-selected="false" title="Planned for Release 1">Graphic Form (Planned)</button>
+            <h3 class="res-card-title" data-i18n="card_solution_title">Nghiệm Chuẩn xác</h3>
+            <div class="method-selector" role="tablist" aria-label="Solution Methods" data-i18n-attr="aria-label:methods_aria">
+              <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-i18n="tab_linear_algebra">Đại số Tuyến tính trên Trường</button>
+              <button type="button" class="tab-btn" role="tab" aria-selected="false" data-i18n="tab_factoring_planned" data-i18n-attr="title:tab_planned_r1_title" title="Dự kiến cho Phát hành 1">Phân tích Nhân tử (Dự kiến)</button>
+              <button type="button" class="tab-btn" role="tab" aria-selected="false" data-i18n="tab_graphic_planned" data-i18n-attr="title:tab_planned_r1_title" title="Dự kiến cho Phát hành 1">Dạng Đồ thị (Dự kiến)</button>
             </div>
           </div>
           <div class="res-card-body">
             <div class="solution-box" id="res-solution-box">
               <div class="solution-equation">
-                <span class="sol-var">x</span>
+                <span class="sol-var" id="res-solution-var">x</span>
                 <span class="sol-eq">=</span>
                 <span class="sol-val" id="res-solution-val">2</span>
               </div>
-              <span class="sol-domain-tag">Exact Rational in \(\mathbb{Q}\)</span>
+              <span class="sol-domain-tag" data-i18n="sol_domain_tag">Số hữu tỉ chính xác trong \(\mathbb{Q}\)</span>
             </div>
 
             <!-- Step by Step Presentation -->
             <div class="step-trace">
-              <h4 class="trace-title">Deterministic Step-by-Step Derivation</h4>
+              <h4 class="trace-title" data-i18n="trace_title">Các bước Biến đổi Tất định</h4>
               <ol class="steps-list" id="res-steps-list">
                 <li class="step-item">
-                  <div class="step-num">Step 1</div>
-                  <div class="step-desc">Isolate variable terms by subtracting constant \(3\) from both sides:</div>
+                  <div class="step-num">Bước 1</div>
+                  <div class="step-desc">Chuyển vế hằng số bằng cách trừ 3 ở cả hai vế:</div>
                   <div class="step-math">\(2x + 3 - 3 = 7 - 3 \implies 2x = 4\)</div>
                 </li>
                 <li class="step-item">
-                  <div class="step-num">Step 2</div>
-                  <div class="step-desc">Apply multiplicative inverse of coefficient \(a=2\) in field \(\mathbb{Q}\):</div>
+                  <div class="step-num">Bước 2</div>
+                  <div class="step-desc">Nhân với nghịch đảo của hệ số a=2 trong trường \(\mathbb{Q}\):</div>
                   <div class="step-math">\(x = \frac{4}{2} = 2\)</div>
                 </li>
               </ol>
@@ -283,29 +294,28 @@ Equation(
         <!-- 3. Domain & Candidate Verification Card -->
         <article class="result-card">
           <div class="res-card-header">
-            <h3 class="res-card-title">Domain &amp; Verification Evidence</h3>
-            <span class="cert-status status-demo">DEMO VERIFIED</span>
+            <h3 class="res-card-title" data-i18n="card_domain_title">Miền Xác định &amp; Minh chứng Kiểm định</h3>
+            <span class="cert-status status-demo" data-i18n="badge_mock_specimen">BẢN MẪU MÔ PHỎNG (DEMO)</span>
           </div>
           <div class="res-card-body">
             <div class="domain-info-grid">
               <div class="domain-tile">
-                <span class="tile-label">Equation Domain</span>
-                <span class="tile-val">Real Numbers \(\mathbb{R}\)</span>
+                <span class="tile-label" data-i18n="tile_eq_domain">Miền nghiệm phương trình</span>
+                <span class="tile-val" data-i18n="val_eq_domain">Số thực \(\mathbb{R}\)</span>
               </div>
               <div class="domain-tile">
-                <span class="tile-label">Original Domain Constraints</span>
-                <span class="tile-val" id="res-domain-constraints">None (No variable denominators)</span>
+                <span class="tile-label" data-i18n="tile_domain_constraints">Ràng buộc miền ban đầu</span>
+                <span class="tile-val" id="res-domain-constraints">Không có (Không có biến ở mẫu số)</span>
               </div>
               <div class="domain-tile">
-                <span class="tile-label">Candidate Check (\(c=2\))</span>
-                <span class="tile-val status-valid-text">\(|L(2) - R(2)| = 0\) (Exact)</span>
+                <span class="tile-label" data-i18n="tile_candidate_check">Kiểm tra nghiệm ứng viên</span>
+                <span class="tile-val status-valid-text" id="res-candidate-check">\(|L(2) - R(2)| = 0\) (Chính xác)</span>
               </div>
             </div>
 
             <div class="crypto-meta">
-              <span class="crypto-tag">PROVENANCE RECEIPT</span>
-              <p class="crypto-hash">Canonical AST Hash (RFC 8785 mock): <code>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code></p>
-              <p class="crypto-note">This receipt is a visual prototype demonstration; production cryptographic signing is planned for future milestones.</p>
+              <span class="crypto-tag" data-i18n="tag_specimen_notice">GHI CHÚ MINH HỌA GIAO DIỆN (DEMO)</span>
+              <p class="crypto-note" data-i18n="msg_specimen_disclaimer">Khung hiển thị này chỉ minh họa cấu trúc biên nhận kiểm định trực quan. Bản mẫu hiện tại không sinh hoặc chứng nhận mã băm mật mã thực tế; cơ chế ký số chứng thực sẽ được tích hợp trong các mốc phát triển chính thức.</p>
             </div>
           </div>
         </article>
@@ -315,30 +325,30 @@ Equation(
     <!-- Screen 3: Syntax Guide View -->
     <section class="screen-view" id="screen-syntax" aria-label="Syntax Rules and Grammar">
       <div class="syntax-guide-container">
-        <h2 class="guide-title">MKE Phase P02A Syntax Specification</h2>
-        <p class="guide-lead">MKE enforces strict mathematical explicit syntax to prevent ambiguity and silent parsing misinterpretations.</p>
+        <h2 class="guide-title" data-i18n="syntax_guide_title">Quy chuẩn Cú pháp MKE Giai đoạn P02A</h2>
+        <p class="guide-lead" data-i18n="syntax_guide_lead">MKE áp dụng cú pháp toán học tường minh nghiêm ngặt nhằm loại trừ hoàn toàn các diễn giải mơ hồ hoặc ngầm định sai lệch.</p>
 
         <div class="syntax-grid">
           <div class="syntax-rule-card">
-            <h3 class="rule-title rule-accepted">&#10003; Accepted Syntax</h3>
+            <h3 class="rule-title rule-accepted" data-i18n="syntax_accepted_title">&#10003; Cú pháp Được Chấp nhận</h3>
             <ul class="rule-list">
-              <li><code>2*x + 3 = 7</code> (Explicit multiplication with <code>*</code>)</li>
-              <li><code>-x^2 = 1</code> (Parsed as <code>-(x^2)</code>)</li>
-              <li><code>(-x)^2 = 1</code> (Grouped negative base)</li>
-              <li><code>x^0 = 1</code> (Preserves power node; evaluated over original domain)</li>
-              <li><code>0*x = 0</code> (Identity equation; solution domain \(\mathbb{R}\))</li>
-              <li><code>(x-1)/(x-1) = 1</code> (Rational equation preserved for candidate verification)</li>
+              <li><code>2*x + 3 = 7</code> <span data-i18n="syntax_acc_1">(Phép nhân tường minh với ký tự <code>*</code>)</span></li>
+              <li><code>-x^2 = 1</code> <span data-i18n="syntax_acc_2">(Được phân tích thành <code>-(x^2)</code>)</span></li>
+              <li><code>(-x)^2 = 1</code> <span data-i18n="syntax_acc_3">(Cơ số âm có dấu ngoặc nhóm)</span></li>
+              <li><code>x^0 = 1</code> <span data-i18n="syntax_acc_4">(Bảo toàn nút lũy thừa; đánh giá trên miền ban đầu)</span></li>
+              <li><code>0*x = 0</code> <span data-i18n="syntax_acc_5">(Phương trình đồng nhất; miền nghiệm \(\mathbb{R}\))</span></li>
+              <li><code>(x-1)/(x-1) = 1</code> <span data-i18n="syntax_acc_6">(Phương trình hữu tỉ được giữ nguyên để kiểm tra ứng viên)</span></li>
             </ul>
           </div>
 
           <div class="syntax-rule-card">
-            <h3 class="rule-title rule-rejected">&#10007; Strictly Rejected (Syntax Errors)</h3>
+            <h3 class="rule-title rule-rejected" data-i18n="syntax_rejected_title">&#10007; Nghiêm ngặt Từ chối (Lỗi Cú pháp)</h3>
             <ul class="rule-list">
-              <li><code>2x = 4</code> (Ambiguous implicit multiplication; use <code>2*x</code>)</li>
-              <li><code>1/2x = 1</code> (Implicit multiplication; use <code>1/(2*x)</code> or <code>(1/2)*x</code>)</li>
-              <li><code>x(x+1) = 0</code> (Implicit multiplication; use <code>x*(x+1)</code>)</li>
-              <li><code>x^3 = 1</code> (Exponent &gt; 2 out of scope in Phase P02A)</li>
-              <li><code>2*y = 4</code> (Multi-variable unsupported; single variable <code>x</code> only)</li>
+              <li><code>2x = 4</code> <span data-i18n="syntax_rej_1">(Phép nhân ngầm mơ hồ; yêu cầu viết <code>2*x</code>)</span></li>
+              <li><code>1/2x = 1</code> <span data-i18n="syntax_rej_2">(Nhân ngầm mẫu số; yêu cầu viết <code>1/(2*x)</code> hoặc <code>(1/2)*x</code>)</span></li>
+              <li><code>x(x+1) = 0</code> <span data-i18n="syntax_rej_3">(Nhân ngầm ngoặc; yêu cầu viết <code>x*(x+1)</code>)</span></li>
+              <li><code>x^3 = 1</code> <span data-i18n="syntax_rej_4">(Số mũ &gt; 2 nằm ngoài phạm vi Giai đoạn P02A)</span></li>
+              <li><code>2*y = 4</code> <span data-i18n="syntax_rej_5">(Không hỗ trợ đa biến; chỉ chấp nhận đơn biến <code>x</code>)</span></li>
             </ul>
           </div>
         </div>
@@ -350,20 +360,20 @@ Equation(
   <footer class="app-footer">
     <div class="footer-container">
       <div class="footer-col">
-        <span class="footer-brand">MKE Product Architecture</span>
-        <p class="footer-desc">Phase P02A — Exact Linear Mathematical Knowledge Engine. All client-side processing, zero external network telemetry.</p>
+        <span class="footer-brand" data-i18n="footer_brand">Kiến trúc Sản phẩm MKE</span>
+        <p class="footer-desc" data-i18n="footer_desc">Giai đoạn P02A — Hệ tri thức Toán học Tuyến tính Chuẩn xác. Toàn bộ xử lý tại trình duyệt máy khách, không thu thập dữ liệu mạng bên ngoài.</p>
       </div>
       <div class="footer-col">
-        <span class="footer-heading">Specifications &amp; Governance</span>
+        <span class="footer-heading" data-i18n="footer_specs_heading">Quy chuẩn &amp; Pháp quy</span>
         <ul class="footer-links">
-          <li><span>Frozen Baseline: <code>31cdb61c</code></span></li>
-          <li><span>Approved Product: <code>813c242d</code></span></li>
-          <li><span>Precedence: FREEZE_ADDENDUM.md</span></li>
+          <li><span data-i18n="footer_baseline_label">Quy chuẩn đóng băng:</span> <code>31cdb61c</code></li>
+          <li><span data-i18n="footer_approved_label">Mã nguồn phê duyệt:</span> <code>813c242d</code></li>
+          <li><span data-i18n="footer_precedence_label">Thứ bậc ưu tiên:</span> <code>FREEZE_ADDENDUM.md</code></li>
         </ul>
       </div>
       <div class="footer-col">
-        <span class="footer-heading">Prototype Disclaimer</span>
-        <p class="footer-disclaimer">WolframAlpha inspired aesthetic; all code, SVG icons, tokens, and layouts are original to MKE. All results are labeled DEMO / MOCK DATA.</p>
+        <span class="footer-heading" data-i18n="footer_disclaimer_heading">Tuyên bố Bản mẫu</span>
+        <p class="footer-disclaimer" data-i18n="footer_disclaimer_desc">Lấy cảm hứng từ phong cách WolframAlpha; toàn bộ mã nguồn, biểu tượng SVG, token thiết kế và bố cục đều thuộc bản quyền nguyên bản của MKE. Tất cả kết quả đều được gắn nhãn BẢN MẪU / DỮ LIỆU DEMO.</p>
       </div>
     </div>
   </footer>
