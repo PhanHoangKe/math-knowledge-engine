@@ -1,95 +1,77 @@
-# MKE PRODUCT-UI-00 Design Tokens & Visual Specification
+# MKE PRODUCT-UI-00 — Design Tokens & Visual Atmosphere
 
-**Milestone:** PRODUCT-UI-00 — Standalone Light/Dark Visual Prototype  
-**Atmosphere Inspiration:** Refined mathematical atmosphere (WolframAlpha inspired, original MKE identity)  
-**Status:** Visual Prototype Only (No Production Backend / Zero Network Requests)  
-**Date:** September 2026  
+This specification defines the authoritative design tokens and styling guidelines for the **Math Knowledge Engine (MKE)**, faithfully capturing the visual elegance, atmosphere, and clarity of **WolframAlpha** while preserving MKE's original identity.
 
 ---
 
-## 1. Color Palette & Semantic Tokens
+## 1. Color Palette Tokens
 
-### Light Theme
-- `--bg-canvas`: `#f8fafc` (Subtle cool off-white)
-- `--bg-surface`: `#ffffff` (Pure white card surfaces)
-- `--bg-surface-elevated`: `#ffffff`
-- `--bg-subtle`: `#f1f5f9` (Input secondary backgrounds, chip fills)
-- `--border-subtle`: `#e2e8f0` (Delicate boundary lines)
-- `--border-accent`: `#7c3aed` (Thin signature violet input border)
-- `--text-primary`: `#0f172a` (Deep slate heading & body)
-- `--text-secondary`: `#475569` (Muted explanation labels)
-- `--text-muted`: `#94a3b8` (Timestamps, metadata, hints)
-- `--accent-primary`: `#7c3aed` (Violet brand color)
-- `--accent-hover`: `#6d28d9`
-- `--accent-surface`: `#ede9fe` (Violet tint for badges/highlights)
-- `--compute-btn`: `#ea580c` (Warm amber/orange compute accent)
-- `--compute-btn-hover`: `#c2410c`
-- `--status-demo`: `#b45309` (Amber warning for demo/mock labels)
-- `--status-demo-bg`: `#fef3c7`
-- `--status-planned`: `#475569`
-- `--status-planned-bg`: `#f1f5f9`
+### 1.1 Canvas & Surface
+| Token | Light Theme | Dark Theme (Wolfram Charcoal) | Description |
+|---|---|---|---|
+| `--bg-canvas` | `#ffffff` | `#262626` | Main canvas background |
+| `--bg-surface` | `#ffffff` | `#2e2e2e` | Base topic card surface |
+| `--bg-surface-elevated` | `#ffffff` | `#363636` | Elevated cards & modals |
+| `--bg-subtle` | `#f7f7f9` | `#333333` | Sub-toolbars & inputs |
+| `--border-subtle` | `#e2e8f0` | `#3d3d3d` | Header & footer rules |
+| `--border-card` | `#e5e7eb` | `#3d3d3d` | Card border |
+| `--border-card-hover` | `#cbd5e1` | `#525252` | Card hover border |
 
-### Dark Theme
-- `--bg-canvas`: `#0b0f19` (Deep obsidian background)
-- `--bg-surface`: `#162032` (Charcoal surface with cool blue tint)
-- `--bg-surface-elevated`: `#1e293b`
-- `--bg-subtle`: `#1e293b`
-- `--border-subtle`: `#2a384e` (Restrained dark border)
-- `--border-accent`: `#a78bfa` (Luminous violet input border)
-- `--text-primary`: `#f8fafc` (Crisp off-white)
-- `--text-secondary`: `#94a3b8` (Medium slate)
-- `--text-muted`: `#64748b` (Low-contrast metadata)
-- `--accent-primary`: `#8b5cf6` (Electric violet)
-- `--accent-hover`: `#a78bfa`
-- `--accent-surface`: `#2e1065`
-- `--compute-btn`: `#f97316` (Vibrant amber/orange compute button)
-- `--compute-btn-hover`: `#ea580c`
-- `--status-demo`: `#fbbf24`
-- `--status-demo-bg`: `#451a03`
-- `--status-planned`: `#94a3b8`
-- `--status-planned-bg`: `#1e293b`
+### 1.2 Signature Accent & Interaction
+| Token | Light Theme | Dark Theme | Purpose |
+|---|---|---|---|
+| `--border-accent` | `#8e6cd9` | `#9d7fe3` | Signature violet 2px search border |
+| `--border-focus` | `#7a54cc` | `#bca4f5` | Focus ring boundary |
+| `--compute-btn` | `#8e6cd9` | `#9d7fe3` | Violet capsule `=` compute button |
+| `--compute-btn-hover` | `#7b55ca` | `#8b66da` | Compute button hover |
+| `--accent-subtle` | `#f3f0fc` | `#3a2e54` | Active chip / pill background |
 
-### Topic Category Accents (Harmonized across both themes)
-- **Algebra & Equations:** `#ea580c` (Orange / Terracotta)
-- **Arithmetic & Rational Field:** `#059669` (Emerald / Sage)
-- **Calculus & Limits (Planned):** `#2563eb` (Royal Blue)
-- **Discrete & Logic (Planned):** `#7c3aed` (Violet / Amethyst)
+### 1.3 The 4 Column Topic Domain Colors (WolframAlpha Palette)
+| Column | Light Color | Dark Color | Domain Representation |
+|---|---|---|---|
+| **Column 1 (Mathematics)** | `#8e6cd9` (Violet) | `#a78bfa` | Linear Algebra & Step Solutions |
+| **Column 2 (Science & Field)** | `#059669` (Emerald) | `#34d399` | Rational Field Arithmetic \(\mathbb{Q}\) |
+| **Column 3 (Society & Polynomials)** | `#e05638` (Terracotta) | `#fb7185` | Quadratics & Factorization |
+| **Column 4 (Classroom & Documents)** | `#0284c7` (Sky Blue) | `#38bdf8` | Diagnostic Tutoring & PDF Ingestion |
 
 ---
 
-## 2. Typography & Type Hierarchy
+## 2. Typography Hierarchy
 
-MKE uses a zero-external-dependency system font stack combining classical mathematical serif authority with modern UI clarity:
+### 2.1 Font Stacks
+- **UI & System:** `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`
+- **Hero Mottos & Taglines:** `"Charter", "Georgia", "Cambria", serif` (styled in italics, capturing Wolfram's expert tagline feel)
+- **Mathematical Form:** `"Cambria Math", "Charter", "Georgia", serif`
+- **AST & Formal Code:** `"Cascadia Code", "Consolas", monospace`
 
-- **Heading Font Stack (Serif Math):**  
-  `"Cambria Math", "Charter", "Georgia", "Times New Roman", serif`
-- **UI & Body Font Stack (Clean Sans):**  
-  `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-- **Code & Mathematical Literal Stack (Monospace):**  
-  `"Cascadia Code", "Consolas", "Courier New", monospace`
-
-### Scale
-- **Display Hero:** `2.5rem` (40px) / `font-weight: 600` / `letter-spacing: -0.02em`
-- **Section Heading:** `1.5rem` (24px) / `font-weight: 600`
-- **Sub-heading / Card Title:** `1.125rem` (18px) / `font-weight: 600`
-- **Body Regular:** `0.9375rem` (15px) / `line-height: 1.6`
-- **Small / Metadata:** `0.8125rem` (13px)
-- **Mathematical Formula:** `1.25rem` (20px) / `font-family: serif & monospace`
+### 2.2 Scale & Weights
+- **Hero Title:** `2.4rem`, weight `700`, tracking `-0.02em`
+- **Hero Italic Subtitle:** `1.125rem`, weight `400`, italic, line-height `1.5`
+- **Column Header:** `1.05rem`, weight `600`, colored with chevron `›`
+- **Topic Card Title:** `0.875rem`, weight `500`, high legibility
+- **Search Input:** `1.15rem`, weight `400`, monospace family
 
 ---
 
-## 3. Elevation, Spacing & Layout Grid
+## 3. Component Architecture
 
-- **Search Bar Elevation:** `0 4px 20px -2px rgba(124, 58, 237, 0.08)` (Light) / `0 4px 24px -2px rgba(0, 0, 0, 0.4)` (Dark)
-- **Card Radius:** `8px` (Clean, rectangular, mathematical precision)
-- **Desktop Grid:** 4-column balanced card grid (`repeat(4, minmax(0, 1fr))`), `gap: 1.5rem`
-- **Mobile Grid:** Single-column layout (`repeat(1, minmax(0, 1fr))`) below `768px` breakpoint
+### 3.1 Capsule Search Box
+- **Shape:** Rounded lozenge (`border-radius: 20px`).
+- **Border:** `2px solid var(--border-accent)` (vibrant violet).
+- **Compute Button:** Integrated rounded square (`border-radius: 12px`, violet background) containing `=`.
+- **Sub-toolbar:** Mode toggles on left (`Toán Chuẩn xác`, `Ký hiệu Tất định`), quick math keys on right (`*`, `x`, `^2`, `^0`, `/`, `=`, `( )`).
 
----
+### 3.2 4-Column Topic Cards
+- 4 balanced desktop columns transitioning to 2 columns on tablet and 1 column on mobile.
+- Each card features a colored icon box (`34px × 34px`) with an authentic domain SVG icon on the left and the title on the right.
+- The bottom card in each column is a dedicated `••• Xem thêm Chuyên đề »` card with a 3x3 dot matrix icon in that column's color.
 
-## 4. Accessibility & Interaction Contracts
+### 3.3 Top-Right Settings Popover (Theme & Language)
+- Clean gear/cog trigger icon in header.
+- Floating popover modal containing:
+  - Theme: Automatic, Light, Dark (with active checkmark)
+  - Language: Tiếng Việt (Default), English (with active checkmark)
 
-- **Keyboard Focus:** High-visibility outline: `2px solid var(--accent-primary)`, `outline-offset: 2px`.
-- **Reduced Motion:** Fully conforms to `prefers-reduced-motion: reduce` by disabling transitions and animations.
-- **Theme Persistence:** Stored in `localStorage` under key `mke_visual_theme_preference`.
-- **Contrast Ratios:** All primary text-to-background combinations exceed WCAG 2.1 AA (4.5:1) and AAA (7:1).
+### 3.4 Architecture Flow Banner
+- Flowchart above the footer:
+  `MKE = Cú pháp AST Tường minh + Số học Hữu tỉ Q + Suy luận Ký hiệu R ➔ Nghiệm & Minh chứng Tất định`

@@ -1,7 +1,7 @@
 /**
  * MKE PRODUCT-UI-00 — Bilingual Client-Side Prototype Logic
+ * Inspired by WolframAlpha's iconic visual atmosphere and interaction model.
  * Strictly self-contained: Zero external network requests, zero CDNs, local storage persistence.
- * English identifiers in source code; user-facing content sourced exclusively from I18N resources.
  */
 
 (function () {
@@ -13,7 +13,7 @@
   const I18N = {
     vi: {
       // Header & Navigation
-      brand_subtitle: 'Hệ thống Tri thức Toán học',
+      brand_subtitle: 'Math Knowledge Engine',
       brand_home_aria: 'Trang chủ MKE',
       prototype_badge: 'UI-00 BẢN MẪU',
       prototype_badge_title: 'Bản mẫu trực quan (Chưa kết nối backend)',
@@ -21,10 +21,8 @@
       nav_home: 'Trang chủ',
       nav_sample: 'Kết quả mẫu',
       nav_syntax: 'Cú pháp',
-      lang_label: 'Ngôn ngữ:',
-      lang_select_aria: 'Chọn ngôn ngữ giao diện',
-      theme_label: 'Giao diện:',
-      theme_select_aria: 'Chọn chủ đề màu',
+      theme_popover_title: 'Giao diện',
+      lang_popover_title: 'Ngôn ngữ',
       theme_auto: 'Tự động (Hệ thống)',
       theme_light: 'Sáng',
       theme_dark: 'Tối',
@@ -34,49 +32,51 @@
       banner_msg: 'Đây là bản mẫu giao diện trực quan độc lập. Mọi kết quả toán học hiển thị chỉ mang tính chất minh họa giả lập; chưa kết nối với bộ giải hay backend chính thức.',
 
       // Home Screen — Hero & Search
-      hero_title: 'Tri thức Toán học Chuẩn xác & Tính toán Kiểm chứng được',
-      hero_subtitle: 'Suy luận ký hiệu tất định trên miền số thực \\(\\mathbb{R}\\) với số học hữu tỉ chuẩn xác trên \\(\\mathbb{Q}\\).',
-      input_placeholder: 'Nhập phương trình (ví dụ: 2*x + 3 = 7, -x^2 = 1, x^0 = 1)...',
+      hero_super: 'TỪ HỆ THỐNG SUY LUẬN KÝ HIỆU HÌNH THỨC & TOÁN HỌC CHÍNH XÁC',
+      hero_subtitle: '"Suy luận ký hiệu tất định trên miền số thực \\(\\mathbb{R}\\) với số học hữu tỉ chuẩn xác trên \\(\\mathbb{Q}\\"',
+      input_placeholder: 'Nhập biểu thức hoặc phương trình cần giải...',
       input_aria: 'Nhập biểu thức toán học',
       clear_title: 'Xóa nội dung nhập',
       clear_aria: 'Xóa nội dung nhập',
-      compute_btn: 'Tính toán',
       compute_aria: 'Tính toán biểu thức',
-      keyboard_aria: 'Phím chèn ký hiệu toán học',
-      kb_hint: 'Chèn nhanh:',
-      sym_mult: '* (nhân tường minh)',
+      mode_exact_math: 'Toán Chuẩn xác',
+      mode_symbolic: 'Ký hiệu Tất định',
       chips_aria: 'Các ví dụ tiêu biểu',
       chips_label: 'Ví dụ:',
       chip_syntax_demo: '1/2x = 1 (Lỗi Cú pháp Demo)',
       chip_syntax_title: 'Minh họa bắt lỗi nhân ngầm mơ hồ',
 
-      // Home Screen — 4 Topic Cards
-      topics_section_aria: 'Chuyên đề toán học',
-      topics_title: 'Chuyên đề Toán học & Năng lực Xử lý',
-      badge_p02a_active: 'GIAI ĐOẠN P02A HOẠT ĐỘNG',
-      card_algebra_title: 'Đại số & Phương trình Tuyến tính',
-      card_algebra_desc: 'Phương trình tuyến tính affine chuẩn xác ax + b = 0 trên miền thực \\(\\mathbb{R}\\) với hệ số hữu tỉ \\(\\mathbb{Q}\\). Xử lý chính xác đồng nhất thức và mâu thuẫn.',
-      prompt_algebra_identity: '0*x = 0 (Đồng nhất thức trên \\(\\mathbb{R}\\))',
+      // 4 Topic Columns (WolframAlpha Layout)
+      col_math_title: 'Toán học & Đại số',
+      tile_step_solutions: 'Lời giải Từng bước Tuyến tính',
+      tile_linear_eq: 'Phương trình Tuyến tính Tuyệt đối',
+      tile_identity_eq: 'Đồng nhất thức & Vô nghiệm',
+      tile_more_algebra: 'Xem thêm Chuyên đề Đại số »',
 
-      badge_core_active: 'CỐT LÕI HOẠT ĐỘNG',
-      card_rational_title: 'Số học Trường Số Hữu tỉ',
-      card_rational_desc: 'Số học chính xác độ chính xác tùy ý trên \\(\\mathbb{Q}\\). Rút gọn GCD Euclid chuẩn tắc, triệt tiêu sai số trôi của số thực dấu phẩy động.',
-      prompt_rational_domain: 'Điều kiện xác định: (x-1)/(x-1)',
-      prompt_rational_bigint: 'Số nguyên lớn (10^100)',
+      col_rational_title: 'Trường Số Hữu tỉ',
+      tile_rational_arithmetic: 'Số học Hữu tỉ Chính xác \\(\\mathbb{Q}\\)',
+      tile_euclidean_gcd: 'Rút gọn GCD Euclid Chuẩn tắc',
+      tile_domain_exclusions: 'Điều kiện Xác định Mẫu số',
+      tile_more_rational: 'Xem thêm Số học Hữu tỉ »',
 
-      badge_planned_r1: 'DỰ KIẾN (R1)',
-      card_quad_title: 'Phương trình Bậc hai & Phân tích Nhân tử',
-      card_quad_desc: 'Phương trình phi tuyến ax^2 + bx + c = 0, tính biệt thức, khai triển bình phương và kiểm tra nghiệm ứng viên độc lập.',
-      prompt_quad_candidate: 'x^2 - 4 = 0 (Kiểm tra nghiệm ứng viên)',
-      prompt_quad_factoring: 'Phương pháp phân tích nhân tử (Dự kiến)',
-      prompt_quad_radicals: 'Mở rộng trường căn thức (Dự kiến)',
+      col_quad_title: 'Đa thức & Bậc hai',
+      tile_quad_eq: 'Phương trình Bậc hai ax² + bx + c',
+      tile_discriminant: 'Phân tích Biệt thức Biệt số Δ',
+      tile_candidate_check: 'Kiểm tra Nghiệm Ứng viên Độc lập',
+      tile_more_quad: 'Xem thêm Chuyên đề Bậc hai »',
 
-      badge_planned_r2: 'DỰ KIẾN (R2)',
-      card_classroom_title: 'Lớp học & Tiếp nhận Tài liệu',
-      card_classroom_desc: 'Chẩn đoán sư phạm từng bước, phân loại lỗi học sinh và tiếp nhận tài liệu toán PDF/hình ảnh có kiểm soát riêng biệt.',
-      prompt_class_tree: 'Cây hướng dẫn từng bước (Dự kiến)',
-      prompt_class_pdf: 'Tiếp nhận tài liệu PDF thủ công (Dự kiến)',
-      prompt_class_grade: 'Chấm điểm danh sách lớp (Dự kiến)',
+      col_classroom_title: 'Sư phạm & Tài liệu',
+      tile_guidance_tree: 'Cây Hướng dẫn Chẩn đoán Lỗi',
+      tile_error_categorization: 'Phân loại Sai lầm Học sinh',
+      tile_doc_ingestion: 'Tiếp nhận Tài liệu Toán (Dự kiến R2)',
+      tile_more_classroom: 'Xem thêm Chuyên đề Sư phạm »',
+
+      // Architecture Flow Banner
+      flow_tagline: 'Được phát triển trên nền tảng suy luận ký hiệu hình thức và số học chính xác »',
+      flow_parser: 'Cú pháp AST Tường minh',
+      flow_rational: 'Số học Hữu tỉ Chuẩn xác \\(\\mathbb{Q}\\)',
+      flow_symbolic: 'Suy luận Ký hiệu \\(\\mathbb{R}\\)',
+      flow_verifiable: 'Nghiệm & Minh chứng Tất định',
 
       // Result Screen
       btn_back_home: '← Quay lại Trang chủ',
@@ -106,7 +106,6 @@
       tile_eq_domain: 'Miền nghiệm phương trình',
       val_eq_domain: 'Số thực \\(\\mathbb{R}\\)',
       tile_domain_constraints: 'Ràng buộc miền ban đầu',
-      tile_candidate_check: 'Kiểm tra nghiệm ứng viên',
       tag_specimen_notice: 'GHI CHÚ MINH HỌA GIAO DIỆN (DEMO)',
       msg_specimen_disclaimer: 'Khung hiển thị này chỉ minh họa cấu trúc biên nhận kiểm định trực quan. Bản mẫu hiện tại không sinh hoặc chứng nhận mã băm mật mã thực tế; cơ chế ký số chứng thực sẽ được tích hợp trong các mốc phát triển chính thức.',
 
@@ -148,10 +147,8 @@
       nav_home: 'Home',
       nav_sample: 'Sample Result',
       nav_syntax: 'Syntax Guide',
-      lang_label: 'Language:',
-      lang_select_aria: 'Select interface language',
-      theme_label: 'Theme:',
-      theme_select_aria: 'Select color theme',
+      theme_popover_title: 'Theme',
+      lang_popover_title: 'Language',
       theme_auto: 'Auto (System)',
       theme_light: 'Light',
       theme_dark: 'Dark',
@@ -161,49 +158,51 @@
       banner_msg: 'This is a standalone visual prototype. Mathematical outputs are simulated illustrative fixtures; no backend or production solver is connected.',
 
       // Home Screen — Hero & Search
-      hero_title: 'Exact Mathematical Knowledge & Verifiable Computation',
-      hero_subtitle: 'Deterministic symbolic reasoning over the real domain \\(\\mathbb{R}\\) with exact rational arithmetic over \\(\\mathbb{Q}\\).',
-      input_placeholder: 'Enter equation (e.g., 2*x + 3 = 7, -x^2 = 1, x^0 = 1)...',
+      hero_super: 'FROM FORMAL SYMBOLIC REASONING & EXACT MATHEMATICS',
+      hero_subtitle: '"Compute deterministic symbolic solutions over the real domain \\(\\mathbb{R}\\) with exact rational arithmetic over \\(\\mathbb{Q}\\"',
+      input_placeholder: 'Enter expression or equation to calculate...',
       input_aria: 'Mathematical expression input',
       clear_title: 'Clear input',
       clear_aria: 'Clear input',
-      compute_btn: 'Compute',
       compute_aria: 'Compute expression',
-      keyboard_aria: 'Quick math symbols keyboard',
-      kb_hint: 'Insert:',
-      sym_mult: '* (explicit mult)',
+      mode_exact_math: 'Exact Math',
+      mode_symbolic: 'Symbolic Logic',
       chips_aria: 'Representative examples',
       chips_label: 'Examples:',
       chip_syntax_demo: '1/2x = 1 (Syntax Error Demo)',
       chip_syntax_title: 'Demonstrates rejection of ambiguous implicit multiplication',
 
-      // Home Screen — 4 Topic Cards
-      topics_section_aria: 'Mathematical domains',
-      topics_title: 'Mathematical Topics & Capabilities',
-      badge_p02a_active: 'PHASE P02A ACTIVE',
-      card_algebra_title: 'Algebra & Linear Equations',
-      card_algebra_desc: 'Exact affine linear equations ax + b = 0 over domain \\(\\mathbb{R}\\) with rational coefficients \\(\\mathbb{Q}\\). Handles identities and contradictions.',
-      prompt_algebra_identity: '0*x = 0 (Identity over \\(\\mathbb{R}\\))',
+      // 4 Topic Columns (WolframAlpha Layout)
+      col_math_title: 'Mathematics & Algebra',
+      tile_step_solutions: 'Step by Step Solutions',
+      tile_linear_eq: 'Linear Affine Equations',
+      tile_identity_eq: 'Identities & Contradictions',
+      tile_more_algebra: 'More Algebra Topics »',
 
-      badge_core_active: 'CORE ACTIVE',
-      card_rational_title: 'Rational Field Arithmetic',
-      card_rational_desc: 'Arbitrary-precision exact arithmetic over \\(\\mathbb{Q}\\). Canonical Euclidean GCD reduction with zero floating-point approximation drift.',
-      prompt_rational_domain: 'Domain Exclusions: (x-1)/(x-1)',
-      prompt_rational_bigint: 'Large Integers (10^100)',
+      col_rational_title: 'Rational Field Arithmetic',
+      tile_rational_arithmetic: 'Exact Rational Field \\(\\mathbb{Q}\\)',
+      tile_euclidean_gcd: 'Canonical Euclidean GCD',
+      tile_domain_exclusions: 'Denominator Domain Exclusions',
+      tile_more_rational: 'More Rational Topics »',
 
-      badge_planned_r1: 'PLANNED (R1)',
-      card_quad_title: 'Quadratics & Factoring',
-      card_quad_desc: 'Non-linear equations ax^2 + bx + c = 0, discriminant analysis, completing the square, and independent candidate checking.',
-      prompt_quad_candidate: 'x^2 - 4 = 0 (Check Candidate)',
-      prompt_quad_factoring: 'Factoring Methods (Planned)',
-      prompt_quad_radicals: 'Radical Field Extensions (Planned)',
+      col_quad_title: 'Quadratics & Factoring',
+      tile_quad_eq: 'Quadratics ax² + bx + c',
+      tile_discriminant: 'Discriminant Analysis Δ',
+      tile_candidate_check: 'Candidate Verification Check',
+      tile_more_quad: 'More Quadratic Topics »',
 
-      badge_planned_r2: 'PLANNED (R2)',
-      card_classroom_title: 'Classroom & Document Ingestion',
-      card_classroom_desc: 'Step-by-step diagnostic tutoring, student error categorization, and separately gated manual PDF/image math ingestion.',
-      prompt_class_tree: 'Step Guidance Tree (Planned)',
-      prompt_class_pdf: 'Manual PDF Ingestion (Planned)',
-      prompt_class_grade: 'Classroom Roster Grading (Planned)',
+      col_classroom_title: 'Classroom & Ingestion',
+      tile_guidance_tree: 'Diagnostic Tutoring Tree',
+      tile_error_categorization: 'Student Error Analysis',
+      tile_doc_ingestion: 'Document Math Ingestion (Planned R2)',
+      tile_more_classroom: 'More Classroom Topics »',
+
+      // Architecture Flow Banner
+      flow_tagline: 'Built on formal symbolic reasoning and exact arithmetic foundations »',
+      flow_parser: 'Explicit AST Grammar',
+      flow_rational: 'Exact Rational Field \\(\\mathbb{Q}\\)',
+      flow_symbolic: 'Symbolic Real Domain \\(\\mathbb{R}\\)',
+      flow_verifiable: 'Deterministic Verification',
 
       // Result Screen
       btn_back_home: '← Back to Home',
@@ -233,7 +232,6 @@
       tile_eq_domain: 'Equation Domain',
       val_eq_domain: 'Real Numbers \\(\\mathbb{R}\\)',
       tile_domain_constraints: 'Original Domain Constraints',
-      tile_candidate_check: 'Candidate Check',
       tag_specimen_notice: 'SIMULATED INTERFACE SPECIMEN (DEMO)',
       msg_specimen_disclaimer: 'This section is a visual mockup demonstration. No cryptographic hash is calculated or attested by this visual prototype. Production cryptographic signing is planned for future milestones.',
 
@@ -266,7 +264,6 @@
     }
   };
 
-  // Helper for lookup with explicit fallback hierarchy: current -> 'vi' -> 'en' -> key
   function t(key, lang) {
     const targetLang = lang || currentLanguage;
     if (I18N[targetLang] && I18N[targetLang][key] !== undefined) {
@@ -286,7 +283,6 @@
   // ==========================================================================
   const LANG_STORAGE_KEY = 'mke_language_preference';
   let currentLanguage = 'vi';
-  const langSelect = document.getElementById('lang-select');
 
   function applyLanguage(lang, syncUrl) {
     if (lang !== 'vi' && lang !== 'en') {
@@ -295,9 +291,11 @@
     currentLanguage = lang;
     document.documentElement.setAttribute('lang', lang);
 
-    if (langSelect) {
-      langSelect.value = lang;
-    }
+    // Update Popover Language Checkmarks
+    const optVi = document.getElementById('opt-lang-vi');
+    const optEn = document.getElementById('opt-lang-en');
+    if (optVi) optVi.classList.toggle('active', lang === 'vi');
+    if (optEn) optEn.classList.toggle('active', lang === 'en');
 
     // Apply textContent to all elements with data-i18n
     document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -307,7 +305,7 @@
       }
     });
 
-    // Apply attribute translations for data-i18n-attr (e.g. "placeholder:input_placeholder,title:clear_title")
+    // Apply attribute translations
     document.querySelectorAll('[data-i18n-attr]').forEach((el) => {
       const spec = el.getAttribute('data-i18n-attr');
       if (!spec) return;
@@ -321,7 +319,7 @@
       });
     });
 
-    // If currently viewing the result screen, re-render fixture to update step descriptions and candidate checks
+    // Re-render active result screen if open
     if (screens.result && screens.result.classList.contains('active')) {
       renderActiveResult();
     }
@@ -359,11 +357,11 @@
 
     applyLanguage(initialLang, false);
 
-    if (langSelect) {
-      langSelect.addEventListener('change', (e) => {
-        setLanguage(e.target.value);
-      });
-    }
+    // Attach popover language option clicks
+    const optVi = document.getElementById('opt-lang-vi');
+    const optEn = document.getElementById('opt-lang-en');
+    if (optVi) optVi.addEventListener('click', () => { setLanguage('vi'); });
+    if (optEn) optEn.addEventListener('click', () => { setLanguage('en'); });
   }
 
   // ==========================================================================
@@ -371,7 +369,6 @@
   // ==========================================================================
   const THEME_STORAGE_KEY = 'mke_visual_theme_preference';
   const htmlRoot = document.documentElement;
-  const themeSelect = document.getElementById('theme-select');
 
   function getSystemTheme() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -382,33 +379,67 @@
   function applyTheme(preference) {
     const effectiveTheme = preference === 'auto' ? getSystemTheme() : preference;
     htmlRoot.setAttribute('data-theme', effectiveTheme);
-    if (themeSelect) {
-      themeSelect.value = preference;
-    }
+
+    // Update Popover Theme Checkmarks
+    const optAuto = document.getElementById('opt-theme-auto');
+    const optLight = document.getElementById('opt-theme-light');
+    const optDark = document.getElementById('opt-theme-dark');
+    if (optAuto) optAuto.classList.toggle('active', preference === 'auto');
+    if (optLight) optLight.classList.toggle('active', preference === 'light');
+    if (optDark) optDark.classList.toggle('active', preference === 'dark');
+  }
+
+  function setTheme(newPref) {
+    localStorage.setItem(THEME_STORAGE_KEY, newPref);
+    applyTheme(newPref);
   }
 
   function initTheme() {
     const urlParams = new URLSearchParams(window.location.search);
     const themeParam = urlParams.get('theme');
-    const saved = themeParam || localStorage.getItem(THEME_STORAGE_KEY) || 'auto';
+    const saved = themeParam || localStorage.getItem(THEME_STORAGE_KEY) || 'light';
     applyTheme(saved);
 
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        const currentPref = localStorage.getItem(THEME_STORAGE_KEY) || 'auto';
+        const currentPref = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
         if (currentPref === 'auto') {
           applyTheme('auto');
         }
       });
     }
 
-    if (themeSelect) {
-      themeSelect.addEventListener('change', (e) => {
-        const newPref = e.target.value;
-        localStorage.setItem(THEME_STORAGE_KEY, newPref);
-        applyTheme(newPref);
-      });
-    }
+    // Attach popover theme option clicks
+    const optAuto = document.getElementById('opt-theme-auto');
+    const optLight = document.getElementById('opt-theme-light');
+    const optDark = document.getElementById('opt-theme-dark');
+    if (optAuto) optAuto.addEventListener('click', () => setTheme('auto'));
+    if (optLight) optLight.addEventListener('click', () => setTheme('light'));
+    if (optDark) optDark.addEventListener('click', () => setTheme('dark'));
+  }
+
+  // ==========================================================================
+  // Settings Popover Menu Toggle (Wolfram Style)
+  // ==========================================================================
+  function initSettingsPopover() {
+    const btnSettings = document.getElementById('btn-settings');
+    const popover = document.getElementById('settings-popover');
+    if (!btnSettings || !popover) return;
+
+    btnSettings.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = popover.classList.toggle('open');
+      btnSettings.classList.toggle('active', isOpen);
+      btnSettings.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!popover.contains(e.target) && !btnSettings.contains(e.target)) {
+        popover.classList.remove('open');
+        btnSettings.classList.remove('active');
+        btnSettings.setAttribute('aria-expanded', 'false');
+      }
+    });
   }
 
   // ==========================================================================
@@ -467,8 +498,6 @@
 
   // ==========================================================================
   // Mock Result Calculation Fixtures (Client-Side Illustrative Demo Only)
-  // Mathematical representations remain strictly untranslated.
-  // Explanatory texts adapt dynamically to chosen language.
   // ==========================================================================
   let activeQueryString = '2*x + 3 = 7';
 
@@ -927,7 +956,7 @@
     }
 
     // Keyboard toolbar buttons
-    document.querySelectorAll('.sym-btn').forEach((btn) => {
+    document.querySelectorAll('.math-key-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         insertSymbol(btn.getAttribute('data-sym') || '');
       });
@@ -943,8 +972,8 @@
       });
     }
 
-    // Example prompt chips and prompt links
-    document.querySelectorAll('.chip, .prompt-link:not(.disabled)').forEach((btn) => {
+    // Example prompt chips and topic tiles
+    document.querySelectorAll('.chip, .topic-tile:not(.more-topics-tile)').forEach((btn) => {
       btn.addEventListener('click', () => {
         const query = btn.getAttribute('data-query');
         if (query) {
@@ -953,12 +982,21 @@
         }
       });
     });
+
+    // More topics buttons: switch to syntax guide view
+    ['btn-more-math', 'btn-more-science', 'btn-more-society', 'btn-more-life'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.addEventListener('click', () => switchScreen('syntax'));
+      }
+    });
   }
 
   // Initialize on DOM load
   document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initLanguage();
+    initSettingsPopover();
     initEvents();
 
     const urlParams = new URLSearchParams(window.location.search);

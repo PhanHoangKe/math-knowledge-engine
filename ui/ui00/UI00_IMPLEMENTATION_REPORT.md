@@ -1,65 +1,52 @@
-# MKE PRODUCT-UI-00-R1 Implementation Report
+# MKE PRODUCT-UI-00 — Visual Design & WolframAlpha Fidelity Report
 
-**Milestone:** PRODUCT-UI-00-R1 (Bilingual Localization & Prototype Refinement)  
+**Milestone:** PRODUCT-UI-00 (Visual Prototype Polish & WolframAlpha Atmospheric Alignment)  
 **Branch:** `design/ui00-light-dark`  
-**Base Commit:** `20de3318670298c3764040b21d60f91ae8cf6281`  
-**Frozen Specification:** `31cdb61cc84a21b8ebe093765f0a71a606776196`  
-**Scope Restriction:** Pure UI prototype only. Zero solver integration, zero backend API, zero external dependencies/CDNs.
+**Base Commit:** `9a4b031e9f60ad1df8438eed0a7d5fef14a3c4f5`  
+**Scope:** Pure visual & interaction polish in native HTML5/CSS3/JavaScript. Zero backend/API dependencies, zero external CDNs.
 
 ---
 
-## 1. Bilingual Localization Decisions
-- **Default Language:** Vietnamese (`vi`) is the default language per Owner directive.
-- **English Support:** English (`en`) is fully supported across all user-facing views (Home, Results, Syntax Guide, Header, Advisory Banner, Footer).
-- **Mathematical Integrity:** Mathematical expressions (`2*x + 3 = 7`, `-x^2 = 1`, `(x-1)/(x-1) = 1`, `\(\mathbb{R}\)`, `\(\mathbb{Q}\)`), AST representations (`Equation(...)`, `BinaryOp(...)`), and technical identifiers are preserved without translation.
-- **Instant Language Switching:** Switching via the header `<select>` dropdown updates the interface instantly without page reloads using safe DOM APIs (`textContent`, `setAttribute`).
-- **Structured Localization Engine:**
-  - Translations are organized in a structured dictionary `I18N = { vi: {...}, en: {...} }`.
-  - Fallback hierarchy: Requested Language $\rightarrow$ Vietnamese (`vi`) $\rightarrow$ English (`en`) $\rightarrow$ translation key.
-  - Dynamically updates `<html lang="...">` attribute to ensure proper browser rendering and font fallback for Vietnamese tonal diacritics.
-- **Persistence & URL Synchronization:**
-  - Persisted independently in `localStorage` under `mke_language_preference`.
-  - URL overrides via `?lang=vi` and `?lang=en` are supported.
-  - Manual changes in the dropdown update `localStorage` and synchronize the URL parameter via `window.history.replaceState` without reloading.
-- **Decoupled Theme & Language:** Theme selection (Auto, Light, Dark) and Language selection (Tiếng Việt, English) operate with complete independence.
-- **Honest Demo Labeling:**
-  - Removed misleading placeholder cryptographic hashes (`e3b0c442...`) from the verification card.
-  - Replaced with clear, explicit disclaimers: `BẢN MẪU MÔ PHỎNG (DEMO)` / `DEMO / MOCK SPECIMEN` and interface specimen notes.
+## 1. Visual Alignment with WolframAlpha
+Following user review and direct screenshot reference from [wolframalpha.com](https://www.wolframalpha.com/), the UI prototype was elevated across colors, typography, iconography, and layout structure:
+
+### 1.1 Colors & Theming
+- **Dark Theme (Authentic Charcoal):** Switched from navy blue to WolframAlpha's warm charcoal (`#262626` background, `#2e2e2e` surface cards, `#3d3d3d` borders) providing optimal mathematical contrast and reduced eye fatigue.
+- **Light Theme (Crisp Clean):** Pure `#ffffff` canvas with clean `#e5e7eb` card borders and soft hover elevations.
+- **Signature Violet Accent:** `#8e6cd9` (Light) and `#9d7fe3` (Dark) applied as a 2px border around the prominent search capsule, with glowing focus rings.
+- **4-Column Domain Palette:**
+  - Column 1 (Mathematics / Algebra): Violet (`#8e6cd9` / `#a78bfa`)
+  - Column 2 (Rational Field / Science): Emerald (`#059669` / `#34d399`)
+  - Column 3 (Quadratics / Society): Terracotta Coral (`#e05638` / `#fb7185`)
+  - Column 4 (Classroom / Everyday Life): Sky Blue (`#0284c7` / `#38bdf8`)
+
+### 1.2 Search Capsule & Controls
+- **Capsule Lozenge Shape:** Smooth `border-radius: 20px` with 2px violet border.
+- **Violet Equals Button:** Right-aligned compute button with rounded corners (`border-radius: 12px`, purple background) containing the iconic `=` symbol.
+- **Sub-search Toolbar:** Mode indicators (`Toán Chuẩn xác`, `Ký hiệu Tất định`) and quick math buttons (`*`, `x`, `^2`, `^0`, `/`, `=`, `( )`).
+
+### 1.3 Topic Grid & Iconography
+- **4 Balanced Columns:** Column headers colored according to their domain with chevrons (`Toán học & Đại số ›`, `Trường Số Hữu tỉ ›`, etc.).
+- **Compact Tile Layout:** Each card contains a dedicated colored icon box (`34px × 34px`) featuring authentic mathematical line icons (checklist, linear formula, fraction, Euclidean GCD, parabola, discriminant Delta, tutoring tree, OCR document).
+- **More Topics Card:** Bottom card in every column formatted as `••• Xem thêm Chuyên đề »` with an authentic 3x3 dot matrix SVG icon in that column's color.
+
+### 1.4 Top-Right Settings Popover (Theme & Language)
+- Circular gear button in the header triggers a floating popover card matching Wolfram's settings modal:
+  - **Theme Section:** Automatic, Light, Dark with active checkmarks.
+  - **Language Section:** Tiếng Việt (Default), English with active checkmarks.
+- Fully interactive with click-outside dismiss and keyboard accessibility.
+
+### 1.5 Architecture Formula Flow Banner
+- Elegant flow banner above footer:
+  `MKE = Cú pháp AST Tường minh + Số học Hữu tỉ Q + Suy luận Ký hiệu R ➔ Nghiệm & Minh chứng Tất định`
 
 ---
 
-## 2. Technology & Architecture Decisions
-- **UI-00 Prototype:** Strictly zero-dependency native HTML5, CSS3, and vanilla ES6+ JavaScript. Offline capable with zero network requests.
-- **Future Production Frontend:** React + TypeScript + Vite with CSS Modules and CSS Variables. UI-00 is kept in vanilla web technologies and not migrated yet.
-- **Backend Mathematical Kernel:** Python.
-- **Backend API:** FastAPI (only when separately authorized).
-- **Source Code Conventions:** Identifiers in source code remain in English. User-facing text is sourced exclusively through the localization resource dictionary.
-
----
-
-## 3. Verification & Testing Results
-Anty conducted full automated headless Chrome tests (`test_ui00_i18n.py`) and visual screenshot captures:
-1. **Default Language (`vi`):** PASS — Verified `<html lang="vi">`, Vietnamese diacritics, hero title, button labels, and topic cards.
-2. **English Override (`?lang=en`):** PASS — Verified `<html lang="en">`, English strings across all views.
-3. **Result View (Bilingual):** PASS — Verified input interpretation, exact solution box, method selector, and step-by-step trace in both languages.
-4. **Mock Integrity:** PASS — Verified that placeholder hashes are absent and mock data is explicitly labeled DEMO.
-5. **Syntax Error Handling:** PASS — Verified `1/2x = 1` demo displays explicit multiplication error message in active language.
-6. **Theme Independence:** PASS — Verified Light and Dark themes render correctly in both languages.
-7. **Artifact Captures:**
-   - `desktop-light.png`: 124,584 bytes (Vietnamese default, Light theme, 1280x900)
-   - `desktop-dark.png`: 125,860 bytes (Vietnamese default, Dark theme, 1280x900)
-   - `mobile-light.png`: 53,516 bytes (Vietnamese default, Light theme, 390x844)
-   - `mobile-dark.png`: 53,524 bytes (Vietnamese default, Dark theme, 390x844)
-
----
-
-## 4. Local Run Instructions
-```bash
-# Option A: Local HTTP server
-python -m http.server -d ui/ui00 8080
-# Visit: http://localhost:8080 (default: Vietnamese)
-# Or visit: http://localhost:8080?lang=en (English)
-
-# Option B: Direct file open
-start ui/ui00/index.html
-```
+## 2. Verification Results
+- **Automated Bilingual Tests (`test_ui00_i18n.py`):** 7/7 PASSED.
+- **Live Local Server:** Running on port `8088` (Status 200).
+- **Updated Screenshots:**
+  - `desktop-light.png`: 101,618 bytes (1280x900, Light theme)
+  - `desktop-dark.png`: 101,369 bytes (1280x900, Charcoal Dark theme)
+  - `mobile-light.png`: 49,663 bytes (390x844, Mobile Light)
+  - `mobile-dark.png`: 50,028 bytes (390x844, Mobile Dark)
