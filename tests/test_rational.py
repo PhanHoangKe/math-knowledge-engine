@@ -259,5 +259,106 @@ class TestRationalBoundaryAndExtremeCases(unittest.TestCase):
         self.assertEqual(repr(r_int), "Rational(9)")
 
 
+class TestRegressionS0R1(unittest.TestCase):
+    """Regression test suite for PRODUCT-02A-S0-R1 targeted remediation.
+
+    Covers:
+    - Defect 1: Equality and hash consistency across Rational, int, and Fraction.
+    - Defect 1: Mixed-type set membership, set cardinality, and dictionary key lookup.
+    - Defect 1: Equality and hash matching between canonically equivalent Rational instances.
+    - Defect 2: Boolean semantics (__bool__) for zero, positive, and negative rationals.
+    """
+
+    def test_hash_consistency_with_int_and_fraction(self):
+        # Rational(2), integer 2, Fraction(2, 1)
+        r2 = Rational(2)
+        i2 = 2
+        f2 = Fraction(2, 1)
+
+        self.assertEqual(r2, i2)
+        self.assertEqual(r2, f2)
+        self.assertEqual(i2, f2)
+
+        self.assertEqual(hash(r2), hash(i2))
+        self.assertEqual(hash(r2), hash(f2))
+
+        # Rational(1, 2), Fraction(1, 2)
+        r_half = Rational(1, 2)
+        f_half = Fraction(1, 2)
+
+        self.assertEqual(r_half, f_half)
+        self.assertEqual(hash(r_half), hash(f_half))
+
+        # Canonical equivalence
+        r_unreduced = Rational(4, 8)
+        self.assertEqual(r_unreduced, r_half)
+        self.assertEqual(hash(r_unreduced), hash(r_half))
+
+        # Negative fractions
+        r_neg = Rational(-3, 5)
+        f_neg = Fraction(-3, 5)
+        self.assertEqual(r_neg, f_neg)
+        self.assertEqual(hash(r_neg), hash(f_neg))
+
+    def test_mixed_type_set_membership_and_cardinality(self):
+        # Cardinality 1 for equivalent values across types
+        s1 = {Rational(2), 2, Fraction(2, 1)}
+        self.assertEqual(len(s1), 1)
+        self.assertIn(Rational(2), s1)
+        self.assertIn(2, s1)
+        self.assertIn(Fraction(2, 1), s1)
+
+        s2 = {Rational(1, 2), Fraction(1, 2), Rational(2, 4)}
+        self.assertEqual(len(s2), 1)
+        self.assertIn(Rational(1, 2), s2)
+        self.assertIn(Fraction(1, 2), s2)
+        self.assertIn(Rational(2, 4), s2)
+
+    def test_mixed_type_dict_lookup(self):
+        d = {
+            Rational(2): "integer-two",
+            Rational(1, 2): "fraction-half",
+        }
+
+        # Lookup with int and Fraction
+        self.assertEqual(d[2], "integer-two")
+        self.assertEqual(d[Fraction(2, 1)], "integer-two")
+        self.assertEqual(d[Fraction(1, 2)], "fraction-half")
+        self.assertEqual(d[Rational(2, 4)], "fraction-half")
+
+    def test_boolean_semantics(self):
+        # Zero cases must evaluate to False
+        self.assertFalse(bool(Rational(0)))
+        self.assertFalse(bool(Rational(0, 1)))
+        self.assertFalse(bool(Rational(0, 42)))
+        self.assertFalse(bool(Rational("0/5")))
+
+        # Positive cases must evaluate to True
+        self.assertTrue(bool(Rational(1, 2)))
+        self.assertTrue(bool(Rational(42)))
+        self.assertTrue(bool(Rational(1, 10**100)))
+
+        # Negative cases must evaluate to True
+        self.assertTrue(bool(Rational(-1, 2)))
+        self.assertTrue(bool(Rational(-5)))
+        self.assertTrue(bool(Rational(-1, 10**100)))
+
+        # Direct conditional statement behavior
+        zero_branch = False
+        if not Rational(0):
+            zero_branch = True
+        self.assertTrue(zero_branch)
+
+        pos_branch = False
+        if Rational(3, 4):
+            pos_branch = True
+        self.assertTrue(pos_branch)
+
+        neg_branch = False
+        if Rational(-7, 8):
+            neg_branch = True
+        self.assertTrue(neg_branch)
+
+
 if __name__ == "__main__":
     unittest.main()

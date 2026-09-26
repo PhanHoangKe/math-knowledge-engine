@@ -1,6 +1,6 @@
-# MKE PRODUCT-02A-S0 Implementation & Acceptance Report
+# MKE PRODUCT-02A-S0-R1 Implementation & Remediation Report
 
-**Milestone:** PRODUCT-02A-S0 — Exact Rational Arithmetic Core  
+**Milestone:** PRODUCT-02A-S0-R1 — Targeted Remediation (Hash Consistency & Boolean Semantics)  
 **Role:** Anty (Execution Agent)  
 **Coordinator & Independent Auditor:** ChatGPT (Chief Architect)  
 **Approval Authority:** Project Owner  
@@ -19,7 +19,7 @@
 
 ## 2. Product Workspace & File Allowlist
 
-The implementation resides in the newly created, isolated external sibling workspace `d:\mke-product`.
+The implementation resides exclusively in the external sibling workspace `d:\mke-product`.
 
 ### Explicit Allowlist of Published Files
 1. `.gitignore`
@@ -36,32 +36,34 @@ Total tracked files: 9.
 
 ---
 
-## 3. Trusted Developer Unit Testing Results
+## 3. Targeted Remediation Summary
+
+### Defect 1: Hash Consistency with `int` and `fractions.Fraction`
+- **Issue:** `Rational` compared equal to equivalent `int` and `Fraction` instances but computed `hash((numerator, denominator))`, violating Python's `a == b => hash(a) == hash(b)` invariant.
+- **Fix:** Implemented `hash(Fraction(self._numerator, self._denominator))`, matching the standard numeric hash model across Python types.
+- **Verification:** Verified identical hash values and single-element set deduplication across `Rational(2)`, `2`, and `Fraction(2, 1)`.
+
+### Defect 2: Boolean Semantics (`__bool__`)
+- **Issue:** `Rational` lacked `__bool__`, relying on default object truthiness.
+- **Fix:** Implemented `__bool__(self) -> bool` returning `self._numerator != 0`.
+- **Verification:** Verified `bool(Rational(0)) is False`, while all positive and negative instances evaluate to `True`.
+
+---
+
+## 4. Trusted Developer Unit Testing Results
 
 - **Test Command:** `python -m unittest tests/test_rational.py -v`
 - **Execution Mode:** Offline local developer tests using standard library `unittest`.
 - **Results:**
-  - Ran: 20 tests
-  - Passed: 20 tests
+  - Ran: 24 tests (20 baseline + 4 regression tests)
+  - Passed: 24 tests
   - Failed: 0 tests
   - Errors: 0 tests
-  - Duration: 0.005s
-
-### Coverage Highlights
-- Positive, negative, unreduced fractions, and negative denominators.
-- Exact arithmetic operations (`+`, `-`, `*`, `/`) with rational and integer operands.
-- Zero numerator canonicalization ($0/q \implies 0/1$) and zero denominator rejection (`ZeroDenominatorError`).
-- Exact division by zero handling (`DivisionByZeroError`).
-- Arbitrary precision large integers ($10^{100}$) and tiny nonzero rational quantities ($1/10^{100}$).
-- Immutability enforcement and deterministic normalization (`to_tuple`, `to_dict`).
-- Strict rejection of floating-point conversions.
-
-> [!NOTE]
-> These developer unit tests verify internal component invariants and do not represent the sealed PRODUCT-02A holdout suite or independent mathematical certification.
+  - Duration: 0.001s
 
 ---
 
-## 4. Protected Historical Repository Integrity
+## 5. Protected Historical Repository Integrity
 
 - **Historical Repository Path:** `d:\Math Knowledge Engine`
 - **Head Branch:** `dev02a-method-knowledge-base` (Commit: `753382a023835dbdbe6b074ca6101a3292d3474c`)
@@ -71,15 +73,14 @@ Total tracked files: 9.
 
 ---
 
-## 5. Git Publication Coordinates
+## 6. Git Publication Coordinates
 
 - **Remote:** `https://github.com/PhanHoangKe/math-knowledge-engine.git`
-- **Branch:** `product/p02a-foundation` (Independent ORPHAN branch with zero shared history with research branches).
+- **Branch:** `product/p02a-foundation`
 - **Target URL:** `https://github.com/PhanHoangKe/math-knowledge-engine/tree/product/p02a-foundation`
 
 ---
 
-## 6. Known Limitations & Open Interface Questions
+## 7. Governance Status
 
-1. **JSON Transport of Arbitrary-Precision Integers:** Standard JSON parsers (ECMA-262) represent numbers as IEEE 754 double precision floats, which lose precision beyond $2^{53} - 1$. Whether large rational numerators/denominators should serialize as strings (`"100000000000000000000"`) or integer tokens is documented as an open interface question for Phase P02A API design.
-2. **Next Steps:** Parser, AST construction, linear equation solver, Win32 Job Object sandbox, and HTTP API remain strictly unauthorized until next milestone authorization.
+Milestone PRODUCT-02A-S0-R1 is complete. Milestone S1 and all subsequent implementation steps remain strictly unauthorized pending Project Owner approval.

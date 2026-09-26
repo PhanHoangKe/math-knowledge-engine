@@ -243,9 +243,14 @@ class Rational:
     def __ge__(self, other: Any) -> bool:
         return self.__gt__(other) or self.__eq__(other)
 
+    def __bool__(self) -> bool:
+        """Boolean value of Rational: False if zero, True if nonzero."""
+        return self._numerator != 0
+
     def __hash__(self) -> int:
         if self._hash is None:
-            h = hash((self._numerator, self._denominator))
+            # Consistent with Python's numeric hash model (equal to int and Fraction)
+            h = hash(Fraction(self._numerator, self._denominator))
             object.__setattr__(self, "_hash", h)
         return self._hash
 
