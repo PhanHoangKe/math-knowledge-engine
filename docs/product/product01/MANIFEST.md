@@ -7,7 +7,8 @@
 | Relative File Path | Size (Bytes) | SHA-256 Digest |
 | :--- | :--- | :--- |
 | `EVIDENCE_INVENTORY.md` | 1184 | `1e344160ad30f82c1dbff4d86addbcab42d3cdd21c0612c99bf4935c30deff8e` |
-| `INDEX.md` | 2505 | `43563cdc4f9931ff8fb709daa30778aecb222f627c0b80e4774d1948c216f443` |
+| `FREEZE_ADDENDUM.md` | 8468 | `c89bfd409730498a37a0cc570b8e4d8a9412db31053104579eb85dca42e8221e` |
+| `INDEX.md` | 2745 | `e2b0aa57bf7315a0b28b03b336cc7f08a79e24f1ff651c16847e52e9cdf6752b` |
 | `OWNER_DECISION_REGISTER.md` | 1244 | `50c685443b32b8679afc6bec8b28eae2478a1cf204a07f579f8fe843b7ee0de8` |
 | `PRODUCT02A_AUTHORIZATION_PROPOSAL.md` | 1434 | `5922ed1fbac64f3b430af4242ce867316f4a765aa56f8c724e185dde5fe7115c` |
 | `REMEDIATION_MATRIX_R1_R7.md` | 3037 | `e633ba8267184d24efc55e2fca5e465f46be82b187421a01b8cbd3550a8efa86` |
@@ -34,4 +35,4 @@
 | `rev0.3/PRODUCT01_VERIFICATION_CONTRACT.md` | 17470 | `2ce233709b3a7464886aec95f3036efec89d2e7d4c110cfc86026ec2d9add926` |
 
 ---
-*Total Tracked Files: 26 (excluding MANIFEST.md)*
+*Total Tracked Files: 27 (excluding MANIFEST.md)*
