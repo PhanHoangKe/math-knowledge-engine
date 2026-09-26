@@ -142,7 +142,7 @@ class TestParserMandatoryRepresentativeCases(unittest.TestCase):
         # Case 10: x^3 = 1 must be REJECTED (exponent not in {0, 1, 2})
         with self.assertRaises(ParserError) as ctx:
             parse("x^3 = 1")
-        self.assertIn("Unsupported exponent value 3", str(ctx.exception))
+        self.assertIn("Unsupported exponent '3'", str(ctx.exception))
 
 
 class TestImplicitMultiplicationVarieties(unittest.TestCase):
@@ -342,6 +342,127 @@ class TestInputBoundsSafety(unittest.TestCase):
         with self.assertRaises(InputBoundsExceededError) as ctx:
             parse(deep)
         self.assertIn("nesting depth exceeds maximum limit of 16", str(ctx.exception))
+
+
+class TestParserRemediationS1R1(unittest.TestCase):
+    """Targeted regression tests for PRODUCT-02A-S1-R1 remediation.
+
+    Covers:
+    - Span, token, and AST descendant immutability.
+    - Strict ASCII digit (0-9) restriction and deterministic Unicode rejection.
+    - Literal exponent grammar enforcement (rejection of "02", "00", "3").
+    - Unary sign precedence audit on -x*2 and -x/2.
+    - Exact token count boundaries.
+    """
+
+    def test_span_immutability(self):
+        s = Span(3, 7)
+        with self.assertRaises(AttributeError):
+            s.start = 0  # type: ignore
+        with self.assertRaises(AttributeError):
+            s.end = 10  # type: ignore
+        with self.assertRaises(AttributeError):
+            del s.start  # type: ignore
+        self.assertEqual(s.to_tuple(), (3, 7))
+
+    def test_ast_and_token_immutability(self):
+        tok = Token(TokenType.INTEGER, "5", Span(0, 1))
+        with self.assertRaises(AttributeError):
+            tok.value = "6"  # type: ignore
+        with self.assertRaises(AttributeError):
+            tok.span = Span(1, 2)  # type: ignore
+
+        eq = parse("2*x + 3 = 7")
+        with self.assertRaises(AttributeError):
+            eq.left = Variable("x", Span(0, 1))  # type: ignore
+        with self.assertRaises(AttributeError):
+            eq.left.left = Variable("x", Span(0, 1))  # type: ignore
+        with self.assertRaises(AttributeError):
+            eq.left.span = Span(0, 10)  # type: ignore
+
+    def test_ascii_only_digits_and_unicode_rejection(self):
+        # Fullwidth digit １ (U+FF11)
+        with self.assertRaises(LexerError) as ctx1:
+            parse("2*x + １ = 3")
+        self.assertIn("Illegal character '１'", str(ctx1.exception))
+        self.assertEqual(ctx1.exception.span, Span(6, 7))
+
+        # Superscript digit ² (U+00B2)
+        with self.assertRaises(LexerError) as ctx2:
+            parse("x² = 1")
+        self.assertIn("Illegal character '²'", str(ctx2.exception))
+        self.assertEqual(ctx2.exception.span, Span(1, 2))
+
+        # Fraction symbol ½ (U+00BD)
+        with self.assertRaises(LexerError) as ctx3:
+            parse("x + ½ = 0")
+        self.assertIn("Illegal character '½'", str(ctx3.exception))
+
+        # Arabic-Indic digit ١ (U+0661)
+        with self.assertRaises(LexerError) as ctx4:
+            parse("x + \u0661 = 0")
+        self.assertIn("Illegal character '\u0661'", str(ctx4.exception))
+
+    def test_literal_exponent_grammar_enforcement(self):
+        # "02" must be rejected (not in {"0", "1", "2"})
+        with self.assertRaises(ParserError) as ctx1:
+            parse("x^02 = 1")
+        self.assertIn("Unsupported exponent '02'", str(ctx1.exception))
+
+        # "00" must be rejected
+        with self.assertRaises(ParserError) as ctx2:
+            parse("x^00 = 1")
+        self.assertIn("Unsupported exponent '00'", str(ctx2.exception))
+
+        # "3" must be rejected
+        with self.assertRaises(ParserError) as ctx3:
+            parse("x^3 = 1")
+        self.assertIn("Unsupported exponent '3'", str(ctx3.exception))
+
+        # Allowed literals parse successfully
+        self.assertIsInstance(parse("x^0 = 1"), Equation)
+        self.assertIsInstance(parse("x^1 = 1"), Equation)
+        self.assertIsInstance(parse("x^2 = 1"), Equation)
+
+    def test_unary_precedence_audit_structure(self):
+        # In the frozen EBNF (expression ::= [add_op] term), unary sign wraps the term:
+        # -x*2 = 0 parses as -(x*2)
+        eq_mul = parse("-x*2 = 0")
+        self.assertIsInstance(eq_mul.left, UnaryOp)
+        self.assertEqual(eq_mul.left.op, "-")
+        self.assertIsInstance(eq_mul.left.operand, BinaryOp)
+        self.assertEqual(eq_mul.left.operand.op, "*")
+        self.assertEqual(eq_mul.left.operand.left, Variable("x", Span(1, 2)))
+        self.assertEqual(eq_mul.left.operand.right, IntegerLiteral(2, Span(3, 4)))
+
+        # -x/2 = 0 parses as -(x/2)
+        eq_div = parse("-x/2 = 0")
+        self.assertIsInstance(eq_div.left, UnaryOp)
+        self.assertEqual(eq_div.left.op, "-")
+        self.assertIsInstance(eq_div.left.operand, BinaryOp)
+        self.assertEqual(eq_div.left.operand.op, "/")
+        self.assertEqual(eq_div.left.operand.left, Variable("x", Span(1, 2)))
+        self.assertEqual(eq_div.left.operand.right, IntegerLiteral(2, Span(3, 4)))
+
+        # Explicit grouping (-x)*2 = 0 retains (-x) as left operand of multiplication
+        eq_grouped = parse("(-x)*2 = 0")
+        self.assertIsInstance(eq_grouped.left, BinaryOp)
+        self.assertEqual(eq_grouped.left.op, "*")
+        self.assertIsInstance(eq_grouped.left.left, Group)
+        self.assertIsInstance(eq_grouped.left.left.inner, UnaryOp)
+
+    def test_token_count_boundaries(self):
+        # 31 'x' + 30 '+' + 1 '=' + 1 '0' = 63 tokens <= 64 limit
+        valid_63 = " + ".join(["x"] * 31) + " = 0"
+        tokens_63 = tokenize(valid_63)
+        self.assertEqual(len(tokens_63), 64)  # 63 tokens + 1 EOF
+        self.assertIsInstance(parse(valid_63), Equation)
+
+        # 32 'x' + 31 '+' + 1 '=' + 1 '0' = 65 tokens > 64 limit
+        exceeded_65 = " + ".join(["x"] * 32) + " = 0"
+        with self.assertRaises(InputBoundsExceededError) as ctx:
+            tokenize(exceeded_65)
+        self.assertIn("exceeds maximum allowed limit of 64 tokens", str(ctx.exception))
 
 
 if __name__ == "__main__":

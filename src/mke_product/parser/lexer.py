@@ -1,11 +1,12 @@
 """Deterministic lexer for mathematical equations.
 
 Enforces:
-- ASCII integer literals, single variable 'x'.
+- ASCII integer literals (strictly '0'-'9'), single variable 'x'.
 - Operators +, -, *, /, ^.
 - Parentheses (, ) and equation equals =.
 - Rejection of implicit multiplication (2x, 1/2x, x(x+1), (x)(x+1), etc.).
 - Bounded input length and token count.
+- Deterministic rejection of non-ASCII and unsupported Unicode characters.
 - Accurate source spans for every token.
 """
 
@@ -43,16 +44,16 @@ def tokenize(text: str) -> List[Token]:
     while i < n:
         ch = text[i]
 
-        # Whitespace
-        if ch.isspace():
+        # ASCII Whitespace
+        if ch in " \t\r\n":
             i += 1
             continue
 
         start = i
 
-        # Digits / Integer literals
-        if ch.isdigit():
-            while i < n and text[i].isdigit():
+        # ASCII Digits / Integer literals (strictly '0' through '9')
+        if "0" <= ch <= "9":
+            while i < n and "0" <= text[i] <= "9":
                 i += 1
             val = text[start:i]
             tokens.append(Token(TokenType.INTEGER, val, Span(start, i)))
@@ -98,7 +99,7 @@ def tokenize(text: str) -> List[Token]:
             i += 1
             continue
 
-        # Any other character is invalid
+        # Any other character (including Unicode digits, non-ASCII letters, etc.) is invalid
         raise LexerError(
             f"Illegal character {ch!r} at position {start}.",
             Span(start, start + 1),

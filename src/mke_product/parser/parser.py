@@ -140,14 +140,13 @@ class Parser:
                 )
 
             exp_tok = self.advance()
-            val = int(exp_tok.value)
-            if val not in {0, 1, 2}:
+            if exp_tok.value not in {"0", "1", "2"}:
                 raise ParserError(
-                    f"Unsupported exponent value {val}. Phase P02A strictly restricts exponents to {{0, 1, 2}}.",
+                    f"Unsupported exponent {exp_tok.value!r}. The frozen grammar strictly permits only literal tokens '0', '1', or '2'.",
                     exp_tok.span,
                 )
 
-            exp_node = IntegerLiteral(value=val, span=exp_tok.span)
+            exp_node = IntegerLiteral(value=int(exp_tok.value), span=exp_tok.span)
             return Power(
                 base=base,
                 exponent=exp_node,

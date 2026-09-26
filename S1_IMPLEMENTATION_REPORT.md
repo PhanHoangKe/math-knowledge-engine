@@ -1,10 +1,10 @@
-# MKE PRODUCT-02A-S1 Implementation & Acceptance Report
+# MKE PRODUCT-02A-S1-R1 Implementation & Remediation Report
 
-**Milestone:** PRODUCT-02A-S1 — Exact Mathematical Parser & Immutable AST  
+**Milestone:** PRODUCT-02A-S1-R1 — Targeted Parser Remediation  
 **Role:** Anty (Execution Agent)  
 **Coordinator & Independent Auditor:** ChatGPT (Chief Architect)  
 **Approval Authority:** Project Owner  
-**Approved Baseline Commit:** `4227827cee28a47cd913cca9a7443a1962f7b1e0`  
+**Approved Baseline Commit:** `451629a3c782182cb817f9cacf9653c56576b089`  
 **Frozen Design Commit:** `31cdb61cc84a21b8ebe093765f0a71a606776196`  
 **Date:** September 2026  
 
@@ -14,91 +14,55 @@
 
 - **Host Operating System:** Microsoft Windows (Windows 11 / 10.0.26100)
 - **Python Version:** Python 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
-- **Dependencies:** Strictly zero external packages; Python standard library only (`unittest`, `dataclasses`, `typing`, `enum`, `abc`, `math`, `fractions`).
-- **External Dependencies Modified / Upgraded:** None.
+- **Dependencies:** Standard library only; strictly zero external packages.
 
 ---
 
-## 2. Product Workspace & File Allowlist
+## 2. Targeted Remediation Summary
 
-All S1 development resides exclusively in the external sibling workspace `d:\mke-product`.
+### 2.1 Span Immutability
+- `Span` is now declared as `@dataclass(frozen=True, slots=True)`.
+- Verified that `start` and `end` cannot be modified, deleted, or rebound after instantiation.
+- Verified that all AST nodes, descendant subtrees, and token spans remain strictly immutable.
 
-### Explicit Allowlist of S1 Files
-1. `.gitignore` (existing)
-2. `README.md` (updated)
-3. `S0_IMPLEMENTATION_REPORT.md` (existing)
-4. `S1_IMPLEMENTATION_REPORT.md` (new)
-5. `src/mke_product/__init__.py` (existing)
-6. `src/mke_product/core/__init__.py` (existing)
-7. `src/mke_product/core/errors.py` (existing)
-8. `src/mke_product/core/rational.py` (existing)
-9. `src/mke_product/parser/__init__.py` (new)
-10. `src/mke_product/parser/ast.py` (new)
-11. `src/mke_product/parser/errors.py` (new)
-12. `src/mke_product/parser/lexer.py` (new)
-13. `src/mke_product/parser/parser.py` (new)
-14. `src/mke_product/parser/tokens.py` (new)
-15. `tests/__init__.py` (existing)
-16. `tests/test_parser.py` (new)
-17. `tests/test_rational.py` (existing)
+### 2.2 ASCII Digit Restriction & Unicode Rejection
+- Integer literal lexing is strictly restricted to ASCII `'0' <= ch <= '9'`.
+- All Unicode digits (e.g., fullwidth `１`, superscripts `²`, fractions `½`, Arabic-Indic digits `١`) and non-ASCII characters are deterministically rejected with typed `LexerError` containing exact character spans.
+- No raw `ValueError` can escape from integer conversion.
 
-Total tracked files: 17.
+### 2.3 Literal Exponent Grammar Enforcement
+- Enforced literal token validation: exponent token must strictly belong to the set `{"0", "1", "2"}`.
+- Inputs such as `x^02 = 1`, `x^00 = 1`, and `x^3 = 1` are deterministically rejected with `ParserError`.
 
----
-
-## 3. Implementation Highlights
-
-### Lexer & Tokenizer
-- Explicit tokenization of ASCII integers, single variable `x`, operators `+`, `-`, `*`, `/`, `^`, parentheses `(`, `)`, and equality `=`.
-- Rejection of implicit multiplication (`2x`, `1/2x`, `x(x+1)`, `(x)(x+1)`) raising `ImplicitMultiplicationError`.
-- Rejection of unsupported characters and variables raising `LexerError`.
-- Source span tracking for every token.
-
-### Authoritative Parser (rev0.3.1 Grammar)
-- Recursive descent parser conforming to the frozen EBNF grammar.
-- Exponents strictly restricted to `{0, 1, 2}`.
-- Operator precedence: Parentheses > Power > Unary sign > Multiplication/Division > Addition/Subtraction.
-- In particular, `-x^2` parses as `-(x^2)` (`UnaryOp("-", Power(Variable("x"), IntegerLiteral(2)))`), while `(-x)^2` retains the grouped negative base (`Power(Group(UnaryOp("-", Variable("x"))), IntegerLiteral(2))`).
-- Exactly one equality sign `=` separating two expressions.
-
-### Immutable AST
-- Typed AST classes using frozen dataclasses with slots.
-- Original expression structure preserved: no simplification of `x^0`, `0^0`, `(x-1)/(x-1)`, `x*x`, or explicit division nodes.
-- Preserves grouping via `Group(inner)` nodes.
-- Source spans recorded on every node.
-
-### Bounded Input Safety
-- Input length ceiling: `MAX_INPUT_LENGTH = 256`.
-- Token count ceiling: `MAX_TOKEN_COUNT = 64`.
-- Nesting depth ceiling: `MAX_NESTING_DEPTH = 16`.
-- Deterministic typed errors with span diagnostics.
+### 2.4 Unary-Sign Precedence Audit & Specification Alignment
+- **Frozen EBNF Grammar:**
+  `expression ::= [ add_op ] term { add_op term }`
+  In this production rule, `[ add_op ]` is parsed at the expression level and applies to the entire first `term`. Consequently:
+  - `-x*2 = 0` parses as `UnaryOp("-", BinaryOp("*", Variable("x"), IntegerLiteral(2)))`, representing `-(x * 2)`.
+  - `-x/2 = 0` parses as `UnaryOp("-", BinaryOp("/", Variable("x"), IntegerLiteral(2)))`, representing `-(x / 2)`.
+  - Explicit grouping `(-x)*2 = 0` retains `(-x)` as the left operand of multiplication (`BinaryOp("*", Group(UnaryOp("-", x)), 2)`).
+- **Task Precedence Order vs EBNF:**
+  The S1 task description lists operator precedence as: Parentheses > Exponentiation > Unary sign > Multiplication/Division > Addition/Subtraction. Under a pure operator precedence hierarchy where unary sign binds tighter than multiplication, `-x*2` would produce `(-x) * 2`.
+- **Mathematical Equivalence & Semantics Preservation:**
+  In real field algebra ($\mathbb{R}$), $-(x \cdot 2) \equiv (-x) \cdot 2 = -2x$ and $-(x / 2) \equiv (-x) / 2 = -\frac{1}{2}x$. Both syntactic structures evaluate to identical real values for all $x$.
+- **Action Taken:**
+  The implementation strictly preserves the literal frozen EBNF grammar production rules (`[add_op] term`) without silent modification. This syntactic distinction is formally documented as a resolved interface note for Chief Architect audit.
 
 ---
 
-## 4. Trusted Developer Unit Testing Results
+## 3. Trusted Developer Unit Testing Results
 
 - **Test Command:** `python -m unittest discover -s tests -p "test_*.py" -v`
-- **Total Tests Ran:** 59
+- **Total Tests Ran:** 65
   - S0 Rational Core: 24 tests (24 passed, 0 failed)
-  - S1 Parser & AST: 35 tests (35 passed, 0 failed)
+  - S1 Baseline Parser: 35 tests (35 passed, 0 failed)
+  - S1-R1 Targeted Remediation: 6 tests (6 passed, 0 failed)
 - **Failures / Errors:** 0
-- **Duration:** 0.004s
-
-### Representative Mandatory Cases Verified
-- `2*x + 3 = 7` $\implies$ PASS (Linear binary tree)
-- `-x^2 = 1` $\implies$ PASS (Parsed as $-(x^2)$)
-- `(-x)^2 = 1` $\implies$ PASS (Grouped base preserved)
-- `1/2x = 1` $\implies$ REJECTED (`ImplicitMultiplicationError`)
-- `2x = 4` $\implies$ REJECTED (`ImplicitMultiplicationError`)
-- `(x-1)/(x-1) = 1` $\implies$ PASS (Preserves both quotient subtrees)
-- `x^0 = 1` $\implies$ PASS (Power node preserved)
-- `0^0 = 1` $\implies$ PASS (Power node preserved; definedness deferred)
-- `x^2 - 4 = 0` $\implies$ PASS (Quadratic tree preserved)
-- `x^3 = 1` $\implies$ REJECTED (Exponent 3 not in $\{0, 1, 2\}$)
+- **Duration:** 0.005s
 
 ---
 
-## 5. Protected Historical Repository Integrity
+## 4. Protected Historical Repository Integrity
 
 - **Historical Repository Path:** `d:\Math Knowledge Engine`
 - **Head Branch:** `dev02a-method-knowledge-base` (Commit: `753382a023835dbdbe6b074ca6101a3292d3474c`)
@@ -108,7 +72,7 @@ Total tracked files: 17.
 
 ---
 
-## 6. Git Publication Coordinates
+## 5. Git Publication Coordinates
 
 - **Remote:** `https://github.com/PhanHoangKe/math-knowledge-engine.git`
 - **Branch:** `product/p02a-foundation`
@@ -116,6 +80,6 @@ Total tracked files: 17.
 
 ---
 
-## 7. Governance Status
+## 6. Governance Status
 
-Milestone PRODUCT-02A-S1 is complete. Milestone S2 and all subsequent implementation steps remain strictly unauthorized pending Project Owner approval.
+Milestone PRODUCT-02A-S1-R1 is complete. Milestone S2 and all subsequent implementation steps remain strictly unauthorized pending Project Owner approval.

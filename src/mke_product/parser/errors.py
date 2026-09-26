@@ -1,27 +1,20 @@
 """Typed error hierarchy for lexical and syntactic mathematical parsing."""
 
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 from ..core.errors import MKEProductError
 
 
+@dataclass(frozen=True, slots=True)
 class Span:
-    """Character span [start, end) within source text."""
-
-    __slots__ = ("start", "end")
-
-    def __init__(self, start: int, end: int) -> None:
-        self.start = start
-        self.end = end
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Span):
-            return False
-        return self.start == other.start and self.end == other.end
+    """Immutable character span [start, end) within source text."""
+    start: int
+    end: int
 
     def __repr__(self) -> str:
         return f"Span({self.start}, {self.end})"
 
-    def to_tuple(self) -> tuple[int, int]:
+    def to_tuple(self) -> Tuple[int, int]:
         return (self.start, self.end)
 
 
