@@ -1,6 +1,14 @@
-"""Deterministic exact AST evaluator and independent candidate verifier."""
+"""Deterministic exact AST evaluator and independent candidate verifier.
+
+Enforces:
+1. Strict original-domain safety on unreduced ASTs.
+2. Shared evaluation budget covering the entire candidate check.
+3. Bounded candidate input validation with strict ASCII rational grammar.
+4. Epistemically precise three-valued definedness contract.
+"""
 
 from __future__ import annotations
+import math
 from fractions import Fraction
 from typing import Any, Mapping, Optional, Tuple, Union
 
@@ -31,32 +39,163 @@ from .result import (
 )
 
 
+def _validate_and_parse_int(part: str, is_denominator: bool, budget: EvaluationBudget) -> int:
+    """Validate and parse an integer component according to ASCII rational grammar.
+
+    Enforces component digit count ceiling BEFORE constructing int.
+    Forbids leading zeros on multi-digit numbers.
+    Forbids zero denominator.
+    """
+    if not part:
+        raise InvalidCandidateError(
+            "Empty numeric component in candidate string.",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    if part[0] in ("+", "-"):
+        sign = -1 if part[0] == "-" else 1
+        digits = part[1:]
+    else:
+        sign = 1
+        digits = part
+
+    if not digits:
+        raise InvalidCandidateError(
+            f"Missing digits after sign in candidate component: {part!r}",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    # Validate ASCII digits only (reject Unicode digits)
+    if not all("0" <= ch <= "9" for ch in digits):
+        raise InvalidCandidateError(
+            f"Invalid characters in candidate component; ASCII digits only: {part!r}",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    # Component-size ceiling BEFORE integer construction
+    # For N bits, max decimal digits ~ ceil(N * log10(2)) + 2
+    max_component_digits = math.ceil(budget.max_candidate_bits * 0.30103) + 2
+    if len(digits) > max_component_digits:
+        raise EvaluationResourceLimitError(
+            f"Candidate component digit count ({len(digits)}) exceeds component ceiling of {max_component_digits} digits.",
+            code="ERR_RESOURCE_EXHAUSTED_CANDIDATE_LIMIT",
+        )
+
+    # Reject leading zeros on multi-digit numbers (e.g. '02', '00', '007')
+    if len(digits) > 1 and digits.startswith("0"):
+        raise InvalidCandidateError(
+            f"Leading zeros are forbidden in numeric candidate: {part!r}",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    # Denominator cannot be zero
+    if is_denominator and digits == "0":
+        raise InvalidCandidateError(
+            "Denominator cannot be zero in rational candidate string.",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    val = int(digits) * sign
+    return val
+
+
+def parse_ascii_rational_string(candidate: str, budget: EvaluationBudget) -> Rational:
+    """Parse candidate string according to strict ASCII rational-string grammar.
+
+    Grammar:
+        candidate_string ::= [ sign ] integer_part [ "/" [ sign ] denominator_part ]
+        sign             ::= "+" | "-"
+        integer_part     ::= "0" | non_zero_digit { digit }
+        denominator_part ::= non_zero_digit { digit }
+        digit            ::= "0" | "1" | ... | "9"
+        non_zero_digit   ::= "1" | "2" | ... | "9"
+
+    Enforces input-length and component-size ceilings BEFORE integer construction.
+    """
+    # Enforce overall string length ceiling BEFORE any parsing
+    max_string_length = budget.max_candidate_bits
+    if len(candidate) > max_string_length:
+        raise EvaluationResourceLimitError(
+            f"Candidate string length ({len(candidate)}) exceeds input ceiling ({max_string_length} characters).",
+            code="ERR_RESOURCE_EXHAUSTED_CANDIDATE_LIMIT",
+        )
+
+    # Enforce ASCII encoding
+    if not candidate.isascii():
+        raise InvalidCandidateError(
+            "Candidate string contains non-ASCII characters.",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    s = candidate.strip()
+    if not s:
+        raise InvalidCandidateError(
+            "Candidate string cannot be empty.",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    if any(ch in s for ch in (" ", "\t", "\n", "\r")):
+        raise InvalidCandidateError(
+            "Candidate string must not contain interior whitespace.",
+            code="ERR_INVALID_CANDIDATE_MALFORMED",
+        )
+
+    if "/" in s:
+        parts = s.split("/")
+        if len(parts) != 2:
+            raise InvalidCandidateError(
+                f"Malformed fraction string with multiple '/': {candidate!r}",
+                code="ERR_INVALID_CANDIDATE_MALFORMED",
+            )
+        num_part, den_part = parts[0], parts[1]
+    else:
+        num_part, den_part = s, "1"
+
+    num = _validate_and_parse_int(num_part, is_denominator=False, budget=budget)
+    den = _validate_and_parse_int(den_part, is_denominator=True, budget=budget)
+
+    # Validate bit length
+    if (
+        abs(num).bit_length() > budget.max_candidate_bits
+        or den.bit_length() > budget.max_candidate_bits
+    ):
+        raise EvaluationResourceLimitError(
+            f"Candidate integer bit length exceeds budget limit ({budget.max_candidate_bits} bits).",
+            code="ERR_RESOURCE_EXHAUSTED_CANDIDATE_LIMIT",
+        )
+
+    return Rational(num, den)
+
+
 def coerce_candidate(candidate: Any, budget: EvaluationBudget) -> Rational:
     """Coerce candidate to exact Rational with strict type validation.
-    
-    Rejects floats and unsupported types deterministically.
+
+    Supported types: Rational, int, fractions.Fraction, and valid ASCII rational strings.
+    Strictly rejected types: float, bool, complex, malformed strings, and oversize components.
     """
+    # Reject bool explicitly (in Python, bool is a subclass of int)
+    if isinstance(candidate, bool):
+        raise InvalidCandidateError(
+            "Boolean candidates are strictly forbidden in exact rational evaluation.",
+            code="ERR_INVALID_CANDIDATE_TYPE",
+        )
+
     if isinstance(candidate, float):
         raise InvalidCandidateError(
             "Floating-point candidates are strictly forbidden in exact rational evaluation.",
             code="ERR_INVALID_CANDIDATE_FLOAT",
         )
 
+    if isinstance(candidate, str):
+        return parse_ascii_rational_string(candidate, budget)
+
     c: Rational
     if isinstance(candidate, Rational):
         c = candidate
-    elif isinstance(candidate, int) and not isinstance(candidate, bool):
+    elif isinstance(candidate, int):
         c = Rational(candidate, 1)
     elif isinstance(candidate, Fraction):
         c = Rational(candidate.numerator, candidate.denominator)
-    elif isinstance(candidate, str):
-        try:
-            c = Rational(candidate)
-        except Exception as err:
-            raise InvalidCandidateError(
-                f"Cannot parse candidate rational string: {candidate!r}",
-                code="ERR_INVALID_CANDIDATE_MALFORMED",
-            ) from err
     else:
         raise InvalidCandidateError(
             f"Unsupported candidate type: {type(candidate).__name__}",
@@ -81,10 +220,15 @@ class ExpressionEvaluator:
 
     __slots__ = ("env", "budget", "operations_count")
 
-    def __init__(self, env: Mapping[str, Rational], budget: EvaluationBudget) -> None:
+    def __init__(
+        self,
+        env: Mapping[str, Rational],
+        budget: EvaluationBudget,
+        initial_operations: int = 0,
+    ) -> None:
         self.env = env
         self.budget = budget
-        self.operations_count = 0
+        self.operations_count = initial_operations
 
     def evaluate(self, node: ASTNode) -> Rational:
         """Recursively evaluate an ASTNode in exact rational arithmetic."""
@@ -196,7 +340,7 @@ def evaluate_expression(
     budget: Optional[EvaluationBudget] = None,
 ) -> Rational:
     """Evaluate an AST expression node exactly with variable substitution.
-    
+
     Raises typed EvaluationError on domain, resource, or unbound variable failures.
     """
     effective_budget = budget if budget is not None else EvaluationBudget()
@@ -206,12 +350,10 @@ def evaluate_expression(
 
 def extract_domain_obligations(node: ASTNode) -> Tuple[DomainObligation, ...]:
     """Statically inspect an AST and extract all original domain obligations.
-    
+
     Extracts:
     - Denominators that must evaluate to non-zero.
     - Bases of power-0 expressions that must evaluate to non-zero.
-    
-    Note: This is static inspection and does not claim to solve real-domain solution sets.
     """
     obligations = []
     for child in node.walk():
@@ -242,26 +384,43 @@ def check_candidate(
     budget: Optional[EvaluationBudget] = None,
 ) -> CandidateCheckResult:
     """Independently verify an exact rational candidate against an original Equation AST.
-    
-    Strict guarantees:
-    - Validates candidate belongs to exact Rational numbers Q.
-    - Evaluates original L(c) and R(c) independently without polynomial reduction.
-    - Preserves all original-domain obligations (e.g., zero denominators, 0^0).
-    - Multiplications by zero do not hide undefined subtrees.
-    - Returns strictly typed, immutable CandidateCheckResult.
+
+    Guarantees:
+    - Global operation budget covering the COMPLETE candidate check across both sides.
+    - Input-length and component-size ceilings BEFORE integer construction.
+    - Explicit three-valued definedness semantics (True/False/None).
+    - Accurate left/right and total operation count diagnostics.
     """
     if not isinstance(equation, Equation):
         raise TypeError(f"check_candidate requires an Equation AST, got: {type(equation).__name__}")
 
     effective_budget = budget if budget is not None else EvaluationBudget()
-    c_rat = coerce_candidate(candidate, effective_budget)
+
+    try:
+        c_rat = coerce_candidate(candidate, effective_budget)
+    except EvaluationResourceLimitError as err:
+        return CandidateCheckResult(
+            status=CandidateCheckStatus.RESOURCE_EXHAUSTED,
+            candidate=None,
+            equation=equation,
+            error_code=err.code,
+            error_message=err.message,
+            error_span=err.span,
+            diagnostics=(
+                ("stage", "CANDIDATE_COERCION"),
+                ("reason", "CANDIDATE_RESOURCE_LIMIT"),
+            ),
+        )
+
     env = {"x": c_rat}
 
-    # Evaluate Left-Hand Side L(c)
-    left_evaluator = ExpressionEvaluator(env=env, budget=effective_budget)
+    # Shared evaluator covering BOTH left and right sides
+    evaluator = ExpressionEvaluator(env=env, budget=effective_budget)
+
+    # 1. Left side evaluation L(c)
     left_val: Optional[Rational] = None
     try:
-        left_val = left_evaluator.evaluate(equation.left)
+        left_val = evaluator.evaluate(equation.left)
     except DomainError as err:
         return CandidateCheckResult(
             status=CandidateCheckStatus.DOMAIN_ERROR,
@@ -272,7 +431,9 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "LEFT_SIDE"),
-                ("steps", str(left_evaluator.operations_count)),
+                ("steps_left", str(evaluator.operations_count)),
+                ("steps_right", "0"),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
     except EvaluationResourceLimitError as err:
@@ -285,7 +446,9 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "LEFT_SIDE"),
-                ("steps", str(left_evaluator.operations_count)),
+                ("steps_left", str(evaluator.operations_count)),
+                ("steps_right", "0"),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
     except UnsupportedEvaluationError as err:
@@ -298,16 +461,20 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "LEFT_SIDE"),
-                ("steps", str(left_evaluator.operations_count)),
+                ("steps_left", str(evaluator.operations_count)),
+                ("steps_right", "0"),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
 
-    # Evaluate Right-Hand Side R(c)
-    right_evaluator = ExpressionEvaluator(env=env, budget=effective_budget)
+    steps_left = evaluator.operations_count
+
+    # 2. Right side evaluation R(c) using the SAME evaluator instance
     right_val: Optional[Rational] = None
     try:
-        right_val = right_evaluator.evaluate(equation.right)
+        right_val = evaluator.evaluate(equation.right)
     except DomainError as err:
+        steps_right = evaluator.operations_count - steps_left
         return CandidateCheckResult(
             status=CandidateCheckStatus.DOMAIN_ERROR,
             candidate=c_rat,
@@ -318,11 +485,13 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "RIGHT_SIDE"),
-                ("steps_left", str(left_evaluator.operations_count)),
-                ("steps_right", str(right_evaluator.operations_count)),
+                ("steps_left", str(steps_left)),
+                ("steps_right", str(steps_right)),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
     except EvaluationResourceLimitError as err:
+        steps_right = evaluator.operations_count - steps_left
         return CandidateCheckResult(
             status=CandidateCheckStatus.RESOURCE_EXHAUSTED,
             candidate=c_rat,
@@ -333,11 +502,13 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "RIGHT_SIDE"),
-                ("steps_left", str(left_evaluator.operations_count)),
-                ("steps_right", str(right_evaluator.operations_count)),
+                ("steps_left", str(steps_left)),
+                ("steps_right", str(steps_right)),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
     except UnsupportedEvaluationError as err:
+        steps_right = evaluator.operations_count - steps_left
         return CandidateCheckResult(
             status=CandidateCheckStatus.UNSUPPORTED,
             candidate=c_rat,
@@ -348,10 +519,14 @@ def check_candidate(
             error_span=err.span,
             diagnostics=(
                 ("branch", "RIGHT_SIDE"),
-                ("steps_left", str(left_evaluator.operations_count)),
-                ("steps_right", str(right_evaluator.operations_count)),
+                ("steps_left", str(steps_left)),
+                ("steps_right", str(steps_right)),
+                ("total_steps", str(evaluator.operations_count)),
             ),
         )
+
+    steps_right = evaluator.operations_count - steps_left
+    total_steps = evaluator.operations_count
 
     # Strict Equality Comparison in Q
     is_equal = left_val == right_val
@@ -367,7 +542,8 @@ def check_candidate(
         diagnostics=(
             ("exact_equality", str(is_equal)),
             ("residual", str(residual)),
-            ("steps_left", str(left_evaluator.operations_count)),
-            ("steps_right", str(right_evaluator.operations_count)),
+            ("steps_left", str(steps_left)),
+            ("steps_right", str(steps_right)),
+            ("total_steps", str(total_steps)),
         ),
     )

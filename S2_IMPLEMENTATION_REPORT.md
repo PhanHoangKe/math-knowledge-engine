@@ -1,10 +1,10 @@
 # MKE PRODUCT-02A-S2 Implementation Report
-**Milestone:** Exact Semantic Evaluation & Candidate Verification  
+**Milestone:** Exact Semantic Evaluation & Candidate Verification (Remediation S2-R1)  
 **Branch:** `product/p02a-foundation`  
 **Base Commit:** `813c242d77aaf05ee9886fd5196de5cbd1943e21`  
 **Frozen Specification:** `31cdb61cc84a21b8ebe093765f0a71a606776196`  
 **Execution Agent:** Anty  
-**Auditor:** ChatGPT  
+**Chief Architect & Auditor:** ChatGPT  
 **Approval Authority:** Project Owner  
 
 ---
@@ -23,87 +23,112 @@ The implementation resides in `src/mke_product/evaluator/` with clean decoupling
   - `DomainError`: Base domain violation error.
   - `ZeroDenominatorEvaluationError`: Division by zero (`DOMAIN_ERROR_DIVISION_BY_ZERO`).
   - `UndefinedZeroToZeroError`: $0^0$ indeterminate / undefined in $\mathbb{R}$ (`DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO`).
-  - `EvaluationResourceLimitError`: Operation count or bit-length budget exhaustion (`RESOURCE_LIMIT_EXCEEDED`).
-  - `InvalidCandidateError`: Rejection of floats, booleans, malformed string representations, or complex numbers (`INVALID_CANDIDATE`).
+  - `EvaluationResourceLimitError`: Operation count or bit-length budget exhaustion (`ERR_RESOURCE_EXHAUSTED_STEP_LIMIT`, `ERR_RESOURCE_EXHAUSTED_INTEGER_LIMIT`, `ERR_RESOURCE_EXHAUSTED_CANDIDATE_LIMIT`).
+  - `InvalidCandidateError`: Rejection of floats, booleans, malformed string representations, or complex numbers (`ERR_INVALID_CANDIDATE_TYPE`, `ERR_INVALID_CANDIDATE_FLOAT`, `ERR_INVALID_CANDIDATE_MALFORMED`).
   - `UnsupportedEvaluationError`: Handling unsupported or unbound AST constructs.
 - `budget.py`: `EvaluationBudget`:
-  - `max_operations: int = 10000`
-  - `max_integer_bits: int = 4096`
-  - `max_candidate_bits: int = 4096`
+  - `max_operations: int = 10_000` (positive integer only; booleans and non-integers rejected)
+  - `max_integer_bits: int = 4096` (positive integer only; booleans and non-integers rejected)
+  - `max_candidate_bits: int = 4096` (positive integer only; booleans and non-integers rejected)
 - `result.py`:
-  - `CandidateCheckStatus`: Enumeration of verification statuses (`VALID_SOLUTION`, `NOT_A_SOLUTION`, `DOMAIN_ERROR_DIVISION_BY_ZERO`, `DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO`, `RESOURCE_LIMIT_EXCEEDED`, `EVALUATION_ERROR`, `INVALID_CANDIDATE`).
+  - `CandidateCheckStatus`: Canonical enum outcome taxonomy:
+    * `VALID = "VALID"`
+    * `INVALID = "INVALID"`
+    * `DOMAIN_ERROR = "DOMAIN_ERROR"`
+    * `RESOURCE_EXHAUSTED = "RESOURCE_EXHAUSTED"`
+    * `UNSUPPORTED = "UNSUPPORTED"`
   - `DomainObligation`: Structured recording of AST domain obligations (denominators $\neq 0$, power base $\neq 0$ when exponent is $0$).
-  - `CandidateCheckResult`: Frozen dataclass capturing exact verification outcomes, evaluated sides, error codes, domain obligations, and execution metrics.
+  - `CandidateCheckResult`: Frozen dataclass capturing verification outcomes, evaluated sides, error codes, domain obligations, and execution metrics.
 - `evaluator.py`:
   - `ExpressionEvaluator`: Tree-walking evaluator operating over immutable AST nodes in exact $\mathbb{Q}$ arithmetic.
-  - `coerce_candidate`: Strict rational coercion rejecting floating-point numbers (`float`) and bools.
+  - `coerce_candidate`: Strict rational coercion validating candidate types against the bounded ASCII rational grammar and size ceilings.
   - `extract_domain_obligations`: Static domain obligation extractor.
-  - `check_candidate`: Public entry point verifying a candidate against an equation AST or string.
+  - `check_candidate`: Public entry point verifying a candidate against an equation AST with a shared global operation budget.
 
 ---
 
-## 2. Domain Safety & Semantics
+## 2. API Contract & Remediation S2-R1 Details
 
-### 2.1 Unreduced AST Domain Safety
-As mandated by PRODUCT-01 rev0.3.1 and `FREEZE_ADDENDUM.md`, algebraic simplification must never erase or hide domain singularities present in the original formulation.
-- For $(x-1)/(x-1) = 1$ at $x=1$, evaluation encounters $(1-1)/(1-1) = 0/0$, returning `DOMAIN_ERROR_DIVISION_BY_ZERO`.
-- For $(x-1)/(x-1) = 1$ at $x=2$, both sides evaluate to $1/1$, returning `VALID_SOLUTION`.
+### 2.1 Public Verification API
+```python
+def check_candidate(
+    equation: Equation,
+    candidate: Union[Rational, int, Fraction, str],
+    budget: Optional[EvaluationBudget] = None,
+) -> CandidateCheckResult:
+```
+- **Equation input**: Requires an immutable `Equation` AST (produced by S1 parser).
+- **Candidate input**: Accepts `Rational`, `int` (non-bool), `fractions.Fraction`, or an ASCII rational `str`. Floating-point numbers (`float`) and booleans (`bool`) are strictly rejected with `InvalidCandidateError`.
+- **Budget input**: Optional `EvaluationBudget` enforcing operation count, intermediate bit length, and candidate bit length ceilings.
 
-### 2.2 $0^0$ Semantics
-Under the frozen MKE real-domain specification:
-- Any variable base raised to exponent zero has the domain obligation $\text{base} \neq 0$.
-- $x^0 = 1$ at $x=0$ yields `DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO`.
-- $(x-1)^0 = 1$ at $x=1$ yields `DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO`.
-- $x^0 = 1$ at $x=2$ yields `VALID_SOLUTION`.
+### 2.2 Global Operation Budget (S2-R1 Correction 1)
+A single shared `max_operations` counter covers the entire candidate verification across both left and right sides.
+- Equation: `x+x=x+x`, Candidate: `x=1`:
+  * Left side evaluation consumes 3 operations.
+  * Right side evaluation consumes 3 operations.
+  * Budget `max_operations=4`: Left completes (3 steps); Right exhausts budget on step 2 (total 5 steps) $\to$ `RESOURCE_EXHAUSTED`.
+  * Budget `max_operations=6`: Left completes (3 steps); Right completes (3 steps, total 6 steps) $\to$ `VALID`.
+- Diagnostics accurately report: `steps_left`, `steps_right`, `total_steps`, and `branch`.
+- `EvaluationBudget` constructor strictly validates that parameters are positive integers, deterministically rejecting `bool`, floats, strings, and non-positive numbers with `TypeError` or `ValueError`.
 
-### 2.3 Strict No-Short-Circuiting in Subtrees
-Multiplication by zero never hides an undefined subtree. In evaluating `BinaryOp(left, "*", right)`:
-- Both `left` and `right` subtrees are unconditionally evaluated before computing the product.
-- Thus, $0 \cdot (1/x) = 0$ at $x=0$ triggers `DOMAIN_ERROR_DIVISION_BY_ZERO` rather than returning $0$.
+### 2.3 Bounded Candidate Input (S2-R1 Correction 2)
+Candidate strings are parsed against a documented ASCII rational-string grammar:
+```
+candidate_string ::= [ sign ] integer_part [ "/" [ sign ] denominator_part ]
+sign             ::= "+" | "-"
+integer_part     ::= "0" | non_zero_digit { digit }
+denominator_part ::= non_zero_digit { digit }
+digit            ::= "0" | "1" | ... | "9"
+non_zero_digit   ::= "1" | "2" | ... | "9"
+```
+- **Pre-parse Ceilings**: Enforces an overall string length ceiling (`len(candidate) <= budget.max_candidate_bits`) and a component digit ceiling (`len(digits) <= ceil(budget.max_candidate_bits * 0.30103) + 2`) BEFORE integer construction.
+- **Resource Classification**: Oversize candidate inputs raise `EvaluationResourceLimitError` and classify as `RESOURCE_EXHAUSTED` rather than `InvalidCandidateError`.
+- **Grammar Enforcement**: Multi-digit leading zeros (`"02"`, `"00"`, `"-05"`, `"1/02"`, `"1/00"`), zero denominators (`"1/0"`), non-ASCII digits (`"١"`, `"３"`), and malformed structures are rejected with `InvalidCandidateError`.
+- **Valid Rational Inputs**: Supports signed and unsigned integers and fractions (`"0"`, `"-0"`, `"+5"`, `"-3/4"`, `"+5/2"`, `"6/-8"`, `"-10/-2"`).
 
-### 2.4 Strict Rational Arithmetic (Zero Floats)
-Candidates are strictly constrained to $\mathbb{Q}$. Python `float` inputs are rejected deterministically with `InvalidCandidateError`. Equality comparisons are exact over $\mathbb{Q}$.
+### 2.4 Three-Valued Definedness Semantics (S2-R1 Correction 3)
+Property `CandidateCheckResult.is_defined -> Optional[bool]` provides an explicit epistemically accurate contract:
+- `True`: The equation is mathematically well-defined at candidate $c$ (`status in {VALID, INVALID}`).
+- `False`: Proven mathematical domain violation (`status == DOMAIN_ERROR`).
+- `None`: Epistemically UNKNOWN due to evaluation resource limit exhaustion or unsupported constructs (`status in {RESOURCE_EXHAUSTED, UNSUPPORTED}`).
 
 ---
 
-## 3. Resource Bounds & Safety
+## 3. Test Suite & Reproducibility (S2-R1 Correction 4)
 
-The evaluation loop tracks every arithmetic operation and inspects integer bit-lengths:
-- Exceeding `max_operations` (default 10,000) raises `EvaluationResourceLimitError`.
-- Intermediate integer bit lengths exceeding `max_integer_bits` (default 4,096 bits) raise `EvaluationResourceLimitError`.
-- Candidate numerators or denominators exceeding `max_candidate_bits` (default 4,096 bits) are rejected.
-- AST nodes remain strictly immutable throughout evaluation.
+### 3.1 Zero-Dependency Standard Library Suite
+All test suites (S0, S1, S2) are implemented entirely using Python's standard-library `unittest` module without any third-party dependencies (such as external pytest).
+
+### 3.2 Exact Local Test Execution & Results
+Command:
+```powershell
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+Output:
+```
+Ran 107 tests in 0.010s
+
+OK
+```
+*(Also verified under pytest: `107 passed in 0.23s`).*
+
+### 3.3 Inventory of Test Families
+- **S0 Rational Core (`tests/test_rational.py`):** 24 tests.
+  * Canonical reduction, sign normalization, zero denominator rejection, string parsing, float rejection, exact arithmetic, comparisons, hash consistency with int and Fraction.
+- **S1 Mathematical Parser & Immutable AST (`tests/test_parser.py`):** 41 tests.
+  * Mandatory representative cases, implicit multiplication rejection, operator precedence/associativity, unary placement, malformed input rejection, AST immutability, input bounds.
+- **S2 Semantic Evaluation & Candidate Verification (`tests/test_evaluator.py`):** 42 tests.
+  * Mandatory representative cases (domain singularities, $0^0$, subtree masking prevention, quadratic roots).
+  * Candidate input validation (types, float/bool rejection, malformed string rejection).
+  * Resource bounds and immutability (operation limits, integer bits, candidate bits, AST immutability, static domain obligations).
+  * Direct expression evaluator checks.
+  * Targeted S2-R1 regressions (shared operation budget, budget parameter validation, oversize candidate ceilings, leading-zero abuse, malformed fractions, small signed rationals, three-valued definedness contract).
+
+### 3.4 Distinction from Sealed Holdout Certification
+The 107 tests reported above represent executed developer verification and regression suites in the open product repository. In conformance with MKE governance, sealed holdout certification sets and independent adversarial validation datasets remain reserved for the Chief Architect and independent audit verification.
 
 ---
 
-## 4. Test Suite Summary
-
-Total Test Count: **99 passed, 0 failed, 0 errors**.
-- **Pre-existing tests:** 65 passed (28 S0 rational tests, 37 S1 parser tests).
-- **New S2 tests:** 34 passed (`tests/test_evaluator.py`).
-
-### S2 Test Coverage:
-1. Mandatory representative cases:
-   - $(x-1)/(x-1) = 1$ at $x=1$ (division by zero domain error).
-   - $(x-1)/(x-1) = 1$ at $x=2$ (valid solution).
-   - $x^0 = 1$ at $x=0$ ($0^0$ domain error).
-   - $x^0 = 1$ at $x=2$ (valid solution).
-   - $(x-1)^0 = 1$ at $x=1$ ($0^0$ domain error).
-   - $2x + 3 = 7$ at $x=2$ (valid solution) and $x=3$ (not a solution).
-   - $0 \cdot (1/x) = 0$ at $x=0$ (multiplication by zero does not mask domain error).
-   - $(1/x) \cdot 0 = 0$ at $x=0$ (reverse operand order does not mask domain error).
-   - $x^2 - 4 = 0$ at $x=2$, $x=-2$ (valid solutions) and $x=1$ (not a solution).
-   - $-x^2 = 1$ at $x=1$ (not a solution: $-1 \neq 1$).
-   - $(-x)^2 = 1$ at $x=1$ (valid solution: $1 = 1$).
-2. Candidate validation:
-   - Strings ("2/3", "-5", "4"), `Rational`, `Fraction`, `int`.
-   - Rejection of `float`, `bool`, malformed strings ("2.5.1", "abc", "1/0"), and unsupported candidate types.
-   - Rejection of non-Equation ASTs in `check_candidate`.
-3. Resource limits and safety:
-   - Operation budget exhaustion.
-   - Integer bit budget exhaustion.
-   - Candidate bit budget exhaustion.
-   - AST immutability verification.
-   - Static domain obligation extraction.
-4. Direct expression evaluator checks:
-   - Linear evaluation, unbound variable handling, unsupported AST nodes.
+## 4. Integrity and Baseline Verification
+- Historical repository (`d:\Math Knowledge Engine`) was inspected read-only: status hash `a5615ff5909d1582ac21f3278900865b8534d6ffd5f8918ab2ef5a38cfa37f76` preserved without modification.
+- All work conducted exclusively in `d:\mke-product`.

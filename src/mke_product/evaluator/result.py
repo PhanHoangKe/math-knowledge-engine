@@ -39,20 +39,20 @@ class DomainObligation:
 @dataclass(frozen=True, slots=True)
 class CandidateCheckResult:
     """Typed, immutable result of evaluating an exact rational candidate against an Equation.
-    
+
     Fields:
         status: The check status (VALID, INVALID, DOMAIN_ERROR, RESOURCE_EXHAUSTED, UNSUPPORTED).
-        candidate: The exact rational candidate c tested.
+        candidate: The exact rational candidate c tested (or None if candidate coercion failed due to resource limits).
         equation: The original, unmodified Equation AST.
         left_value: Exact rational value of L(c), or None if undefined or error.
         right_value: Exact rational value of R(c), or None if undefined or error.
         error_code: Exact error code string if domain/resource error occurred, else None.
         error_message: Human-readable diagnostic explanation, or None.
-        error_span: Source span of the offending AST node where domain failure occurred.
-        diagnostics: Immutable tuple of diagnostic key-value pairs (provisional debug trace).
+        error_span: Source span of the offending AST node where failure occurred, else None.
+        diagnostics: Immutable tuple of diagnostic key-value pairs.
     """
     status: CandidateCheckStatus
-    candidate: Rational
+    candidate: Optional[Rational]
     equation: Equation
     left_value: Optional[Rational] = None
     right_value: Optional[Rational] = None
@@ -67,15 +67,27 @@ class CandidateCheckResult:
         return self.status == CandidateCheckStatus.VALID
 
     @property
-    def is_defined(self) -> bool:
-        """True if the equation is mathematically well-defined at candidate c."""
-        return self.status in {CandidateCheckStatus.VALID, CandidateCheckStatus.INVALID}
+    def is_defined(self) -> Optional[bool]:
+        """Explicit three-valued definedness contract:
+
+        - True: The equation is mathematically well-defined at candidate c (status in {VALID, INVALID}).
+        - False: Proven mathematical domain violation at candidate c (status == DOMAIN_ERROR).
+        - None: Epistemically UNKNOWN due to evaluation resource exhaustion or unsupported constructs
+                (status in {RESOURCE_EXHAUSTED, UNSUPPORTED}).
+        """
+        if self.status in (CandidateCheckStatus.VALID, CandidateCheckStatus.INVALID):
+            return True
+        if self.status == CandidateCheckStatus.DOMAIN_ERROR:
+            return False
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         """Deterministic inspection dictionary (provisional non-normative format)."""
         return {
             "status": self.status.value,
-            "candidate": self.candidate.to_dict(),
+            "candidate": self.candidate.to_dict() if self.candidate is not None else None,
+            "is_valid": self.is_valid,
+            "is_defined": self.is_defined,
             "left_value": self.left_value.to_dict() if self.left_value is not None else None,
             "right_value": self.right_value.to_dict() if self.right_value is not None else None,
             "error_code": self.error_code,
