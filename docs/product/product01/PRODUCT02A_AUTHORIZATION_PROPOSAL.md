@@ -1,60 +1,25 @@
 # Phase PRODUCT-02A Implementation Authorization Proposal
 
-**Document Version:** 1.0  
-**Target Phase:** Phase P02A — Exact Linear Kernel & Win32 Sandbox  
+**Document Version:** 1.1  
+**Target Phase:** Phase P02A — Exact Linear Foundation & Win32 Sandbox  
 **Governance State:** PROPOSAL ONLY — STRICTLY UNAUTHORIZED UNTIL OWNER APPROVAL  
-**Author:** Anty (Implementation Agent)  
-**Reviewer:** ChatGPT (Chief Architect & Independent Reviewer)  
 **Authority:** Project Owner  
 **Date:** September 2026  
 
 ---
 
-## 1. Executive Notice & Implementation Status
+## 1. Governance Notice
 
 > [!CAUTION]
 > **PHASE PRODUCT-02A IMPLEMENTATION IS CURRENTLY NOT AUTHORIZED.**  
-> Neither implementation source code, test execution, nor project harness runs may commence until the Project Owner provides written, explicit authorization based on this proposal and the approval of Revision 0.3 specifications.
+> Zero implementation code, test execution, or harness runs may take place until the Project Owner explicitly approves Revision 0.3.1 and authorizes the sibling workspace.
 
 ---
 
-## 2. Proposed Scope of Work (Phase P02A)
+## 2. Bounded Scope for Phase P02A
 
-Upon receiving explicit Project Owner authorization, Phase P02A will execute under the following strictly bounded constraints:
-
-### 2.1 Deliverables
-1. **P02A Lexer & Parser:** Conforming strictly to the EBNF grammar defined in `PRODUCT01_VERIFICATION_CONTRACT.md` §2.1. Strictly single variable `x`, exact rational coefficients, non-negative integer exponents $\in \{0, 1\}$, explicit rejection of implicit multiplication.
-2. **Pre-simplification Structural Guard:** Rejection of expressions with variables in denominators (`OUT_OF_SCOPE_RATIONAL_FRACTION`).
-3. **Exact $\mathbb{Q}$ Linear Solver:** Deterministic reduction to $ax + b = 0$ and computation of root $x = -b/a$ via `fractions.Fraction`.
-4. **Independent Verifier:** Exact rational substitution verification evaluating $L(c) - R(c) = 0$.
-5. **Win32 Job Object Execution Wrapper:** Hardened process sandboxing with suspended creation, memory quota (256 MB), breakaway disabled, and network isolation.
-6. **Offline Test Suite:** Complete implementation of the 80 Development Test Cases across the 5 specified families.
-
-### 2.2 Strict Invariants & Non-Goals
-- **Zero Ingestion OCR:** No integration of Pix2Text, PyMuPDF, or image processing.
-- **Zero WebSockets:** No stateful WebSocket implementations; CLI and local HTTP POST only.
-- **No Quadratic/Non-Linear Solvers:** Equations with degree $> 1$ or multiple variables terminate with deterministic `OUT_OF_SCOPE` errors.
-
----
-
-## 3. Workspace Isolation Proposal
-
-To guarantee zero regression or accidental modification of the frozen repository baseline:
-- Implementation will take place in the external sibling workspace:  
-  `../mke-product/` (or relative path approved by the Project Owner).
-- The root repository `PhanHoangKe/math-knowledge-engine` will remain frozen at branch `dev02a-method-knowledge-base` / `docs/product01-review`.
-
----
-
-## 4. Proposed Authorization Directive Template
-
-For convenience, the Project Owner may authorize Phase P02A by executing the following directive:
-
-```text
-PROJECT OWNER DIRECTIVE: PRODUCT-02A AUTHORIZATION
-- Revision 0.3 Specifications: APPROVED (FINAL CONTRACT FREEZE)
-- Workspace Location: APPROVED at ../mke-product
-- Scope: Bounded Phase P02A Exact Linear Kernel & Win32 Sandbox ONLY
-- Execution: 80 Development test cases authorized; 80 Holdout cases remain SEALED
-- Core Repository: STRICTLY FROZEN
-```
+1. **Mathematical Scope:** Affine linear equations ($ax + b = 0$) over Real domain $\mathbb{R}$ with rational coefficients $\mathbb{Q}$. Returns exact $-b/a$, `DomainSet(R)` for $0x=0$, or `EmptySet` for $0x=c$.
+2. **Authoritative Grammar:** Single variable `x`, explicit multiplication required (`*`), exponents $\in \{0, 1, 2\}$. Bounded $x^2$ and rational expressions parsed for candidate checking.
+3. **Independent `CHECK_CANDIDATE`:** Validates candidate $c \in \mathbb{Q}$ against original domain (rejecting division by zero in unreduced expressions) and confirms $|L(c) - R(c)| == 0$.
+4. **Win32 Job Object Execution:** Sandboxed worker with 256 MiB per-process limit and 512 MiB job-wide limit. Outbound egress blocked.
+5. **Workspace:** Isolated in `../mke-product`.
