@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Knowledge Engine (MKE) — Visual Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header & Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand" id="brand-logo" role="button" tabindex="0" aria-label="Math Knowledge Engine Home">
+        <svg class="brand-icon" viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="16" cy="16" r="13" />
+          <path d="M10 16h12M16 10v12" />
+          <path d="M12 12l8 8M20 12l-8 8" stroke-width="1.4" opacity="0.6" />
+        </svg>
+        <div class="brand-text">
+          <span class="brand-title">MKE</span>
+          <span class="brand-sub">Math Knowledge Engine</span>
+        </div>
+        <span class="prototype-badge" title="Visual Prototype Only">UI-00 PROTOTYPE</span>
+      </div>
+
+      <nav class="nav-links" aria-label="Main Navigation">
+        <button type="button" class="nav-btn active" id="nav-home">Home</button>
+        <button type="button" class="nav-btn" id="nav-demo-result">Sample Result</button>
+        <button type="button" class="nav-btn" id="nav-syntax">Syntax Guide</button>
+      </nav>
+
+      <div class="theme-control">
+        <label for="theme-select" class="theme-label">Theme:</label>
+        <select id="theme-select" class="theme-select" aria-label="Select Color Theme">
+          <option value="auto">Auto (System)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Prototype Advisory Banner -->
+  <div class="disclaimer-banner" role="status">
+    <div class="banner-inner">
+      <span class="banner-tag">DEMO / MOCK DATA</span>
+      <span class="banner-msg">This is a standalone visual prototype. Mathematical outputs are simulated illustrative fixtures; no backend or production solver is connected.</span>
+    </div>
+  </div>
+
+  <main class="main-content" id="app-main">
+    <!-- Screen 1: Home View -->
+    <section class="screen-view active" id="screen-home" aria-label="Equation Input and Topics">
+      <div class="hero-section">
+        <h1 class="hero-title">Exact Mathematical Knowledge &amp; Verifiable Computation</h1>
+        <p class="hero-subtitle">Deterministic symbolic reasoning over the real domain \(\mathbb{R}\) with exact rational arithmetic over \(\mathbb{Q}\).</p>
+      </div>
+
+      <!-- Prominent Equation Search Field -->
+      <div class="search-wrapper">
+        <form class="search-form" id="search-form" action="#" onsubmit="return false;">
+          <div class="input-container">
+            <span class="input-prefix-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input 
+              type="text" 
+              id="math-input" 
+              class="math-input" 
+              placeholder="Enter equation (e.g., 2*x + 3 = 7, -x^2 = 1, x^0 = 1)..." 
+              value="2*x + 3 = 7"
+              autocomplete="off" 
+              spellcheck="false"
+              aria-label="Mathematical expression input"
+            >
+            <button type="button" class="clear-btn" id="btn-clear" aria-label="Clear input" title="Clear input">&times;</button>
+            <button type="submit" class="compute-btn" id="btn-compute" aria-label="Compute expression">
+              <span class="btn-text">Compute</span>
+              <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Quick Math Insertion Toolbar -->
+          <div class="math-keyboard" aria-label="Quick Math Symbols">
+            <span class="kb-hint">Insert:</span>
+            <button type="button" class="sym-btn" data-sym="*">* (explicit mult)</button>
+            <button type="button" class="sym-btn" data-sym="x">x</button>
+            <button type="button" class="sym-btn" data-sym="^2">^2</button>
+            <button type="button" class="sym-btn" data-sym="^0">^0</button>
+            <button type="button" class="sym-btn" data-sym="/">/</button>
+            <button type="button" class="sym-btn" data-sym="=">=</button>
+            <button type="button" class="sym-btn" data-sym="( )">( )</button>
+          </div>
+        </form>
+
+        <!-- Suggested Prompt Chips -->
+        <div class="sample-chips" aria-label="Representative Examples">
+          <span class="chips-label">Examples:</span>
+          <button type="button" class="chip" data-query="2*x + 3 = 7">2*x + 3 = 7</button>
+          <button type="button" class="chip" data-query="-x^2 = 1">-x^2 = 1</button>
+          <button type="button" class="chip" data-query="(-x)^2 = 1">(-x)^2 = 1</button>
+          <button type="button" class="chip" data-query="x^0 = 1">x^0 = 1</button>
+          <button type="button" class="chip" data-query="0*x = 0">0*x = 0</button>
+          <button type="button" class="chip" data-query="(x-1)/(x-1) = 1">(x-1)/(x-1) = 1</button>
+          <button type="button" class="chip chip-syntax" data-query="1/2x = 1" title="Syntax error demonstration">1/2x = 1 (Syntax Error Demo)</button>
+        </div>
+      </div>
+
+      <!-- 4-Column Mathematical Topic Grid -->
+      <section class="topics-section" aria-label="Mathematical Domains">
+        <h2 class="section-title">Mathematical Topics &amp; Capabilities</h2>
+        <div class="topic-grid">
+          <!-- Card 1: Linear Algebra -->
+          <article class="topic-card card-algebra">
+            <div class="card-header">
+              <span class="card-icon icon-algebra" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="3" y1="20" x2="21" y2="4"></line>
+                  <circle cx="7" cy="16" r="2"></circle>
+                  <circle cx="17" cy="8" r="2"></circle>
+                </svg>
+              </span>
+              <span class="card-badge active-badge">PHASE P02A ACTIVE</span>
+            </div>
+            <h3 class="card-title">Algebra &amp; Linear Equations</h3>
+            <p class="card-desc">Exact affine linear equations \(ax + b = 0\) over domain \(\mathbb{R}\) with rational coefficients \(\mathbb{Q}\). Handles identities and contradictions.</p>
+            <ul class="card-prompts">
+              <li><button type="button" class="prompt-link" data-query="3*x - 5 = 10">3*x - 5 = 10</button></li>
+              <li><button type="button" class="prompt-link" data-query="4*x + 2 = 2*x + 8">4*x + 2 = 2*x + 8</button></li>
+              <li><button type="button" class="prompt-link" data-query="0*x = 0">0*x = 0 (Identity over \(\mathbb{R}\))</button></li>
+            </ul>
+          </article>
+
+          <!-- Card 2: Rational Field -->
+          <article class="topic-card card-rational">
+            <div class="card-header">
+              <span class="card-icon icon-rational" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19h16M7 14l5-9 5 9"></path>
+                </svg>
+              </span>
+              <span class="card-badge active-badge">CORE ACTIVE</span>
+            </div>
+            <h3 class="card-title">Rational Field Arithmetic</h3>
+            <p class="card-desc">Arbitrary-precision exact arithmetic over \(\mathbb{Q}\). Canonical Euclidean GCD reduction with zero floating-point approximation drift.</p>
+            <ul class="card-prompts">
+              <li><button type="button" class="prompt-link" data-query="1/3 + 1/6 = 1/2">1/3 + 1/6 = 1/2</button></li>
+              <li><button type="button" class="prompt-link" data-query="(x-1)/(x-1) = 1">Domain Exclusions: (x-1)/(x-1)</button></li>
+              <li><button type="button" class="prompt-link" data-query="10^100 / 10^99 = 10">Large Integers (10^100)</button></li>
+            </ul>
+          </article>
+
+          <!-- Card 3: Quadratics (Planned) -->
+          <article class="topic-card card-quadratic">
+            <div class="card-header">
+              <span class="card-icon icon-quadratic" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 18c4-12 12-12 16 0"></path>
+                </svg>
+              </span>
+              <span class="card-badge planned-badge">PLANNED (R1)</span>
+            </div>
+            <h3 class="card-title">Quadratics &amp; Factoring</h3>
+            <p class="card-desc">Non-linear equations \(ax^2 + bx + c = 0\), discriminant analysis, completing the square, and independent candidate checking.</p>
+            <ul class="card-prompts">
+              <li><button type="button" class="prompt-link" data-query="x^2 - 4 = 0">x^2 - 4 = 0 (Check Candidate)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1">Factoring Methods (Planned)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1">Radical Field Extensions (Planned)</button></li>
+            </ul>
+          </article>
+
+          <!-- Card 4: Classroom & Document Ingestion (Planned) -->
+          <article class="topic-card card-classroom">
+            <div class="card-header">
+              <span class="card-icon icon-classroom" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+              </span>
+              <span class="card-badge planned-badge">PLANNED (R2)</span>
+            </div>
+            <h3 class="card-title">Classroom &amp; Document Ingestion</h3>
+            <p class="card-desc">Step-by-step diagnostic tutoring, student error categorization, and separately gated manual PDF/image math ingestion.</p>
+            <ul class="card-prompts">
+              <li><button type="button" class="prompt-link disabled" tabindex="-1">Step Guidance Tree (Planned)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1">Manual PDF Ingestion (Planned)</button></li>
+              <li><button type="button" class="prompt-link disabled" tabindex="-1">Classroom Roster Grading (Planned)</button></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <!-- Screen 2: Result View -->
+    <section class="screen-view" id="screen-result" aria-label="Equation Solution and Verification">
+      <!-- Result Screen Top Header -->
+      <div class="result-header">
+        <button type="button" class="back-link" id="btn-back-home">&larr; Back to Home</button>
+        <div class="result-query-badge">
+          <span class="query-label">Active Query:</span>
+          <code class="query-code" id="result-query-text">2*x + 3 = 7</code>
+        </div>
+      </div>
+
+      <!-- Result Card Stack -->
+      <div class="result-stack">
+        <!-- 1. Input Interpretation Card -->
+        <article class="result-card">
+          <div class="res-card-header">
+            <h3 class="res-card-title">Input Interpretation</h3>
+            <span class="syntax-status status-valid">SYNTACTICALLY VALID</span>
+          </div>
+          <div class="res-card-body">
+            <div class="math-display-large" id="res-math-display">
+              \(2x + 3 = 7\)
+            </div>
+            <div class="ast-meta">
+              <span class="meta-item"><strong>Grammar Standard:</strong> PRODUCT-01 EBNF (rev0.3.1)</span>
+              <span class="meta-item"><strong>Multiplication:</strong> Explicit (<code>*</code> confirmed)</span>
+              <span class="meta-item"><strong>AST Nodes:</strong> 7 nodes preserved</span>
+            </div>
+            <details class="ast-details">
+              <summary class="ast-summary">View Parsed AST Structure</summary>
+              <pre class="ast-code" id="res-ast-json">
+Equation(
+  left=BinaryOp("+",
+    left=BinaryOp("*", left=IntegerLiteral(2), right=Variable("x")),
+    right=IntegerLiteral(3)),
+  right=IntegerLiteral(7)
+)</pre>
+            </details>
+          </div>
+        </article>
+
+        <!-- 2. Exact Solution & Method Card -->
+        <article class="result-card card-primary-solution">
+          <div class="res-card-header">
+            <h3 class="res-card-title">Exact Solution</h3>
+            <div class="method-selector" role="tablist" aria-label="Solution Methods">
+              <button type="button" class="tab-btn active" role="tab" aria-selected="true">Linear Field Algebra</button>
+              <button type="button" class="tab-btn" role="tab" aria-selected="false" title="Planned for Release 1">Factoring (Planned)</button>
+              <button type="button" class="tab-btn" role="tab" aria-selected="false" title="Planned for Release 1">Graphic Form (Planned)</button>
+            </div>
+          </div>
+          <div class="res-card-body">
+            <div class="solution-box" id="res-solution-box">
+              <div class="solution-equation">
+                <span class="sol-var">x</span>
+                <span class="sol-eq">=</span>
+                <span class="sol-val" id="res-solution-val">2</span>
+              </div>
+              <span class="sol-domain-tag">Exact Rational in \(\mathbb{Q}\)</span>
+            </div>
+
+            <!-- Step by Step Presentation -->
+            <div class="step-trace">
+              <h4 class="trace-title">Deterministic Step-by-Step Derivation</h4>
+              <ol class="steps-list" id="res-steps-list">
+                <li class="step-item">
+                  <div class="step-num">Step 1</div>
+                  <div class="step-desc">Isolate variable terms by subtracting constant \(3\) from both sides:</div>
+                  <div class="step-math">\(2x + 3 - 3 = 7 - 3 \implies 2x = 4\)</div>
+                </li>
+                <li class="step-item">
+                  <div class="step-num">Step 2</div>
+                  <div class="step-desc">Apply multiplicative inverse of coefficient \(a=2\) in field \(\mathbb{Q}\):</div>
+                  <div class="step-math">\(x = \frac{4}{2} = 2\)</div>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </article>
+
+        <!-- 3. Domain & Candidate Verification Card -->
+        <article class="result-card">
+          <div class="res-card-header">
+            <h3 class="res-card-title">Domain &amp; Verification Evidence</h3>
+            <span class="cert-status status-demo">DEMO VERIFIED</span>
+          </div>
+          <div class="res-card-body">
+            <div class="domain-info-grid">
+              <div class="domain-tile">
+                <span class="tile-label">Equation Domain</span>
+                <span class="tile-val">Real Numbers \(\mathbb{R}\)</span>
+              </div>
+              <div class="domain-tile">
+                <span class="tile-label">Original Domain Constraints</span>
+                <span class="tile-val" id="res-domain-constraints">None (No variable denominators)</span>
+              </div>
+              <div class="domain-tile">
+                <span class="tile-label">Candidate Check (\(c=2\))</span>
+                <span class="tile-val status-valid-text">\(|L(2) - R(2)| = 0\) (Exact)</span>
+              </div>
+            </div>
+
+            <div class="crypto-meta">
+              <span class="crypto-tag">PROVENANCE RECEIPT</span>
+              <p class="crypto-hash">Canonical AST Hash (RFC 8785 mock): <code>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code></p>
+              <p class="crypto-note">This receipt is a visual prototype demonstration; production cryptographic signing is planned for future milestones.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Screen 3: Syntax Guide View -->
+    <section class="screen-view" id="screen-syntax" aria-label="Syntax Rules and Grammar">
+      <div class="syntax-guide-container">
+        <h2 class="guide-title">MKE Phase P02A Syntax Specification</h2>
+        <p class="guide-lead">MKE enforces strict mathematical explicit syntax to prevent ambiguity and silent parsing misinterpretations.</p>
+
+        <div class="syntax-grid">
+          <div class="syntax-rule-card">
+            <h3 class="rule-title rule-accepted">&#10003; Accepted Syntax</h3>
+            <ul class="rule-list">
+              <li><code>2*x + 3 = 7</code> (Explicit multiplication with <code>*</code>)</li>
+              <li><code>-x^2 = 1</code> (Parsed as <code>-(x^2)</code>)</li>
+              <li><code>(-x)^2 = 1</code> (Grouped negative base)</li>
+              <li><code>x^0 = 1</code> (Preserves power node; evaluated over original domain)</li>
+              <li><code>0*x = 0</code> (Identity equation; solution domain \(\mathbb{R}\))</li>
+              <li><code>(x-1)/(x-1) = 1</code> (Rational equation preserved for candidate verification)</li>
+            </ul>
+          </div>
+
+          <div class="syntax-rule-card">
+            <h3 class="rule-title rule-rejected">&#10007; Strictly Rejected (Syntax Errors)</h3>
+            <ul class="rule-list">
+              <li><code>2x = 4</code> (Ambiguous implicit multiplication; use <code>2*x</code>)</li>
+              <li><code>1/2x = 1</code> (Implicit multiplication; use <code>1/(2*x)</code> or <code>(1/2)*x</code>)</li>
+              <li><code>x(x+1) = 0</code> (Implicit multiplication; use <code>x*(x+1)</code>)</li>
+              <li><code>x^3 = 1</code> (Exponent &gt; 2 out of scope in Phase P02A)</li>
+              <li><code>2*y = 4</code> (Multi-variable unsupported; single variable <code>x</code> only)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-col">
+        <span class="footer-brand">MKE Product Architecture</span>
+        <p class="footer-desc">Phase P02A — Exact Linear Mathematical Knowledge Engine. All client-side processing, zero external network telemetry.</p>
+      </div>
+      <div class="footer-col">
+        <span class="footer-heading">Specifications &amp; Governance</span>
+        <ul class="footer-links">
+          <li><span>Frozen Baseline: <code>31cdb61c</code></span></li>
+          <li><span>Approved Product: <code>813c242d</code></span></li>
+          <li><span>Precedence: FREEZE_ADDENDUM.md</span></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <span class="footer-heading">Prototype Disclaimer</span>
+        <p class="footer-disclaimer">WolframAlpha inspired aesthetic; all code, SVG icons, tokens, and layouts are original to MKE. All results are labeled DEMO / MOCK DATA.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
