@@ -495,5 +495,96 @@ class TestEvaluationRemediationS2R1(unittest.TestCase):
         self.assertIs(unsupported_res.is_defined, None)
 
 
+class TestResidualBudgetRemediationS2R2(unittest.TestCase):
+    """Targeted regressions for S2-R2 bounded residual arithmetic."""
+
+    def test_residual_exceeding_integer_bit_budget_returns_resource_exhausted(self):
+        """Required regression:
+        Equation x = 1/7, candidate 1/5, max_integer_bits=4.
+        Both evaluated sides fit the budget, but residual 2/35 (35 requires 6 bits) exceeds max_integer_bits=4.
+        Result must be RESOURCE_EXHAUSTED with definedness UNKNOWN (None).
+        """
+        eq = parse_equation("x = 1/7")
+        budget = EvaluationBudget(max_integer_bits=4)
+        res = check_candidate(eq, "1/5", budget=budget)
+
+        self.assertEqual(res.status, CandidateCheckStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res.is_defined)
+        self.assertFalse(res.is_valid)
+        self.assertEqual(res.left_value, Rational(1, 5))
+        self.assertEqual(res.right_value, Rational(1, 7))
+        self.assertEqual(res.error_code, "ERR_RESOURCE_EXHAUSTED_INTEGER_LIMIT")
+        self.assertIn("Diagnostic residual integer bit length", res.error_message or "")
+        diag = dict(res.diagnostics)
+        self.assertEqual(diag.get("stage"), "RESIDUAL_CALCULATION")
+
+    def test_equal_values_with_tight_budget(self):
+        """Equal values yield residual 0, which safely fits tight integer bit budget."""
+        eq = parse_equation("x = 1/7")
+        budget = EvaluationBudget(max_integer_bits=4)
+        res = check_candidate(eq, "1/7", budget=budget)
+
+        self.assertEqual(res.status, CandidateCheckStatus.VALID)
+        self.assertTrue(res.is_valid)
+        self.assertTrue(res.is_defined)
+        self.assertEqual(res.left_value, Rational(1, 7))
+        self.assertEqual(res.right_value, Rational(1, 7))
+        diag = dict(res.diagnostics)
+        self.assertEqual(diag.get("exact_equality"), "True")
+        self.assertEqual(diag.get("residual"), "0")
+
+    def test_negative_residual_difference_exceeding_budget(self):
+        """Negative difference (left < right):
+        Equation x = 1/5, candidate 1/7, max_integer_bits=4.
+        left - right = 1/7 - 1/5 = -2/35.
+        Residual abs(-2/35) = 2/35 exceeds max_integer_bits=4 -> RESOURCE_EXHAUSTED.
+        """
+        eq = parse_equation("x = 1/5")
+        budget = EvaluationBudget(max_integer_bits=4)
+        res = check_candidate(eq, "1/7", budget=budget)
+
+        self.assertEqual(res.status, CandidateCheckStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res.is_defined)
+        self.assertEqual(res.left_value, Rational(1, 7))
+        self.assertEqual(res.right_value, Rational(1, 5))
+        self.assertEqual(res.error_code, "ERR_RESOURCE_EXHAUSTED_INTEGER_LIMIT")
+
+    def test_negative_residual_difference_fitting_budget(self):
+        """Negative difference (left < right) fitting normal budget:
+        Equation x = 5, candidate 2, max_integer_bits=10.
+        left - right = 2 - 5 = -3.
+        Residual abs(-3) = 3 fits budget -> INVALID with definedness True.
+        """
+        eq = parse_equation("x = 5")
+        budget = EvaluationBudget(max_integer_bits=10)
+        res = check_candidate(eq, 2, budget=budget)
+
+        self.assertEqual(res.status, CandidateCheckStatus.INVALID)
+        self.assertFalse(res.is_valid)
+        self.assertTrue(res.is_defined)
+        self.assertEqual(res.left_value, Rational(2, 1))
+        self.assertEqual(res.right_value, Rational(5, 1))
+        diag = dict(res.diagnostics)
+        self.assertEqual(diag.get("exact_equality"), "False")
+        self.assertEqual(diag.get("residual"), "3")
+
+    def test_normal_budget_invalid_candidate(self):
+        """Normal budget with x = 1/7, candidate 1/5:
+        Residual 2/35 fits within default max_integer_bits (4096).
+        Returns INVALID with definedness True.
+        """
+        eq = parse_equation("x = 1/7")
+        res = check_candidate(eq, "1/5")
+
+        self.assertEqual(res.status, CandidateCheckStatus.INVALID)
+        self.assertFalse(res.is_valid)
+        self.assertTrue(res.is_defined)
+        self.assertEqual(res.left_value, Rational(1, 5))
+        self.assertEqual(res.right_value, Rational(1, 7))
+        diag = dict(res.diagnostics)
+        self.assertEqual(diag.get("exact_equality"), "False")
+        self.assertEqual(diag.get("residual"), "2/35")
+
+
 if __name__ == "__main__":
     unittest.main()

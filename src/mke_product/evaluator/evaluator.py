@@ -530,8 +530,40 @@ def check_candidate(
 
     # Strict Equality Comparison in Q
     is_equal = left_val == right_val
+
+    # Diagnostic Residual Arithmetic under Bounded Budget Policy
+    # All arithmetic operations, including diagnostics, must respect intermediate bit-budgets.
+    # If values are exactly equal, residual is 0 (safely within any valid positive integer bit budget).
+    if is_equal:
+        residual = Rational(0, 1)
+    else:
+        diff = left_val - right_val
+        residual = abs(diff)
+        if (
+            residual.numerator.bit_length() > effective_budget.max_integer_bits
+            or residual.denominator.bit_length() > effective_budget.max_integer_bits
+        ):
+            return CandidateCheckResult(
+                status=CandidateCheckStatus.RESOURCE_EXHAUSTED,
+                candidate=c_rat,
+                equation=equation,
+                left_value=left_val,
+                right_value=right_val,
+                error_code="ERR_RESOURCE_EXHAUSTED_INTEGER_LIMIT",
+                error_message=(
+                    f"Diagnostic residual integer bit length ("
+                    f"{max(residual.numerator.bit_length(), residual.denominator.bit_length())} bits) "
+                    f"exceeds budget limit ({effective_budget.max_integer_bits} bits)."
+                ),
+                diagnostics=(
+                    ("stage", "RESIDUAL_CALCULATION"),
+                    ("steps_left", str(steps_left)),
+                    ("steps_right", str(steps_right)),
+                    ("total_steps", str(total_steps)),
+                ),
+            )
+
     status = CandidateCheckStatus.VALID if is_equal else CandidateCheckStatus.INVALID
-    residual = abs(left_val - right_val)
 
     return CandidateCheckResult(
         status=status,
