@@ -17,6 +17,7 @@ import msvcrt
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -1092,6 +1093,101 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertEqual(fallback["error"]["message"], "Error serialization failed.")
         serialized = json.dumps(fallback).encode("utf-8")
         self.assertLessEqual(len(serialized), IPC_MAX_RESPONSE_BYTES)
+
+    def test_writer_setup_hang_quarantines_handle(self):
+        """Writer setup hang/timeout quarantines handle and avoids premature close while writer is active."""
+        controller = WorkerController(timeout_sec=1.0)
+        res = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"},
+            _inject_writer_setup_hang=True,
+        )
+        self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
+        self.assertTrue(res.get("error", {}).get("details", {}).get("setup_timed_out"))
+        self.assertTrue(res.get("error", {}).get("details", {}).get("handle_quarantined"))
+
+        # Active quarantine queue contains 1 record
+        self.assertEqual(controller.get_active_quarantine_count(), 1)
+        recs = controller.get_quarantine_records()
+        self.assertEqual(len(recs), 1)
+        self.assertFalse(recs[0]["settled"])
+
+        # Settle once writer thread completes its sleep
+        time.sleep(2.2)
+        controller.settle_quarantine(timeout=0.1)
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+        self.assertTrue(controller.get_quarantine_records()[0]["settled"])
+        self.assertTrue(controller.get_quarantine_records()[0]["handle_closed"])
+
+    def test_quarantine_capacity_limit_rejects_requests(self):
+        """Active quarantine queue bounded at MAX_ACTIVE_QUARANTINE (32) rejects new requests with WORKER_RESOURCE_EXHAUSTED."""
+        from mke_product.worker.controller import MAX_ACTIVE_QUARANTINE, QuarantineRecord, SafePipeHandle
+        controller = WorkerController(timeout_sec=1.0)
+
+        # Populate quarantine with MAX_ACTIVE_QUARANTINE dummy unsettled records
+        dummy_thread = threading.Thread(target=lambda: time.sleep(10), daemon=True)
+        dummy_thread.start()
+        dummy_pipe = SafePipeHandle(wintypes.HANDLE(0x1234))
+        dummy_pipe.quarantine()
+
+        with controller._quarantine_lock:
+            for i in range(MAX_ACTIVE_QUARANTINE):
+                controller._quarantine_counter += 1
+                rec = QuarantineRecord(
+                    record_id=controller._quarantine_counter,
+                    thread=dummy_thread,
+                    handle=dummy_pipe,
+                    created_at=time.monotonic(),
+                    settled=False,
+                    settled_at=None,
+                    handle_val=0x1234,
+                    handle_closed=False,
+                    handle_close_error=0,
+                )
+                controller._quarantine.append(rec)
+
+        self.assertEqual(controller.get_active_quarantine_count(), MAX_ACTIVE_QUARANTINE)
+
+        # Attempt to execute request must be rejected with WORKER_RESOURCE_EXHAUSTED
+        res = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertIn("capacity exceeded", res.get("error", {}).get("message", "").lower())
+
+        # Clean up dummy records
+        with controller._quarantine_lock:
+            controller._quarantine.clear()
+
+    def test_safe_pipe_handle_close_win32_validation(self):
+        """SafePipeHandle validates CloseHandle return value and records error code."""
+        from mke_product.worker.controller import SafePipeHandle
+        # Test valid handle closing
+        sa = SECURITY_ATTRIBUTES()
+        sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
+        sa.bInheritHandle = False
+        h_read = wintypes.HANDLE()
+        h_write = wintypes.HANDLE()
+        kernel32.CreatePipe(ctypes.byref(h_read), ctypes.byref(h_write), ctypes.byref(sa), 0)
+
+        pipe = SafePipeHandle(h_write)
+        closed_ok = pipe.close()
+        self.assertTrue(closed_ok)
+        self.assertTrue(pipe.is_closed())
+        self.assertEqual(pipe.close_success, True)
+        self.assertEqual(pipe.close_error, 0)
+
+        # Test double close is idempotent
+        closed_ok2 = pipe.close()
+        self.assertTrue(closed_ok2)
+        self.assertEqual(pipe.close_error, 0)
+
+        # Clean up read handle
+        safe_close_handle(h_read)
+
+        # Test closing invalid handle
+        invalid_pipe = SafePipeHandle(wintypes.HANDLE(0xDEADBEEF))
+        closed_ok3 = invalid_pipe.close()
+        self.assertFalse(closed_ok3)
+        self.assertEqual(invalid_pipe.close_success, False)
+        self.assertNotEqual(invalid_pipe.close_error, 0)
 
 
 if __name__ == "__main__":

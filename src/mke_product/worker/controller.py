@@ -152,6 +152,9 @@ def _build_controller_error(
 # Safe Handle Ownership & Quarantine
 # ---------------------------------------------------------------------------
 
+MAX_ACTIVE_QUARANTINE = 32
+
+
 class SafePipeHandle:
     """Thread-safe, atomic single-ownership wrapper around a Win32 pipe HANDLE.
 
@@ -159,6 +162,7 @@ class SafePipeHandle:
     - Exactly-once Win32 CloseHandle execution.
     - Quarantined handles are protected from premature caller closing.
     - Idempotent close() calls across thread callbacks and controller settlement.
+    - Win32 CloseHandle return validation and error capture.
     """
 
     def __init__(self, handle: wintypes.HANDLE) -> None:
@@ -166,6 +170,8 @@ class SafePipeHandle:
         self._raw_val = int(handle.value) if handle and handle.value else 0
         self._lock = threading.Lock()
         self._closed = False
+        self._close_success = False
+        self._close_error = 0
         self._quarantined = False
 
     @property
@@ -176,6 +182,19 @@ class SafePipeHandle:
     @property
     def raw_val(self) -> int:
         return self._raw_val
+
+    def raw_value(self) -> int:
+        return self._raw_val
+
+    @property
+    def close_success(self) -> bool:
+        with self._lock:
+            return self._close_success
+
+    @property
+    def close_error(self) -> int:
+        with self._lock:
+            return self._close_error
 
     def is_quarantined(self) -> bool:
         with self._lock:
@@ -193,12 +212,14 @@ class SafePipeHandle:
         """Atomically close the underlying handle if not already closed."""
         with self._lock:
             if self._closed or not self._handle or not self._handle.value:
-                return False
+                return self._close_success
             h = self._handle
             self._handle = wintypes.HANDLE(0)
             self._closed = True
-            safe_close_handle(h)
-            return True
+            ok, err = safe_close_handle(h)
+            self._close_success = ok
+            self._close_error = err
+            return ok
 
 
 @dataclass
@@ -206,7 +227,10 @@ class QuarantineRecord:
     """Tracks a quarantined pipe handle awaiting worker thread exit."""
     record_id: int
     thread: Optional[threading.Thread]
-    handle: SafePipeHandle
+    handle: Optional[SafePipeHandle]
+    handle_val: int
+    handle_closed: bool
+    handle_close_error: int
     created_at: float
     settled: bool = False
     settled_at: Optional[float] = None
@@ -258,7 +282,11 @@ class WorkerController:
                     if rec.thread.is_alive() and timeout > 0:
                         rec.thread.join(timeout=timeout)
                     if not rec.thread.is_alive():
-                        rec.handle.close()
+                        if rec.handle is not None:
+                            rec.handle.close()
+                            rec.handle_closed = rec.handle.is_closed()
+                            rec.handle_close_error = rec.handle.close_error
+                            rec.handle = None  # Release handle object and its lock
                         rec.settled = True
                         rec.settled_at = time.monotonic()
                         rec.thread = None  # Release Python Thread object to free underlying OS handles
@@ -271,6 +299,10 @@ class WorkerController:
                 settled = settled[-64:]
             self._quarantine = unsettled + settled
 
+            # Clear current writer thread reference if it has completed
+            if self._current_writer_thread and not self._current_writer_thread.is_alive():
+                self._current_writer_thread = None
+
         return settled_count
 
     def get_quarantine_records(self) -> List[Dict[str, Any]]:
@@ -281,8 +313,9 @@ class WorkerController:
                     "record_id": r.record_id,
                     "thread_name": r.thread.name if r.thread is not None else "mke-ipc-writer",
                     "thread_alive": r.thread.is_alive() if r.thread is not None else False,
-                    "handle_val": r.handle.raw_val,
-                    "handle_closed": r.handle.is_closed(),
+                    "handle_val": r.handle_val,
+                    "handle_closed": r.handle.is_closed() if r.handle is not None else r.handle_closed,
+                    "handle_close_error": r.handle.close_error if r.handle is not None else r.handle_close_error,
                     "created_at": r.created_at,
                     "settled": r.settled,
                     "settled_at": r.settled_at,
@@ -306,6 +339,7 @@ class WorkerController:
         _inject_assignment_failure: bool = False,
         _inject_resume_failure: bool = False,
         _inject_duplicate_handle_failure: bool = False,
+        _inject_writer_setup_hang: bool = False,
         _inject_cancel_io_failure: bool = False,
         _inject_writer_join_timeout: bool = False,
         _inject_normal_write_join_timeout: bool = False,
@@ -320,6 +354,19 @@ class WorkerController:
 
         # Settle any previously completed quarantined handles before beginning new request
         self.settle_quarantine(timeout=0.0)
+
+        # Enforce active quarantine capacity ceiling
+        active_count = self.get_active_quarantine_count()
+        if active_count >= MAX_ACTIVE_QUARANTINE:
+            op_name = "UNKNOWN"
+            if isinstance(request, dict) and "operation" in request:
+                op_name = _normalize_operation(request["operation"])
+            return _build_controller_error(
+                WORKER_RESOURCE_EXHAUSTED,
+                f"Active quarantined handle capacity exceeded ({active_count}/{MAX_ACTIVE_QUARANTINE}). Refusing new request.",
+                details={"active_quarantine_count": active_count, "max_active_quarantine": MAX_ACTIVE_QUARANTINE},
+                operation=op_name,
+            )
 
         # Extract normalized operation for error envelopes to prevent untrusted string reflection
         operation = "UNKNOWN"
@@ -650,6 +697,7 @@ class WorkerController:
                 _inject_cancel_io_failure=_inject_cancel_io_failure,
                 _inject_writer_join_timeout=_inject_writer_join_timeout,
                 _inject_normal_write_join_timeout=_inject_normal_write_join_timeout,
+                _inject_writer_setup_hang=_inject_writer_setup_hang,
             )
             if isinstance(write_res, dict):
                 return write_res
@@ -769,6 +817,7 @@ class WorkerController:
         _inject_cancel_io_failure: bool = False,
         _inject_writer_join_timeout: bool = False,
         _inject_normal_write_join_timeout: bool = False,
+        _inject_writer_setup_hang: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Write exact bytes to pipe within full-lifecycle deadline, handling partial writes and blocking worker."""
         write_error = [None]
@@ -783,6 +832,9 @@ class WorkerController:
 
         def _writer():
             try:
+                if _inject_writer_setup_hang:
+                    time.sleep(2.0)
+
                 if _inject_duplicate_handle_failure:
                     dup_ok = False
                     ctypes.set_last_error(5)  # ERROR_ACCESS_DENIED
@@ -849,12 +901,31 @@ class WorkerController:
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
         self._current_writer_thread = writer_thread
         writer_thread.start()
-        setup_done.wait(timeout=1.0)
+        setup_ok = setup_done.wait(timeout=0.05 if _inject_writer_setup_hang else 1.0)
 
-        # Check DuplicateHandle status before proceeding
-        if not dup_success[0]:
-            writer_thread.join(timeout=1.0)
+        # Check DuplicateHandle status and setup completion before proceeding
+        if not setup_ok or not dup_success[0]:
+            writer_thread.join(timeout=0.001 if _inject_writer_setup_hang else 1.0)
             writer_exited = not writer_thread.is_alive()
+            quarantined = False
+            if not writer_exited:
+                pipe_owner.quarantine()
+                quarantined = True
+                with self._quarantine_lock:
+                    self._quarantine_counter += 1
+                    rec = QuarantineRecord(
+                        record_id=self._quarantine_counter,
+                        thread=writer_thread,
+                        handle=pipe_owner,
+                        created_at=time.monotonic(),
+                        settled=False,
+                        settled_at=None,
+                        handle_val=pipe_owner.raw_value(),
+                        handle_closed=False,
+                        handle_close_error=0,
+                    )
+                    self._quarantine.append(rec)
+
             self._last_write_info = {
                 "duplicate_handle_success": False,
                 "duplicate_handle_error": dup_error[0],
@@ -870,13 +941,14 @@ class WorkerController:
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
                 "all_handles_safely_released": writer_exited,
+                "handle_quarantined": quarantined,
                 "bytes_written": 0,
                 "total_bytes": len(data),
             }
             return _build_controller_error(
                 WORKER_STARTUP_FAILURE,
-                f"Failed to duplicate writer thread handle for safe cancellation (win32 error {dup_error[0]}).",
-                details={"win32_error": dup_error[0]},
+                f"Failed to duplicate writer thread handle for safe cancellation (win32 error {dup_error[0]})." if not dup_success[0] and setup_ok else "Writer thread setup timed out.",
+                details={"win32_error": dup_error[0], "setup_timed_out": not setup_ok, "writer_exited": writer_exited, "handle_quarantined": quarantined},
                 operation=operation,
             )
 
@@ -933,6 +1005,9 @@ class WorkerController:
                         created_at=time.monotonic(),
                         settled=False,
                         settled_at=None,
+                        handle_val=pipe_owner.raw_value(),
+                        handle_closed=False,
+                        handle_close_error=0,
                     )
                     self._quarantine.append(rec)
 
@@ -1007,6 +1082,9 @@ class WorkerController:
                         created_at=time.monotonic(),
                         settled=False,
                         settled_at=None,
+                        handle_val=pipe_owner.raw_value(),
+                        handle_closed=False,
+                        handle_close_error=0,
                     )
                     self._quarantine.append(rec)
 
@@ -1053,6 +1131,9 @@ class WorkerController:
                     created_at=time.monotonic(),
                     settled=False,
                     settled_at=None,
+                    handle_val=pipe_owner.raw_value(),
+                    handle_closed=False,
+                    handle_close_error=0,
                 )
                 self._quarantine.append(rec)
 

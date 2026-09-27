@@ -1,7 +1,7 @@
 """Win32 ctypes interfaces and safe abstractions for Job Objects and process containment."""
 
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 if sys.platform != "win32":
     raise ImportError("mke_product.worker.win32 is only supported on Windows operating systems.")
@@ -235,13 +235,21 @@ kernel32.GetProcessHandleCount.restype = wintypes.BOOL
 # Safe Abstractions & Helper Functions
 # ---------------------------------------------------------------------------
 
-def safe_close_handle(handle: Optional[wintypes.HANDLE]) -> None:
-    """Safely close a Windows handle if valid."""
+def safe_close_handle(handle: Optional[Union[wintypes.HANDLE, int]]) -> Tuple[bool, int]:
+    """Safely close a Windows handle if valid.
+
+    Returns:
+        (success: bool, win32_error: int)
+    """
     if handle and handle != wintypes.HANDLE(0).value and handle != wintypes.HANDLE(-1).value:
         try:
-            kernel32.CloseHandle(handle)
+            res = kernel32.CloseHandle(handle)
+            if not res:
+                return False, ctypes.get_last_error()
+            return True, 0
         except Exception:
-            pass
+            return False, -1
+    return True, 0
 
 
 def get_current_process_handle_count() -> int:
