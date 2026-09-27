@@ -947,6 +947,10 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         )
         # Warmup request to initialize lazy Win32 DLL structures
         controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+        time.sleep(0.5)
+        controller.settle_quarantine(timeout=0.5)
+        import gc
+        gc.collect()
 
         handles_start = get_current_process_handle_count()
 
@@ -967,7 +971,7 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertGreaterEqual(len(recs1), 1)
 
         # Allow writer thread to finish sleeping
-        time.sleep(0.35)
+        time.sleep(0.4)
 
         # Request 2: normal solve ON THE SAME CONTROLLER INSTANCE
         res2 = controller.execute_request(
@@ -989,14 +993,13 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertTrue(recs2[0]["handle_closed"])
 
         # Allow worker process tombstone release and settle quarantine
-        time.sleep(0.1)
-        controller.settle_quarantine(timeout=0.2)
-        import gc
+        time.sleep(0.5)
+        controller.settle_quarantine(timeout=0.5)
         gc.collect()
 
-        # Process handle count remains stable
+        # Process handle count remains strictly stable
         handles_end = get_current_process_handle_count()
-        self.assertLessEqual(abs(handles_end - handles_start), 15)
+        self.assertEqual(handles_end - handles_start, 0, f"Handle leak: start={handles_start}, end={handles_end}")
 
     def test_quarantined_handle_released_after_delayed_writer_eventual_exit(self):
         """Quarantined handle is safely released when delayed writer thread eventually finishes."""
@@ -1031,13 +1034,17 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertEqual(controller.get_active_quarantine_count(), 0)
 
     def test_repeated_write_timeouts_no_kernel_handle_leak(self):
-        """Repeated write timeouts on the same controller do not leak Windows kernel handles."""
+        """Repeated write timeouts on the same controller do not leak Windows kernel handles (0 delta)."""
         controller = WorkerController(
             timeout_sec=0.15,
             _stdin_pipe_buffer_size=1024,
         )
         # Warmup single request
         controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+        time.sleep(0.1)
+        controller.settle_quarantine(timeout=0.2)
+        import gc
+        gc.collect()
 
         baseline_handles = get_current_process_handle_count()
         self.assertGreater(baseline_handles, 0)
@@ -1052,18 +1059,16 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
             self.assertEqual(res["status"], WORKER_TIMEOUT)
 
         # Allow all writer threads to finish sleeping
-        time.sleep(0.4)
+        time.sleep(0.5)
         controller.settle_quarantine(timeout=0.5)
-        import gc
         gc.collect()
 
         # Settle check: all records settled
         self.assertEqual(controller.get_active_quarantine_count(), 0)
 
         final_handles = get_current_process_handle_count()
-        # Verify no leaking handle accumulation (Windows OS maintains ~1 tombstone handle per terminated process)
         handle_diff = final_handles - baseline_handles
-        self.assertLessEqual(handle_diff, 8, f"Handle leak detected: baseline={baseline_handles}, final={final_handles}")
+        self.assertEqual(handle_diff, 0, f"Handle leak detected: baseline={baseline_handles}, final={final_handles}")
 
     def test_normal_write_completion_guards_active_writer(self):
         """Normal write completion fails closed and quarantines handle if writer thread is still active."""
@@ -1121,7 +1126,7 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertFalse(recs[0]["settled"])
 
         # Settle once writer thread completes its sleep
-        time.sleep(2.2)
+        time.sleep(0.2)
         controller.settle_quarantine(timeout=0.1)
         self.assertEqual(controller.get_active_quarantine_count(), 0)
         self.assertTrue(controller.get_quarantine_records()[0]["settled"])
@@ -1289,8 +1294,43 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertTrue(controller.get_quarantine_records()[0]["settled"])
         self.assertTrue(controller.get_quarantine_records()[0]["handle_closed"])
 
-    def test_setup_interleaving_d_late_duplication_after_timeout(self):
-        """Interleaving D: Late DuplicateHandle completion after timeout triggers abort barrier before WriteFile."""
+    def test_normal_execution_pipe_close_failure_quarantines_and_fails_closed(self):
+        """Normal completion with injected pipe close failure fails closed and registers quarantine diagnostics."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(req, _inject_close_handle_failure=True)
+
+        # Must NOT return SUCCESS; must fail closed with WORKER_RESOURCE_EXHAUSTED
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertTrue(res.get("error", {}).get("details", {}).get("handle_quarantined"))
+
+        # Quarantine ledger contains unclosed handle records (for thread handle and pipe handle)
+        recs = controller.get_quarantine_records()
+        self.assertGreaterEqual(len(recs), 1)
+        unsettled = [r for r in recs if not r["settled"]]
+        self.assertGreaterEqual(len(unsettled), 1)
+        for u in unsettled:
+            if u["handle_val"] is not None:
+                self.assertFalse(u["handle_closed"])
+                self.assertNotEqual(u["handle_close_error"], 0)
+            if u["thread_handle_val"] is not None:
+                self.assertFalse(u["thread_handle_closed"])
+                self.assertNotEqual(u["thread_handle_close_error"], 0)
+
+        # Cleanup: release failure injection and settle
+        with controller._quarantine_lock:
+            for r in controller._quarantine:
+                if r.handle:
+                    r.handle._inject_close_failure = False
+                if r.thread_handle:
+                    r.thread_handle._inject_close_failure = False
+        controller.settle_quarantine(timeout=0.1)
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+
+    def test_actual_late_duplication_sequence_exit_after_quarantine(self):
+        """Interleaving D (Actual Late Duplication): Worker pauses before DuplicateHandle until controller setup deadline."""
         controller = WorkerController(
             timeout_sec=0.2,
             _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
@@ -1300,12 +1340,20 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
             {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
             _inject_late_duplicate_handle=True,
         )
-        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
         self.assertIsNotNone(controller._last_write_info)
-        self.assertTrue(controller._last_write_info["duplicate_handle_success"])
-        # Thread handle owner must be cleanly closed
-        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
-        self.assertTrue(controller._last_write_info["writer_exited"])
+        self.assertTrue(controller._last_write_info["handle_quarantined"])
+
+        # Allow writer thread to complete its delayed execution (0.08s) and close handles in finally:
+        time.sleep(0.2)
+        settled_count = controller.settle_quarantine(timeout=0.2)
+        self.assertEqual(settled_count, 1)
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+
+        recs = controller.get_quarantine_records()
+        self.assertTrue(recs[0]["settled"])
+        self.assertTrue(recs[0]["handle_closed"])
+        self.assertTrue(recs[0]["thread_handle_closed"])
 
     def test_single_request_contract_concurrent_execution_rejected(self):
         """WorkerController rejects concurrent execute_request calls atomically with WORKER_RESOURCE_EXHAUSTED."""

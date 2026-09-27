@@ -8,7 +8,8 @@
     "active_quarantine_count": 0,
     "total_quarantine_records": 0,
     "all_records_settled": true,
-    "elapsed_sec": 1.218
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 1.109
   },
   {
     "scenario": "Scenario A: Normal Requests (Control)",
@@ -19,7 +20,8 @@
     "active_quarantine_count": 0,
     "total_quarantine_records": 0,
     "all_records_settled": true,
-    "elapsed_sec": 2.219
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 1.875
   },
   {
     "scenario": "Scenario A: Normal Requests (Control)",
@@ -30,7 +32,8 @@
     "active_quarantine_count": 0,
     "total_quarantine_records": 0,
     "all_records_settled": true,
-    "elapsed_sec": 3.328
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 3.203
   },
   {
     "scenario": "Scenario A: Normal Requests (Control)",
@@ -41,7 +44,8 @@
     "active_quarantine_count": 0,
     "total_quarantine_records": 0,
     "all_records_settled": true,
-    "elapsed_sec": 6.063
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 6.485
   },
   {
     "scenario": "Scenario B: Write Timeouts & Quarantine",
@@ -54,7 +58,7 @@
     "total_quarantine_records": 5,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 1.703
+    "elapsed_sec": 1.656
   },
   {
     "scenario": "Scenario B: Write Timeouts & Quarantine",
@@ -67,7 +71,7 @@
     "total_quarantine_records": 10,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 2.547
+    "elapsed_sec": 2.563
   },
   {
     "scenario": "Scenario B: Write Timeouts & Quarantine",
@@ -80,7 +84,7 @@
     "total_quarantine_records": 20,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 4.375
+    "elapsed_sec": 4.453
   },
   {
     "scenario": "Scenario B: Write Timeouts & Quarantine",
@@ -93,7 +97,7 @@
     "total_quarantine_records": 40,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 7.937
+    "elapsed_sec": 8.047
   },
   {
     "scenario": "Scenario C: Setup Timeouts / Hangs",
@@ -101,12 +105,12 @@
     "baseline_handles": 132,
     "final_handles": 132,
     "net_delta": 0,
-    "settled_count": 5,
+    "settled_count": 2,
     "active_quarantine_count": 0,
     "total_quarantine_records": 5,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 2.844
+    "elapsed_sec": 0.812
   },
   {
     "scenario": "Scenario C: Setup Timeouts / Hangs",
@@ -114,12 +118,38 @@
     "baseline_handles": 132,
     "final_handles": 132,
     "net_delta": 0,
-    "settled_count": 10,
+    "settled_count": 2,
     "active_quarantine_count": 0,
     "total_quarantine_records": 10,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 3.266
+    "elapsed_sec": 1.047
+  },
+  {
+    "scenario": "Scenario C: Setup Timeouts / Hangs",
+    "iterations": 20,
+    "baseline_handles": 132,
+    "final_handles": 132,
+    "net_delta": 0,
+    "settled_count": 2,
+    "active_quarantine_count": 0,
+    "total_quarantine_records": 20,
+    "all_records_settled": true,
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 1.687
+  },
+  {
+    "scenario": "Scenario C: Setup Timeouts / Hangs",
+    "iterations": 40,
+    "baseline_handles": 132,
+    "final_handles": 132,
+    "net_delta": 0,
+    "settled_count": 2,
+    "active_quarantine_count": 0,
+    "total_quarantine_records": 40,
+    "all_records_settled": true,
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 2.704
   },
   {
     "scenario": "Scenario D: Late Duplication Completions",
@@ -127,12 +157,12 @@
     "baseline_handles": 132,
     "final_handles": 132,
     "net_delta": 0,
-    "settled_count": 0,
+    "settled_count": 2,
     "active_quarantine_count": 0,
-    "total_quarantine_records": 0,
+    "total_quarantine_records": 5,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 2.375
+    "elapsed_sec": 0.843
   },
   {
     "scenario": "Scenario D: Late Duplication Completions",
@@ -140,12 +170,12 @@
     "baseline_handles": 132,
     "final_handles": 132,
     "net_delta": 0,
-    "settled_count": 0,
+    "settled_count": 2,
     "active_quarantine_count": 0,
-    "total_quarantine_records": 0,
+    "total_quarantine_records": 10,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 3.921
+    "elapsed_sec": 1.219
   },
   {
     "scenario": "Scenario D: Late Duplication Completions",
@@ -153,11 +183,24 @@
     "baseline_handles": 132,
     "final_handles": 132,
     "net_delta": 0,
-    "settled_count": 0,
+    "settled_count": 2,
     "active_quarantine_count": 0,
-    "total_quarantine_records": 0,
+    "total_quarantine_records": 20,
     "all_records_settled": true,
     "all_handles_confirmed_closed": true,
-    "elapsed_sec": 7.094
+    "elapsed_sec": 1.797
+  },
+  {
+    "scenario": "Scenario D: Late Duplication Completions",
+    "iterations": 40,
+    "baseline_handles": 132,
+    "final_handles": 132,
+    "net_delta": 0,
+    "settled_count": 2,
+    "active_quarantine_count": 0,
+    "total_quarantine_records": 40,
+    "all_records_settled": true,
+    "all_handles_confirmed_closed": true,
+    "elapsed_sec": 2.5
   }
 ]

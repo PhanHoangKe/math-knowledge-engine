@@ -873,8 +873,39 @@ class WorkerController:
                 return write_res
 
             # Close stdin write handle to signal EOF to worker
-            if pipe_owner is not None:
+            if pipe_owner is not None and not pipe_owner.is_quarantined():
                 pipe_owner.close(_inject_failure=_inject_close_handle_failure)
+                if not pipe_owner.is_confirmed_closed():
+                    pipe_owner.quarantine()
+                    with self._quarantine_lock:
+                        self._quarantine_counter += 1
+                        rec = QuarantineRecord(
+                            record_id=self._quarantine_counter,
+                            thread=None,
+                            handle=pipe_owner,
+                            thread_handle=None,
+                            handle_val=pipe_owner.raw_value(),
+                            thread_handle_val=None,
+                            handle_closed=False,
+                            thread_handle_closed=True,
+                            handle_close_error=pipe_owner.close_error,
+                            thread_handle_close_error=0,
+                            created_at=time.monotonic(),
+                            settled=False,
+                            settled_at=None,
+                        )
+                        self._quarantine.append(rec)
+                    return _build_controller_error(
+                        WORKER_RESOURCE_EXHAUSTED,
+                        f"Failed to close stdin pipe during request execution (win32 error {pipe_owner.close_error}).",
+                        details={
+                            "safe_cleanup": False,
+                            "handle_quarantined": True,
+                            "pipe_close_error": pipe_owner.close_error,
+                            "handle_val": pipe_owner.raw_value(),
+                        },
+                        operation=operation,
+                    )
 
             # 8. Bounded read from stdout pipe with same effective deadline
             response_header = self._read_exact_bytes(
@@ -909,6 +940,18 @@ class WorkerController:
                         "Worker response root is not a JSON dictionary.",
                         operation=operation,
                     )
+                if pipe_owner is not None and not pipe_owner.is_confirmed_closed():
+                    return _build_controller_error(
+                        WORKER_RESOURCE_EXHAUSTED,
+                        f"Failed to close stdin pipe handle during request completion (win32 error {pipe_owner.close_error}).",
+                        details={
+                            "safe_cleanup": False,
+                            "handle_quarantined": True,
+                            "pipe_close_error": pipe_owner.close_error,
+                            "handle_val": pipe_owner.raw_value(),
+                        },
+                        operation=operation,
+                    )
                 return result
             except Exception as exc:
                 return _build_controller_error(
@@ -925,6 +968,26 @@ class WorkerController:
             # Handle ownership invariant: close pipe_owner ONLY IF not quarantined
             if pipe_owner is not None and not pipe_owner.is_quarantined():
                 pipe_owner.close(_inject_failure=_inject_close_handle_failure)
+                if not pipe_owner.is_confirmed_closed():
+                    pipe_owner.quarantine()
+                    with self._quarantine_lock:
+                        self._quarantine_counter += 1
+                        rec = QuarantineRecord(
+                            record_id=self._quarantine_counter,
+                            thread=None,
+                            handle=pipe_owner,
+                            thread_handle=None,
+                            handle_val=pipe_owner.raw_value(),
+                            thread_handle_val=None,
+                            handle_closed=False,
+                            thread_handle_closed=True,
+                            handle_close_error=pipe_owner.close_error,
+                            thread_handle_close_error=0,
+                            created_at=time.monotonic(),
+                            settled=False,
+                            settled_at=None,
+                        )
+                        self._quarantine.append(rec)
 
             safe_close_handle(h_stdout_read)
             h_stdout_read = wintypes.HANDLE()
@@ -1006,7 +1069,12 @@ class WorkerController:
         def _writer():
             try:
                 if _inject_writer_setup_hang:
-                    time.sleep(2.0)
+                    time.sleep(0.08)
+
+                if _inject_late_duplicate_handle:
+                    # Step 1: Worker enters setup and delays BEFORE DuplicateHandle
+                    # until controller reaches its setup deadline and requests abort
+                    time.sleep(0.08)
 
                 if abort_requested.is_set():
                     write_status[0] = "ABORTED_BEFORE_SETUP"
@@ -1038,13 +1106,12 @@ class WorkerController:
                     setup_done.set()
                     return
 
+                # Step 4: DuplicateHandle completes afterward
                 dup_success[0] = True
                 write_status[0] = "ENTERED"
                 setup_done.set()
 
-                if _inject_late_duplicate_handle:
-                    time.sleep(0.3)
-
+                # Step 5: Worker detects abort before WriteFile
                 if abort_requested.is_set():
                     write_status[0] = "ABORTED_BEFORE_WRITE"
                     return
@@ -1084,7 +1151,7 @@ class WorkerController:
                 write_done.set()
                 if _inject_writer_join_timeout or _inject_normal_write_join_timeout:
                     time.sleep(0.3)
-                # Ensure thread handle is closed upon thread termination
+                # Step 6: Ensure thread handle is closed upon thread termination
                 thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
                 # Deferred release: if quarantined, safely close handle upon thread termination
                 if pipe_owner.is_quarantined():
@@ -1093,7 +1160,7 @@ class WorkerController:
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
         self._current_writer_thread = writer_thread
         writer_thread.start()
-        setup_ok = setup_done.wait(timeout=0.05 if (_inject_writer_setup_hang or _inject_late_duplicate_handle) else 1.0)
+        setup_ok = setup_done.wait(timeout=0.02 if (_inject_writer_setup_hang or _inject_late_duplicate_handle) else 1.0)
 
         # Check DuplicateHandle status and setup completion before proceeding
         if not setup_ok or not dup_success[0]:
@@ -1124,9 +1191,29 @@ class WorkerController:
                     self._quarantine.append(rec)
             else:
                 thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
+                if not thread_handle_owner.is_confirmed_closed():
+                    quarantined = True
+                    with self._quarantine_lock:
+                        self._quarantine_counter += 1
+                        rec = QuarantineRecord(
+                            record_id=self._quarantine_counter,
+                            thread=None,
+                            handle=None,
+                            thread_handle=thread_handle_owner,
+                            handle_val=None,
+                            thread_handle_val=thread_handle_owner.raw_value(),
+                            handle_closed=True,
+                            thread_handle_closed=False,
+                            handle_close_error=0,
+                            thread_handle_close_error=thread_handle_owner.close_error,
+                            created_at=time.monotonic(),
+                            settled=False,
+                            settled_at=None,
+                        )
+                        self._quarantine.append(rec)
 
             self._last_write_info = {
-                "duplicate_handle_success": False,
+                "duplicate_handle_success": dup_success[0],
                 "duplicate_handle_error": dup_error[0],
                 "write_entered": False,
                 "write_blocked_at_deadline": False,
@@ -1139,7 +1226,7 @@ class WorkerController:
                 "writer_thread_alive_after_join": not writer_exited,
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
-                "all_handles_safely_released": writer_exited,
+                "all_handles_safely_released": writer_exited and thread_handle_owner.is_confirmed_closed(),
                 "handle_quarantined": quarantined,
                 "bytes_written": 0,
                 "total_bytes": len(data),
@@ -1216,6 +1303,28 @@ class WorkerController:
                     self._quarantine.append(rec)
             else:
                 thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
+                if not thread_handle_owner.is_confirmed_closed():
+                    quarantined = True
+                    with self._quarantine_lock:
+                        self._quarantine_counter += 1
+                        rec = QuarantineRecord(
+                            record_id=self._quarantine_counter,
+                            thread=None,
+                            handle=None,
+                            thread_handle=thread_handle_owner,
+                            handle_val=None,
+                            thread_handle_val=thread_handle_owner.raw_value(),
+                            handle_closed=True,
+                            thread_handle_closed=False,
+                            handle_close_error=0,
+                            thread_handle_close_error=thread_handle_owner.close_error,
+                            created_at=time.monotonic(),
+                            settled=False,
+                            settled_at=None,
+                        )
+                        self._quarantine.append(rec)
+
+            safe_cleanup = writer_exited and thread_handle_owner.is_confirmed_closed()
 
             self._last_write_info = {
                 "duplicate_handle_success": True,
@@ -1231,24 +1340,25 @@ class WorkerController:
                 "writer_thread_alive_after_join": not writer_exited,
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
-                "all_handles_safely_released": writer_exited,
+                "all_handles_safely_released": safe_cleanup,
                 "handle_quarantined": quarantined,
                 "bytes_written": bytes_written_total[0],
                 "total_bytes": len(data),
             }
 
-            if not writer_exited:
-                # Do NOT claim safe cleanup if writer thread is still running
+            if not safe_cleanup:
+                # Do NOT claim safe cleanup if writer thread is still running or handle close failed
                 return _build_controller_error(
                     WORKER_TIMEOUT,
-                    "Worker execution timed out during WRITE phase and writer thread failed to terminate safely within deadline.",
+                    "Worker execution timed out during WRITE phase and writer resources failed to clean up safely.",
                     details={
                         "timeout_phase": "WRITE",
                         "safe_cleanup": False,
-                        "writer_exited": False,
+                        "writer_exited": writer_exited,
                         "handle_quarantined": True,
                         "cancel_synchronous_io_return": cancel_ret,
                         "cancel_synchronous_io_last_error": cancel_err,
+                        "thread_handle_close_error": thread_handle_owner.close_error,
                         "timeout_sec": self.timeout_sec,
                     },
                     operation=operation,
@@ -1272,6 +1382,26 @@ class WorkerController:
             writer_exited = not writer_thread.is_alive()
             if writer_exited:
                 thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
+                if not thread_handle_owner.is_confirmed_closed():
+                    quarantined = True
+                    with self._quarantine_lock:
+                        self._quarantine_counter += 1
+                        rec = QuarantineRecord(
+                            record_id=self._quarantine_counter,
+                            thread=None,
+                            handle=None,
+                            thread_handle=thread_handle_owner,
+                            handle_val=None,
+                            thread_handle_val=thread_handle_owner.raw_value(),
+                            handle_closed=True,
+                            thread_handle_closed=False,
+                            handle_close_error=0,
+                            thread_handle_close_error=thread_handle_owner.close_error,
+                            created_at=time.monotonic(),
+                            settled=False,
+                            settled_at=None,
+                        )
+                        self._quarantine.append(rec)
 
             quarantined = False
             if not writer_exited:
@@ -1310,7 +1440,7 @@ class WorkerController:
                 "writer_thread_alive_after_join": not writer_exited,
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
-                "all_handles_safely_released": writer_exited,
+                "all_handles_safely_released": writer_exited and thread_handle_owner.is_confirmed_closed(),
                 "handle_quarantined": quarantined,
                 "bytes_written": bytes_written_total[0],
                 "total_bytes": len(data),
@@ -1325,6 +1455,25 @@ class WorkerController:
         writer_exited = not writer_thread.is_alive()
         if writer_exited:
             thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
+            if not thread_handle_owner.is_confirmed_closed():
+                with self._quarantine_lock:
+                    self._quarantine_counter += 1
+                    rec = QuarantineRecord(
+                        record_id=self._quarantine_counter,
+                        thread=None,
+                        handle=None,
+                        thread_handle=thread_handle_owner,
+                        handle_val=None,
+                        thread_handle_val=thread_handle_owner.raw_value(),
+                        handle_closed=True,
+                        thread_handle_closed=False,
+                        handle_close_error=0,
+                        thread_handle_close_error=thread_handle_owner.close_error,
+                        created_at=time.monotonic(),
+                        settled=False,
+                        settled_at=None,
+                    )
+                    self._quarantine.append(rec)
 
         quarantined = False
         if not writer_exited:
@@ -1349,6 +1498,8 @@ class WorkerController:
                 )
                 self._quarantine.append(rec)
 
+        safe_cleanup = writer_exited and thread_handle_owner.is_confirmed_closed()
+
         self._last_write_info = {
             "duplicate_handle_success": True,
             "duplicate_handle_error": 0,
@@ -1363,8 +1514,8 @@ class WorkerController:
             "writer_thread_alive_after_join": not writer_exited,
             "write_file_status": write_status[0],
             "writer_exited": writer_exited,
-            "all_handles_safely_released": writer_exited,
-            "handle_quarantined": quarantined,
+            "all_handles_safely_released": safe_cleanup,
+            "handle_quarantined": quarantined or (not thread_handle_owner.is_confirmed_closed()),
             "bytes_written": bytes_written_total[0],
             "total_bytes": len(data),
         }
@@ -1378,6 +1529,19 @@ class WorkerController:
                     "safe_cleanup": False,
                     "writer_exited": False,
                     "handle_quarantined": True,
+                },
+                operation=operation,
+            )
+
+        if not thread_handle_owner.is_confirmed_closed():
+            return _build_controller_error(
+                WORKER_RESOURCE_EXHAUSTED,
+                f"Failed to close duplicated writer thread handle during cleanup (win32 error {thread_handle_owner.close_error}).",
+                details={
+                    "safe_cleanup": False,
+                    "handle_quarantined": True,
+                    "thread_handle_close_error": thread_handle_owner.close_error,
+                    "thread_handle_val": thread_handle_owner.raw_value(),
                 },
                 operation=operation,
             )
