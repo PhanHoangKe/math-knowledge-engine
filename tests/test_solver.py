@@ -300,5 +300,90 @@ class TestSolverAlgebraicVarietiesAndProperties(unittest.TestCase):
             solve_equation("2*x = 4")  # type: ignore
 
 
+class TestScopePreflightRemediationS3R1(unittest.TestCase):
+    """Targeted regressions for MKE PRODUCT-02A-S3-R1 scope preflight remediation."""
+
+    def test_issue1_exponent_zero_binding_multiplication(self):
+        """x*(x^0) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x*(x^0) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_issue1_exponent_zero_binding_denominator(self):
+        """1/(x^0) = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("1/(x^0) = 1")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_issue1_exponent_zero_binding_nested_power(self):
+        """(x^0)^2 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("(x^0)^2 = 1")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_issue1_exponent_zero_binding_addition_left(self):
+        """x^0 + x^2 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x^0 + x^2 = 1")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_issue1_exponent_zero_binding_addition_right(self):
+        """x^2 + x^0 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x^2 + x^0 = 1")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_issue2_constant_undefinedness_division_by_zero_right(self):
+        """x^2 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("x^2 + 1/0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_issue2_constant_undefinedness_division_by_zero_left(self):
+        """1/0 + x^2 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("1/0 + x^2 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_issue2_constant_undefinedness_zero_to_zero_right(self):
+        """x/(x-1) + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("x/(x-1) + 0^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    def test_issue2_constant_undefinedness_zero_to_zero_left(self):
+        """0^0 + x/(x-1) = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("0^0 + x/(x-1) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    def test_permutation_invariance_nonlinear_and_rational(self):
+        """Permutation invariance between nonlinear and rational fraction."""
+        eq1 = parse_equation("x^2 + x/(x-1) = 0")
+        eq2 = parse_equation("x/(x-1) + x^2 = 0")
+        res1 = solve_equation(eq1)
+        res2 = solve_equation(eq2)
+        self.assertEqual(res1.status, res2.status)
+        self.assertEqual(res1.error_code, res2.error_code)
+
+    def test_simultaneous_exponent_zero_and_constant_undefinedness(self):
+        """Equation with both x^0 and 1/0 is rejected with deterministic domain error."""
+        eq1 = parse_equation("x^0 + 1/0 = 0")
+        eq2 = parse_equation("1/0 + x^0 = 0")
+        res1 = solve_equation(eq1)
+        res2 = solve_equation(eq2)
+        self.assertEqual(res1.status, res2.status)
+        self.assertEqual(res1.error_code, res2.error_code)
+
+
 if __name__ == "__main__":
     unittest.main()
