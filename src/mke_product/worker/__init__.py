@@ -13,7 +13,21 @@ from .constants import (
     WORKER_STARTUP_FAILURE,
     WORKER_TIMEOUT,
 )
-from .controller import WorkerController, dispatch_via_worker
+from typing import Any
+
+from .constants import (
+    DEFAULT_WORKER_TIMEOUT_SEC,
+    IPC_MAX_REQUEST_BYTES,
+    IPC_MAX_RESPONSE_BYTES,
+    JOB_MEMORY_LIMIT_BYTES,
+    PROCESS_MEMORY_LIMIT_BYTES,
+    WORKER_ASSIGNMENT_FAILURE,
+    WORKER_EXIT_FAILURE,
+    WORKER_PROTOCOL_FAILURE,
+    WORKER_RESOURCE_EXHAUSTED,
+    WORKER_STARTUP_FAILURE,
+    WORKER_TIMEOUT,
+)
 
 __all__ = [
     "DEFAULT_WORKER_TIMEOUT_SEC",
@@ -30,3 +44,14 @@ __all__ = [
     "WorkerController",
     "dispatch_via_worker",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "WorkerController":
+        from .controller import WorkerController
+        return WorkerController
+    if name == "dispatch_via_worker":
+        from .controller import dispatch_via_worker
+        return dispatch_via_worker
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

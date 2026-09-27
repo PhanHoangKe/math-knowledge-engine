@@ -195,6 +195,11 @@ class AppContainerManager:
         self.bootstrap: Optional[Path] = None
         self._prepared = False
         self._active_children = 0
+        self._stage_removed: bool = True
+        self._profile_deleted: bool = True
+        self._stage_error: Optional[str] = None
+        self._delete_hresult: int = 0
+        self._cleanup_failed: bool = False
         self._last_cleanup: Dict[str, Any] = {"state": "NOT_ATTEMPTED"}
 
     @property
@@ -202,8 +207,18 @@ class AppContainerManager:
         with self._lock:
             return self._active_children
 
+    def has_unresolved_cleanup(self) -> bool:
+        with self._lock:
+            return self._cleanup_failed or (
+                self._last_cleanup.get("state") == "CLEANUP_FAILED"
+            )
+
     def prepare(self) -> None:
         with self._lock:
+            if self.has_unresolved_cleanup():
+                self.cleanup()
+                if self.has_unresolved_cleanup():
+                    raise RuntimeError("Cannot prepare AppContainer worker: unresolved cleanup state exists")
             if self._prepared:
                 return
             hr = userenv.CreateAppContainerProfile(
@@ -212,12 +227,17 @@ class AppContainerManager:
             )
             if hr != 0:
                 raise OSError(_u32(hr), "CreateAppContainerProfile failed")
+            self._profile_deleted = False
+            self._delete_hresult = 0
+            self._cleanup_failed = False
             try:
                 if not self.sid or not advapi32.IsValidSid(self.sid):
                     raise OSError("CreateAppContainerProfile returned an invalid SID")
                 self.sid_string = _sid_text(self.sid)
                 root = Path(tempfile.mkdtemp(prefix="mke-s4b2-p1-"))
                 self.stage_root = root
+                self._stage_removed = False
+                self._stage_error = None
                 runtime = root / "runtime"
                 source = root / "src"
                 runtime.mkdir()
@@ -254,6 +274,8 @@ class AppContainerManager:
             ):
                 shutil.copy2(item, destination / item.name)
         shutil.copytree(source / "DLLs", destination / "DLLs")
+        for item in (destination / "DLLs").glob("*.dll"):
+            shutil.copy2(item, destination / item.name)
         ignored = shutil.ignore_patterns(
             "site-packages", "__pycache__", "ensurepip", "idlelib", "test", "tests",
             "tkinter", "turtledemo", "venv",
@@ -303,7 +325,7 @@ class AppContainerManager:
         self.prepare()
         system_root = os.environ.get("SystemRoot", r"C:\Windows")
         values = {
-            "PATH": str(self.python_exe.parent),
+            "PATH": f"{self.python_exe.parent};{self.python_exe.parent / 'DLLs'}",
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONNOUSERSITE": "1",
             "SystemRoot": system_root,
@@ -322,7 +344,12 @@ class AppContainerManager:
         serialized = "\0".join(f"{key}={values[key]}" for key in sorted(values, key=str.upper)) + "\0\0"
         return ctypes.create_unicode_buffer(serialized)
 
-    def cleanup(self) -> Dict[str, Any]:
+    def cleanup(
+        self,
+        *,
+        _inject_stage_deletion_failure: bool = False,
+        _inject_profile_deletion_failure: bool = False,
+    ) -> Dict[str, Any]:
         with self._lock:
             if self._active_children:
                 self._last_cleanup = {
@@ -331,30 +358,78 @@ class AppContainerManager:
                     "profile_name": self.profile_name,
                 }
                 return dict(self._last_cleanup)
-            self._cleanup_created_state()
+            self._cleanup_created_state(
+                _inject_stage_deletion_failure=_inject_stage_deletion_failure,
+                _inject_profile_deletion_failure=_inject_profile_deletion_failure,
+            )
             return dict(self._last_cleanup)
 
-    def _cleanup_created_state(self) -> None:
-        stage_removed = True
-        if self.stage_root is not None:
-            try:
-                shutil.rmtree(self.stage_root)
-            except OSError:
-                stage_removed = False
-        delete_hr = 0
-        if self.sid:
-            delete_hr = userenv.DeleteAppContainerProfile(self.profile_name)
-            advapi32.FreeSid(self.sid)
-        self.sid = ctypes.c_void_p()
-        self.sid_string = ""
-        self.stage_root = None
-        self.python_exe = None
-        self.bootstrap = None
-        self._prepared = False
+    def _cleanup_created_state(
+        self,
+        *,
+        _inject_stage_deletion_failure: bool = False,
+        _inject_profile_deletion_failure: bool = False,
+    ) -> None:
+        if not self._prepared and self.stage_root is None and not self.sid:
+            self._last_cleanup = {
+                "state": "CLEANED",
+                "stage_removed": True,
+                "delete_hresult": 0,
+                "active_children": self._active_children,
+                "profile_name": self.profile_name,
+            }
+            return
+
+        # 1. Clean up staging directory if present and not already removed
+        if self.stage_root is not None and not self._stage_removed:
+            if _inject_stage_deletion_failure:
+                self._stage_removed = False
+                self._stage_error = "Injected staging directory deletion failure"
+            else:
+                try:
+                    if self.stage_root.exists():
+                        shutil.rmtree(self.stage_root)
+                    self._stage_removed = True
+                    self._stage_error = None
+                    self.stage_root = None
+                    self.python_exe = None
+                    self.bootstrap = None
+                except OSError as exc:
+                    self._stage_removed = False
+                    self._stage_error = str(exc)
+
+        # 2. Clean up AppContainer profile if present and not already deleted
+        if self.sid and not self._profile_deleted:
+            if _inject_profile_deletion_failure:
+                self._profile_deleted = False
+                self._delete_hresult = 0x80004005
+            else:
+                delete_hr = userenv.DeleteAppContainerProfile(self.profile_name)
+                if delete_hr == 0:
+                    advapi32.FreeSid(self.sid)
+                    self.sid = ctypes.c_void_p()
+                    self.sid_string = ""
+                    self._profile_deleted = True
+                    self._delete_hresult = 0
+                else:
+                    self._profile_deleted = False
+                    self._delete_hresult = _u32(delete_hr)
+
+        is_cleaned = bool(self._stage_removed and self._profile_deleted)
+        self._cleanup_failed = not is_cleaned
+        if is_cleaned:
+            self._prepared = False
+            self.stage_root = None
+            self.python_exe = None
+            self.bootstrap = None
+            self.sid = ctypes.c_void_p()
+            self.sid_string = ""
+
         self._last_cleanup = {
-            "state": "CLEANED" if stage_removed and delete_hr == 0 else "CLEANUP_FAILED",
-            "stage_removed": stage_removed,
-            "delete_hresult": _u32(delete_hr),
+            "state": "CLEANED" if is_cleaned else "CLEANUP_FAILED",
+            "stage_removed": self._stage_removed,
+            "stage_error": self._stage_error,
+            "delete_hresult": self._delete_hresult,
             "active_children": self._active_children,
             "profile_name": self.profile_name,
         }
@@ -372,3 +447,4 @@ def cleanup_appcontainer_runtime() -> Dict[str, Any]:
 
 
 atexit.register(cleanup_appcontainer_runtime)
+

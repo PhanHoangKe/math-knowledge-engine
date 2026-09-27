@@ -115,33 +115,34 @@
     "elevated": false,
     "verified_before_resume": true,
     "query_error": 0,
-    "appcontainer_sid": "S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266",
+    "appcontainer_sid": "S-1-15-2-995832725-2294432519-719043668-3531832658-2427251326-3186074894-2825198323",
     "accepted": true,
-    "profile_name": "mke.product.worker.p1.9412.5b478af67ec7",
-    "expected_sid": "S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266",
+    "profile_name": "mke.product.worker.p1.10872.431b4920bc4e",
+    "expected_sid": "S-1-15-2-995832725-2294432519-719043668-3531832658-2427251326-3186074894-2825198323",
     "job_assignment_verified": true,
     "process_was_resumed": true
   },
   "profile": {
-    "name": "mke.product.worker.p1.9412.5b478af67ec7",
+    "name": "mke.product.worker.p1.10872.431b4920bc4e",
     "active_children_after_request": 0,
     "cleanup_with_active_lease": {
       "state": "REFUSED_ACTIVE_CHILDREN",
       "active_children": 1,
-      "profile_name": "mke.product.worker.p1.9412.5b478af67ec7"
+      "profile_name": "mke.product.worker.p1.10872.431b4920bc4e"
     },
     "cleanup_after_release": {
       "state": "CLEANED",
       "stage_removed": true,
+      "stage_error": null,
       "delete_hresult": 0,
       "active_children": 0,
-      "profile_name": "mke.product.worker.p1.9412.5b478af67ec7"
+      "profile_name": "mke.product.worker.p1.10872.431b4920bc4e"
     }
   },
   "acl": {
     "command": "icacls.exe <staged-root>",
     "returncode": 0,
-    "stdout": "<staged-root> S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266:(OI)(CI)(RX)\n                                                       NT AUTHORITY\\SYSTEM:(OI)(CI)(F)\n                                                       BUILTIN\\Administrators:(OI)(CI)(F)\n                                                       OWNER RIGHTS:(OI)(CI)(F)\n\nSuccessfully processed 1 files; Failed processing 0 files",
+    "stdout": "<staged-root> S-1-15-2-995832725-2294432519-719043668-3531832658-2427251326-3186074894-2825198323:(OI)(CI)(RX)\n                                                       phanhoangke\\CodexSandboxUsers:(I)(OI)(CI)(M)\n                                                       S-1-5-21-3061253661-1315290125-2520860270-4197145290:(I)(OI)(CI)(M)\n                                                       NT AUTHORITY\\SYSTEM:(I)(OI)(CI)(F)\n                                                       BUILTIN\\Administrators:(I)(OI)(CI)(F)\n                                                       PHANHOANGKE\\kedep:(I)(OI)(CI)(F)\n\nSuccessfully processed 1 files; Failed processing 0 files",
     "stderr": "",
     "intended_sid_rights": "(OI)(CI)RX"
   },
@@ -180,9 +181,9 @@
       ],
       "appcontainer_access": "(OI)(CI)RX"
     },
-    "file_count": 673,
-    "total_bytes": 36388444,
-    "aggregate_sha256": "9B8915A38FF6890F6A6C315DCF6177AE03C9C12B107B77E6022395D185BB921B"
+    "file_count": 712,
+    "total_bytes": 38026112,
+    "aggregate_sha256": "D57C93191EB121E4B42966A78F5083D6AFCD47AF49E309F72D4CCFCF0A20E9A3"
   },
   "scope_limitations": [
     "No claim of complete filesystem isolation.",

@@ -882,23 +882,26 @@ class TestWindowsHandleConfinement(unittest.TestCase):
             h = int(decoy)
 
             child_code = f"""
-import ctypes, json, struct, sys
-from ctypes import wintypes
-k32 = ctypes.WinDLL('kernel32', use_last_error=True)
-k32.GetFileType.argtypes = [wintypes.HANDLE]
-k32.GetFileType.restype = wintypes.DWORD
+import json, struct, sys, _winapi
 header = sys.stdin.buffer.read(4)
 size = struct.unpack('>I', header)[0]
 sys.stdin.buffer.read(size)
-ctypes.set_last_error(0)
+cur = _winapi.GetCurrentProcess()
+dup = None
+dup_error = 0
+file_type = -1
+file_type_error = 0
 try:
-    file_type = int(k32.GetFileType(wintypes.HANDLE({h})))
-    file_type_error = ctypes.get_last_error()
+    dup = _winapi.DuplicateHandle(cur, {h}, cur, 0, False, _winapi.DUPLICATE_SAME_ACCESS)
+    file_type = int(_winapi.GetFileType(dup))
+    file_type_error = _winapi.GetLastError()
+    _winapi.CloseHandle(dup)
 except OSError as exc:
-    file_type = -1
-    file_type_error = int(getattr(exc, 'winerror', 6) or 6)
+    dup_error = int(getattr(exc, 'winerror', 6) or 6)
+
 result = {{
-    'decoy_event_accessible': file_type == 0 and file_type_error == 0,
+    'decoy_event_accessible': dup is not None and file_type == 0 and file_type_error == 0,
+    'dup_error': dup_error,
     'candidate_file_type': file_type,
     'candidate_error': file_type_error,
 }}
@@ -989,6 +992,115 @@ class TestWindowsAppContainerIntegration(unittest.TestCase):
         cleaned = manager.cleanup()
         self.assertEqual(cleaned["state"], "CLEANED")
         self.assertEqual(cleaned["active_children"], 0)
+
+    def test_staging_directory_deletion_failure_preserves_state_and_recovers(self):
+        manager = get_appcontainer_manager()
+        manager.prepare()
+        stage_root = manager.stage_root
+        self.assertIsNotNone(stage_root)
+        self.assertTrue(stage_root.exists())
+
+        failed = manager.cleanup(_inject_stage_deletion_failure=True)
+        self.assertEqual(failed["state"], "CLEANUP_FAILED")
+        self.assertFalse(failed["stage_removed"])
+        self.assertIsNotNone(manager.stage_root)
+        self.assertTrue(manager.has_unresolved_cleanup())
+
+        recovered = manager.cleanup(_inject_stage_deletion_failure=False)
+        self.assertEqual(recovered["state"], "CLEANED")
+        self.assertTrue(recovered["stage_removed"])
+        self.assertIsNone(manager.stage_root)
+        self.assertFalse(manager.has_unresolved_cleanup())
+
+    def test_profile_deletion_failure_preserves_sid_and_recovers(self):
+        manager = get_appcontainer_manager()
+        manager.prepare()
+        self.assertTrue(manager.sid)
+
+        failed = manager.cleanup(_inject_profile_deletion_failure=True)
+        self.assertEqual(failed["state"], "CLEANUP_FAILED")
+        self.assertNotEqual(failed["delete_hresult"], 0)
+        self.assertTrue(manager.sid)
+        self.assertTrue(manager.has_unresolved_cleanup())
+
+        recovered = manager.cleanup(_inject_profile_deletion_failure=False)
+        self.assertEqual(recovered["state"], "CLEANED")
+        self.assertEqual(recovered["delete_hresult"], 0)
+        self.assertFalse(manager.has_unresolved_cleanup())
+
+    def test_partial_preparation_failure_cleans_up_or_preserves_diagnostics(self):
+        from mke_product.worker.appcontainer import AppContainerManager
+        mgr = AppContainerManager()
+        with mock.patch.object(mgr, "_grant_read_execute", side_effect=OSError("Injected permission error")):
+            with self.assertRaises(OSError):
+                mgr.prepare()
+        self.assertIn(mgr._last_cleanup["state"], ("CLEANED", "CLEANUP_FAILED"))
+
+    def test_cleanup_idempotent_when_already_cleaned(self):
+        manager = get_appcontainer_manager()
+        manager.prepare()
+        res1 = manager.cleanup()
+        self.assertEqual(res1["state"], "CLEANED")
+        res2 = manager.cleanup()
+        self.assertEqual(res2["state"], "CLEANED")
+        self.assertEqual(res2["delete_hresult"], 0)
+        self.assertTrue(res2["stage_removed"])
+
+    def test_unresolved_cleanup_prevents_unsafe_profile_reuse(self):
+        manager = get_appcontainer_manager()
+        manager.prepare()
+        failed = manager.cleanup(_inject_stage_deletion_failure=True)
+        self.assertEqual(failed["state"], "CLEANUP_FAILED")
+        self.assertTrue(manager.has_unresolved_cleanup())
+
+        with mock.patch("shutil.rmtree", side_effect=OSError("Access denied")):
+            with self.assertRaises(RuntimeError) as ctx:
+                manager.prepare()
+            self.assertIn("unresolved cleanup state exists", str(ctx.exception))
+
+        recovered = manager.cleanup()
+        self.assertEqual(recovered["state"], "CLEANED")
+        self.assertFalse(manager.has_unresolved_cleanup())
+
+    def test_real_appcontainer_process_lease_gating_and_termination_recovery(self):
+        """Phase 2: Genuine AppContainer child process under Job containment with controlled termination uncertainty."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        manager = get_appcontainer_manager()
+
+        res = controller.execute_request(
+            self.request,
+            _inject_terminate_process_failure=True,
+            _inject_termination_wait_timeout=True,
+            _inject_job_close_failure=True,
+        )
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+
+        process_owners = [h for h in controller.get_unresolved_handles() if isinstance(h, SafeProcessHandle)]
+        self.assertEqual(len(process_owners), 1)
+        proc_owner = process_owners[0]
+        job_owners = controller.get_unresolved_job_handles()
+        self.assertEqual(len(job_owners), 1)
+        job_owner = job_owners[0]
+
+        self.assertEqual(kernel32.WaitForSingleObject(proc_owner.handle, 0), WAIT_TIMEOUT)
+        refused = manager.cleanup()
+        self.assertEqual(refused["state"], "REFUSED_ACTIVE_CHILDREN")
+        self.assertGreaterEqual(refused["active_children"], 1)
+
+        self.assertTrue(job_owner.close(_inject_failure=False))
+        self.assertEqual(kernel32.WaitForSingleObject(proc_owner.handle, 5000), WAIT_OBJECT_0)
+
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(controller.get_unresolved_count(), 0)
+        self.assertEqual(manager.active_children, 0)
+
+        cleaned = manager.cleanup()
+        self.assertEqual(cleaned["state"], "CLEANED")
+        self.assertEqual(cleaned["active_children"], 0)
+
 
 
 class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
