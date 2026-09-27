@@ -1,0 +1,4 @@
+Zig 0.16.0
+clang 21.1.0
+Target x86_64-unknown-windows-gnu
+Command: zig c++ scripts/appcontainer_native_diagnosis.cpp -std=c++17 -O2 -municode -Wno-nullability-completeness -luserenv -ladvapi32 -o <temp>\mke-s4b2-p0-r1-native.exe

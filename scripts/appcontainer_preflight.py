@@ -53,6 +53,7 @@ class STARTUPINFOW(ctypes.Structure):
         ("dwXSize", wintypes.DWORD),
         ("dwYSize", wintypes.DWORD),
         ("dwXCountChars", wintypes.DWORD),
+        ("dwYCountChars", wintypes.DWORD),
         ("dwFillAttribute", wintypes.DWORD),
         ("dwFlags", wintypes.DWORD),
         ("wShowWindow", wintypes.WORD),
