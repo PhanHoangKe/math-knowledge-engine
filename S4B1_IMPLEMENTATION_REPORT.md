@@ -62,7 +62,7 @@ Prior to implementation, the local execution environment was inspected:
 
 ---
 
-## 4. Test Inventory & Verification Results (S4-B1-R3 Final Closure)
+## 4. Test Inventory & Verification Results (S4-B1-R4 Final Closure)
 
 ### 4.1 Test Execution Summary
 Command:
@@ -71,18 +71,18 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 282 tests in 5.057s
+Ran 288 tests in 6.504s
 
 OK
 ```
 
-### 4.2 Breakdown (282 Total Tests)
+### 4.2 Breakdown (288 Total Tests)
 - **S0 Rational Arithmetic (`tests/test_rational.py`):** 24 tests.
 - **S1 EBNF Parser & AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluator (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests.
 - **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 62 tests.
-- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 36 tests:
+- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 42 tests:
   - *Suspended Startup & Assignment:*
     * `test_worker_assigned_to_job_before_thread_resumed` (PASS)
   - *Process Memory Limit (256 MiB):*
@@ -114,7 +114,7 @@ OK
   - *Full-Lifecycle Timeout & Safe IPC Write Cancellation:*
     * `test_worker_payload_too_large` (PASS)
     * `test_worker_timeout_fails_closed` (PASS - deterministic blocking 5.0s fixture with 0.2s timeout, reports `timeout_phase: "READ"`, duration < 1.5s)
-    * `test_worker_timeout_during_ipc_write_non_reading_worker` (PASS - non-reading worker with 4000+ byte payload over 1024-byte pipe buffer times out during write; proven real thread handle duplication, `CancelSynchronousIo`, verified thread exit before pipe close, reports `timeout_phase: "WRITE"`)
+    * `test_worker_timeout_during_ipc_write_non_reading_worker` (PASS - real Windows kernel non-reading worker with 4000+ byte payload over 1024-byte pipe buffer times out during write; proven real thread handle duplication, `CancelSynchronousIo`, verified thread exit before pipe close, reports `timeout_phase: "WRITE"`, all telemetry verified)
   - *Controller Input Boundary Pre-Validation & Bounded Error Envelopes:*
     * `test_controller_rejects_cyclic_dictionary` (PASS)
     * `test_controller_rejects_non_string_keys` (PASS)
@@ -130,6 +130,13 @@ OK
     * `test_strict_utf8_payload_rejection` (PASS - raw invalid UTF-8 bytes rejected without replacement)
   - *Handle Confinement:*
     * `test_unallowlisted_handle_not_inherited` (PASS - unallowlisted inheritable handle inaccessible in worker)
+  - *Cancellation Failure Handling & Strict Handle Ownership (S4-B1-R4):*
+    * `test_duplicate_handle_failure_aborts_before_write` (PASS - DuplicateHandle failure aborts before WriteFile, zero uncancelable write)
+    * `test_cancel_synchronous_io_failure_handled_safely` (PASS - CancelSynchronousIo failure handled, GetLastError recorded, child termination breaks pipe)
+    * `test_delayed_writer_termination_quarantines_handle` (PASS - writer thread join expiry quarantines handle, prevents premature close, safe_cleanup: False)
+    * `test_no_double_close_on_pipe_handle` (PASS - verified zero duplicate CloseHandle calls across all pipe handles)
+    * `test_independent_repeated_requests_reset_telemetry` (PASS - telemetry completely reset before every request, zero stale state)
+    * `test_error_envelope_deterministic_fallback_on_serialization_failure` (PASS - deterministic minimal fallback if JSON encoding of error details fails)
 
 ---
 
@@ -142,8 +149,9 @@ OK
 | **Job Aggregate Memory Quota (512 MiB)** | `JOB_OBJECT_LIMIT_JOB_MEMORY` | Causal control established: Worker 2 succeeds in isolation, fails with code 42 under aggregate ceiling | **RUNTIME VERIFIED** |
 | **Breakaway Prevention** | Omit breakaway flags in Job Object | `CREATE_BREAKAWAY_FROM_JOB` fails with `ERROR_ACCESS_DENIED` (code 5) using full `STARTUPINFOW` | **RUNTIME VERIFIED** |
 | **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | Worker terminated immediately upon closing sole Job handle | **RUNTIME VERIFIED** |
-| **Full-Lifecycle Timeout & Safe Cancellation** | Single deadline across IPC write & read; `CancelSynchronousIo` + verified join before pipe close | Real thread handle duplicated, cancellation called, confirmed thread exit before pipe handle close; `timeout_phase` reported | **RUNTIME VERIFIED** |
-| **Bounded Error Envelopes & Operation Normalization** | Operation allowlist + `_normalize_operation` + `IPC_MAX_RESPONSE_BYTES` enforcement | Untrusted operation strings normalized to UNKNOWN, no untrusted string reflection, all error responses $\le 16384$ bytes | **RUNTIME VERIFIED** |
+| **Full-Lifecycle Timeout & Safe Cancellation** | Single deadline, real thread handle duplication, `CancelSynchronousIo`, cancellation failure handling | Real thread handle duplicated, cancellation called, confirmed thread exit before pipe handle close; `timeout_phase` reported | **RUNTIME VERIFIED** |
+| **Single-Owner Handle Invariant** | `execute_request` sole owner; zero premature or double-close | `_write_exact_bytes_with_timeout` never closes `h_pipe`; `h_stdin_write` closed only once and only when writer is dead | **RUNTIME VERIFIED** |
+| **Bounded Error Envelopes & Normalization** | Operation allowlist + deterministic serialization fallback | Untrusted operation strings normalized to UNKNOWN, no untrusted string reflection, all error responses $\le 16384$ bytes | **RUNTIME VERIFIED** |
 | **Input Boundary Pre-Validation & Post-Serialization Check** | Bounded `_measure_dict_bytes` + `ensure_ascii=False` + byte check | Oversized inputs rejected before Job Object creation; cycles and surrogates handled | **RUNTIME VERIFIED** |
 | **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | Raw invalid byte sequences rejected as `ERR_PROTOCOL_JSON_DECODE` | **RUNTIME VERIFIED** |
 | **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Worker inherits exclusively its own pipes; unallowlisted handles raise `OSError` | **RUNTIME VERIFIED** |

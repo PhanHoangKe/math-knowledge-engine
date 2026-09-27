@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 # Platform gating: All tests require real Windows runtime
@@ -667,12 +668,19 @@ class TestWindowsTimeoutAndFraming(unittest.TestCase):
         self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
         self.assertEqual(res["status"], WORKER_TIMEOUT)
         self.assertEqual(res.get("error", {}).get("details", {}).get("timeout_phase"), "WRITE")
+        self.assertTrue(res.get("error", {}).get("details", {}).get("safe_cleanup"))
         self.assertIsNotNone(controller._last_write_info)
+        self.assertTrue(controller._last_write_info["duplicate_handle_success"])
         self.assertTrue(controller._last_write_info["write_entered"])
         self.assertTrue(controller._last_write_info["write_blocked_at_deadline"])
+        self.assertTrue(controller._last_write_info["cancellation_requested"])
         self.assertTrue(controller._last_write_info["cancel_synchronous_io_called"])
+        self.assertTrue(controller._last_write_info["cancel_synchronous_io_return"])
         self.assertTrue(controller._last_write_info["writer_thread_alive_before_cancel"])
         self.assertFalse(controller._last_write_info["writer_thread_alive_after_join"])
+        self.assertTrue(controller._last_write_info["writer_exited"])
+        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
+        self.assertIn(controller._last_write_info["write_file_status"], ("ABORTED", "BROKEN_PIPE"))
         self.assertIsNone(res["definedness"])
         self.assertLess(elapsed, 1.5)
 
@@ -836,6 +844,137 @@ except OSError:
             os.close(fd)
             if os.path.exists(path):
                 os.unlink(path)
+
+
+class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
+    """Test L: Failure handling for IPC cancellation and strict handle ownership."""
+
+    def test_duplicate_handle_failure_aborts_before_write(self):
+        """If DuplicateHandle fails, WriteFile is never entered, request fails closed cleanly."""
+        controller = WorkerController()
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(req, _inject_duplicate_handle_failure=True)
+
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertFalse(controller._last_write_info["duplicate_handle_success"])
+        self.assertFalse(controller._last_write_info["write_entered"])
+        self.assertFalse(controller._last_write_info["cancellation_requested"])
+        self.assertTrue(controller._last_write_info["writer_exited"])
+        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
+        self.assertEqual(controller._last_write_info["write_file_status"], "DUPLICATE_HANDLE_FAILED")
+
+    def test_cancel_synchronous_io_failure_handled_safely(self):
+        """If CancelSynchronousIo returns False, telemetry records failure and worker is terminated."""
+        non_reading_cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=non_reading_cmd,
+            _stdin_pipe_buffer_size=1024,
+        )
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "SOLVE",
+            "equation": "x=" + "1" * 4000,
+        }
+        res = controller.execute_request(req, _inject_cancel_io_failure=True)
+
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertTrue(controller._last_write_info["cancellation_requested"])
+        self.assertFalse(controller._last_write_info["cancel_synchronous_io_return"])
+        self.assertEqual(controller._last_write_info["cancel_synchronous_io_last_error"], 1168)
+        # TerminateProcess caused child pipe break, allowing writer thread to exit safely
+        self.assertTrue(controller._last_write_info["writer_exited"])
+        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
+
+    def test_delayed_writer_termination_quarantines_handle(self):
+        """If writer thread does not exit within join deadline, handle is not closed and cleanup is not falsely claimed."""
+        non_reading_cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=non_reading_cmd,
+            _stdin_pipe_buffer_size=1024,
+        )
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "SOLVE",
+            "equation": "x=" + "1" * 4000,
+        }
+        res = controller.execute_request(req, _inject_writer_join_timeout=True)
+
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertFalse(res.get("error", {}).get("details", {}).get("writer_exited"))
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertFalse(controller._last_write_info["writer_exited"])
+        self.assertFalse(controller._last_write_info["all_handles_safely_released"])
+
+    def test_no_double_close_on_pipe_handle(self):
+        """Verify that controller pipe handles are closed exactly once, never double-closed."""
+        closed_handles = []
+        original_close_handle = kernel32.CloseHandle
+
+        def _tracking_close_handle(handle):
+            if handle and handle != wintypes.HANDLE(0).value and handle != wintypes.HANDLE(-1).value:
+                closed_handles.append(handle if isinstance(handle, int) else handle.value)
+            return original_close_handle(handle)
+
+        with mock.patch.object(kernel32, "CloseHandle", side_effect=_tracking_close_handle):
+            controller = WorkerController(
+                timeout_sec=0.2,
+                _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+                _stdin_pipe_buffer_size=1024,
+            )
+            req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000}
+            res = controller.execute_request(req)
+            self.assertEqual(res["status"], WORKER_TIMEOUT)
+
+        # Check for duplicate handle IDs in closed_handles
+        duplicates = [h for h in closed_handles if closed_handles.count(h) > 1]
+        self.assertEqual(duplicates, [], f"Detected double-closed handles: {duplicates}")
+
+    def test_independent_repeated_requests_reset_telemetry(self):
+        """Repeated requests on the same controller reset telemetry cleanly without stale state."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+            _stdin_pipe_buffer_size=1024,
+        )
+        # Request 1: triggers timeout
+        res1 = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000})
+        self.assertEqual(res1["status"], WORKER_TIMEOUT)
+        self.assertTrue(controller._last_write_info["cancellation_requested"])
+
+        # Request 2: normal solve controller
+        controller2 = WorkerController()
+        res2 = controller2.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertIsNotNone(controller2._last_write_info)
+        self.assertFalse(controller2._last_write_info["cancellation_requested"])
+        self.assertFalse(controller2._last_write_info["write_blocked_at_deadline"])
+        self.assertTrue(controller2._last_write_info["writer_exited"])
+        self.assertTrue(controller2._last_write_info["all_handles_safely_released"])
+
+    def test_error_envelope_deterministic_fallback_on_serialization_failure(self):
+        """_build_controller_error returns a minimal deterministic envelope when JSON serialization fails."""
+        from mke_product.worker.controller import _build_controller_error
+        # Non-serializable object inside details
+        fallback = _build_controller_error(
+            "ERR_INTERNAL",
+            "Initial failure",
+            details={"unserializable": object()},
+            operation="SOLVE",
+        )
+        self.assertEqual(fallback["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(fallback["status"], "ERR_INTERNAL")
+        self.assertEqual(fallback["operation"], "SOLVE")
+        self.assertEqual(fallback["error"]["message"], "Error serialization failed.")
+        serialized = json.dumps(fallback).encode("utf-8")
+        self.assertLessEqual(len(serialized), IPC_MAX_RESPONSE_BYTES)
 
 
 if __name__ == "__main__":

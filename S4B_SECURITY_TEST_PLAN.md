@@ -147,9 +147,19 @@ This document defines the verification strategy, security test cases, observed k
   - `test_unallowlisted_handle_not_inherited`: An inheritable handle (`bInheritHandle=True`) not present in `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` is proven inaccessible in the worker (`msvcrt.open_osfhandle` fails with `OSError`, exit code 77).
 - **Status:** PASS (Verified).
 
+### Requirement L: Cancellation Failure Handling & Handle Ownership
+- **Test:** `TestWindowsCancellationAndHandleOwnership` (6 tests)
+  - `test_duplicate_handle_failure_aborts_before_write`: Proves that when `DuplicateHandle` fails, `WriteFile` is never entered, telemetry records failure, and request fails closed cleanly.
+  - `test_cancel_synchronous_io_failure_handled_safely`: Proves that when `CancelSynchronousIo` returns `False`, telemetry records failure and worker process termination triggers pipe break for clean thread exit.
+  - `test_delayed_writer_termination_quarantines_handle`: Proves that if the writer thread does not exit within join deadline, `h_stdin_write` is quarantined (not closed prematurely) and safe cleanup is not falsely claimed.
+  - `test_no_double_close_on_pipe_handle`: Proves every controller pipe handle is closed at most once across the entire timeout lifecycle.
+  - `test_independent_repeated_requests_reset_telemetry`: Proves subsequent requests reset cancellation telemetry completely without stale state.
+  - `test_error_envelope_deterministic_fallback_on_serialization_failure`: Proves `_build_controller_error` produces a deterministic bounded envelope even when JSON serialization of details fails.
+- **Status:** PASS (Verified).
+
 ---
 
-## 4. Security Control Status (S4-B1-R2 Verification Matrix)
+## 4. Security Control Status (S4-B1-R4 Verification Matrix)
 
 | Security Control | Implementation Mechanism | Status |
 | :--- | :--- | :--- |
@@ -158,7 +168,9 @@ This document defines the verification strategy, security test cases, observed k
 | **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` + `msvcrt` verification | **RUNTIME VERIFIED** (Pass) |
 | **Breakaway Prevention** | Disabled breakaway flags + `ERROR_ACCESS_DENIED` test | **RUNTIME VERIFIED** (Pass) |
 | **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | **RUNTIME VERIFIED** (Pass) |
-| **Full-Lifecycle Timeout** | Single deadline across IPC write & read phases | **RUNTIME VERIFIED** (Pass) |
+| **Full-Lifecycle Timeout & Safe Cancellation** | Single deadline, verified join before pipe close, cancellation failure handling | **RUNTIME VERIFIED** (Pass) |
+| **Single-Owner Handle Invariant** | `execute_request` sole owner; zero premature or double-close | **RUNTIME VERIFIED** (Pass) |
+| **Bounded Error Envelopes & Normalization** | Operation allowlist + deterministic serialization fallback | **RUNTIME VERIFIED** (Pass) |
 | **Input Boundary Pre-Validation & Size Check** | Bounded `_measure_dict_bytes` + post-serialization check | **RUNTIME VERIFIED** (Pass) |
 | **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | **RUNTIME VERIFIED** (Pass) |
 | **Fail-Closed Result Taxonomy** | S4 Protocol Error Mapping & Stderr Sanitization | **RUNTIME VERIFIED** (Pass) |

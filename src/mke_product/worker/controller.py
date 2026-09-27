@@ -129,7 +129,20 @@ def _build_controller_error(
                 },
             }
     except Exception:
-        pass
+        # Guaranteed deterministic minimal fallback if serialization fails
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": norm_op,
+            "outcome": outcome,
+            "status": status,
+            "definedness": None,
+            "is_provisional_evidence": False,
+            "error": {
+                "code": status,
+                "message": "Error serialization failed.",
+                "details": {"reason": "serialization_failure"},
+            },
+        }
 
     return envelope
 
@@ -150,6 +163,7 @@ class WorkerController:
         self.timeout_sec = timeout_sec
         self._stdin_pipe_buffer_size = _stdin_pipe_buffer_size
         self._last_write_info: Optional[Dict[str, Any]] = None
+        self._current_writer_thread: Optional[threading.Thread] = None
 
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
@@ -166,9 +180,16 @@ class WorkerController:
         _inject_process_creation_failure: bool = False,
         _inject_assignment_failure: bool = False,
         _inject_resume_failure: bool = False,
+        _inject_duplicate_handle_failure: bool = False,
+        _inject_cancel_io_failure: bool = False,
+        _inject_writer_join_timeout: bool = False,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
         effective_timeout = timeout_sec if timeout_sec is not None else self.timeout_sec
+
+        # Reset per-request cancellation and write telemetry before every request
+        self._last_write_info = None
+        self._current_writer_thread = None
 
         # Extract normalized operation for error envelopes to prevent untrusted string reflection
         operation = "UNKNOWN"
@@ -487,7 +508,15 @@ class WorkerController:
             msg = header + raw_payload
 
             write_res = self._write_exact_bytes_with_timeout(
-                h_stdin_write, msg, deadline, pi.hProcess, h_job, operation=operation
+                h_stdin_write,
+                msg,
+                deadline,
+                pi.hProcess,
+                h_job,
+                operation=operation,
+                _inject_duplicate_handle_failure=_inject_duplicate_handle_failure,
+                _inject_cancel_io_failure=_inject_cancel_io_failure,
+                _inject_writer_join_timeout=_inject_writer_join_timeout,
             )
             if isinstance(write_res, dict):
                 return write_res
@@ -540,11 +569,31 @@ class WorkerController:
         finally:
             # 10. Guaranteed cleanup of all handles and attribute lists
             safe_close_handle(h_stdin_read)
-            safe_close_handle(h_stdin_write)
+            h_stdin_read = wintypes.HANDLE()
+
+            # Handle ownership invariant: close h_stdin_write ONLY IF writer is not active
+            if h_stdin_write.value:
+                writer_alive = (
+                    self._current_writer_thread is not None
+                    and self._current_writer_thread.is_alive()
+                )
+                if not writer_alive:
+                    safe_close_handle(h_stdin_write)
+                    h_stdin_write = wintypes.HANDLE()
+                else:
+                    # Writer thread is still active; quarantine handle to prevent unsafe closure or reuse
+                    if self._last_write_info:
+                        self._last_write_info["all_handles_safely_released"] = False
+                    h_stdin_write = wintypes.HANDLE()
+
             safe_close_handle(h_stdout_read)
+            h_stdout_read = wintypes.HANDLE()
             safe_close_handle(h_stdout_write)
+            h_stdout_write = wintypes.HANDLE()
             safe_close_handle(h_stderr_read)
+            h_stderr_read = wintypes.HANDLE()
             safe_close_handle(h_stderr_write)
+            h_stderr_write = wintypes.HANDLE()
 
             if pi.hProcess:
                 # Ensure worker process terminates
@@ -568,6 +617,7 @@ class WorkerController:
         h_job: Optional[wintypes.HANDLE],
         timeout_phase: str = "UNKNOWN",
         operation: str = "UNKNOWN",
+        safe_cleanup: bool = True,
     ) -> Dict[str, Any]:
         """Build structured timeout error after terminating worker."""
         kernel32.TerminateProcess(h_process, 0x00000102)
@@ -580,6 +630,7 @@ class WorkerController:
                 "timeout_sec": self.timeout_sec,
                 "peak_process_bytes": peak_proc,
                 "peak_job_bytes": peak_job,
+                "safe_cleanup": safe_cleanup,
             },
             operation=operation,
         )
@@ -592,49 +643,116 @@ class WorkerController:
         h_process: wintypes.HANDLE,
         h_job: Optional[wintypes.HANDLE],
         operation: str = "UNKNOWN",
+        _inject_duplicate_handle_failure: bool = False,
+        _inject_cancel_io_failure: bool = False,
+        _inject_writer_join_timeout: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Write exact bytes to pipe within full-lifecycle deadline, handling partial writes and blocking worker."""
         write_error = [None]
         bytes_written_total = [0]
         write_done = threading.Event()
-        write_started = threading.Event()
+        setup_done = threading.Event()
+        write_in_progress = threading.Event()
+        dup_success = [False]
+        dup_error = [0]
+        write_status = ["NOT_STARTED"]
         h_thread_real = wintypes.HANDLE()
 
         def _writer():
-            cur_proc = kernel32.GetCurrentProcess()
-            cur_th = kernel32.GetCurrentThread()
-            kernel32.DuplicateHandle(
-                cur_proc,
-                cur_th,
-                cur_proc,
-                ctypes.byref(h_thread_real),
-                0,
-                False,
-                DUPLICATE_SAME_ACCESS,
-            )
-            write_started.set()
             try:
+                if _inject_duplicate_handle_failure:
+                    dup_ok = False
+                    ctypes.set_last_error(5)  # ERROR_ACCESS_DENIED
+                else:
+                    cur_proc = kernel32.GetCurrentProcess()
+                    cur_th = kernel32.GetCurrentThread()
+                    dup_ok = bool(kernel32.DuplicateHandle(
+                        cur_proc,
+                        cur_th,
+                        cur_proc,
+                        ctypes.byref(h_thread_real),
+                        0,
+                        False,
+                        DUPLICATE_SAME_ACCESS,
+                    ))
+
+                if not dup_ok:
+                    dup_error[0] = ctypes.get_last_error()
+                    dup_success[0] = False
+                    write_status[0] = "DUPLICATE_HANDLE_FAILED"
+                    setup_done.set()
+                    return
+
+                dup_success[0] = True
+                write_status[0] = "ENTERED"
+                setup_done.set()
+
                 total = 0
                 while total < len(data):
                     chunk = data[total:]
                     written = wintypes.DWORD()
+                    write_in_progress.set()
                     ok = kernel32.WriteFile(h_pipe, chunk, len(chunk), ctypes.byref(written), None)
+                    err = ctypes.get_last_error()
+                    write_in_progress.clear()
                     if not ok:
-                        write_error[0] = ctypes.get_last_error()
+                        write_error[0] = err
+                        if err == ERROR_OPERATION_ABORTED:
+                            write_status[0] = "ABORTED"
+                        elif err == ERROR_BROKEN_PIPE:
+                            write_status[0] = "BROKEN_PIPE"
+                        else:
+                            write_status[0] = f"WIN32_ERROR_{err}"
                         return
                     if written.value == 0:
                         write_error[0] = 0
+                        write_status[0] = "ZERO_BYTES_WRITTEN"
                         return
                     total += written.value
                     bytes_written_total[0] = total
+                write_status[0] = "COMPLETED"
             except Exception as ex:
                 write_error[0] = ex
+                write_status[0] = f"EXCEPTION_{type(ex).__name__}"
             finally:
+                if _inject_writer_join_timeout:
+                    time.sleep(0.3)
+                write_in_progress.clear()
                 write_done.set()
 
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
+        self._current_writer_thread = writer_thread
         writer_thread.start()
-        write_started.wait(timeout=1.0)
+        setup_done.wait(timeout=1.0)
+
+        # Check DuplicateHandle status before proceeding
+        if not dup_success[0]:
+            writer_thread.join(timeout=1.0)
+            writer_exited = not writer_thread.is_alive()
+            self._last_write_info = {
+                "duplicate_handle_success": False,
+                "duplicate_handle_error": dup_error[0],
+                "write_entered": False,
+                "write_blocked_at_deadline": False,
+                "cancellation_requested": False,
+                "cancel_synchronous_io_called": False,
+                "cancel_synchronous_io_success": False,
+                "cancel_synchronous_io_return": None,
+                "cancel_synchronous_io_last_error": None,
+                "writer_thread_alive_before_cancel": False,
+                "writer_thread_alive_after_join": not writer_exited,
+                "write_file_status": write_status[0],
+                "writer_exited": writer_exited,
+                "all_handles_safely_released": writer_exited,
+                "bytes_written": 0,
+                "total_bytes": len(data),
+            }
+            return _build_controller_error(
+                WORKER_STARTUP_FAILURE,
+                f"Failed to duplicate writer thread handle for safe cancellation (win32 error {dup_error[0]}).",
+                details={"win32_error": dup_error[0]},
+                operation=operation,
+            )
 
         write_timed_out = False
         abnormal_exit_code = None
@@ -656,55 +774,125 @@ class WorkerController:
                     break
 
         if write_timed_out:
-            write_blocked_at_deadline = not write_done.is_set()
-            writer_thread_alive_before = writer_thread.is_alive()
-            cancel_called = False
-            cancel_ok = False
-            if h_thread_real.value:
-                cancel_called = True
-                cancel_ok = bool(kernel32.CancelSynchronousIo(h_thread_real))
+            write_blocked = write_in_progress.is_set()
+            writer_alive_before = writer_thread.is_alive()
+            cancel_called = True
+            cancel_ret = False
+            cancel_err = 0
+
+            if _inject_cancel_io_failure:
+                cancel_ret = False
+                cancel_err = 1168  # ERROR_NOT_FOUND
+            elif h_thread_real.value:
+                cancel_ret = bool(kernel32.CancelSynchronousIo(h_thread_real))
+                if not cancel_ret:
+                    cancel_err = ctypes.get_last_error()
 
             kernel32.TerminateProcess(h_process, 0x00000102)
-            writer_thread.join(timeout=2.0)
-            writer_thread_alive_after = writer_thread.is_alive()
+
+            join_timeout = 0.001 if _inject_writer_join_timeout else 2.0
+            writer_thread.join(timeout=join_timeout)
+            writer_exited = not writer_thread.is_alive()
 
             self._last_write_info = {
+                "duplicate_handle_success": True,
+                "duplicate_handle_error": 0,
                 "write_entered": True,
-                "write_blocked_at_deadline": write_blocked_at_deadline,
+                "write_blocked_at_deadline": write_blocked,
+                "cancellation_requested": cancel_called,
                 "cancel_synchronous_io_called": cancel_called,
-                "cancel_synchronous_io_success": cancel_ok,
-                "writer_thread_alive_before_cancel": writer_thread_alive_before,
-                "writer_thread_alive_after_join": writer_thread_alive_after,
+                "cancel_synchronous_io_success": cancel_ret,
+                "cancel_synchronous_io_return": cancel_ret,
+                "cancel_synchronous_io_last_error": cancel_err,
+                "writer_thread_alive_before_cancel": writer_alive_before,
+                "writer_thread_alive_after_join": not writer_exited,
+                "write_file_status": write_status[0],
+                "writer_exited": writer_exited,
+                "all_handles_safely_released": writer_exited,
                 "bytes_written": bytes_written_total[0],
                 "total_bytes": len(data),
             }
 
             safe_close_handle(h_thread_real)
-            safe_close_handle(h_pipe)
+            h_thread_real = wintypes.HANDLE()
+
+            if not writer_exited:
+                # Do NOT claim safe cleanup if writer thread is still running
+                return _build_controller_error(
+                    WORKER_TIMEOUT,
+                    "Worker execution timed out during WRITE phase and writer thread failed to terminate safely within deadline.",
+                    details={
+                        "timeout_phase": "WRITE",
+                        "safe_cleanup": False,
+                        "writer_exited": False,
+                        "cancel_synchronous_io_return": cancel_ret,
+                        "cancel_synchronous_io_last_error": cancel_err,
+                        "timeout_sec": self.timeout_sec,
+                    },
+                    operation=operation,
+                )
+
             return self._handle_worker_timeout(
-                h_process, h_job, timeout_phase="WRITE", operation=operation
+                h_process, h_job, timeout_phase="WRITE", operation=operation, safe_cleanup=True
             )
 
         if abnormal_exit_code is not None:
+            cancel_called = False
+            cancel_ret = None
+            cancel_err = None
             if h_thread_real.value:
-                kernel32.CancelSynchronousIo(h_thread_real)
+                cancel_called = True
+                cancel_ret = bool(kernel32.CancelSynchronousIo(h_thread_real))
+                cancel_err = 0 if cancel_ret else ctypes.get_last_error()
+
             writer_thread.join(timeout=2.0)
+            writer_exited = not writer_thread.is_alive()
             safe_close_handle(h_thread_real)
-            safe_close_handle(h_pipe)
+            h_thread_real = wintypes.HANDLE()
+
+            self._last_write_info = {
+                "duplicate_handle_success": True,
+                "duplicate_handle_error": 0,
+                "write_entered": True,
+                "write_blocked_at_deadline": False,
+                "cancellation_requested": cancel_called,
+                "cancel_synchronous_io_called": cancel_called,
+                "cancel_synchronous_io_success": bool(cancel_ret),
+                "cancel_synchronous_io_return": cancel_ret,
+                "cancel_synchronous_io_last_error": cancel_err,
+                "writer_thread_alive_before_cancel": False,
+                "writer_thread_alive_after_join": not writer_exited,
+                "write_file_status": write_status[0],
+                "writer_exited": writer_exited,
+                "all_handles_safely_released": writer_exited,
+                "bytes_written": bytes_written_total[0],
+                "total_bytes": len(data),
+            }
+
             return self._handle_worker_abnormal_exit(
                 h_process, h_job, abnormal_exit_code, operation=operation
             )
 
         writer_thread.join(timeout=2.0)
+        writer_exited = not writer_thread.is_alive()
         safe_close_handle(h_thread_real)
+        h_thread_real = wintypes.HANDLE()
 
         self._last_write_info = {
+            "duplicate_handle_success": True,
+            "duplicate_handle_error": 0,
             "write_entered": True,
             "write_blocked_at_deadline": False,
+            "cancellation_requested": False,
             "cancel_synchronous_io_called": False,
             "cancel_synchronous_io_success": False,
+            "cancel_synchronous_io_return": None,
+            "cancel_synchronous_io_last_error": None,
             "writer_thread_alive_before_cancel": False,
-            "writer_thread_alive_after_join": False,
+            "writer_thread_alive_after_join": not writer_exited,
+            "write_file_status": write_status[0],
+            "writer_exited": writer_exited,
+            "all_handles_safely_released": writer_exited,
             "bytes_written": bytes_written_total[0],
             "total_bytes": len(data),
         }
