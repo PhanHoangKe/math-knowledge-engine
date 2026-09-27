@@ -1,8 +1,9 @@
 # MKE PRODUCT-02A-S3 Implementation Report
-**Milestone:** Exact Linear Equation Solver (including S3-R1 Preflight Remediation and S3-R2 Final Solver Remediation)  
+**Milestone:** Exact Linear Equation Solver (including S3-R1 Preflight Remediation, S3-R2 Final Solver Remediation, and S3-R3 Test Evidence Closure)  
 **Branch:** `product/p02a-foundation`  
 **Base Commit:** `75d3b6a57198740ac1154ee6f309099b199cfcf9`  
 **S3-R1 Base Commit:** `8c5382159bbd88d82e67a1b1e8e44f75a23a85aa`  
+**S3-R2 Base Commit:** `1cbcc72cdcacad845a740386cfcb1cde0bd5f86e`  
 **Frozen Specification:** `31cdb61cc84a21b8ebe093765f0a71a606776196`  
 **Owner Decision Record:** `S3_OWNER_DECISION_RECORD.md` (MKE-S3-ADR-001)  
 **Execution Agent:** Anty  
@@ -93,21 +94,50 @@ The Project Owner has explicitly approved Decision **MKE-S3-ADR-001** (recorded 
 
 ---
 
-## 4. S3 Resource Accounting Policy
+## 4. S3-R3 Operation-Count Calculations & Stage Coverage
 
-S3 enforces a unified, auditable resource-accounting policy across solver execution:
+S3 enforces auditable resource accounting where every solver stage charges exact operation steps to a shared `OperationTracker`:
 
-1. **Preflight Traversal:** Each visited AST node during preflight traversal is charged 1 operation step.
-2. **Memoized Variable-Dependency Tracking:** Variable-dependency analysis is memoized bottom-up by immutable AST node identity (`id(node)`). Initial node visits charge 1 operation step; subsequent lookups are $O(1)$ and incur zero redundant tree traversals.
-3. **Constant-Expression Evaluations:** Constant base evaluations ($0^0$) and denominator evaluations ($1/(2-2)$) during preflight and extraction are charged step-by-step against the shared `OperationTracker`.
-4. **Affine Extraction:** Each AST node visited during affine extraction charges 1 operation step.
-5. **Reduction Arithmetic:** Normalized coefficient subtractions ($a_L - a_R$, $b_L - b_R$) and root isolation division ($-b / a$) charge 1 operation step each.
-6. **Fail-Closed Guarantees:**
-   - If the operation budget is exceeded at any point during preflight, extraction, or reduction, the solver immediately returns `RESOURCE_EXHAUSTED`.
-   - Resource exhaustion never produces `UNIQUE_ROOT`, `DomainSet(R)`, or `EmptySet`.
-   - The engine never assumes an uninspected hazard is safe.
-7. **S2 Independent Verification Boundary:** The S2 candidate verifier (`check_candidate()`) is called as an independent verification pass with its own evaluation budget (`effective_budget`), preserving modular separation between the solver and verifier.
-8. **Sandbox Scope Clarification:** Software operation and bit-length budgets bound algorithm complexity within the Python runtime; they do not implement OS-level process sandboxing or kernel hardware isolation.
+### 4.1 Stage 1: Constant-Evaluation Boundary (`x/0 = 0`)
+- **AST Nodes (5 total):** `Equation`, `BinaryOp(/)`, `Variable(x)`, `IntegerLiteral(0)` [denominator], `IntegerLiteral(0)` [rhs].
+- **Step Breakdown:**
+  1. *Variable-dependency memoization:* Visits all 5 nodes in post/pre-order ($\text{ops } 1 \dots 5$).
+  2. *Preflight AST traversal:*
+     - Visits `Equation` ($\text{op } 6$).
+     - Visits `BinaryOp(/)` ($\text{op } 7$).
+     - Detects constant denominator `IntegerLiteral(0)` and invokes `ExpressionEvaluator.evaluate(IntegerLiteral(0))`.
+     - Inside `evaluate`: Attempts step 8.
+- **Boundary Verification:**
+  - With `max_operations = 7`: Exhaustion occurs strictly *inside* constant denominator evaluation on step 8 ($8 > 7$). Spy instrumentation proves `ExpressionEvaluator.evaluate` was entered with `operations_count == 7`. Returns `RESOURCE_EXHAUSTED`.
+  - With `max_operations = 11`: `evaluate` completes on step 8 (evaluating to zero, recording domain violation). Traversal visits remaining nodes `Variable(x)` ($\text{op } 9$), left `IntegerLiteral(0)` ($\text{op } 10$), and right `IntegerLiteral(0)` ($\text{op } 11$). Preflight completes and returns `DOMAIN_ERROR_DIVISION_BY_ZERO`.
+
+### 4.2 Stage 2: Affine-Extraction Boundary (`x = 1`)
+- **AST Nodes (3 total):** `Equation`, `Variable(x)`, `IntegerLiteral(1)`.
+- **Step Breakdown:**
+  1. *Variable-dependency memoization:* Visits 3 nodes ($\text{ops } 1 \dots 3$).
+  2. *Preflight AST traversal:* Visits 3 nodes ($\text{ops } 4 \dots 6$). Preflight completes cleanly at operation 6.
+  3. *Affine extraction (lhs):* `extract_affine(Variable(x))` runs on step 7 ($7 \le 7$).
+  4. *Affine extraction (rhs):* `extract_affine(IntegerLiteral(1))` attempts step 8.
+- **Boundary Verification:**
+  - With `max_operations = 7`: Extraction of lhs succeeds, and extraction of rhs exhausts on step 8 ($8 > 7$). Spy instrumentation proves `extract_affine` was called for lhs (`Variable`, entered at step 6) and rhs (`IntegerLiteral`, entered at step 7). Returns `RESOURCE_EXHAUSTED`.
+
+### 4.3 Stage 3: Root-Isolation Boundary (`x = 1`)
+- **Step Breakdown:**
+  1. Preflight memoization: $\text{ops } 1 \dots 3$.
+  2. Preflight traversal: $\text{ops } 4 \dots 6$.
+  3. Affine extraction lhs (`Variable x`): $\text{op } 7$.
+  4. Affine extraction rhs (`IntegerLiteral 1`): $\text{op } 8$.
+  5. Affine normalization $a = a_L - a_R$: $\text{op } 9$.
+  6. Affine normalization $b = b_L - b_R$: $\text{op } 10$.
+  7. Root isolation $x_0 = -b / a$: $\text{op } 11$.
+- **Boundary Verification:**
+  - With `max_operations = 10`: Normalization completes cleanly at step 10. Root isolation attempts step 11 ($11 > 10$) and exhausts inside `solve_equation`. Returns `RESOURCE_EXHAUSTED` with `classification = None`.
+  - With `max_operations = 11`: Root isolation succeeds at step 11. S3 invokes independent S2 candidate verification with its own fresh budget. Returns `UNIQUE_ROOT` with root $1$ and verified S2 evidence.
+
+### 4.4 S2 Budget Independence & Fail-Closed Guarantee
+- **Modular Decoupling:** S2 candidate verification (`check_candidate()`) runs as an independent verification pass with its own evaluation budget (`effective_budget`), preserving modular separation between the solver and verifier.
+- **Fail-Closed:** Resource exhaustion at any point never produces a solved classification (`UNIQUE_ROOT`, `DomainSet(R)`, or `EmptySet`).
+- **Runtime Scope:** Software operation and bit-length budgets bound algorithm complexity within the Python runtime; they do not implement OS-level process sandboxing or kernel hardware isolation.
 
 ---
 
@@ -120,46 +150,27 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 179 tests in 0.038s
+Ran 184 tests in 0.030s
 
 OK
 ```
 
-### 5.2 Test Inventory (179 Total Tests)
+### 5.2 Test Inventory (184 Total Tests)
 - **S0 Rational Core (`tests/test_rational.py`):** 24 tests.
 - **S1 Parser & Immutable AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluation & Verification (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Baseline Solver Tests (`tests/test_solver.py`):** 31 tests.
-- **S3-R1 Remediation Regressions (`tests/test_solver.py`):** 11 tests.
-- **S3-R2 Final Solver Regressions (`tests/test_solver.py`):** 25 tests:
-  - `test_owner_decision_a_exponent_zero_and_div_zero_left`: `x^0 + 1/0 = 0`
-  - `test_owner_decision_a_div_zero_and_exponent_zero_right`: `1/0 + x^0 = 0`
-  - `test_owner_decision_a_exponent_zero_and_zero_to_zero_left`: `x^0 + 0^0 = 0`
-  - `test_owner_decision_a_zero_to_zero_and_exponent_zero_right`: `0^0 + x^0 = 0`
-  - `test_owner_decision_a_shifted_var_exponent_zero_and_div_zero`: `(x-1)^0 + 1/(2-2) = 0`
-  - `test_owner_decision_a_div_zero_and_shifted_var_exponent_zero`: `1/(2-2) + (x-1)^0 = 0`
-  - `test_mixed_hazard_nonlinear_and_div_zero_left`: `x^2 + 1/0 = 0`
-  - `test_mixed_hazard_div_zero_and_nonlinear_right`: `1/0 + x^2 = 0`
-  - `test_mixed_hazard_rational_fraction_and_div_zero_left`: `x/(x-1) + 1/0 = 0`
-  - `test_mixed_hazard_div_zero_and_rational_fraction_right`: `1/0 + x/(x-1) = 0`
-  - `test_mixed_hazard_rational_fraction_and_zero_to_zero_left`: `x/(x-1) + 0^0 = 0`
-  - `test_mixed_hazard_zero_to_zero_and_rational_fraction_right`: `0^0 + x/(x-1) = 0`
-  - `test_multiple_domain_errors_preserves_domain_error_category`: `1/0 + 0^0 = 0` vs `0^0 + 1/0 = 0`
-  - `test_exponent_zero_precedence_over_nonlinear_multiplication`: `x*(x^0) = 0`
-  - `test_exponent_zero_precedence_over_quadratic_power`: `x^0 + x^2 = 0`
-  - `test_exponent_zero_precedence_over_quadratic_power_reversed`: `x^2 + x^0 = 0`
-  - `test_exponent_zero_precedence_over_rational_fraction`: `(x^0)/(x-1) = 0`
-  - `test_budget_exhaustion_during_preflight_traversal`: preflight traversal exhaustion
-  - `test_budget_exhaustion_during_preflight_constant_subexpression`: preflight constant evaluation exhaustion
-  - `test_budget_exhaustion_during_affine_extraction`: affine extraction exhaustion
-  - `test_resource_exhaustion_never_produces_solution_classification`: fail-closed contract
-  - `test_s2_independent_verification_present_and_valid`: S2 candidate check verification
-  - `test_no_regression_unique_root`: $3x + 6 = 0 \implies x = -2$
-  - `test_no_regression_all_reals`: $x + 1 = x + 1 \implies \text{DomainSet(R)}$
-  - `test_no_regression_empty_set`: $x + 1 = x + 2 \implies \text{EmptySet}$
+- **S3-R1 Preflight Remediation Regressions (`tests/test_solver.py`):** 11 tests.
+- **S3-R2 Final Solver Regressions (`tests/test_solver.py`):** 25 tests.
+- **S3-R3 Stage Boundary Regressions (`tests/test_solver.py`):** 5 tests:
+  - `test_constant_evaluation_boundary_exhaustion`: `x/0 = 0` (max_ops=7 exhausts inside constant eval; max_ops=11 returns DOMAIN_ERROR; instrumented with ExpressionEvaluator spy).
+  - `test_affine_extraction_boundary_exhaustion`: `x = 1` (max_ops=7 exhausts inside rhs extract_affine; instrumented with extract_affine spy).
+  - `test_root_isolation_boundary_exhaustion`: `x = 1` (max_ops=10 exhausts during root isolation; max_ops=11 completes S3 and passes S2 verification).
+  - `test_s2_separate_budget_preservation`: verifies S2 independent budget is preserved and not depleted by S3 steps.
+  - `test_resource_exhaustion_never_produces_solved_classification_exhaustive`: parameterized verification across all boundary stages.
 
 ### 5.3 Holdout Dataset Isolation
-The 179 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
+The 184 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
 
 ---
 
