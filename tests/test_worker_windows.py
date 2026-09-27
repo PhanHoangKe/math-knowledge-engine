@@ -1101,6 +1101,76 @@ class TestWindowsAppContainerIntegration(unittest.TestCase):
         self.assertEqual(cleaned["state"], "CLEANED")
         self.assertEqual(cleaned["active_children"], 0)
 
+    def test_concurrent_lease_release_is_strictly_idempotent_and_thread_safe(self):
+        """Concurrent calls to release() on the same AppContainerLease instance decrement count exactly once."""
+        manager = get_appcontainer_manager()
+        lease = manager.acquire()
+        initial_children = manager.active_children
+        self.assertGreaterEqual(initial_children, 1)
+
+        errors = []
+
+        def worker_release():
+            try:
+                lease.release()
+            except Exception as ex:
+                errors.append(ex)
+
+        threads = [threading.Thread(target=worker_release) for _ in range(16)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=2.0)
+
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(manager.active_children, initial_children - 1)
+        self.assertTrue(lease._released)
+
+    def test_atomic_lease_acquisition_prevents_cleanup_interleaving(self):
+        """Atomic lock in acquire() ensures concurrent cleanup cannot delete the profile between preparation and lease registration."""
+        from mke_product.worker.appcontainer import AppContainerManager
+        mgr = AppContainerManager()
+
+        cleanup_observed_states = []
+        barrier = threading.Barrier(2)
+
+        original_prepare = mgr.prepare
+
+        def synchronized_prepare():
+            with mgr._lock:
+                original_prepare()
+                try:
+                    barrier.wait(timeout=1.0)
+                except threading.BrokenBarrierError:
+                    pass
+
+        def attempt_concurrent_cleanup():
+            try:
+                barrier.wait(timeout=1.0)
+            except threading.BrokenBarrierError:
+                pass
+            res = mgr.cleanup()
+            cleanup_observed_states.append(res)
+
+        mgr.prepare = synchronized_prepare
+        cleaner_thread = threading.Thread(target=attempt_concurrent_cleanup)
+        cleaner_thread.start()
+
+        lease = mgr.acquire()
+        cleaner_thread.join(timeout=3.0)
+
+        try:
+            self.assertEqual(len(cleanup_observed_states), 1)
+            self.assertEqual(cleanup_observed_states[0]["state"], "REFUSED_ACTIVE_CHILDREN")
+            self.assertEqual(cleanup_observed_states[0]["active_children"], 1)
+            self.assertTrue(mgr._prepared)
+            self.assertIsNotNone(mgr.stage_root)
+        finally:
+            lease.release()
+            cleaned = mgr.cleanup()
+            self.assertEqual(cleaned["state"], "CLEANED")
+
+
 
 
 class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):

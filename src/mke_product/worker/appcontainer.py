@@ -175,11 +175,13 @@ class AppContainerLease:
     def __init__(self, manager: "AppContainerManager") -> None:
         self._manager = manager
         self._released = False
+        self._lock = threading.Lock()
 
     def release(self) -> None:
-        if not self._released:
-            self._released = True
-            self._manager._release()
+        with self._lock:
+            if not self._released:
+                self._released = True
+                self._manager._release()
 
 
 class AppContainerManager:
@@ -292,10 +294,10 @@ class AppContainerManager:
             raise OSError(f"icacls failed ({proc.returncode}): {proc.stderr.strip()}")
 
     def acquire(self) -> AppContainerLease:
-        self.prepare()
         with self._lock:
+            self.prepare()
             self._active_children += 1
-        return AppContainerLease(self)
+            return AppContainerLease(self)
 
     def _release(self) -> None:
         with self._lock:
@@ -304,34 +306,38 @@ class AppContainerManager:
             self._active_children -= 1
 
     def security_capabilities(self) -> SECURITY_CAPABILITIES:
-        self.prepare()
-        return SECURITY_CAPABILITIES(self.sid, None, 0, 0)
+        with self._lock:
+            self.prepare()
+            return SECURITY_CAPABILITIES(self.sid, None, 0, 0)
 
     def default_command(self) -> str:
-        self.prepare()
-        return subprocess.list2cmdline([str(self.python_exe), "-I", "-S", "-B", str(self.bootstrap)])
+        with self._lock:
+            self.prepare()
+            return subprocess.list2cmdline([str(self.python_exe), "-I", "-S", "-B", str(self.bootstrap)])
 
     def rewrite_python_command(self, command: str) -> str:
-        self.prepare()
-        old = f'"{sys.executable}"'
-        if command.lower().startswith(old.lower()):
-            return f'"{self.python_exe}" -I -S -B' + command[len(old):]
-        if command.lower().startswith(sys.executable.lower()):
-            return f'"{self.python_exe}" -I -S -B' + command[len(sys.executable):]
-        raise ValueError("Custom worker command must use the allowlisted current Python executable")
+        with self._lock:
+            self.prepare()
+            old = f'"{sys.executable}"'
+            if command.lower().startswith(old.lower()):
+                return f'"{self.python_exe}" -I -S -B' + command[len(old):]
+            if command.lower().startswith(sys.executable.lower()):
+                return f'"{self.python_exe}" -I -S -B' + command[len(sys.executable):]
+            raise ValueError("Custom worker command must use the allowlisted current Python executable")
 
     def environment_block(self) -> Any:
         """Build a minimal deterministic Unicode environment for the worker."""
-        self.prepare()
-        system_root = os.environ.get("SystemRoot", r"C:\Windows")
-        values = {
-            "PATH": f"{self.python_exe.parent};{self.python_exe.parent / 'DLLs'}",
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "PYTHONNOUSERSITE": "1",
-            "SystemRoot": system_root,
-            "WINDIR": system_root,
-        }
-        # Windows profile/AppContainer initialization consumes these standard
+        with self._lock:
+            self.prepare()
+            system_root = os.environ.get("SystemRoot", r"C:\Windows")
+            values = {
+                "PATH": f"{self.python_exe.parent};{self.python_exe.parent / 'DLLs'}",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONNOUSERSITE": "1",
+                "SystemRoot": system_root,
+                "WINDIR": system_root,
+            }
+            # Windows profile/AppContainer initialization consumes these standard
         # locations.  Copy only this explicit allowlist; the AppContainer DACL
         # still prevents access to the caller's profile and temp directories.
         for key in (

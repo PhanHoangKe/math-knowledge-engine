@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 repo_root = Path(__file__).resolve().parents[1]
-output_log = repo_root / "evidence" / "s4b2_p1_r1" / "handle_forensics_raw.log"
-output_json = repo_root / "evidence" / "s4b2_p1_r1" / "handle_forensics_results.json"
+output_log = repo_root / "evidence" / "s4b2_p1_r2" / "handle_forensics_raw.log"
+output_json = repo_root / "evidence" / "s4b2_p1_r2" / "handle_forensics_results.json"
 output_log.parent.mkdir(parents=True, exist_ok=True)
 
 cmd = [sys.executable, "scripts/handle_forensics.py"]
