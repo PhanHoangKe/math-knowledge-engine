@@ -462,6 +462,7 @@ class WorkerController:
         _inject_normal_write_join_timeout: bool = False,
         _inject_late_duplicate_handle: bool = False,
         _inject_close_handle_failure: bool = False,
+        _inject_job_close_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
@@ -494,6 +495,7 @@ class WorkerController:
                 _inject_normal_write_join_timeout=_inject_normal_write_join_timeout,
                 _inject_late_duplicate_handle=_inject_late_duplicate_handle,
                 _inject_close_handle_failure=_inject_close_handle_failure,
+                _inject_job_close_failure=_inject_job_close_failure,
                 _worker_cmd=_worker_cmd,
             )
         finally:
@@ -516,6 +518,7 @@ class WorkerController:
         _inject_normal_write_join_timeout: bool = False,
         _inject_late_duplicate_handle: bool = False,
         _inject_close_handle_failure: bool = False,
+        _inject_job_close_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Internal execution body running under single-request lock."""
@@ -962,14 +965,19 @@ class WorkerController:
 
         finally:
             # 10. Guaranteed cleanup of all handles and attribute lists
-            safe_close_handle(h_stdin_read)
-            h_stdin_read = wintypes.HANDLE()
+            cleanup_failures: Dict[str, Any] = {}
+
+            if h_stdin_read.value:
+                if not safe_close_handle(h_stdin_read):
+                    cleanup_failures["stdin_read"] = ctypes.get_last_error()
+                h_stdin_read = wintypes.HANDLE()
 
             # Handle ownership invariant: close pipe_owner ONLY IF not quarantined
             if pipe_owner is not None and not pipe_owner.is_quarantined():
                 pipe_owner.close(_inject_failure=_inject_close_handle_failure)
                 if not pipe_owner.is_confirmed_closed():
                     pipe_owner.quarantine()
+                    cleanup_failures["pipe_owner"] = pipe_owner.close_error
                     with self._quarantine_lock:
                         self._quarantine_counter += 1
                         rec = QuarantineRecord(
@@ -989,30 +997,65 @@ class WorkerController:
                         )
                         self._quarantine.append(rec)
 
-            safe_close_handle(h_stdout_read)
-            h_stdout_read = wintypes.HANDLE()
-            safe_close_handle(h_stdout_write)
-            h_stdout_write = wintypes.HANDLE()
-            safe_close_handle(h_stderr_read)
-            h_stderr_read = wintypes.HANDLE()
-            safe_close_handle(h_stderr_write)
-            h_stderr_write = wintypes.HANDLE()
+            if h_stdout_read.value:
+                if not safe_close_handle(h_stdout_read):
+                    cleanup_failures["stdout_read"] = ctypes.get_last_error()
+                h_stdout_read = wintypes.HANDLE()
+
+            if h_stdout_write.value:
+                if not safe_close_handle(h_stdout_write):
+                    cleanup_failures["stdout_write"] = ctypes.get_last_error()
+                h_stdout_write = wintypes.HANDLE()
+
+            if h_stderr_read.value:
+                if not safe_close_handle(h_stderr_read):
+                    cleanup_failures["stderr_read"] = ctypes.get_last_error()
+                h_stderr_read = wintypes.HANDLE()
+
+            if h_stderr_write.value:
+                if not safe_close_handle(h_stderr_write):
+                    cleanup_failures["stderr_write"] = ctypes.get_last_error()
+                h_stderr_write = wintypes.HANDLE()
 
             if pi.hProcess:
                 # Ensure worker process terminates
                 kernel32.TerminateProcess(pi.hProcess, 0)
                 kernel32.WaitForSingleObject(pi.hProcess, 1000)
-                safe_close_handle(pi.hProcess)
-            safe_close_handle(pi.hThread)
+                if not safe_close_handle(pi.hProcess):
+                    cleanup_failures["process_handle"] = ctypes.get_last_error()
+
+            if pi.hThread:
+                if not safe_close_handle(pi.hThread):
+                    cleanup_failures["thread_handle"] = ctypes.get_last_error()
 
             if attr_buf:
                 try:
                     kernel32.DeleteProcThreadAttributeList(attr_buf)
-                except Exception:
-                    pass
+                except Exception as ex:
+                    cleanup_failures["attr_list"] = str(ex)
 
             # Closing Job Object handle triggers KILL_ON_JOB_CLOSE for any remaining child processes
-            safe_close_handle(h_job)
+            if h_job:
+                if _inject_job_close_failure:
+                    safe_close_handle(h_job)
+                    cleanup_failures["job_object"] = 5  # ERROR_ACCESS_DENIED
+                else:
+                    if not safe_close_handle(h_job):
+                        cleanup_failures["job_object"] = ctypes.get_last_error()
+
+            if cleanup_failures:
+                # Fail closed: never return success or unqualified result if any handle cleanup failed
+                return _build_controller_error(
+                    WORKER_RESOURCE_EXHAUSTED,
+                    f"Failed to safely release worker resources during teardown: {list(cleanup_failures.keys())}.",
+                    details={
+                        "safe_cleanup": False,
+                        "handle_quarantined": True if (pipe_owner and pipe_owner.is_quarantined()) else False,
+                        "cleanup_failures": cleanup_failures,
+                        "job_close_error": cleanup_failures.get("job_object"),
+                    },
+                    operation=operation,
+                )
 
     def _handle_worker_timeout(
         self,
@@ -1059,10 +1102,14 @@ class WorkerController:
         bytes_written_total = [0]
         write_done = threading.Event()
         setup_done = threading.Event()
+        barrier_writer_ready = threading.Event()
+        barrier_controller_proceed = threading.Event()
         write_in_progress = threading.Event()
         abort_requested = threading.Event()
+        dup_invoked = [False]
         dup_success = [False]
         dup_error = [0]
+        dup_raw_val = [0]
         write_status = ["NOT_STARTED"]
         thread_handle_owner = SafeThreadHandle(_inject_close_failure=_inject_close_handle_failure)
 
@@ -1072,14 +1119,13 @@ class WorkerController:
                     time.sleep(0.08)
 
                 if _inject_late_duplicate_handle:
-                    # Step 1: Worker enters setup and delays BEFORE DuplicateHandle
-                    # until controller reaches its setup deadline and requests abort
-                    time.sleep(0.08)
+                    # Step 1: Worker reaches barrier BEFORE DuplicateHandle
+                    barrier_writer_ready.set()
+                    # Wait for controller to signal abort and permit proceeding
+                    barrier_controller_proceed.wait(timeout=2.0)
+                    time.sleep(0.05)
 
-                if abort_requested.is_set():
-                    write_status[0] = "ABORTED_BEFORE_SETUP"
-                    return
-
+                dup_invoked[0] = True
                 if _inject_duplicate_handle_failure:
                     dup_ok = False
                     ctypes.set_last_error(5)  # ERROR_ACCESS_DENIED
@@ -1097,6 +1143,7 @@ class WorkerController:
                         DUPLICATE_SAME_ACCESS,
                     ))
                     if dup_ok:
+                        dup_raw_val[0] = int(raw_th.value) if raw_th.value else 0
                         thread_handle_owner.set_handle(raw_th)
 
                 if not dup_ok:
@@ -1104,16 +1151,24 @@ class WorkerController:
                     dup_success[0] = False
                     write_status[0] = "DUPLICATE_HANDLE_FAILED"
                     setup_done.set()
+                    if self._last_write_info is not None:
+                        self._last_write_info["duplicate_handle_invoked"] = True
+                        self._last_write_info["duplicate_handle_raw_val"] = dup_raw_val[0]
+                        self._last_write_info["write_file_status"] = write_status[0]
                     return
 
-                # Step 4: DuplicateHandle completes afterward
+                # DuplicateHandle completed successfully
                 dup_success[0] = True
                 write_status[0] = "ENTERED"
                 setup_done.set()
 
-                # Step 5: Worker detects abort before WriteFile
+                # Worker detects abort before WriteFile
                 if abort_requested.is_set():
                     write_status[0] = "ABORTED_BEFORE_WRITE"
+                    if self._last_write_info is not None:
+                        self._last_write_info["duplicate_handle_invoked"] = True
+                        self._last_write_info["duplicate_handle_raw_val"] = dup_raw_val[0]
+                        self._last_write_info["write_file_status"] = write_status[0]
                     return
 
                 total = 0
@@ -1151,7 +1206,7 @@ class WorkerController:
                 write_done.set()
                 if _inject_writer_join_timeout or _inject_normal_write_join_timeout:
                     time.sleep(0.3)
-                # Step 6: Ensure thread handle is closed upon thread termination
+                # Ensure thread handle is closed upon thread termination
                 thread_handle_owner.close(_inject_failure=_inject_close_handle_failure)
                 # Deferred release: if quarantined, safely close handle upon thread termination
                 if pipe_owner.is_quarantined():
@@ -1160,10 +1215,19 @@ class WorkerController:
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
         self._current_writer_thread = writer_thread
         writer_thread.start()
-        setup_ok = setup_done.wait(timeout=0.02 if (_inject_writer_setup_hang or _inject_late_duplicate_handle) else 1.0)
+
+        if _inject_late_duplicate_handle:
+            # Step 2: Controller waits for writer barrier, then signals abort BEFORE DuplicateHandle runs
+            barrier_writer_ready.wait(timeout=1.0)
+            setup_ok = setup_done.wait(timeout=0.02)
+            abort_requested.set()
+            # Step 3: Controller allows writer to run DuplicateHandle
+            barrier_controller_proceed.set()
+        else:
+            setup_ok = setup_done.wait(timeout=0.02 if _inject_writer_setup_hang else 1.0)
 
         # Check DuplicateHandle status and setup completion before proceeding
-        if not setup_ok or not dup_success[0]:
+        if not setup_ok or not dup_success[0] or _inject_late_duplicate_handle:
             abort_requested.set()
             writer_thread.join(timeout=0.001 if (_inject_writer_setup_hang or _inject_late_duplicate_handle) else 1.0)
             writer_exited = not writer_thread.is_alive()
@@ -1213,6 +1277,8 @@ class WorkerController:
                         self._quarantine.append(rec)
 
             self._last_write_info = {
+                "duplicate_handle_invoked": dup_invoked[0],
+                "duplicate_handle_raw_val": dup_raw_val[0],
                 "duplicate_handle_success": dup_success[0],
                 "duplicate_handle_error": dup_error[0],
                 "write_entered": False,
@@ -1327,6 +1393,8 @@ class WorkerController:
             safe_cleanup = writer_exited and thread_handle_owner.is_confirmed_closed()
 
             self._last_write_info = {
+                "duplicate_handle_invoked": dup_invoked[0],
+                "duplicate_handle_raw_val": dup_raw_val[0],
                 "duplicate_handle_success": True,
                 "duplicate_handle_error": 0,
                 "write_entered": True,
@@ -1427,6 +1495,8 @@ class WorkerController:
                     self._quarantine.append(rec)
 
             self._last_write_info = {
+                "duplicate_handle_invoked": dup_invoked[0],
+                "duplicate_handle_raw_val": dup_raw_val[0],
                 "duplicate_handle_success": True,
                 "duplicate_handle_error": 0,
                 "write_entered": True,
@@ -1501,6 +1571,8 @@ class WorkerController:
         safe_cleanup = writer_exited and thread_handle_owner.is_confirmed_closed()
 
         self._last_write_info = {
+            "duplicate_handle_invoked": dup_invoked[0],
+            "duplicate_handle_raw_val": dup_raw_val[0],
             "duplicate_handle_success": True,
             "duplicate_handle_error": 0,
             "write_entered": True,

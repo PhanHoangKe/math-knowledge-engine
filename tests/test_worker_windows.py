@@ -1344,16 +1344,51 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertIsNotNone(controller._last_write_info)
         self.assertTrue(controller._last_write_info["handle_quarantined"])
 
-        # Allow writer thread to complete its delayed execution (0.08s) and close handles in finally:
+        # Allow writer thread to complete its delayed execution (0.05s) and close handles in finally:
         time.sleep(0.2)
         settled_count = controller.settle_quarantine(timeout=0.2)
         self.assertEqual(settled_count, 1)
         self.assertEqual(controller.get_active_quarantine_count(), 0)
 
+        info = controller._last_write_info
+        self.assertTrue(info["duplicate_handle_invoked"])
+        self.assertGreater(info["duplicate_handle_raw_val"], 0)
+        self.assertEqual(info["write_file_status"], "ABORTED_BEFORE_WRITE")
+        self.assertEqual(info["bytes_written"], 0)
+
         recs = controller.get_quarantine_records()
         self.assertTrue(recs[0]["settled"])
         self.assertTrue(recs[0]["handle_closed"])
         self.assertTrue(recs[0]["thread_handle_closed"])
+
+    def test_job_object_close_failure_fails_closed_and_preserves_diagnostics(self):
+        """Job Object CloseHandle failure fails closed with WORKER_RESOURCE_EXHAUSTED and preserves diagnostics."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(req, _inject_job_close_failure=True)
+
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertEqual(res.get("error", {}).get("details", {}).get("job_close_error"), 5)
+        self.assertIn("job_object", res.get("error", {}).get("details", {}).get("cleanup_failures", {}))
+
+    def test_recovery_following_cleanup_failure(self):
+        """WorkerController successfully recovers and executes subsequent requests on the same instance after cleanup failure."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+
+        # Request 1: Injected Job Object close failure fails closed
+        res1 = controller.execute_request(req, _inject_job_close_failure=True)
+        self.assertEqual(res1["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertFalse(res1.get("error", {}).get("details", {}).get("safe_cleanup"))
+
+        # Request 2: Normal request on the same controller instance succeeds cleanly
+        res2 = controller.execute_request(req)
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertEqual(res2["status"], "UNIQUE_ROOT")
+        self.assertEqual(res2.get("root", {}).get("numerator"), "1")
+        self.assertEqual(res2.get("root", {}).get("denominator"), "1")
 
     def test_single_request_contract_concurrent_execution_rejected(self):
         """WorkerController rejects concurrent execute_request calls atomically with WORKER_RESOURCE_EXHAUSTED."""
