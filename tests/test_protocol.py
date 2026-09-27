@@ -19,6 +19,9 @@ from mke_product.protocol import (
     SCHEMA_VERSION,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
+    MAX_RESPONSE_BYTES,
+    MIN_RESPONSE_BYTES,
+    MAX_JSON_NESTING_DEPTH,
 )
 
 
@@ -672,6 +675,9 @@ class TestProtocolRemediationS4AR1(unittest.TestCase):
         payload = '{"a": ' * 200 + '{"schema_version": "mke.p02a.v1"}' + '}' * 200
         res = dispatch_request(payload)
         self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertIn("nesting depth", res["error"]["message"])
         self.assertIsNone(res["definedness"])
 
     def test_candidate_whitespace_rejected_at_protocol_boundary(self):
@@ -719,17 +725,34 @@ class TestProtocolRemediationS4AR1(unittest.TestCase):
             "operation": OPERATION_SOLVE,
             "equation": "x=1",
         }
-        # Force ceiling smaller than standard response
-        res = dispatch_request(req, max_response_bytes=60)
+        # Configurations smaller than MIN_RESPONSE_BYTES (512) are rejected with ValueError
+        with self.assertRaises(ValueError):
+            dispatch_request(req, max_response_bytes=60)
+
+        with self.assertRaises(ValueError):
+            dispatch_json(json.dumps(req), max_response_bytes=60)
+
+        # Valid configurable limit (512 bytes): SOLVE response (~1355 bytes) exceeding 512 bytes fails closed
+        req_solve = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+        }
+        res = dispatch_request(req_solve, max_response_bytes=512)
         self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
         self.assertEqual(res["status"], "ERR_RESPONSE_LIMIT_EXCEEDED")
         self.assertIsNone(res["definedness"])
         self.assertFalse(res["is_provisional_evidence"])
         self.assertEqual(res["error"]["code"], "ERR_RESPONSE_LIMIT_EXCEEDED")
 
+        # Serialized length must satisfy effective limit
+        serialized = json.dumps(res, separators=(",", ":")).encode("utf-8")
+        self.assertLessEqual(len(serialized), 512)
+
         # dispatch_json helper also respects max_response_bytes
-        raw_json = dispatch_json(json.dumps(req), max_response_bytes=60)
+        raw_json = dispatch_json(json.dumps(req_solve), max_response_bytes=512)
         self.assertIn("ERR_RESPONSE_LIMIT_EXCEEDED", raw_json)
+        self.assertLessEqual(len(raw_json.encode("utf-8")), 512)
 
     def test_syntax_error_definedness_null(self):
         """SYNTAX_ERROR returns definedness null, not false."""
@@ -741,6 +764,216 @@ class TestProtocolRemediationS4AR1(unittest.TestCase):
         res = dispatch_request(req)
         self.assertEqual(res["outcome"], "SYNTAX_ERROR")
         self.assertIsNone(res["definedness"])
+
+
+class TestProtocolRemediationS4AR2(unittest.TestCase):
+    """Regressions and boundary tests for S4-A-R2 remediation."""
+
+    def test_response_limit_rejects_invalid_configuration(self):
+        """max_response_bytes smaller than MIN_RESPONSE_BYTES (512) is rejected with ValueError."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+        }
+        with self.assertRaises(ValueError):
+            dispatch_request(req, max_response_bytes=60)
+
+        with self.assertRaises(ValueError):
+            dispatch_request(req, max_response_bytes=511)
+
+        with self.assertRaises(ValueError):
+            dispatch_request(req, max_response_bytes="invalid")
+
+        with self.assertRaises(ValueError):
+            dispatch_json(json.dumps(req), max_response_bytes=60)
+
+    def test_response_limit_valid_smaller_ceiling(self):
+        """A valid smaller ceiling (e.g. 512) enforces serialized limit and fails closed when exceeded."""
+        # 1. Normal response fitting within 512 bytes (CHECK_CANDIDATE response is ~486 bytes)
+        req_cand = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": "x=1",
+            "candidate": "1",
+        }
+        res_ok = dispatch_request(req_cand, max_response_bytes=512)
+        self.assertEqual(res_ok["outcome"], "SUCCESS")
+        serialized_ok = json.dumps(res_ok, separators=(",", ":")).encode("utf-8")
+        self.assertLessEqual(len(serialized_ok), 512)
+
+        # 2. When response exceeds the smaller ceiling (SOLVE response is ~1355 bytes > 512 bytes), fails closed
+        req_solve = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+        }
+        res_solve = dispatch_request(req_solve, max_response_bytes=512)
+        self.assertEqual(res_solve["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res_solve["status"], "ERR_RESPONSE_LIMIT_EXCEEDED")
+        self.assertIsNone(res_solve["definedness"])
+        self.assertFalse(res_solve["is_provisional_evidence"])
+        # Invariant: serialized fallback length MUST satisfy <= 512 bytes
+        serialized_fallback = json.dumps(res_solve, separators=(",", ":")).encode("utf-8")
+        self.assertLessEqual(len(serialized_fallback), 512)
+
+        # 3. Valid configurable limit accommodating SOLVE response (e.g. 2048 bytes)
+        res_solve_2k = dispatch_request(req_solve, max_response_bytes=2048)
+        self.assertEqual(res_solve_2k["outcome"], "SUCCESS")
+        serialized_2k = json.dumps(res_solve_2k, separators=(",", ":")).encode("utf-8")
+        self.assertLessEqual(len(serialized_2k), 2048)
+
+        # dispatch_json helper also respects the valid smaller ceiling
+        raw_json = dispatch_json(json.dumps(req_solve), max_response_bytes=512)
+        self.assertIn("ERR_RESPONSE_LIMIT_EXCEEDED", raw_json)
+        self.assertLessEqual(len(raw_json.encode("utf-8")), 512)
+
+    def test_response_limit_default_max_response_bytes(self):
+        """Default MAX_RESPONSE_BYTES=16384 satisfies serialized limit invariant."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "2*x+3=7",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        serialized = json.dumps(res, separators=(",", ":")).encode("utf-8")
+        self.assertLessEqual(len(serialized), MAX_RESPONSE_BYTES)
+
+    def test_json_error_classification_malformed_syntax(self):
+        """Malformed JSON string produces ERR_PROTOCOL_JSON_DECODE (not malformed structure)."""
+        bad_payloads = [
+            "{invalid json",
+            '{"schema_version": "mke.p02a.v1", "operation": }',
+            '{"incomplete": ',
+            "{",
+        ]
+        for p in bad_payloads:
+            res = dispatch_request(p)
+            self.assertEqual(res["outcome"], "PROTOCOL_ERROR", f"Failed for {p!r}")
+            self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE", f"Failed for {p!r}")
+            self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+            self.assertIsNone(res["definedness"])
+
+    def test_json_error_classification_incorrect_root_structure(self):
+        """Valid JSON with non-dict root produces ERR_PROTOCOL_MALFORMED_STRUCTURE."""
+        non_dict_payloads = [
+            "[1, 2, 3]",
+            '"just a string"',
+            "12345",
+            "true",
+            "null",
+        ]
+        for p in non_dict_payloads:
+            res = dispatch_request(p)
+            self.assertEqual(res["outcome"], "PROTOCOL_ERROR", f"Failed for {p!r}")
+            self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE", f"Failed for {p!r}")
+            self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+            self.assertIsNone(res["definedness"])
+
+    def test_json_error_classification_duplicate_keys(self):
+        """Valid JSON with duplicate object keys produces ERR_PROTOCOL_MALFORMED_STRUCTURE."""
+        p = '{"schema_version": "mke.p02a.v1", "schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "x=1"}'
+        res = dispatch_request(p)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertIn("Duplicate", res["error"]["message"])
+        self.assertIsNone(res["definedness"])
+
+    def test_invalid_unicode_isolated_surrogates_in_string(self):
+        """Isolated Unicode surrogate in string payload is caught as ERR_PROTOCOL_JSON_DECODE."""
+        surrogate_payload = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "\ud800=0"}'
+        res = dispatch_request(surrogate_payload)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+    def test_invalid_unicode_isolated_surrogates_in_dict(self):
+        """Isolated Unicode surrogate in dict payload is caught as ERR_PROTOCOL_JSON_DECODE."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "\ud800=0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+    def test_invalid_unicode_malformed_utf8_bytes(self):
+        """Malformed UTF-8 bytes payload is caught as ERR_PROTOCOL_JSON_DECODE without uncaught exceptions."""
+        malformed_bytes = b"\xff\xfe\x00\x00"
+        res = dispatch_request(malformed_bytes)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+    def test_dict_multibyte_unicode_oversized_in_unexpected_field(self):
+        """Dict with oversized multibyte Unicode in unexpected field triggers ERR_PAYLOAD_TOO_LARGE.
+
+        Guarantees that genuine byte bound is enforced before unexpected-field checking.
+        """
+        # Emoji '\U0001F600' is 1 char but 4 UTF-8 bytes; 1500 emojis = 6000 bytes > 4096 MAX_PAYLOAD_BYTES
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": "\U0001F600" * 1500,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        # Must be ERR_PAYLOAD_TOO_LARGE, NOT ERR_PROTOCOL_UNEXPECTED_FIELD
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertEqual(res["error"]["code"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertIsNone(res["definedness"])
+
+    def test_dict_rejects_unsupported_value_types(self):
+        """Dict payload with unsupported value types is rejected predictably with ERR_PROTOCOL_INVALID_TYPE."""
+        unsupported_req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "custom_object": object(),
+        }
+        res = dispatch_request(unsupported_req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res["definedness"])
+
+    def test_json_nesting_ceiling_enforced_on_otherwise_valid_request(self):
+        """Otherwise valid request wrapped in structures exceeding MAX_JSON_NESTING_DEPTH (16) fails with ERR_PROTOCOL_MALFORMED_STRUCTURE."""
+        # 17 levels of wrapper objects around an otherwise valid request
+        valid_inner = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "x=1"}'
+        deeply_wrapped = '{"wrap": ' * 17 + valid_inner + '}' * 17
+        res = dispatch_request(deeply_wrapped)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertIn("nesting depth", res["error"]["message"])
+        self.assertIsNone(res["definedness"])
+
+    def test_json_nesting_ceiling_deep_arrays(self):
+        """Deeply nested arrays exceeding MAX_JSON_NESTING_DEPTH fail with ERR_PROTOCOL_MALFORMED_STRUCTURE."""
+        deep_arr = "[" * 20 + "]" * 20
+        res = dispatch_request(deep_arr)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertIn("nesting depth", res["error"]["message"])
+
+    def test_valid_ordinary_request_within_nesting_ceiling(self):
+        """Valid ordinary request parses and executes normally within nesting ceiling."""
+        req_str = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "x=1"}'
+        res = dispatch_request(req_str)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        self.assertEqual(res["status"], "UNIQUE_ROOT")
+        self.assertEqual(res["root"], {"numerator": "1", "denominator": "1"})
+        self.assertTrue(res["definedness"])
 
 
 if __name__ == "__main__":

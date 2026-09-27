@@ -69,7 +69,9 @@ Requests are validated against explicit conservative bounds BEFORE AST parsing o
 | Parameter | Limit | Failure Code |
 | :--- | :--- | :--- |
 | **Max Payload Size** | 4,096 bytes (UTF-8) | `ERR_PAYLOAD_TOO_LARGE` |
-| **Max Response Size** | 16,384 bytes (16 KiB) | `ERR_RESPONSE_LIMIT_EXCEEDED` |
+| **Max Response Size** | 16,384 bytes (16 KiB default) | `ERR_RESPONSE_LIMIT_EXCEEDED` |
+| **Min Response Size** | 512 bytes (enforceable floor) | `ValueError` (invalid config) |
+| **Max JSON Nesting Depth** | 16 levels (`{}` or `[]`) | `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
 | **JSON Encoding** | Strict UTF-8 JSON object | `ERR_PROTOCOL_JSON_DECODE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
 | **Max Equation Length** | 256 ASCII characters | `ERR_PROTOCOL_INPUT_LIMIT` |
 | **Max Token Count** | 64 tokens | `InputBoundsExceededError` |
@@ -85,15 +87,30 @@ Every response unambiguously reports the protocol version, requested operation, 
 
 ### 4.1 Outcome Hierarchy
 1. `SUCCESS`: Valid protocol request that completed mathematical execution (producing a unique root, identity, contradiction, or verified candidate outcome).
-2. `SYNTAX_ERROR`: Mathematical expression could not be parsed according to S1 EBNF grammar.
-3. `PROTOCOL_ERROR`: Request framing violation, schema mismatch, invalid data types, extra fields, or malformed candidate string.
-4. `DOMAIN_ERROR`: Expression contains proven mathematical undefinedness in $\mathbb{R}$ ($1/0$, $0^0$).
-5. `OUT_OF_SCOPE`: Equation contains constructs outside S3 affine linear capability ($x^2$, $x \cdot x$, $x^0$, variable denominators).
-6. `RESOURCE_EXHAUSTED`: Execution exceeded configured operation or bit-length budgets, or serialized response exceeded `MAX_RESPONSE_BYTES` (`ERR_RESPONSE_LIMIT_EXCEEDED`).
-7. `INTERNAL_VERIFICATION_FAILURE`: S3 computed a root that failed independent S2 certification.
-8. `UNSUPPORTED`: Expression exceeds evaluation capabilities.
+2. `SYNTAX_ERROR`: Mathematical expression could not be parsed according to S1 EBNF grammar (definedness `null`).
+3. `PROTOCOL_ERROR`: Request framing violation, schema mismatch, invalid data types, extra fields, malformed candidate string, or transport decode errors:
+   - Malformed JSON syntax $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
+   - Isolated Unicode surrogates / unencodable chars $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
+   - Invalid UTF-8 bytes $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
+   - Root not a JSON object $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+   - Duplicate JSON object keys $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+   - JSON nesting depth $> 16$ levels $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+   - Dict payload $> 4096$ UTF-8 bytes $\implies$ `ERR_PAYLOAD_TOO_LARGE`.
+   - Non-string keys or unsupported value types $\implies$ `ERR_PROTOCOL_INVALID_TYPE`.
+4. `DOMAIN_ERROR`: Expression contains proven mathematical undefinedness in $\mathbb{R}$ ($1/0$, $0^0$). Reserved exclusively for definedness `false`.
+5. `OUT_OF_SCOPE`: Equation contains constructs outside S3 affine linear capability ($x^2$, $x \cdot x$, $x^0$, variable denominators) (definedness `null`).
+6. `RESOURCE_EXHAUSTED`: Execution exceeded configured operation or bit-length budgets, or serialized response exceeded `max_response_bytes` (`ERR_RESPONSE_LIMIT_EXCEEDED`, definedness `null`).
+7. `INTERNAL_VERIFICATION_FAILURE`: S3 computed a root that failed independent S2 certification (definedness `null`).
+8. `UNSUPPORTED`: Expression exceeds evaluation capabilities (definedness `null`).
 
-### 4.2 Exact Rational Serialization
+### 4.2 Enforceable Response Limit Invariant
+The response builder `_build_bounded_response` establishes an explicit, enforceable invariant:
+- Every successful return satisfies `len(serialized_bytes) <= max_response_bytes`.
+- Configurable limits smaller than `MIN_RESPONSE_BYTES = 512` are rejected with `ValueError` rather than returning an oversized fallback envelope.
+- The deterministic error envelope (`ERR_RESPONSE_LIMIT_EXCEEDED`) requires $\approx 313$ bytes, guaranteed to fit in any valid `max_response_bytes >= 512`.
+- Exact numbers and provisional evidence are never truncated or fabricated.
+
+### 4.3 Exact Rational Serialization
 All mathematical numbers (roots, candidates, residuals, left/right evaluated values) are transmitted as explicit decimal strings:
 ```json
 {
@@ -103,7 +120,7 @@ All mathematical numbers (roots, candidates, residuals, left/right evaluated val
 ```
 **Rule:** No IEEE 754 floating-point values are ever serialized for mathematical quantities. Canonical signs and coprime reductions from `Rational` are preserved.
 
-### 4.3 Three-Valued Definedness Contract
+### 4.4 Three-Valued Definedness Contract
 The response field `definedness` represents original-domain mathematical definedness on $\mathbb{R}$:
 - `true`: Proven everywhere-defined on $\mathbb{R}$ or at the evaluated candidate.
 - `false`: Proven undefined in original expression ($1/0$, $0^0$). Reserved exclusively for mathematical `DOMAIN_ERROR`.

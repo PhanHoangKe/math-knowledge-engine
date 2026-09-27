@@ -96,42 +96,46 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 227 tests in 0.045s
+Ran 241 tests in 0.035s
 
 OK
 ```
 
-### 5.2 Test Inventory (227 Total Tests)
+### 5.2 Test Inventory (241 Total Tests)
 - **S0 Rational Core (`tests/test_rational.py`):** 24 tests.
 - **S1 Parser & Immutable AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluation & Verification (`tests/test_evaluator.py`):** 47 tests.
-- **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests (31 baseline + 11 R1 + 25 R2 + 5 R3).
-- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 43 tests (32 baseline + 11 S4-A-R1 regressions):
+- **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests.
+- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 57 tests:
   - *SOLVE Operations (11 tests)*
   - *CHECK_CANDIDATE Operations (6 tests)*
   - *Validation, Security & Framing (15 tests)*
-  - *S4-A-R1 Boundary Remediations (11 tests):*
-    * `test_excessive_tokens_solve_caught_cleanly`: Equation <= 256 chars with > 64 tokens caught for SOLVE.
-    * `test_excessive_tokens_check_candidate_caught_cleanly`: Equation <= 256 chars with > 64 tokens caught for CHECK_CANDIDATE.
-    * `test_excessive_parenthesis_nesting_solve_caught_cleanly`: Parentheses nesting > 16 levels caught for SOLVE.
-    * `test_excessive_parenthesis_nesting_check_candidate_caught_cleanly`: Parentheses nesting > 16 levels caught for CHECK_CANDIDATE.
-    * `test_duplicate_json_keys_rejected`: Rejects duplicate JSON keys via `_reject_duplicate_keys_hook`.
-    * `test_dict_input_size_limit_enforced`: Dict payload size limit ceiling (4096 bytes) enforced without unbounded serialization.
-    * `test_non_string_dict_key_rejected`: Rejects non-string dict keys with `ERR_PROTOCOL_INVALID_TYPE`.
-    * `test_excessive_json_nesting_rejected`: Handles excessive JSON nesting safely without uncaught recursion errors.
-    * `test_candidate_whitespace_rejected_at_protocol_boundary`: Rejects candidate with surrounding or internal whitespace.
-    * `test_response_size_limit_fails_closed`: Response exceeding `MAX_RESPONSE_BYTES` (16 KiB) fails closed with `ERR_RESPONSE_LIMIT_EXCEEDED` and `definedness: null`.
-    * `test_syntax_error_definedness_null`: Ensures `SYNTAX_ERROR` returns `definedness: null`.
+  - *S4-A-R1 Boundary Remediations (11 tests)*
+  - *S4-A-R2 Final Boundary Corrections (14 tests):*
+    * `test_response_limit_rejects_invalid_configuration`: Rejects `max_response_bytes < MIN_RESPONSE_BYTES` (512) with `ValueError`.
+    * `test_response_limit_valid_smaller_ceiling`: Valid smaller ceiling (512 bytes) enforces serialized limit invariant, fails closed with `ERR_RESPONSE_LIMIT_EXCEEDED` on oversized payload, and validates `dispatch_json`.
+    * `test_response_limit_default_max_response_bytes`: Default `MAX_RESPONSE_BYTES = 16384` satisfies serialized limit invariant.
+    * `test_json_error_classification_malformed_syntax`: Malformed JSON syntax produces `ERR_PROTOCOL_JSON_DECODE`.
+    * `test_json_error_classification_incorrect_root_structure`: Non-dict JSON roots produce `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+    * `test_json_error_classification_duplicate_keys`: Duplicate JSON keys produce `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+    * `test_invalid_unicode_isolated_surrogates_in_string`: Isolated Unicode surrogates in string payload produce `ERR_PROTOCOL_JSON_DECODE`.
+    * `test_invalid_unicode_isolated_surrogates_in_dict`: Isolated Unicode surrogates in dict payload produce `ERR_PROTOCOL_JSON_DECODE`.
+    * `test_invalid_unicode_malformed_utf8_bytes`: Malformed UTF-8 bytes produce `ERR_PROTOCOL_JSON_DECODE`.
+    * `test_dict_multibyte_unicode_oversized_in_unexpected_field`: Multibyte Unicode dict value exceeding 4096 bytes triggers `ERR_PAYLOAD_TOO_LARGE` before unexpected-field checks.
+    * `test_dict_rejects_unsupported_value_types`: Unsupported dictionary value types rejected predictably with `ERR_PROTOCOL_INVALID_TYPE`.
+    * `test_json_nesting_ceiling_enforced_on_otherwise_valid_request`: Request wrapped in structures exceeding 16 levels fails with `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+    * `test_json_nesting_ceiling_deep_arrays`: Deeply nested arrays exceeding 16 levels fail with `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+    * `test_valid_ordinary_request_within_nesting_ceiling`: Valid ordinary request within nesting ceiling executes normally.
 
-### 5.3 S4-A-R1 Remediation Summary
-1. **Unhandled S1 Input Limits:** Dispatcher catches `MKEParserError` / `InputBoundsExceededError`, deterministically returning structured syntax errors with `definedness: null`.
-2. **Strict Transport Validation:** Bounded dict input size calculation, duplicate JSON key rejection, non-string dict key rejection, candidate whitespace rejection.
-3. **Definedness Semantics:** `SYNTAX_ERROR` produces `definedness: null`, reserving `false` solely for mathematical `DOMAIN_ERROR`.
-4. **Response Bounds:** Enforced `MAX_RESPONSE_BYTES = 16384` ceiling, failing closed with `ERR_RESPONSE_LIMIT_EXCEEDED` and `definedness: null`.
-5. **Documentation & Reproducibility:** Documented local loopback API host (`127.0.0.1` only) in `S4_PROTOCOL_CONTRACT.md`; added `sys.path.insert(0, ...)` to `tests/test_protocol.py`.
+### 5.3 S4-A-R2 Final Remediation Summary
+1. **Response Limit Invariant:** Validated `max_response_bytes >= MIN_RESPONSE_BYTES` (512 bytes floor). Guaranteed that fallback envelope satisfies serialized ceiling. Rejected invalid configurations with `ValueError`.
+2. **JSON Error Classification:** Caught `json.JSONDecodeError` before `ValueError`, accurately distinguishing `ERR_PROTOCOL_JSON_DECODE` (malformed JSON syntax) from `ERR_PROTOCOL_MALFORMED_STRUCTURE` (non-dict root, duplicate keys, excessive nesting).
+3. **Invalid Unicode Handling:** Intercepted `UnicodeEncodeError` and `UnicodeDecodeError` on transport inputs, deterministically mapping isolated surrogates and malformed bytes to `ERR_PROTOCOL_JSON_DECODE` with zero unhandled tracebacks.
+4. **Equivalent Dictionary Byte Bounds:** Replaced arbitrary character-count estimates with genuine UTF-8 byte calculation (`_measure_dict_bytes`) without unbounded serialization. Enforced byte ceiling before field-level checks. Predictably rejected unsupported types and non-string keys.
+5. **JSON Nesting Control:** Defined `MAX_JSON_NESTING_DEPTH = 16`. Enforced nesting ceilings before parsing or during dictionary measurement, raising `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
 
 ### 5.4 Holdout Dataset Isolation
-The 227 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
+The 241 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
 
 ---
 

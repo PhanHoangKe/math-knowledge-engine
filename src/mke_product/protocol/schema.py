@@ -14,6 +14,8 @@ SUPPORTED_OPERATIONS = (OPERATION_SOLVE, OPERATION_CHECK_CANDIDATE)
 MAX_PAYLOAD_BYTES = 4096
 MAX_EQUATION_CHARS = 256
 MAX_RESPONSE_BYTES = 16384  # 16 KiB ceiling for serialized response
+MIN_RESPONSE_BYTES = 512    # Minimal byte ceiling to accommodate deterministic error envelope
+MAX_JSON_NESTING_DEPTH = 16 # Conservative JSON object/array nesting ceiling
 
 
 def serialize_rational(val: Optional[Rational]) -> Optional[Dict[str, str]]:

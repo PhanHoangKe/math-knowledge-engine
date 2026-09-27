@@ -19,6 +19,7 @@ from .schema import (
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
     MAX_RESPONSE_BYTES,
+    MIN_RESPONSE_BYTES,
     serialize_rational,
     serialize_span,
 )
@@ -34,6 +35,11 @@ def _build_bounded_response(
     If exceeded, fail closed with ERR_RESPONSE_LIMIT_EXCEEDED and definedness: None,
     without truncating numbers or fabricating certificates.
     """
+    if type(max_bytes) is not int or max_bytes < MIN_RESPONSE_BYTES:
+        raise ValueError(
+            f"max_response_bytes must be an integer >= {MIN_RESPONSE_BYTES}; got {max_bytes!r}."
+        )
+
     try:
         serialized = json.dumps(res_dict, separators=(",", ":")).encode("utf-8")
         if len(serialized) <= max_bytes:
@@ -42,7 +48,7 @@ def _build_bounded_response(
         pass
 
     op = res_dict.get("operation")
-    return {
+    fallback = {
         "schema_version": SCHEMA_VERSION,
         "operation": op,
         "outcome": "RESOURCE_EXHAUSTED",
@@ -55,6 +61,12 @@ def _build_bounded_response(
         "definedness": None,
         "is_provisional_evidence": False,
     }
+    fallback_serialized = json.dumps(fallback, separators=(",", ":")).encode("utf-8")
+    if len(fallback_serialized) > max_bytes:
+        raise ValueError(
+            f"Fallback response length ({len(fallback_serialized)} bytes) exceeds max_bytes ({max_bytes} bytes)."
+        )
+    return fallback
 
 
 def dispatch_request(
@@ -72,7 +84,12 @@ def dispatch_request(
     - Explicit distinction between protocol errors, syntax errors, and mathematical outcomes.
     - Three-valued definedness (true, false, null).
     - Clear marking of provisional mathematical inspection evidence.
+    - Enforceable response serialized byte bounds.
     """
+    if type(max_response_bytes) is not int or max_response_bytes < MIN_RESPONSE_BYTES:
+        raise ValueError(
+            f"max_response_bytes must be an integer >= {MIN_RESPONSE_BYTES}; got {max_response_bytes!r}."
+        )
     # Step 1: Decode and validate payload framing
     try:
         raw_dict = parse_and_validate_raw_payload(payload)
@@ -286,5 +303,9 @@ def dispatch_json(
     max_response_bytes: int = MAX_RESPONSE_BYTES,
 ) -> str:
     """Convenience helper dispatching JSON string/bytes and returning compact JSON string."""
+    if type(max_response_bytes) is not int or max_response_bytes < MIN_RESPONSE_BYTES:
+        raise ValueError(
+            f"max_response_bytes must be an integer >= {MIN_RESPONSE_BYTES}; got {max_response_bytes!r}."
+        )
     res_dict = dispatch_request(payload, budget=budget, max_response_bytes=max_response_bytes)
     return json.dumps(res_dict, separators=(",", ":"))
