@@ -13,8 +13,10 @@ H. Timeout and framing bounds.
 
 import base64
 import json
+import msvcrt
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -28,6 +30,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import ctypes
 from ctypes import wintypes
 
+import time
+
 from mke_product.protocol.dispatcher import dispatch_request
 from mke_product.protocol.schema import SCHEMA_VERSION
 from mke_product.worker.constants import (
@@ -35,6 +39,7 @@ from mke_product.worker.constants import (
     CREATE_SUSPENDED,
     DEFAULT_WORKER_TIMEOUT_SEC,
     JOB_OBJECT_LIMIT_BREAKAWAY_OK,
+    JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
     PROCESS_MEMORY_LIMIT_BYTES,
     STARTF_USESTDHANDLES,
     WAIT_OBJECT_0,
@@ -49,10 +54,12 @@ from mke_product.worker.constants import (
 from mke_product.worker.controller import WorkerController, dispatch_via_worker
 from mke_product.worker.win32 import (
     PROCESS_INFORMATION,
+    SECURITY_ATTRIBUTES,
     STARTUPINFOW,
     assign_and_verify_process_in_job,
     create_configured_job_object,
     kernel32,
+    query_job_limits,
     query_job_peak_memory,
     query_job_pids,
     safe_close_handle,
@@ -207,7 +214,7 @@ class TestWindowsJobMemoryLimit(unittest.TestCase):
     """Test C: Multi-process aggregate memory ceiling (JobMemoryLimit)."""
 
     def test_job_memory_limit_exceeded_aggregate(self):
-        """Two concurrent processes in same Job Object: second process exceeds aggregate Job limit."""
+        """Two concurrent processes in same Job Object: second process exceeds aggregate Job limit with readiness handshake."""
         # 100 MiB Job limit, 80 MiB Process limit
         h_job, _ = create_configured_job_object(
             process_memory_limit=80 * 1024 * 1024,
@@ -215,13 +222,15 @@ class TestWindowsJobMemoryLimit(unittest.TestCase):
         )
         self.assertIsNotNone(h_job)
 
-        # Worker 1: holds 55 MiB (under 80 MiB process limit and 100 MiB job limit)
+        # Worker 1: allocates 55 MiB, touches pages, writes handshake to stdout, and sleeps
         w1_code = """
 import sys, time
 buf = bytearray(55 * 1024 * 1024)
 for i in range(0, len(buf), 4096):
     buf[i] = 1
-time.sleep(5)
+sys.stdout.write("READY\\n")
+sys.stdout.flush()
+time.sleep(10)
 sys.exit(0)
 """
         b64_1 = base64.b64encode(w1_code.encode()).decode("ascii")
@@ -243,8 +252,20 @@ except Exception:
         b64_2 = base64.b64encode(w2_code.encode()).decode("ascii")
         cmd2 = f'"{sys.executable}" -c "import base64; exec(base64.b64decode(\'{b64_2}\'))"'
 
+        # Pipe for Worker 1 stdout handshake
+        sa = SECURITY_ATTRIBUTES()
+        sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
+        sa.bInheritHandle = True
+        h_read = wintypes.HANDLE()
+        h_write = wintypes.HANDLE()
+        kernel32.CreatePipe(ctypes.byref(h_read), ctypes.byref(h_write), ctypes.byref(sa), 0)
+        kernel32.SetHandleInformation(h_read, 1, 0)
+
         si1 = STARTUPINFOW()
         si1.cb = ctypes.sizeof(STARTUPINFOW)
+        si1.dwFlags = STARTF_USESTDHANDLES
+        si1.hStdOutput = h_write
+        si1.hStdError = h_write
         pi1 = PROCESS_INFORMATION()
 
         si2 = STARTUPINFOW()
@@ -253,28 +274,51 @@ except Exception:
 
         try:
             # Start Worker 1
-            kernel32.CreateProcessW(None, ctypes.create_unicode_buffer(cmd1), None, None, False, CREATE_SUSPENDED, None, None, ctypes.byref(si1), ctypes.byref(pi1))
-            assign_and_verify_process_in_job(h_job, pi1.hProcess)
+            kernel32.CreateProcessW(None, ctypes.create_unicode_buffer(cmd1), None, None, True, CREATE_SUSPENDED, None, None, ctypes.byref(si1), ctypes.byref(pi1))
+            safe_close_handle(h_write)
+            h_write = wintypes.HANDLE()
+
+            assign_ok1, _ = assign_and_verify_process_in_job(h_job, pi1.hProcess)
+            self.assertTrue(assign_ok1)
             kernel32.ResumeThread(pi1.hThread)
 
-            # Give worker 1 time to commit memory
-            import time
-            time.sleep(1.0)
+            # Explicit readiness handshake: wait for READY\n from Worker 1
+            buf = ctypes.create_string_buffer(32)
+            bytes_read = wintypes.DWORD(0)
+            kernel32.ReadFile(h_read, buf, 32, ctypes.byref(bytes_read), None)
+            handshake = buf.raw[: bytes_read.value].decode("ascii", errors="replace")
+            self.assertIn("READY", handshake)
 
-            # Start Worker 2
+            # Confirm both processes are tracked in Job Object
+            pids1, _ = query_job_pids(h_job)
+            self.assertIn(pi1.dwProcessId, pids1)
+
+            # Verify peak memory of job is at least 50 MiB
+            peak_proc1, peak_job1, _ = query_job_peak_memory(h_job)
+            self.assertGreaterEqual(peak_job1, 50 * 1024 * 1024)
+
+            # Start Worker 2 in the same Job Object
             kernel32.CreateProcessW(None, ctypes.create_unicode_buffer(cmd2), None, None, False, CREATE_SUSPENDED, None, None, ctypes.byref(si2), ctypes.byref(pi2))
-            assign_and_verify_process_in_job(h_job, pi2.hProcess)
-            kernel32.ResumeThread(pi2.hThread)
+            assign_ok2, _ = assign_and_verify_process_in_job(h_job, pi2.hProcess)
+            self.assertTrue(assign_ok2)
 
+            pids2, _ = query_job_pids(h_job)
+            self.assertIn(pi1.dwProcessId, pids2)
+            self.assertIn(pi2.dwProcessId, pids2)
+
+            kernel32.ResumeThread(pi2.hThread)
             kernel32.WaitForSingleObject(pi2.hProcess, 10000)
+
             exit_code2 = wintypes.DWORD()
             kernel32.GetExitCodeProcess(pi2.hProcess, ctypes.byref(exit_code2))
 
             # Worker 2 alone requested 55 MiB (less than its 80 MiB process limit)
-            # It failed with code 42 (MemoryError) strictly because of aggregate JobMemoryLimit!
+            # It failed with code 42 (MemoryError) strictly because aggregate JobMemoryLimit was exhausted
             self.assertEqual(exit_code2.value, 42)
 
         finally:
+            safe_close_handle(h_read)
+            safe_close_handle(h_write)
             kernel32.TerminateProcess(pi1.hProcess, 0)
             kernel32.TerminateProcess(pi2.hProcess, 0)
             safe_close_handle(pi1.hThread)
@@ -291,23 +335,66 @@ class TestWindowsBreakawayRejection(unittest.TestCase):
         h_job, _ = create_configured_job_object()
         self.assertIsNotNone(h_job)
 
+        # 1. Verify Job Object configuration: neither breakaway flag is enabled
+        limits, err = query_job_limits(h_job)
+        self.assertEqual(err, 0)
+        self.assertIsNotNone(limits)
+        flags = limits.BasicLimitInformation.LimitFlags
+        self.assertEqual(flags & JOB_OBJECT_LIMIT_BREAKAWAY_OK, 0)
+        self.assertEqual(flags & JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK, 0)
+
+        # 2. Worker attempts CreateProcess with CREATE_BREAKAWAY_FROM_JOB using full Win32 STARTUPINFOW struct
         breakaway_code = """
 import sys, ctypes
 from ctypes import wintypes
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
 class STARTUPINFOW(ctypes.Structure):
-    _fields_ = [("cb", wintypes.DWORD)] + [("pad", ctypes.c_byte)] * 64
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("lpReserved", wintypes.LPWSTR),
+        ("lpDesktop", wintypes.LPWSTR),
+        ("lpTitle", wintypes.LPWSTR),
+        ("dwX", wintypes.DWORD),
+        ("dwY", wintypes.DWORD),
+        ("dwXSize", wintypes.DWORD),
+        ("dwYSize", wintypes.DWORD),
+        ("dwXCountChars", wintypes.DWORD),
+        ("dwYCountChars", wintypes.DWORD),
+        ("dwFillAttribute", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("wShowWindow", wintypes.WORD),
+        ("cbReserved2", wintypes.WORD),
+        ("lpReserved2", ctypes.c_void_p),
+        ("hStdInput", wintypes.HANDLE),
+        ("hStdOutput", wintypes.HANDLE),
+        ("hStdError", wintypes.HANDLE),
+    ]
+
 class PROCESS_INFORMATION(ctypes.Structure):
-    _fields_ = [("hProcess", wintypes.HANDLE), ("hThread", wintypes.HANDLE), ("dwProcessId", wintypes.DWORD), ("dwThreadId", wintypes.DWORD)]
+    _fields_ = [
+        ("hProcess", wintypes.HANDLE),
+        ("hThread", wintypes.HANDLE),
+        ("dwProcessId", wintypes.DWORD),
+        ("dwThreadId", wintypes.DWORD),
+    ]
+
+k32.CreateProcessW.argtypes = [
+    wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.c_void_p, ctypes.c_void_p,
+    wintypes.BOOL, wintypes.DWORD, ctypes.c_void_p, wintypes.LPCWSTR,
+    ctypes.POINTER(STARTUPINFOW), ctypes.POINTER(PROCESS_INFORMATION)
+]
+k32.CreateProcessW.restype = wintypes.BOOL
 
 si = STARTUPINFOW()
-si.cb = 68
+si.cb = ctypes.sizeof(STARTUPINFOW)
 pi = PROCESS_INFORMATION()
 
 CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 cmd = sys.executable + ' -c "import sys; sys.exit(0)"'
 res = k32.CreateProcessW(None, ctypes.create_unicode_buffer(cmd), None, None, False, CREATE_BREAKAWAY_FROM_JOB, None, None, ctypes.byref(si), ctypes.byref(pi))
 err = ctypes.get_last_error()
+# If res is 0 and err is ERROR_ACCESS_DENIED (5), exit with 55
 if not res and err == 5:
     sys.exit(55)
 elif res:
@@ -331,7 +418,7 @@ else:
             exit_code = wintypes.DWORD()
             kernel32.GetExitCodeProcess(pi.hProcess, ctypes.byref(exit_code))
 
-            # Exit code 55 proves CreateProcess with CREATE_BREAKAWAY_FROM_JOB failed with ERROR_ACCESS_DENIED (5)
+            # Exit code 55 proves CreateProcess with CREATE_BREAKAWAY_FROM_JOB failed specifically with ERROR_ACCESS_DENIED (5)
             self.assertEqual(exit_code.value, 55)
 
         finally:
@@ -487,13 +574,107 @@ class TestWindowsTimeoutAndFraming(unittest.TestCase):
         self.assertIsNone(res["definedness"])
 
     def test_worker_timeout_fails_closed(self):
-        # We simulate a worker timeout by configuring timeout_sec = 0.001
-        controller = WorkerController(timeout_sec=0.001)
-        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "2*x+3=7"}
+        """Dedicated blocking fixture: prove worker timeout strictly fails closed without race."""
+        blocking_cmd = f'"{sys.executable}" -c "import time; time.sleep(5.0)"'
+        controller = WorkerController(timeout_sec=0.2, _worker_cmd=blocking_cmd)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        t0 = time.monotonic()
         res = controller.execute_request(req)
-        # Should be WORKER_TIMEOUT (or if worker was instantaneous, it succeeds; let's test with a small timeout on a slower command)
-        # To guarantee timeout: we test timeout mechanism deterministically
-        self.assertIn(res["status"], (WORKER_TIMEOUT, "UNIQUE_ROOT"))
+        elapsed = time.monotonic() - t0
+
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertIsNone(res["definedness"])
+        self.assertLess(elapsed, 1.5)
+
+
+class TestWindowsControllerInputBoundary(unittest.TestCase):
+    """Test I: Robustness of controller input pre-validation before worker IPC."""
+
+    def setUp(self):
+        self.controller = WorkerController()
+
+    def test_controller_rejects_cyclic_dictionary(self):
+        d = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE"}
+        d["self"] = d
+        res = self.controller.execute_request(d)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertIn(res["status"], ("ERR_PAYLOAD_TOO_LARGE", "ERR_PROTOCOL_MALFORMED_STRUCTURE"))
+        self.assertIsNone(res["definedness"])
+
+    def test_controller_rejects_non_string_keys(self):
+        d = {"schema_version": SCHEMA_VERSION, 123: "val"}
+        res = self.controller.execute_request(d)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res["definedness"])
+
+    def test_controller_rejects_unsupported_types(self):
+        d = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": {1, 2, 3}}
+        res = self.controller.execute_request(d)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res["definedness"])
+
+    def test_controller_rejects_oversized_payload(self):
+        d = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 5000}
+        res = self.controller.execute_request(d)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertIsNone(res["definedness"])
+
+    def test_controller_rejects_isolated_surrogates(self):
+        d = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "\ud800"}
+        res = self.controller.execute_request(d)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+
+class TestWindowsStrictUtf8Ipc(unittest.TestCase):
+    """Test J: Strict UTF-8 validation across IPC without lossy character replacement."""
+
+    def test_strict_utf8_payload_rejection(self):
+        controller = WorkerController()
+        # Invalid UTF-8 byte 0xFF inside payload
+        raw_invalid_utf8 = b'{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "x=\xff"}'
+        res = controller.execute_request(raw_invalid_utf8)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+
+class TestWindowsHandleConfinement(unittest.TestCase):
+    """Test K: Prove unallowlisted inheritable handles are not inherited by worker."""
+
+    def test_unallowlisted_handle_not_inherited(self):
+        fd, path = tempfile.mkstemp()
+        try:
+            os.set_inheritable(fd, True)
+            h = msvcrt.get_osfhandle(fd)
+
+            child_code = f"""
+import msvcrt, sys
+try:
+    _ = msvcrt.open_osfhandle({h}, 0)
+    sys.exit(88)  # Leaked!
+except OSError:
+    sys.exit(77)  # Confined!
+"""
+            b64 = base64.b64encode(child_code.encode()).decode("ascii")
+            cmd = f'"{sys.executable}" -c "import base64; exec(base64.b64decode(\'{b64}\'))"'
+
+            controller = WorkerController(_worker_cmd=cmd)
+            res = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+            self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+            self.assertEqual(res["status"], WORKER_EXIT_FAILURE)
+            # Exit code 77 confirms msvcrt.open_osfhandle raised OSError (ERROR_INVALID_HANDLE)
+            exit_code = res.get("error", {}).get("details", {}).get("exit_code")
+            self.assertEqual(exit_code, 77)
+        finally:
+            os.close(fd)
+            if os.path.exists(path):
+                os.unlink(path)
 
 
 if __name__ == "__main__":

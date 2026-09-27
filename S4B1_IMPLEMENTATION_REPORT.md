@@ -62,7 +62,7 @@ Prior to implementation, the local execution environment was inspected:
 
 ---
 
-## 4. Test Inventory & Verification Results
+## 4. Test Inventory & Verification Results (S4-B1-R1 Remediation)
 
 ### 4.1 Test Execution Summary
 Command:
@@ -71,27 +71,27 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 268 tests in 4.870s
+Ran 275 tests in 5.638s
 
 OK
 ```
 
-### 4.2 Breakdown (268 Total Tests)
+### 4.2 Breakdown (275 Total Tests)
 - **S0 Rational Arithmetic (`tests/test_rational.py`):** 24 tests.
 - **S1 EBNF Parser & AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluator (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests.
 - **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 62 tests.
-- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 22 tests:
+- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 29 tests:
   - *Suspended Startup & Assignment:*
     * `test_worker_assigned_to_job_before_thread_resumed` (PASS)
   - *Process Memory Limit (256 MiB):*
     * `test_process_memory_limit_exceeded_disposable_worker` (PASS)
     * `test_process_memory_within_limit_succeeds` (PASS)
   - *Job Memory Limit (512 MiB aggregate):*
-    * `test_job_memory_limit_exceeded_aggregate` (PASS)
+    * `test_job_memory_limit_exceeded_aggregate` (PASS - with explicit readiness handshake and peak memory assertion)
   - *Breakaway Rejection:*
-    * `test_breakaway_from_job_rejected` (PASS)
+    * `test_breakaway_from_job_rejected` (PASS - full `STARTUPINFOW` struct, zero breakaway flags, `ERROR_ACCESS_DENIED` 5)
   - *Kill On Job Close:*
     * `test_kill_on_job_close_terminates_worker` (PASS)
   - *Failure Paths & Fail-Closed Cleanup:*
@@ -112,7 +112,17 @@ OK
     * `test_check_candidate_domain_error` (PASS)
   - *Timeout & Framing Bounds:*
     * `test_worker_payload_too_large` (PASS)
-    * `test_worker_timeout_fails_closed` (PASS)
+    * `test_worker_timeout_fails_closed` (PASS - deterministic blocking 5.0s fixture with 0.2s timeout, duration < 1.5s)
+  - *Controller Input Boundary Pre-Validation:*
+    * `test_controller_rejects_cyclic_dictionary` (PASS)
+    * `test_controller_rejects_non_string_keys` (PASS)
+    * `test_controller_rejects_unsupported_types` (PASS)
+    * `test_controller_rejects_oversized_payload` (PASS)
+    * `test_controller_rejects_isolated_surrogates` (PASS)
+  - *Strict UTF-8 Transport:*
+    * `test_strict_utf8_payload_rejection` (PASS - raw invalid UTF-8 bytes rejected without replacement)
+  - *Handle Confinement:*
+    * `test_unallowlisted_handle_not_inherited` (PASS - unallowlisted inheritable handle inaccessible in worker)
 
 ---
 
@@ -120,17 +130,21 @@ OK
 
 | Security Control | Implementation Mechanism | Verification Result | Status |
 | :--- | :--- | :--- | :--- |
-| **Suspended Startup Assignment** | `CREATE_SUSPENDED` + `IsProcessInJob` verification | Suspend count verified = 1; PID list contains worker before resume | **VERIFIED** |
-| **Process Memory Quota (256 MiB)** | `JOB_OBJECT_LIMIT_PROCESS_MEMORY` | 300 MiB commit rejected with `ERROR_COMMITMENT_LIMIT`, exit code 42 | **VERIFIED** |
-| **Job Aggregate Memory Quota (512 MiB)** | `JOB_OBJECT_LIMIT_JOB_MEMORY` | Concurrent multi-process commit blocked at aggregate ceiling | **VERIFIED** |
-| **Breakaway Prevention** | Omit breakaway flags in Job Object | `CREATE_BREAKAWAY_FROM_JOB` fails with `ERROR_ACCESS_DENIED` (code 5) | **VERIFIED** |
-| **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | Worker terminated immediately upon closing sole Job handle | **VERIFIED** |
-| **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Worker inherits exclusively its own stdin/stdout/stderr pipes | **VERIFIED** |
-| **Mathematical Decoupling** | Zero fallback math in controller | Controller returns structured worker error; never executes math | **VERIFIED** |
-| **Restricted Filesystem ACL / Tokens** | Planned for S4-B2 | Deferred to S4-B2 | **PLANNED / UNVERIFIED** |
-| **Outbound Network Blocking (WFP)** | Planned for S4-B2 | Deferred to S4-B2 | **PLANNED / UNVERIFIED** |
-| **Adversarial Penetration Certification** | Planned for S4-B3 | Deferred to S4-B3 | **PLANNED / UNVERIFIED** |
-| **Overall Sandbox Security Certification** | Post S4-B3 Full Audit | Deferred to future audit | **PLANNED / UNVERIFIED** |
+| **Suspended Startup Assignment** | `CREATE_SUSPENDED` + `IsProcessInJob` verification | Suspend count verified = 1; PID list contains worker before resume | **RUNTIME VERIFIED** |
+| **Process Memory Quota (256 MiB)** | `JOB_OBJECT_LIMIT_PROCESS_MEMORY` | 300 MiB commit rejected with `ERROR_COMMITMENT_LIMIT`, exit code 42 | **RUNTIME VERIFIED** |
+| **Job Aggregate Memory Quota (512 MiB)** | `JOB_OBJECT_LIMIT_JOB_MEMORY` | Concurrent multi-process commit blocked with explicit handshake; peak memory verified | **RUNTIME VERIFIED** |
+| **Breakaway Prevention** | Omit breakaway flags in Job Object | `CREATE_BREAKAWAY_FROM_JOB` fails with `ERROR_ACCESS_DENIED` (code 5) using full `STARTUPINFOW` | **RUNTIME VERIFIED** |
+| **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | Worker terminated immediately upon closing sole Job handle | **RUNTIME VERIFIED** |
+| **Deterministic Timeout** | Blocking fixture + `WaitForSingleObject` | Strict `WORKER_TIMEOUT`, process terminated, duration < 1.5s | **RUNTIME VERIFIED** |
+| **Controller Input Pre-Validation** | Bounded `_measure_dict_bytes` before serialization | Cyclic structures, non-string keys, invalid types, surrogates safely rejected | **RUNTIME VERIFIED** |
+| **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | Raw invalid byte sequences rejected as `ERR_PROTOCOL_JSON_DECODE` | **RUNTIME VERIFIED** |
+| **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Worker inherits exclusively its own pipes; unallowlisted handles raise `OSError` | **RUNTIME VERIFIED** |
+| **Error Sanitization** | Stderr path stripping & accurate status | Filesystem paths stripped from worker error messages; exit codes properly mapped | **RUNTIME VERIFIED** |
+| **Mathematical Decoupling** | Zero fallback math in controller | Controller returns structured worker error; never executes math | **RUNTIME VERIFIED** |
+| **Restricted Filesystem ACL / Tokens** | Planned for S4-B2 | Deferred to S4-B2 (Unauthorized in S4-B1) | **UNVERIFIED / BLOCKED** |
+| **Outbound Network Blocking (WFP)** | Planned for S4-B2 | Deferred to S4-B2 (Unauthorized in S4-B1) | **UNVERIFIED / BLOCKED** |
+| **Adversarial Penetration Certification** | Planned for S4-B3 | Deferred to S4-B3 (Unauthorized in S4-B1) | **UNVERIFIED / BLOCKED** |
+| **Overall Sandbox Security Certification** | Post S4-B3 Full Audit | Deferred to future audit (Unauthorized in S4-B1) | **UNVERIFIED / BLOCKED** |
 
 ---
 

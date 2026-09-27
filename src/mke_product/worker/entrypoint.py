@@ -9,7 +9,7 @@ import struct
 import sys
 from typing import Any, Dict, Union
 
-from mke_product.protocol.dispatcher import dispatch_json
+from mke_product.protocol.dispatcher import dispatch_request
 from mke_product.protocol.schema import SCHEMA_VERSION
 
 from .constants import (
@@ -117,9 +117,8 @@ def run_worker() -> int:
             _write_framed_response(err_dict)
             return 1
 
-        # Dispatch through S4-A kernel
-        payload_str = payload_bytes.decode("utf-8", errors="replace")
-        response_dict = dispatch_json(payload_str)
+        # Dispatch raw bytes through S4-A kernel (strict UTF-8 decoding in validator)
+        response_dict = dispatch_request(payload_bytes)
         _write_framed_response(response_dict)
         return 0
 
@@ -133,7 +132,7 @@ def run_worker() -> int:
             "is_provisional_evidence": False,
             "error": {
                 "code": WORKER_PROTOCOL_FAILURE,
-                "message": f"Unhandled exception inside worker: {exc}",
+                "message": "Internal worker execution failure.",
                 "details": {"exception_type": type(exc).__name__},
             },
         }

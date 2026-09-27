@@ -64,8 +64,8 @@ class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
         ("IoInfo", IO_COUNTERS),
         ("ProcessMemoryLimit", ctypes.c_size_t),
         ("JobMemoryLimit", ctypes.c_size_t),
-        ("PeakProcessMemoryLimit", ctypes.c_size_t),
-        ("PeakJobMemoryLimit", ctypes.c_size_t),
+        ("PeakProcessMemoryUsed", ctypes.c_size_t),
+        ("PeakJobMemoryUsed", ctypes.c_size_t),
     ]
 
 
@@ -309,7 +309,7 @@ def query_job_pids(h_job: wintypes.HANDLE) -> Tuple[List[int], int]:
 
 
 def query_job_peak_memory(h_job: wintypes.HANDLE) -> Tuple[int, int, int]:
-    """Query PeakProcessMemoryLimit and PeakJobMemoryLimit for Job Object.
+    """Query PeakProcessMemoryUsed and PeakJobMemoryUsed for Job Object.
 
     Returns:
         (peak_process_bytes, peak_job_bytes, win32_error)
@@ -325,4 +325,21 @@ def query_job_peak_memory(h_job: wintypes.HANDLE) -> Tuple[int, int, int]:
     )
     if not res:
         return 0, 0, ctypes.get_last_error()
-    return int(info.PeakProcessMemoryLimit), int(info.PeakJobMemoryLimit), 0
+    return int(info.PeakProcessMemoryUsed), int(info.PeakJobMemoryUsed), 0
+
+
+def query_job_limits(h_job: wintypes.HANDLE) -> Tuple[Optional[JOBOBJECT_EXTENDED_LIMIT_INFORMATION], int]:
+    """Query configured limits for a Job Object."""
+    info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+    ret_len = wintypes.DWORD()
+    res = kernel32.QueryInformationJobObject(
+        h_job,
+        JobObjectExtendedLimitInformation,
+        ctypes.byref(info),
+        ctypes.sizeof(info),
+        ctypes.byref(ret_len),
+    )
+    if not res:
+        return None, ctypes.get_last_error()
+    return info, 0
+

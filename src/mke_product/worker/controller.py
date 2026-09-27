@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import struct
 import sys
 import time
@@ -14,7 +15,15 @@ if sys.platform != "win32":
 import ctypes
 from ctypes import wintypes
 
+from mke_product.protocol.errors import (
+    ProtocolError,
+    ProtocolInvalidTypeError,
+    ProtocolJsonDecodeError,
+    ProtocolPayloadTooLargeError,
+    ProtocolStructureError,
+)
 from mke_product.protocol.schema import SCHEMA_VERSION
+from mke_product.protocol.validator import _measure_dict_bytes
 
 from .constants import (
     CREATE_SUSPENDED,
@@ -31,6 +40,7 @@ from .constants import (
     PROCESS_MEMORY_LIMIT_BYTES,
     PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
     STARTF_USESTDHANDLES,
+    STATUS_COMMITMENT_LIMIT,
     WAIT_OBJECT_0,
     WAIT_TIMEOUT,
     WORKER_ASSIGNMENT_FAILURE,
@@ -52,6 +62,17 @@ from .win32 import (
 )
 
 
+def _sanitize_error_text(text: str) -> str:
+    """Sanitize internal filesystem paths and sensitive identifiers from error output."""
+    if not text:
+        return ""
+    # Redact Windows paths (e.g. C:\... or D:\...)
+    sanitized = re.sub(r"[a-zA-Z]:\\[^\s\"';,]+", "[REDACTED_PATH]", text)
+    # Redact Unix style paths
+    sanitized = re.sub(r"/(?:[a-zA-Z0-9_\.\-]+/)+[a-zA-Z0-9_\.\-]+", "[REDACTED_PATH]", sanitized)
+    return sanitized.strip()
+
+
 def _build_controller_error(
     status: str,
     message: str,
@@ -69,7 +90,7 @@ def _build_controller_error(
         "is_provisional_evidence": False,
         "error": {
             "code": status,
-            "message": message,
+            "message": _sanitize_error_text(message),
             "details": details or {},
         },
     }
@@ -83,6 +104,7 @@ class WorkerController:
         process_memory_limit: int = PROCESS_MEMORY_LIMIT_BYTES,
         job_memory_limit: int = JOB_MEMORY_LIMIT_BYTES,
         timeout_sec: float = DEFAULT_WORKER_TIMEOUT_SEC,
+        _worker_cmd: Optional[str] = None,
     ) -> None:
         self.process_memory_limit = process_memory_limit
         self.job_memory_limit = job_memory_limit
@@ -91,6 +113,7 @@ class WorkerController:
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
         self._python_exe = sys.executable
+        self._worker_cmd = _worker_cmd or f'"{self._python_exe}" -m mke_product.worker.entrypoint'
 
     def execute_request(
         self,
@@ -109,36 +132,95 @@ class WorkerController:
         # Extract operation if available for error envelopes
         operation = "UNKNOWN"
         if isinstance(request, dict):
-            operation = str(request.get("operation", "UNKNOWN"))
-            raw_payload = json.dumps(request, separators=(",", ":")).encode("utf-8")
+            if "operation" in request and isinstance(request["operation"], str):
+                operation = request["operation"]
+            # Bounded pre-validation before any serialization to prevent denial of service in controller
+            try:
+                _measure_dict_bytes(request, max_bytes=IPC_MAX_REQUEST_BYTES)
+            except ProtocolPayloadTooLargeError as err:
+                return _build_controller_error(
+                    "ERR_PAYLOAD_TOO_LARGE",
+                    f"Request payload size exceeds maximum limit of {IPC_MAX_REQUEST_BYTES} bytes: {err}",
+                    details={"max_bytes": IPC_MAX_REQUEST_BYTES},
+                    operation=operation,
+                )
+            except ProtocolInvalidTypeError as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_INVALID_TYPE",
+                    f"Invalid request type: {err}",
+                    operation=operation,
+                )
+            except ProtocolStructureError as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_MALFORMED_STRUCTURE",
+                    f"Malformed request structure: {err}",
+                    operation=operation,
+                )
+            except ProtocolJsonDecodeError as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_JSON_DECODE",
+                    f"Invalid Unicode in request dictionary: {err}",
+                    operation=operation,
+                )
+            except Exception as err:
+                return _build_controller_error(
+                    WORKER_PROTOCOL_FAILURE,
+                    f"Failed to validate request dictionary: {type(err).__name__}",
+                    operation=operation,
+                )
+
+            try:
+                raw_payload = json.dumps(request, separators=(",", ":")).encode("utf-8")
+            except (TypeError, ValueError, OverflowError) as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_INVALID_TYPE",
+                    f"Failed to serialize request dictionary: {err}",
+                    operation=operation,
+                )
+
         elif isinstance(request, str):
-            raw_payload = request.encode("utf-8")
+            try:
+                raw_payload = request.encode("utf-8")
+            except UnicodeEncodeError as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_JSON_DECODE",
+                    f"Payload string contains unencodable Unicode surrogates: {err}",
+                    operation=operation,
+                )
+            if len(raw_payload) > IPC_MAX_REQUEST_BYTES:
+                return _build_controller_error(
+                    "ERR_PAYLOAD_TOO_LARGE",
+                    f"Request payload size ({len(raw_payload)} bytes) exceeds maximum limit of {IPC_MAX_REQUEST_BYTES} bytes.",
+                    details={"actual_bytes": len(raw_payload), "max_bytes": IPC_MAX_REQUEST_BYTES},
+                    operation=operation,
+                )
             try:
                 parsed = json.loads(request)
-                if isinstance(parsed, dict):
-                    operation = str(parsed.get("operation", "UNKNOWN"))
+                if isinstance(parsed, dict) and "operation" in parsed and isinstance(parsed["operation"], str):
+                    operation = parsed["operation"]
             except Exception:
                 pass
+
         elif isinstance(request, (bytes, bytearray)):
             raw_payload = bytes(request)
+            if len(raw_payload) > IPC_MAX_REQUEST_BYTES:
+                return _build_controller_error(
+                    "ERR_PAYLOAD_TOO_LARGE",
+                    f"Request payload size ({len(raw_payload)} bytes) exceeds maximum limit of {IPC_MAX_REQUEST_BYTES} bytes.",
+                    details={"actual_bytes": len(raw_payload), "max_bytes": IPC_MAX_REQUEST_BYTES},
+                    operation=operation,
+                )
             try:
-                parsed = json.loads(request.decode("utf-8"))
-                if isinstance(parsed, dict):
-                    operation = str(parsed.get("operation", "UNKNOWN"))
+                parsed = json.loads(raw_payload.decode("utf-8"))
+                if isinstance(parsed, dict) and "operation" in parsed and isinstance(parsed["operation"], str):
+                    operation = parsed["operation"]
             except Exception:
                 pass
+
         else:
             return _build_controller_error(
-                WORKER_PROTOCOL_FAILURE,
+                "ERR_PROTOCOL_INVALID_TYPE",
                 f"Unsupported request type: {type(request).__name__}.",
-                operation=operation,
-            )
-
-        if len(raw_payload) > IPC_MAX_REQUEST_BYTES:
-            return _build_controller_error(
-                "ERR_PAYLOAD_TOO_LARGE",
-                f"Request payload size ({len(raw_payload)} bytes) exceeds maximum limit of {IPC_MAX_REQUEST_BYTES} bytes.",
-                details={"actual_bytes": len(raw_payload), "max_bytes": IPC_MAX_REQUEST_BYTES},
                 operation=operation,
             )
 
@@ -206,9 +288,29 @@ class WorkerController:
                 )
 
             # Ensure controller pipe ends are strictly NOT inheritable
-            kernel32.SetHandleInformation(h_stdin_write, HANDLE_FLAG_INHERIT, 0)
-            kernel32.SetHandleInformation(h_stdout_read, HANDLE_FLAG_INHERIT, 0)
-            kernel32.SetHandleInformation(h_stderr_read, HANDLE_FLAG_INHERIT, 0)
+            if not kernel32.SetHandleInformation(h_stdin_write, HANDLE_FLAG_INHERIT, 0):
+                err = ctypes.get_last_error()
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    f"Failed to set handle information on stdin pipe (win32 error {err}).",
+                    operation=operation,
+                )
+
+            if not kernel32.SetHandleInformation(h_stdout_read, HANDLE_FLAG_INHERIT, 0):
+                err = ctypes.get_last_error()
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    f"Failed to set handle information on stdout pipe (win32 error {err}).",
+                    operation=operation,
+                )
+
+            if not kernel32.SetHandleInformation(h_stderr_read, HANDLE_FLAG_INHERIT, 0):
+                err = ctypes.get_last_error()
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    f"Failed to set handle information on stderr pipe (win32 error {err}).",
+                    operation=operation,
+                )
 
             # 3. Configure PROC_THREAD_ATTRIBUTE_HANDLE_LIST (inheriting ONLY worker pipe ends)
             attr_size = ctypes.c_size_t(0)
@@ -243,7 +345,7 @@ class WorkerController:
             siex.StartupInfo.hStdError = h_stderr_write
             siex.lpAttributeList = ctypes.cast(attr_buf, ctypes.c_void_p)
 
-            cmd = f'"{self._python_exe}" -m mke_product.worker.entrypoint'
+            cmd = self._worker_cmd
             creation_flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED
 
             if _inject_process_creation_failure:
@@ -461,8 +563,8 @@ class WorkerController:
     ) -> Dict[str, Any]:
         """Diagnose worker failure upon pipe disconnect without fallback math execution."""
         exit_code = wintypes.DWORD()
-        kernel32.GetExitCodeProcess(h_process, ctypes.byref(exit_code))
-        code = exit_code.value
+        exit_ok = kernel32.GetExitCodeProcess(h_process, ctypes.byref(exit_code))
+        code = exit_code.value if exit_ok else -1
 
         peak_proc, peak_job, _ = query_job_peak_memory(h_job) if h_job else (0, 0, 0)
 
@@ -473,15 +575,18 @@ class WorkerController:
                 err_buf = ctypes.create_string_buffer(min(err_avail.value, 4096))
                 err_read = wintypes.DWORD(0)
                 if kernel32.ReadFile(h_stderr, err_buf, len(err_buf), ctypes.byref(err_read), None):
-                    stderr_msg = err_buf.raw[: err_read.value].decode("utf-8", errors="replace").strip()
+                    raw_stderr = err_buf.raw[: err_read.value].decode("utf-8", errors="replace").strip()
+                    stderr_msg = _sanitize_error_text(raw_stderr)
 
         # Distinguish resource exhaustion from abnormal exit
-        # Exit code 42 (explicit MemoryError test) or peak memory approaching limit
-        if (
-            code in (42, 137)
-            or peak_proc >= self.process_memory_limit
-            or peak_job >= self.job_memory_limit
-        ):
+        # Explicit test code 42 (MemoryError), NTSTATUS/Win32 commitment errors, or peak memory at/above quota
+        is_memory_exhaustion = (
+            code in (42, STATUS_COMMITMENT_LIMIT, ERROR_COMMITMENT_LIMIT, ERROR_NOT_ENOUGH_QUOTA)
+            or (peak_proc > 0 and peak_proc >= self.process_memory_limit)
+            or (peak_job > 0 and peak_job >= self.job_memory_limit)
+        )
+
+        if is_memory_exhaustion:
             return _build_controller_error(
                 WORKER_RESOURCE_EXHAUSTED,
                 f"Worker exceeded memory quota (exit code: {code}, peak memory: {peak_proc} bytes).",

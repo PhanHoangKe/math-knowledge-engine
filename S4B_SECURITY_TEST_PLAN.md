@@ -113,18 +113,49 @@ This document defines the verification strategy, security test cases, observed k
 
 ---
 
-## 4. Security Control Status (S4-B1 Closure)
+### Requirement H: Deterministic Timeout & Bounded Execution
+- **Test:** `TestWindowsTimeoutAndFraming` (2 tests)
+  - `test_worker_payload_too_large`: Verifies oversized payload (> 4096 bytes) is rejected as `ERR_PAYLOAD_TOO_LARGE`.
+  - `test_worker_timeout_fails_closed`: Uses dedicated blocking fixture (5.0s sleep with 0.2s timeout), proving strict `outcome: RESOURCE_EXHAUSTED` and `status: WORKER_TIMEOUT` without timing races, duration $< 1.5$s, and immediate process cleanup.
+- **Status:** PASS (Verified).
+
+### Requirement I: Controller Input Boundary Pre-Validation
+- **Test:** `TestWindowsControllerInputBoundary` (5 tests)
+  - `test_controller_rejects_cyclic_dictionary`: Cyclic structure rejected before serialization as `ERR_PAYLOAD_TOO_LARGE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+  - `test_controller_rejects_non_string_keys`: Non-string keys rejected as `ERR_PROTOCOL_INVALID_TYPE`.
+  - `test_controller_rejects_unsupported_types`: Sets / complex types rejected as `ERR_PROTOCOL_INVALID_TYPE`.
+  - `test_controller_rejects_oversized_payload`: Oversized dict rejected as `ERR_PAYLOAD_TOO_LARGE`.
+  - `test_controller_rejects_isolated_surrogates`: Isolated surrogates rejected as `ERR_PROTOCOL_JSON_DECODE`.
+- **Status:** PASS (Verified).
+
+### Requirement J: Strict UTF-8 IPC Transport
+- **Test:** `TestWindowsStrictUtf8Ipc` (1 test)
+  - `test_strict_utf8_payload_rejection`: Raw invalid UTF-8 byte (`b'x=\xff'`) sent over IPC pipe is rejected strictly as `ERR_PROTOCOL_JSON_DECODE` without character replacement (`errors="replace"` eliminated).
+- **Status:** PASS (Verified).
+
+### Requirement K: Restricted Handle Confinement
+- **Test:** `TestWindowsHandleConfinement` (1 test)
+  - `test_unallowlisted_handle_not_inherited`: An inheritable handle (`bInheritHandle=True`) not present in `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` is proven inaccessible in the worker (`msvcrt.open_osfhandle` fails with `OSError`, exit code 77).
+- **Status:** PASS (Verified).
+
+---
+
+## 4. Security Control Status (S4-B1-R1 Verification Matrix)
 
 | Security Control | Implementation Mechanism | Status |
 | :--- | :--- | :--- |
-| **Job Object Memory Quota (256 MiB/512 MiB)** | Win32 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` | **VERIFIED** (Pass) |
-| **Suspended Startup Assignment** | `CREATE_SUSPENDED` + `IsProcessInJob` | **VERIFIED** (Pass) |
-| **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | **VERIFIED** (Pass) |
-| **Breakaway Prevention** | Disabled `JOB_OBJECT_LIMIT_BREAKAWAY_OK` | **VERIFIED** (Pass) |
-| **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | **VERIFIED** (Pass) |
-| **Fail-Closed Result Taxonomy** | S4 Protocol Error Mapping | **VERIFIED** (Pass) |
-| **Mathematical Non-Fallback Invariant** | Controller Decoupling | **VERIFIED** (Pass) |
-| **Restricted Filesystem ACL / Token** | Planned for S4-B2 | **PLANNED / UNVERIFIED** |
-| **Outbound Network Blocking (WFP)** | Planned for S4-B2 | **PLANNED / UNVERIFIED** |
-| **Adversarial Penetration Certification** | Planned for S4-B3 | **PLANNED / UNVERIFIED** |
-| **Overall Sandbox Security Certification** | Post S4-B3 Full Audit | **PLANNED / UNVERIFIED** |
+| **Job Object Memory Quota (256 MiB/512 MiB)** | Win32 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` | **RUNTIME VERIFIED** (Pass) |
+| **Suspended Startup Assignment** | `CREATE_SUSPENDED` + `IsProcessInJob` | **RUNTIME VERIFIED** (Pass) |
+| **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` + `msvcrt` verification | **RUNTIME VERIFIED** (Pass) |
+| **Breakaway Prevention** | Disabled breakaway flags + `ERROR_ACCESS_DENIED` test | **RUNTIME VERIFIED** (Pass) |
+| **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | **RUNTIME VERIFIED** (Pass) |
+| **Deterministic Timeout** | Blocking fixture + `WaitForSingleObject` + `TerminateProcess` | **RUNTIME VERIFIED** (Pass) |
+| **Input Boundary Pre-Validation** | Bounded `_measure_dict_bytes` before serialization | **RUNTIME VERIFIED** (Pass) |
+| **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | **RUNTIME VERIFIED** (Pass) |
+| **Fail-Closed Result Taxonomy** | S4 Protocol Error Mapping & Stderr Sanitization | **RUNTIME VERIFIED** (Pass) |
+| **Mathematical Non-Fallback Invariant** | Controller Decoupling | **RUNTIME VERIFIED** (Pass) |
+| **Restricted Filesystem ACL / Token** | Planned for S4-B2 | **UNVERIFIED / BLOCKED** (Unauthorized in S4-B1) |
+| **Outbound Network Blocking (WFP)** | Planned for S4-B2 | **UNVERIFIED / BLOCKED** (Unauthorized in S4-B1) |
+| **Adversarial Penetration Certification** | Planned for S4-B3 | **UNVERIFIED / BLOCKED** (Unauthorized in S4-B1) |
+| **Overall Sandbox Security Certification** | Post S4-B3 Full Audit | **UNVERIFIED / BLOCKED** (Unauthorized in S4-B1) |
+
