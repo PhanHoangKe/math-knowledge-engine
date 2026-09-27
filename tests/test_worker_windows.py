@@ -213,6 +213,55 @@ sys.exit(0)
 class TestWindowsJobMemoryLimit(unittest.TestCase):
     """Test C: Multi-process aggregate memory ceiling (JobMemoryLimit)."""
 
+    def test_job_memory_limit_isolated_control_succeeds(self):
+        """Isolated control: prove identical Worker 2 allocation succeeds under 80 MiB per-process limit with generous Job limit."""
+        # 80 MiB per-process limit, 200 MiB generous Job limit
+        h_job, _ = create_configured_job_object(
+            process_memory_limit=80 * 1024 * 1024,
+            job_memory_limit=200 * 1024 * 1024,
+        )
+        self.assertIsNotNone(h_job)
+
+        w2_code = """
+import sys
+try:
+    buf = bytearray(55 * 1024 * 1024)
+    for i in range(0, len(buf), 4096):
+        buf[i] = 1
+    sys.exit(0)
+except MemoryError:
+    sys.exit(42)
+except Exception:
+    sys.exit(99)
+"""
+        b64_2 = base64.b64encode(w2_code.encode()).decode("ascii")
+        cmd2 = f'"{sys.executable}" -c "import base64; exec(base64.b64decode(\'{b64_2}\'))"'
+
+        si = STARTUPINFOW()
+        si.cb = ctypes.sizeof(STARTUPINFOW)
+        pi = PROCESS_INFORMATION()
+
+        try:
+            kernel32.CreateProcessW(None, ctypes.create_unicode_buffer(cmd2), None, None, False, CREATE_SUSPENDED, None, None, ctypes.byref(si), ctypes.byref(pi))
+            assign_ok, _ = assign_and_verify_process_in_job(h_job, pi.hProcess)
+            self.assertTrue(assign_ok)
+
+            pids, _ = query_job_pids(h_job)
+            self.assertIn(pi.dwProcessId, pids)
+
+            kernel32.ResumeThread(pi.hThread)
+            kernel32.WaitForSingleObject(pi.hProcess, 10000)
+
+            exit_code = wintypes.DWORD()
+            kernel32.GetExitCodeProcess(pi.hProcess, ctypes.byref(exit_code))
+            # Isolated Worker 2 succeeds with exit code 0 under 80 MiB process limit
+            self.assertEqual(exit_code.value, 0)
+        finally:
+            kernel32.TerminateProcess(pi.hProcess, 0)
+            safe_close_handle(pi.hThread)
+            safe_close_handle(pi.hProcess)
+            safe_close_handle(h_job)
+
     def test_job_memory_limit_exceeded_aggregate(self):
         """Two concurrent processes in same Job Object: second process exceeds aggregate Job limit with readiness handshake."""
         # 100 MiB Job limit, 80 MiB Process limit
@@ -282,11 +331,19 @@ except Exception:
             self.assertTrue(assign_ok1)
             kernel32.ResumeThread(pi1.hThread)
 
-            # Explicit readiness handshake: wait for READY\n from Worker 1
-            buf = ctypes.create_string_buffer(32)
-            bytes_read = wintypes.DWORD(0)
-            kernel32.ReadFile(h_read, buf, 32, ctypes.byref(bytes_read), None)
-            handshake = buf.raw[: bytes_read.value].decode("ascii", errors="replace")
+            # Explicit readiness handshake: bounded wait for READY\n from Worker 1
+            handshake_deadline = time.monotonic() + 5.0
+            handshake = ""
+            while time.monotonic() < handshake_deadline:
+                avail = wintypes.DWORD(0)
+                if kernel32.PeekNamedPipe(h_read, None, 0, None, ctypes.byref(avail), None) and avail.value > 0:
+                    buf = ctypes.create_string_buffer(32)
+                    bytes_read = wintypes.DWORD(0)
+                    if kernel32.ReadFile(h_read, buf, min(32, avail.value), ctypes.byref(bytes_read), None):
+                        handshake = buf.raw[: bytes_read.value].decode("ascii", errors="replace")
+                        if "READY" in handshake:
+                            break
+                time.sleep(0.02)
             self.assertIn("READY", handshake)
 
             # Confirm both processes are tracked in Job Object
@@ -588,6 +645,29 @@ class TestWindowsTimeoutAndFraming(unittest.TestCase):
         self.assertLess(elapsed, 1.5)
 
 
+    def test_worker_timeout_during_ipc_write_non_reading_worker(self):
+        """Dedicated non-reading worker fixture: prove full-lifecycle timeout covers IPC write phase."""
+        non_reading_cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=non_reading_cmd,
+            _stdin_pipe_buffer_size=1024,
+        )
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "SOLVE",
+            "equation": "x=" + "1" * 4000,
+        }
+        t0 = time.monotonic()
+        res = controller.execute_request(req)
+        elapsed = time.monotonic() - t0
+
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertIsNone(res["definedness"])
+        self.assertLess(elapsed, 1.5)
+
+
 class TestWindowsControllerInputBoundary(unittest.TestCase):
     """Test I: Robustness of controller input pre-validation before worker IPC."""
 
@@ -629,6 +709,33 @@ class TestWindowsControllerInputBoundary(unittest.TestCase):
         self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
         self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
         self.assertIsNone(res["definedness"])
+
+    def test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation(self):
+        """Reproduce Chinese character byte expansion: 1400 chars (4200 bytes) rejected before Job creation."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "SOLVE",
+            "equation": "x=1",
+            "unexpected": "\u4e2d" * 1400,
+        }
+        # Injected failure on Job creation proves rejection occurred before Job creation
+        res = self.controller.execute_request(req, _inject_job_creation_failure=True)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertIsNone(res["definedness"])
+
+    def test_controller_accepts_chinese_chars_within_byte_limit_before_worker(self):
+        """700 repetitions of U+4E2D (2100 bytes) serializes within 4096 bytes and reaches Job creation."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "SOLVE",
+            "equation": "x=1",
+            "unexpected": "\u4e2d" * 700,
+        }
+        res = self.controller.execute_request(req, _inject_job_creation_failure=True)
+        # Reaching the injected job creation failure proves it passed serialization validation
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
 
 
 class TestWindowsStrictUtf8Ipc(unittest.TestCase):

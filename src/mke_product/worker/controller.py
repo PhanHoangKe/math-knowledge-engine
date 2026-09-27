@@ -5,6 +5,7 @@ import os
 import re
 import struct
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
@@ -105,10 +106,12 @@ class WorkerController:
         job_memory_limit: int = JOB_MEMORY_LIMIT_BYTES,
         timeout_sec: float = DEFAULT_WORKER_TIMEOUT_SEC,
         _worker_cmd: Optional[str] = None,
+        _stdin_pipe_buffer_size: int = 0,
     ) -> None:
         self.process_memory_limit = process_memory_limit
         self.job_memory_limit = job_memory_limit
         self.timeout_sec = timeout_sec
+        self._stdin_pipe_buffer_size = _stdin_pipe_buffer_size
 
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
@@ -170,11 +173,25 @@ class WorkerController:
                 )
 
             try:
-                raw_payload = json.dumps(request, separators=(",", ":")).encode("utf-8")
+                raw_payload = json.dumps(request, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
             except (TypeError, ValueError, OverflowError) as err:
                 return _build_controller_error(
                     "ERR_PROTOCOL_INVALID_TYPE",
                     f"Failed to serialize request dictionary: {err}",
+                    operation=operation,
+                )
+            except UnicodeEncodeError as err:
+                return _build_controller_error(
+                    "ERR_PROTOCOL_JSON_DECODE",
+                    f"Invalid Unicode in request dictionary: {err}",
+                    operation=operation,
+                )
+
+            if len(raw_payload) > IPC_MAX_REQUEST_BYTES:
+                return _build_controller_error(
+                    "ERR_PAYLOAD_TOO_LARGE",
+                    f"Request serialized payload size ({len(raw_payload)} bytes) exceeds maximum limit of {IPC_MAX_REQUEST_BYTES} bytes.",
+                    details={"actual_bytes": len(raw_payload), "max_bytes": IPC_MAX_REQUEST_BYTES},
                     operation=operation,
                 )
 
@@ -263,7 +280,7 @@ class WorkerController:
             sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
             sa.bInheritHandle = True
 
-            if not kernel32.CreatePipe(ctypes.byref(h_stdin_read), ctypes.byref(h_stdin_write), ctypes.byref(sa), 0):
+            if not kernel32.CreatePipe(ctypes.byref(h_stdin_read), ctypes.byref(h_stdin_write), ctypes.byref(sa), self._stdin_pipe_buffer_size):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
@@ -424,27 +441,26 @@ class WorkerController:
                     operation=operation,
                 )
 
-            # 7. Write length-prefixed request to stdin pipe
+            # 7. Establish full-lifecycle deadline before worker IPC
+            deadline = time.monotonic() + effective_timeout
+
+            # Write length-prefixed request to stdin pipe within full-lifecycle deadline
             header = struct.pack(">I", len(raw_payload))
-            bytes_written = wintypes.DWORD()
             msg = header + raw_payload
 
-            if not kernel32.WriteFile(h_stdin_write, msg, len(msg), ctypes.byref(bytes_written), None):
-                err = ctypes.get_last_error()
-                return _build_controller_error(
-                    WORKER_PROTOCOL_FAILURE,
-                    f"Failed to write request to worker pipe (win32 error {err}).",
-                    operation=operation,
-                )
+            write_res = self._write_exact_bytes_with_timeout(
+                h_stdin_write, msg, deadline, pi.hProcess, h_job, operation=operation
+            )
+            if isinstance(write_res, dict):
+                return write_res
 
             # Close stdin write handle to signal EOF to worker
             safe_close_handle(h_stdin_write)
             h_stdin_write = wintypes.HANDLE()
 
-            # 8. Bounded read from stdout pipe with deterministic timeout
-            deadline = time.monotonic() + effective_timeout
+            # 8. Bounded read from stdout pipe with same effective deadline
             response_header = self._read_exact_bytes(
-                h_stdout_read, pi.hProcess, IPC_HEADER_SIZE, deadline, h_job, h_stderr=h_stderr_read
+                h_stdout_read, pi.hProcess, IPC_HEADER_SIZE, deadline, h_job, h_stderr=h_stderr_read, operation=operation
             )
 
             if isinstance(response_header, dict):
@@ -461,7 +477,7 @@ class WorkerController:
                 )
 
             response_body = self._read_exact_bytes(
-                h_stdout_read, pi.hProcess, resp_length, deadline, h_job, h_stderr=h_stderr_read
+                h_stdout_read, pi.hProcess, resp_length, deadline, h_job, h_stderr=h_stderr_read, operation=operation
             )
             if isinstance(response_body, dict):
                 return response_body
@@ -508,6 +524,102 @@ class WorkerController:
             # Closing Job Object handle triggers KILL_ON_JOB_CLOSE for any remaining child processes
             safe_close_handle(h_job)
 
+    def _handle_worker_timeout(
+        self,
+        h_process: wintypes.HANDLE,
+        h_job: Optional[wintypes.HANDLE],
+        operation: str = "UNKNOWN",
+    ) -> Dict[str, Any]:
+        """Build structured timeout error after terminating worker."""
+        kernel32.TerminateProcess(h_process, 0x00000102)
+        peak_proc, peak_job, _ = query_job_peak_memory(h_job) if h_job else (0, 0, 0)
+        return _build_controller_error(
+            WORKER_TIMEOUT,
+            f"Worker execution timed out after {self.timeout_sec} seconds.",
+            details={
+                "timeout_sec": self.timeout_sec,
+                "peak_process_bytes": peak_proc,
+                "peak_job_bytes": peak_job,
+            },
+            operation=operation,
+        )
+
+    def _write_exact_bytes_with_timeout(
+        self,
+        h_pipe: wintypes.HANDLE,
+        data: bytes,
+        deadline: float,
+        h_process: wintypes.HANDLE,
+        h_job: Optional[wintypes.HANDLE],
+        operation: str = "UNKNOWN",
+    ) -> Optional[Dict[str, Any]]:
+        """Write exact bytes to pipe within full-lifecycle deadline, handling partial writes and blocking worker."""
+        write_error = [None]
+        bytes_written_total = [0]
+        write_done = threading.Event()
+
+        def _writer():
+            try:
+                total = 0
+                while total < len(data):
+                    chunk = data[total:]
+                    written = wintypes.DWORD()
+                    ok = kernel32.WriteFile(h_pipe, chunk, len(chunk), ctypes.byref(written), None)
+                    if not ok:
+                        write_error[0] = ctypes.get_last_error()
+                        return
+                    if written.value == 0:
+                        write_error[0] = 0
+                        return
+                    total += written.value
+                    bytes_written_total[0] = total
+            except Exception as ex:
+                write_error[0] = ex
+            finally:
+                write_done.set()
+
+        writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
+        writer_thread.start()
+
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                # Full-lifecycle deadline expired during IPC write!
+                kernel32.TerminateProcess(h_process, 0x00000102)
+                safe_close_handle(h_pipe)
+                writer_thread.join(timeout=1.0)
+                return self._handle_worker_timeout(h_process, h_job, operation=operation)
+
+            if write_done.wait(timeout=min(0.02, remaining)):
+                break
+
+            # Check if worker process terminated prematurely while writing
+            exit_code = wintypes.DWORD()
+            if kernel32.GetExitCodeProcess(h_process, ctypes.byref(exit_code)):
+                if exit_code.value != 259:  # STILL_ACTIVE
+                    safe_close_handle(h_pipe)
+                    writer_thread.join(timeout=1.0)
+                    return self._handle_worker_abnormal_exit(
+                        h_process, h_job, exit_code.value, operation=operation
+                    )
+
+        writer_thread.join(timeout=1.0)
+
+        if write_error[0] is not None:
+            exit_code = wintypes.DWORD()
+            if kernel32.GetExitCodeProcess(h_process, ctypes.byref(exit_code)):
+                if exit_code.value != 259:
+                    return self._handle_worker_abnormal_exit(
+                        h_process, h_job, exit_code.value, operation=operation
+                    )
+            return _build_controller_error(
+                WORKER_PROTOCOL_FAILURE,
+                f"Failed to write request to worker pipe (win32 error {write_error[0]}).",
+                operation=operation,
+            )
+
+        return None
+
     def _read_exact_bytes(
         self,
         h_pipe: wintypes.HANDLE,
@@ -516,17 +628,14 @@ class WorkerController:
         deadline: float,
         h_job: Optional[wintypes.HANDLE],
         h_stderr: Optional[wintypes.HANDLE] = None,
+        operation: str = "UNKNOWN",
     ) -> Union[bytes, Dict[str, Any]]:
         """Read exactly `num_bytes` from `h_pipe` before `deadline`, checking process status."""
         accumulated = bytearray()
         while len(accumulated) < num_bytes:
             now = time.monotonic()
             if now >= deadline:
-                kernel32.TerminateProcess(h_process, 1)
-                return _build_controller_error(
-                    WORKER_TIMEOUT,
-                    f"Worker execution timed out after {self.timeout_sec} seconds.",
-                )
+                return self._handle_worker_timeout(h_process, h_job, operation=operation)
 
             avail = wintypes.DWORD(0)
             peek_res = kernel32.PeekNamedPipe(h_pipe, None, 0, None, ctypes.byref(avail), None)

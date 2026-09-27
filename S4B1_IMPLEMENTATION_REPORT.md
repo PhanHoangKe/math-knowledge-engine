@@ -62,7 +62,7 @@ Prior to implementation, the local execution environment was inspected:
 
 ---
 
-## 4. Test Inventory & Verification Results (S4-B1-R1 Remediation)
+## 4. Test Inventory & Verification Results (S4-B1-R2 Final Closure)
 
 ### 4.1 Test Execution Summary
 Command:
@@ -71,27 +71,28 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 275 tests in 5.638s
+Ran 279 tests in 4.860s
 
 OK
 ```
 
-### 4.2 Breakdown (275 Total Tests)
+### 4.2 Breakdown (279 Total Tests)
 - **S0 Rational Arithmetic (`tests/test_rational.py`):** 24 tests.
 - **S1 EBNF Parser & AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluator (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests.
 - **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 62 tests.
-- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 29 tests:
+- **S4-B1 Windows Job Object & Worker (`tests/test_worker_windows.py`):** 33 tests:
   - *Suspended Startup & Assignment:*
     * `test_worker_assigned_to_job_before_thread_resumed` (PASS)
   - *Process Memory Limit (256 MiB):*
     * `test_process_memory_limit_exceeded_disposable_worker` (PASS)
     * `test_process_memory_within_limit_succeeds` (PASS)
-  - *Job Memory Limit (512 MiB aggregate):*
-    * `test_job_memory_limit_exceeded_aggregate` (PASS - with explicit readiness handshake and peak memory assertion)
+  - *Job Memory Limit (512 MiB aggregate / 100 MiB test):*
+    * `test_job_memory_limit_isolated_control_succeeds` (PASS - proves identical Worker 2 55 MiB allocation succeeds under 80 MiB per-process limit with generous Job limit)
+    * `test_job_memory_limit_exceeded_aggregate` (PASS - proves identical Worker 2 fails with code 42 strictly when Worker 1 holds 55 MiB under 100 MiB restricted Job limit)
   - *Breakaway Rejection:*
-    * `test_breakaway_from_job_rejected` (PASS - full `STARTUPINFOW` struct, zero breakaway flags, `ERROR_ACCESS_DENIED` 5)
+    * `test_breakaway_from_job_rejected` (PASS - full 104-byte `STARTUPINFOW`, zero breakaway flags, `ERROR_ACCESS_DENIED` 5)
   - *Kill On Job Close:*
     * `test_kill_on_job_close_terminates_worker` (PASS)
   - *Failure Paths & Fail-Closed Cleanup:*
@@ -110,15 +111,18 @@ OK
     * `test_check_candidate_valid` (PASS)
     * `test_check_candidate_invalid` (PASS)
     * `test_check_candidate_domain_error` (PASS)
-  - *Timeout & Framing Bounds:*
+  - *Full-Lifecycle Timeout & Framing Bounds:*
     * `test_worker_payload_too_large` (PASS)
     * `test_worker_timeout_fails_closed` (PASS - deterministic blocking 5.0s fixture with 0.2s timeout, duration < 1.5s)
-  - *Controller Input Boundary Pre-Validation:*
+    * `test_worker_timeout_during_ipc_write_non_reading_worker` (PASS - non-reading worker with 4000+ byte payload over 1024-byte pipe buffer times out during write)
+  - *Controller Input Boundary Pre-Validation & Serialization:*
     * `test_controller_rejects_cyclic_dictionary` (PASS)
     * `test_controller_rejects_non_string_keys` (PASS)
     * `test_controller_rejects_unsupported_types` (PASS)
     * `test_controller_rejects_oversized_payload` (PASS)
     * `test_controller_rejects_isolated_surrogates` (PASS)
+    * `test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation` (PASS - 1400 chars / 4200 bytes rejected before Job Object creation)
+    * `test_controller_accepts_chinese_chars_within_byte_limit_before_worker` (PASS - 700 chars / 2100 bytes serialized with ensure_ascii=False within bounds)
   - *Strict UTF-8 Transport:*
     * `test_strict_utf8_payload_rejection` (PASS - raw invalid UTF-8 bytes rejected without replacement)
   - *Handle Confinement:*
@@ -132,11 +136,11 @@ OK
 | :--- | :--- | :--- | :--- |
 | **Suspended Startup Assignment** | `CREATE_SUSPENDED` + `IsProcessInJob` verification | Suspend count verified = 1; PID list contains worker before resume | **RUNTIME VERIFIED** |
 | **Process Memory Quota (256 MiB)** | `JOB_OBJECT_LIMIT_PROCESS_MEMORY` | 300 MiB commit rejected with `ERROR_COMMITMENT_LIMIT`, exit code 42 | **RUNTIME VERIFIED** |
-| **Job Aggregate Memory Quota (512 MiB)** | `JOB_OBJECT_LIMIT_JOB_MEMORY` | Concurrent multi-process commit blocked with explicit handshake; peak memory verified | **RUNTIME VERIFIED** |
+| **Job Aggregate Memory Quota (512 MiB)** | `JOB_OBJECT_LIMIT_JOB_MEMORY` | Causal control established: Worker 2 succeeds in isolation, fails with code 42 under aggregate ceiling | **RUNTIME VERIFIED** |
 | **Breakaway Prevention** | Omit breakaway flags in Job Object | `CREATE_BREAKAWAY_FROM_JOB` fails with `ERROR_ACCESS_DENIED` (code 5) using full `STARTUPINFOW` | **RUNTIME VERIFIED** |
 | **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | Worker terminated immediately upon closing sole Job handle | **RUNTIME VERIFIED** |
-| **Deterministic Timeout** | Blocking fixture + `WaitForSingleObject` | Strict `WORKER_TIMEOUT`, process terminated, duration < 1.5s | **RUNTIME VERIFIED** |
-| **Controller Input Pre-Validation** | Bounded `_measure_dict_bytes` before serialization | Cyclic structures, non-string keys, invalid types, surrogates safely rejected | **RUNTIME VERIFIED** |
+| **Full-Lifecycle Timeout** | Single deadline across IPC write & read phases | Non-reading worker write timeout and read timeout both fail closed (< 1.5s) | **RUNTIME VERIFIED** |
+| **Input Boundary Pre-Validation & Post-Serialization Check** | Bounded `_measure_dict_bytes` + `ensure_ascii=False` + byte check | Oversized inputs rejected before Job Object creation; cycles and surrogates handled | **RUNTIME VERIFIED** |
 | **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | Raw invalid byte sequences rejected as `ERR_PROTOCOL_JSON_DECODE` | **RUNTIME VERIFIED** |
 | **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Worker inherits exclusively its own pipes; unallowlisted handles raise `OSError` | **RUNTIME VERIFIED** |
 | **Error Sanitization** | Stderr path stripping & accurate status | Filesystem paths stripped from worker error messages; exit codes properly mapped | **RUNTIME VERIFIED** |

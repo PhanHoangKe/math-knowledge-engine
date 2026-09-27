@@ -68,18 +68,16 @@ This document defines the verification strategy, security test cases, observed k
 
 ### Requirement C: Aggregate Job Memory Limit (512 MiB / 100 MiB Test Ceiling)
 - **Test:** `TestWindowsJobMemoryLimit.test_job_memory_limit_exceeded_aggregate`
-- **Objective:** Verify that multiple concurrent processes in the same Job Object cannot exceed the aggregate Job memory limit, even when each process stays within its individual per-process ceiling.
-- **Mechanism:**
-  1. Configure Job Object with 100 MiB Job limit and 80 MiB Process limit.
-  2. Worker 1 commits 55 MiB ($< 80$ MiB, $< 100$ MiB) and sleeps.
-  3. Worker 2 requests 55 MiB ($< 80$ MiB per-process limit). Aggregate commit would be 110 MiB ($> 100$ MiB).
-- **Observed Kernel Behavior:** Worker 2's allocation fails with `MemoryError` (exit code 42) strictly due to Job memory limit exhaustion.
+### Requirement C: Aggregate Job Memory Limit (Causal Control & 100 MiB Restricted Ceiling)
+- **Test:** `TestWindowsJobMemoryLimit` (2 tests)
+  - `test_job_memory_limit_isolated_control_succeeds`: Proves identical Worker 2 55 MiB allocation succeeds (exit code 0) under 80 MiB per-process limit when Job limit is generous (200 MiB), establishing the isolated control baseline.
+  - `test_job_memory_limit_exceeded_aggregate`: Proves identical Worker 2 55 MiB allocation fails with `MemoryError` (exit code 42) strictly when concurrent Worker 1 holds 55 MiB under restricted 100 MiB Job limit. Bounded handshake polling ensures deterministic execution.
 - **Status:** PASS (Verified).
 
 ### Requirement D: Breakaway Prevention
 - **Test:** `TestWindowsBreakawayRejection.test_breakaway_from_job_rejected`
 - **Objective:** Prove that a worker process inside the Job cannot escape by spawning a child process with `CREATE_BREAKAWAY_FROM_JOB`.
-- **Mechanism:** Worker inside Job calls `CreateProcessW` with `dwCreationFlags = CREATE_BREAKAWAY_FROM_JOB` (0x01000000).
+- **Mechanism:** Worker inside Job calls `CreateProcessW` with `dwCreationFlags = CREATE_BREAKAWAY_FROM_JOB` (0x01000000) using full 104-byte `STARTUPINFOW`.
 - **Observed Kernel Behavior:** Windows kernel immediately blocks process creation and returns `ERROR_ACCESS_DENIED` (error code 5). Exit code 55 confirms rejection.
 - **Status:** PASS (Verified).
 
@@ -113,19 +111,22 @@ This document defines the verification strategy, security test cases, observed k
 
 ---
 
-### Requirement H: Deterministic Timeout & Bounded Execution
-- **Test:** `TestWindowsTimeoutAndFraming` (2 tests)
+### Requirement H: Deterministic Full-Lifecycle Timeout
+- **Test:** `TestWindowsTimeoutAndFraming` (3 tests)
   - `test_worker_payload_too_large`: Verifies oversized payload (> 4096 bytes) is rejected as `ERR_PAYLOAD_TOO_LARGE`.
   - `test_worker_timeout_fails_closed`: Uses dedicated blocking fixture (5.0s sleep with 0.2s timeout), proving strict `outcome: RESOURCE_EXHAUSTED` and `status: WORKER_TIMEOUT` without timing races, duration $< 1.5$s, and immediate process cleanup.
+  - `test_worker_timeout_during_ipc_write_non_reading_worker`: Proves single effective deadline covers IPC writing to a non-reading worker with near-maximum payload (4000+ bytes) over 1024-byte pipe buffer, terminating worker and joining writer thread deterministically.
 - **Status:** PASS (Verified).
 
 ### Requirement I: Controller Input Boundary Pre-Validation
-- **Test:** `TestWindowsControllerInputBoundary` (5 tests)
+- **Test:** `TestWindowsControllerInputBoundary` (7 tests)
   - `test_controller_rejects_cyclic_dictionary`: Cyclic structure rejected before serialization as `ERR_PAYLOAD_TOO_LARGE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
   - `test_controller_rejects_non_string_keys`: Non-string keys rejected as `ERR_PROTOCOL_INVALID_TYPE`.
   - `test_controller_rejects_unsupported_types`: Sets / complex types rejected as `ERR_PROTOCOL_INVALID_TYPE`.
   - `test_controller_rejects_oversized_payload`: Oversized dict rejected as `ERR_PAYLOAD_TOO_LARGE`.
   - `test_controller_rejects_isolated_surrogates`: Isolated surrogates rejected as `ERR_PROTOCOL_JSON_DECODE`.
+  - `test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation`: 1400 Chinese characters (4200 bytes) rejected as `ERR_PAYLOAD_TOO_LARGE` before Job Object creation (`_inject_job_creation_failure=True` not reached).
+  - `test_controller_accepts_chinese_chars_within_byte_limit_before_worker`: 700 Chinese characters (2100 bytes) serialize safely under `ensure_ascii=False` within bounds and advance to Job Object creation.
 - **Status:** PASS (Verified).
 
 ### Requirement J: Strict UTF-8 IPC Transport
@@ -140,7 +141,7 @@ This document defines the verification strategy, security test cases, observed k
 
 ---
 
-## 4. Security Control Status (S4-B1-R1 Verification Matrix)
+## 4. Security Control Status (S4-B1-R2 Verification Matrix)
 
 | Security Control | Implementation Mechanism | Status |
 | :--- | :--- | :--- |
@@ -149,8 +150,8 @@ This document defines the verification strategy, security test cases, observed k
 | **Restricted Handle Inheritance** | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` + `msvcrt` verification | **RUNTIME VERIFIED** (Pass) |
 | **Breakaway Prevention** | Disabled breakaway flags + `ERROR_ACCESS_DENIED` test | **RUNTIME VERIFIED** (Pass) |
 | **Kill On Job Close** | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` | **RUNTIME VERIFIED** (Pass) |
-| **Deterministic Timeout** | Blocking fixture + `WaitForSingleObject` + `TerminateProcess` | **RUNTIME VERIFIED** (Pass) |
-| **Input Boundary Pre-Validation** | Bounded `_measure_dict_bytes` before serialization | **RUNTIME VERIFIED** (Pass) |
+| **Full-Lifecycle Timeout** | Single deadline across IPC write & read phases | **RUNTIME VERIFIED** (Pass) |
+| **Input Boundary Pre-Validation & Size Check** | Bounded `_measure_dict_bytes` + post-serialization check | **RUNTIME VERIFIED** (Pass) |
 | **Strict UTF-8 Transport** | Zero lossy replacement on IPC pipes | **RUNTIME VERIFIED** (Pass) |
 | **Fail-Closed Result Taxonomy** | S4 Protocol Error Mapping & Stderr Sanitization | **RUNTIME VERIFIED** (Pass) |
 | **Mathematical Non-Fallback Invariant** | Controller Decoupling | **RUNTIME VERIFIED** (Pass) |
