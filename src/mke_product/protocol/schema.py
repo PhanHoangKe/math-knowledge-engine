@@ -13,6 +13,7 @@ SUPPORTED_OPERATIONS = (OPERATION_SOLVE, OPERATION_CHECK_CANDIDATE)
 
 MAX_PAYLOAD_BYTES = 4096
 MAX_EQUATION_CHARS = 256
+MAX_RESPONSE_BYTES = 16384  # 16 KiB ceiling for serialized response
 
 
 def serialize_rational(val: Optional[Rational]) -> Optional[Dict[str, str]]:

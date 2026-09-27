@@ -96,55 +96,42 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 216 tests in 0.026s
+Ran 227 tests in 0.045s
 
 OK
 ```
 
-### 5.2 Test Inventory (216 Total Tests)
+### 5.2 Test Inventory (227 Total Tests)
 - **S0 Rational Core (`tests/test_rational.py`):** 24 tests.
 - **S1 Parser & Immutable AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluation & Verification (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests (31 baseline + 11 R1 + 25 R2 + 5 R3).
-- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 32 tests:
-  - *SOLVE Operations (11 tests):*
-    * `test_solve_unique_root`: `2*x+3=7` differential verification against S3.
-    * `test_solve_fractional_coefficients`: `(1/2)*x + (3/4) = 0` $\implies x = -3/2$.
-    * `test_solve_domain_set_r`: `x = x` identity.
-    * `test_solve_domain_set_r_constant_identity`: `1 = 1` identity.
-    * `test_solve_empty_set_constant_contradiction`: `1 = 2` contradiction.
-    * `test_solve_empty_set_zero_times_x_equals_constant`: `0*x = 5` contradiction.
-    * `test_solve_nonlinear_scope_abstention`: `x^2 - 4 = 0`.
-    * `test_solve_variable_exponent_zero_abstention`: `x^0 = 1`.
-    * `test_solve_mixed_hazard_owner_ruling_a`: Owner Decision ADR-001 ($x^0 + 1/0 = 0$, $1/0 + x^0 = 0$, $x^0 + 0^0 = 0$).
-    * `test_solve_resource_exhausted`: Budget exhaustion produces `RESOURCE_EXHAUSTED` and `definedness: null`.
-    * `test_solve_syntax_error`: Syntax error reporting with span.
-  - *CHECK_CANDIDATE Operations (6 tests):*
-    * `test_candidate_valid`: `(x-1)/(x-1)=1` with candidate `"2"`.
-    * `test_candidate_invalid`: `2*x=4` with candidate `"3"` (residual 2).
-    * `test_candidate_domain_error_division_by_zero`: `(x-1)/(x-1)=1` with candidate `"1"`.
-    * `test_candidate_domain_error_zero_to_zero`: `x^0=1` with candidate `"0"`.
-    * `test_candidate_tiny_nonzero_rational_residual`: $x = 1/7$ with candidate `"1/5"` (residual $2/35$).
-    * `test_candidate_resource_exhausted`: Budget exhaustion produces `RESOURCE_EXHAUSTED`.
-  - *Validation, Security & Framing (15 tests):*
-    * `test_unsupported_protocol_version`: Rejects `"mke.p02a.v2"`.
-    * `test_unsupported_operation`: Rejects unknown operations (`"INTEGRATE"`).
-    * `test_missing_required_fields`: Enforces presence of all required fields.
-    * `test_unexpected_extra_fields`: Strict allowlist rejection of extra fields.
-    * `test_invalid_types_on_solve`: Type checking on all fields.
-    * `test_json_float_candidate_rejected`: Rejects JSON floats (e.g. `2.5`).
-    * `test_json_bool_candidate_rejected`: Rejects JSON booleans (e.g. `True`).
-    * `test_json_null_candidate_rejected`: Rejects JSON `null`.
-    * `test_malformed_candidate_string_rejected`: Rejects `"abc"`, `"02"`, `"1/0"`.
-    * `test_oversized_payload_rejected`: Rejects payloads > 4096 bytes before parsing.
-    * `test_oversized_equation_rejected`: Rejects equations > 256 characters.
-    * `test_non_ascii_equation_rejected`: Rejects non-ASCII unicode characters.
-    * `test_exact_rational_decimal_string_serialization`: Verifies string formatting of numbers.
-    * `test_json_roundtrip_bytes_and_str`: Verifies `dispatch_json` with string and bytes.
-    * `test_provisional_evidence_flag_consistency`: Verifies `is_provisional_evidence` behavior.
+- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 43 tests (32 baseline + 11 S4-A-R1 regressions):
+  - *SOLVE Operations (11 tests)*
+  - *CHECK_CANDIDATE Operations (6 tests)*
+  - *Validation, Security & Framing (15 tests)*
+  - *S4-A-R1 Boundary Remediations (11 tests):*
+    * `test_excessive_tokens_solve_caught_cleanly`: Equation <= 256 chars with > 64 tokens caught for SOLVE.
+    * `test_excessive_tokens_check_candidate_caught_cleanly`: Equation <= 256 chars with > 64 tokens caught for CHECK_CANDIDATE.
+    * `test_excessive_parenthesis_nesting_solve_caught_cleanly`: Parentheses nesting > 16 levels caught for SOLVE.
+    * `test_excessive_parenthesis_nesting_check_candidate_caught_cleanly`: Parentheses nesting > 16 levels caught for CHECK_CANDIDATE.
+    * `test_duplicate_json_keys_rejected`: Rejects duplicate JSON keys via `_reject_duplicate_keys_hook`.
+    * `test_dict_input_size_limit_enforced`: Dict payload size limit ceiling (4096 bytes) enforced without unbounded serialization.
+    * `test_non_string_dict_key_rejected`: Rejects non-string dict keys with `ERR_PROTOCOL_INVALID_TYPE`.
+    * `test_excessive_json_nesting_rejected`: Handles excessive JSON nesting safely without uncaught recursion errors.
+    * `test_candidate_whitespace_rejected_at_protocol_boundary`: Rejects candidate with surrounding or internal whitespace.
+    * `test_response_size_limit_fails_closed`: Response exceeding `MAX_RESPONSE_BYTES` (16 KiB) fails closed with `ERR_RESPONSE_LIMIT_EXCEEDED` and `definedness: null`.
+    * `test_syntax_error_definedness_null`: Ensures `SYNTAX_ERROR` returns `definedness: null`.
 
-### 5.3 Holdout Dataset Isolation
-The 216 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
+### 5.3 S4-A-R1 Remediation Summary
+1. **Unhandled S1 Input Limits:** Dispatcher catches `MKEParserError` / `InputBoundsExceededError`, deterministically returning structured syntax errors with `definedness: null`.
+2. **Strict Transport Validation:** Bounded dict input size calculation, duplicate JSON key rejection, non-string dict key rejection, candidate whitespace rejection.
+3. **Definedness Semantics:** `SYNTAX_ERROR` produces `definedness: null`, reserving `false` solely for mathematical `DOMAIN_ERROR`.
+4. **Response Bounds:** Enforced `MAX_RESPONSE_BYTES = 16384` ceiling, failing closed with `ERR_RESPONSE_LIMIT_EXCEEDED` and `definedness: null`.
+5. **Documentation & Reproducibility:** Documented local loopback API host (`127.0.0.1` only) in `S4_PROTOCOL_CONTRACT.md`; added `sys.path.insert(0, ...)` to `tests/test_protocol.py`.
+
+### 5.4 Holdout Dataset Isolation
+The 227 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
 
 ---
 

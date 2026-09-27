@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 import json
+import os
+import sys
 import unittest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from mke_product.core.rational import Rational
 from mke_product.parser.parser import parse_equation
@@ -200,7 +204,7 @@ class TestProtocolSolveDispatch(unittest.TestCase):
         res = dispatch_request(req)
         self.assertEqual(res["outcome"], "SYNTAX_ERROR")
         self.assertEqual(res["status"], "ERR_SYNTAX_ParserError")
-        self.assertFalse(res["definedness"])
+        self.assertIsNone(res["definedness"])
         self.assertEqual(res["error"]["span"], [4, 5])
         self.assertFalse(res["is_provisional_evidence"])
 
@@ -556,6 +560,187 @@ class TestProtocolValidationAndSecurity(unittest.TestCase):
             "equation": "x==1",
         })
         self.assertFalse(res_syn["is_provisional_evidence"])
+
+
+class TestProtocolRemediationS4AR1(unittest.TestCase):
+    """Regressions and boundary tests for S4-A-R1 remediation."""
+
+    def test_excessive_tokens_solve_caught_cleanly(self):
+        """Equation within 256 characters but exceeding 64 tokens caught for SOLVE."""
+        # 33 ones + 33 pluses + 'x' + '=' + '0' = 69 tokens; string length is 69 chars (< 256 chars)
+        eq = "x" + "+1" * 33 + "=0"
+        self.assertLessEqual(len(eq), 256)
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": eq,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SYNTAX_ERROR")
+        self.assertEqual(res["status"], "ERR_SYNTAX_InputBoundsExceededError")
+        self.assertIsNone(res["definedness"])
+        self.assertFalse(res["is_provisional_evidence"])
+        self.assertIn("tokens", res["error"]["message"])
+
+    def test_excessive_tokens_check_candidate_caught_cleanly(self):
+        """Equation within 256 characters but exceeding 64 tokens caught for CHECK_CANDIDATE."""
+        eq = "x" + "+1" * 33 + "=0"
+        self.assertLessEqual(len(eq), 256)
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": eq,
+            "candidate": "0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SYNTAX_ERROR")
+        self.assertEqual(res["status"], "ERR_SYNTAX_InputBoundsExceededError")
+        self.assertIsNone(res["definedness"])
+        self.assertFalse(res["is_provisional_evidence"])
+        self.assertIn("tokens", res["error"]["message"])
+
+    def test_excessive_parenthesis_nesting_solve_caught_cleanly(self):
+        """Equation exceeding 16 parenthesis levels caught for SOLVE."""
+        # 17 levels of parentheses: (((...((x))...))) = 0
+        eq = "(" * 17 + "x" + ")" * 17 + "=0"
+        self.assertLessEqual(len(eq), 256)
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": eq,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SYNTAX_ERROR")
+        self.assertEqual(res["status"], "ERR_SYNTAX_InputBoundsExceededError")
+        self.assertIsNone(res["definedness"])
+        self.assertFalse(res["is_provisional_evidence"])
+        self.assertIn("nesting depth", res["error"]["message"])
+
+    def test_excessive_parenthesis_nesting_check_candidate_caught_cleanly(self):
+        """Equation exceeding 16 parenthesis levels caught for CHECK_CANDIDATE."""
+        eq = "(" * 17 + "x" + ")" * 17 + "=0"
+        self.assertLessEqual(len(eq), 256)
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": eq,
+            "candidate": "1",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SYNTAX_ERROR")
+        self.assertEqual(res["status"], "ERR_SYNTAX_InputBoundsExceededError")
+        self.assertIsNone(res["definedness"])
+        self.assertFalse(res["is_provisional_evidence"])
+        self.assertIn("nesting depth", res["error"]["message"])
+
+    def test_duplicate_json_keys_rejected(self):
+        """Duplicate JSON object keys must be rejected before mathematical dispatch."""
+        payload = '{"schema_version": "mke.p02a.v1", "schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "x=1"}'
+        res = dispatch_request(payload)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_MALFORMED_STRUCTURE")
+        self.assertIsNone(res["definedness"])
+        self.assertIn("Duplicate", res["error"]["message"])
+
+    def test_dict_input_size_limit_enforced(self):
+        """Dict payload exceeding 4096 bytes is rejected without unbounded serialization."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=" + "1" * 4500,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertIsNone(res["definedness"])
+
+    def test_non_string_dict_key_rejected(self):
+        """Non-string dictionary key rejected with ERR_PROTOCOL_INVALID_TYPE."""
+        req = {
+            123: "SOLVE",
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res["definedness"])
+
+    def test_excessive_json_nesting_rejected(self):
+        """Excessive JSON nesting handled safely without uncaught recursion errors."""
+        payload = '{"a": ' * 200 + '{"schema_version": "mke.p02a.v1"}' + '}' * 200
+        res = dispatch_request(payload)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertIsNone(res["definedness"])
+
+    def test_candidate_whitespace_rejected_at_protocol_boundary(self):
+        """Candidate string with leading, trailing, or internal whitespace is strictly rejected."""
+        # 1. Surrounding whitespace
+        req1 = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": "x=1",
+            "candidate": " 1 ",
+        }
+        res1 = dispatch_request(req1)
+        self.assertEqual(res1["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res1["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res1["definedness"])
+
+        # 2. Internal whitespace
+        req2 = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": "x=1",
+            "candidate": "1/ 2",
+        }
+        res2 = dispatch_request(req2)
+        self.assertEqual(res2["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res2["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res2["definedness"])
+
+        # 3. Tab character
+        req3 = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": "x=1",
+            "candidate": "\t1",
+        }
+        res3 = dispatch_request(req3)
+        self.assertEqual(res3["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res3["status"], "ERR_PROTOCOL_INVALID_TYPE")
+        self.assertIsNone(res3["definedness"])
+
+    def test_response_size_limit_fails_closed(self):
+        """Response exceeding MAX_RESPONSE_BYTES fails closed with ERR_RESPONSE_LIMIT_EXCEEDED."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+        }
+        # Force ceiling smaller than standard response
+        res = dispatch_request(req, max_response_bytes=60)
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], "ERR_RESPONSE_LIMIT_EXCEEDED")
+        self.assertIsNone(res["definedness"])
+        self.assertFalse(res["is_provisional_evidence"])
+        self.assertEqual(res["error"]["code"], "ERR_RESPONSE_LIMIT_EXCEEDED")
+
+        # dispatch_json helper also respects max_response_bytes
+        raw_json = dispatch_json(json.dumps(req), max_response_bytes=60)
+        self.assertIn("ERR_RESPONSE_LIMIT_EXCEEDED", raw_json)
+
+    def test_syntax_error_definedness_null(self):
+        """SYNTAX_ERROR returns definedness null, not false."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x++1=0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SYNTAX_ERROR")
+        self.assertIsNone(res["definedness"])
 
 
 if __name__ == "__main__":

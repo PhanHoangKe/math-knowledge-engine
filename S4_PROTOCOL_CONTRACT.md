@@ -69,6 +69,7 @@ Requests are validated against explicit conservative bounds BEFORE AST parsing o
 | Parameter | Limit | Failure Code |
 | :--- | :--- | :--- |
 | **Max Payload Size** | 4,096 bytes (UTF-8) | `ERR_PAYLOAD_TOO_LARGE` |
+| **Max Response Size** | 16,384 bytes (16 KiB) | `ERR_RESPONSE_LIMIT_EXCEEDED` |
 | **JSON Encoding** | Strict UTF-8 JSON object | `ERR_PROTOCOL_JSON_DECODE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
 | **Max Equation Length** | 256 ASCII characters | `ERR_PROTOCOL_INPUT_LIMIT` |
 | **Max Token Count** | 64 tokens | `InputBoundsExceededError` |
@@ -88,7 +89,7 @@ Every response unambiguously reports the protocol version, requested operation, 
 3. `PROTOCOL_ERROR`: Request framing violation, schema mismatch, invalid data types, extra fields, or malformed candidate string.
 4. `DOMAIN_ERROR`: Expression contains proven mathematical undefinedness in $\mathbb{R}$ ($1/0$, $0^0$).
 5. `OUT_OF_SCOPE`: Equation contains constructs outside S3 affine linear capability ($x^2$, $x \cdot x$, $x^0$, variable denominators).
-6. `RESOURCE_EXHAUSTED`: Execution exceeded configured operation or bit-length budgets.
+6. `RESOURCE_EXHAUSTED`: Execution exceeded configured operation or bit-length budgets, or serialized response exceeded `MAX_RESPONSE_BYTES` (`ERR_RESPONSE_LIMIT_EXCEEDED`).
 7. `INTERNAL_VERIFICATION_FAILURE`: S3 computed a root that failed independent S2 certification.
 8. `UNSUPPORTED`: Expression exceeds evaluation capabilities.
 
@@ -105,8 +106,8 @@ All mathematical numbers (roots, candidates, residuals, left/right evaluated val
 ### 4.3 Three-Valued Definedness Contract
 The response field `definedness` represents original-domain mathematical definedness on $\mathbb{R}$:
 - `true`: Proven everywhere-defined on $\mathbb{R}$ or at the evaluated candidate.
-- `false`: Proven undefined ($1/0$, $0^0$).
-- `null`: UNKNOWN (e.g. execution budget exhausted before definedness could be proved, or expression is out of scope).
+- `false`: Proven undefined in original expression ($1/0$, $0^0$). Reserved exclusively for mathematical `DOMAIN_ERROR`.
+- `null`: UNKNOWN (e.g. `SYNTAX_ERROR`, `PROTOCOL_ERROR`, execution budget exhausted before definedness could be proved, or expression is out of scope).
 
 ### 4.4 Example Responses
 
@@ -200,17 +201,18 @@ To achieve production-grade mathematical certificates as mandated by the frozen 
 S4-A contains NO network listeners, NO external endpoints, NO subprocess spawning, and NO sandbox controls. It is an in-memory library dispatcher.
 
 ### 6.2 Target Multi-Process Trust Architecture
-Untrusted HTTP traffic must never directly invoke the mathematical kernel. The approved future architecture enforces strict defense-in-depth:
+Untrusted callers must never directly invoke the mathematical kernel. The approved future architecture enforces strict defense-in-depth with an unsandboxed local loopback API host communicating via IPC with an isolated worker:
 
 ```
-[ UNTRUSTED CLIENT ]
-        │  HTTPS Request
+[ LOCAL CLIENT / CALLER ]
+        │  HTTP Request (127.0.0.1 only)
         ▼
 ┌──────────────────────────────────────┐
-│       S4-C API HOST (Public)         │
-│  - TLS termination                   │
-│  - Rate limiting & IP throttling     │
-│  - Request framing & schema checks   │
+│  S4-C LOCAL LOOPBACK API HOST        │
+│  - Binds strictly to 127.0.0.1       │
+│  - Never exposed to public HTTPS     │
+│  - Rate limiting & request framing   │
+│  - Schema & size limit validation    │
 │  - Zero mathematical evaluation      │
 └──────────────────┬───────────────────┘
                    │  IPC / Anonymous Pipe
@@ -233,7 +235,7 @@ Before S4-B can be authorized, the worker implementation must prove:
 2. **Strict Memory Ceilings:** 256 MiB per-process limit (`JobObjectExtendedLimitInformation.ProcessMemoryLimit`), 512 MiB job-wide limit.
 3. **Kill on Close:** `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` guaranteed so orphaned child processes are terminated on host failure.
 4. **Breakaway Prevention:** Disallowing `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK` to prevent child processes from escaping the sandbox.
-5. **OS-Enforced Network Isolation:** Windows Filtering Platform (WFP) or AppContainer blocking all outbound network traffic. *Note: Binding a server socket to 127.0.0.1 does NOT constitute outbound network isolation.*
+5. **OS-Enforced Network Isolation:** Windows Filtering Platform (WFP) or AppContainer blocking all outbound network traffic. *Note: Binding a server socket to 127.0.0.1 on the host is a local loopback interface, but does NOT constitute outbound network isolation for the sandboxed worker.*
 6. **Filesystem Confinement:** Read-only access to application binaries; zero write access to system or user directories.
 
 All OS sandboxing controls remain **PLANNED / UNVERIFIED** until real Windows runtime verification tests pass under milestone S4-B.

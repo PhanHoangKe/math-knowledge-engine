@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 import json
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List, Tuple
 
 from .errors import (
+    ProtocolError,
     ProtocolPayloadTooLargeError,
     ProtocolJsonDecodeError,
     ProtocolStructureError,
@@ -25,13 +26,25 @@ from .schema import (
 )
 
 
+def _reject_duplicate_keys_hook(pairs: List[Tuple[Any, Any]]) -> Dict[Any, Any]:
+    """Strict JSON object hook rejecting duplicate keys before dispatch."""
+    d: Dict[Any, Any] = {}
+    for key, value in pairs:
+        if key in d:
+            raise ProtocolStructureError(f"Duplicate JSON object key detected: {key!r}")
+        d[key] = value
+    return d
+
+
 def parse_and_validate_raw_payload(payload: Union[str, bytes, Dict[str, Any]]) -> Dict[str, Any]:
     """Inspect and decode raw transport payload before parsing or mathematical execution.
 
     Enforces:
     1. Maximum byte-length ceiling BEFORE JSON parsing.
-    2. Strict JSON UTF-8 decoding.
-    3. Root object must be a dict (rejects JSON arrays, primitives, null).
+    2. Equivalent bounded size enforcement on dict inputs without unbounded serialization.
+    3. Strict JSON UTF-8 decoding with duplicate key rejection.
+    4. Safe handling of excessive JSON nesting and malformed UTF-8 without uncaught exceptions.
+    5. Root object must be a dict with string keys (rejects JSON arrays, primitives, null).
     """
     if isinstance(payload, (str, bytes)):
         raw_bytes = payload.encode("utf-8") if isinstance(payload, str) else payload
@@ -40,13 +53,49 @@ def parse_and_validate_raw_payload(payload: Union[str, bytes, Dict[str, Any]]) -
                 f"Payload size ({len(raw_bytes)} bytes) exceeds maximum limit of {MAX_PAYLOAD_BYTES} bytes."
             )
         try:
-            decoded = json.loads(raw_bytes.decode("utf-8"))
+            decoded_str = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as err:
             raise ProtocolJsonDecodeError(f"Payload contains invalid UTF-8 bytes: {err}")
+
+        try:
+            decoded = json.loads(decoded_str, object_pairs_hook=_reject_duplicate_keys_hook)
+        except ProtocolError:
+            raise
+        except (RecursionError, ValueError) as err:
+            raise ProtocolStructureError(f"Excessive nesting or malformed JSON structure: {err}")
         except json.JSONDecodeError as err:
             raise ProtocolJsonDecodeError(f"Malformed JSON payload: {err.msg}")
+
     elif isinstance(payload, dict):
+        # Strict dictionary validation
+        # 1. Reject non-string keys
+        for k in payload.keys():
+            if type(k) is not str:
+                raise ProtocolInvalidTypeError(
+                    f"Dictionary keys must be strings, got {type(k).__name__}."
+                )
+
+        # 2. Bounded size calculation on dict input
+        approx_size = 2  # '{}'
+        for k, v in payload.items():
+            approx_size += len(k) + 4
+            if isinstance(v, str):
+                approx_size += len(v) + 2
+            elif isinstance(v, (int, float, bool)):
+                approx_size += 20
+            elif v is None:
+                approx_size += 4
+            elif isinstance(v, (dict, list)):
+                approx_size += 50
+            else:
+                approx_size += 50
+
+            if approx_size > MAX_PAYLOAD_BYTES:
+                raise ProtocolPayloadTooLargeError(
+                    f"Dict payload approximate size ({approx_size} bytes) exceeds maximum limit of {MAX_PAYLOAD_BYTES} bytes."
+                )
         decoded = payload
+
     else:
         raise ProtocolStructureError(
             f"Payload must be a JSON string, bytes, or dict; got {type(payload).__name__}."
@@ -69,6 +118,7 @@ def validate_request_dict(req: Dict[str, Any]) -> Dict[str, Any]:
     - Strict field allowlists (no extra fields permitted)
     - Strict type validation (rejects bool, float, int, list, dict, null where str is expected)
     - Character length and ASCII encoding bounds.
+    - Candidate rational grammar without whitespace.
     """
     # 1. schema_version check
     if "schema_version" not in req:
@@ -170,6 +220,11 @@ def validate_request_dict(req: Dict[str, Any]) -> Dict[str, Any]:
         if not c_val.isascii():
             raise ProtocolInvalidTypeError(
                 "Field 'candidate' must contain ASCII characters only.",
+                operation=op,
+            )
+        if c_val != c_val.strip() or any(ch.isspace() for ch in c_val):
+            raise ProtocolInvalidTypeError(
+                f"Candidate string must conform strictly to rational grammar without whitespace: {c_val!r}.",
                 operation=op,
             )
         if len(c_val) > MAX_EQUATION_CHARS:

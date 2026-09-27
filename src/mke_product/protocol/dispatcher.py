@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 
 from ..core.rational import Rational
 from ..parser.parser import parse_equation
-from ..parser.errors import ParserError, LexerError
+from ..parser.errors import MKEParserError, ParserError, LexerError, InputBoundsExceededError
 from ..evaluator.budget import EvaluationBudget
 from ..evaluator.evaluator import check_candidate
 from ..evaluator.result import CandidateCheckStatus
@@ -18,15 +18,49 @@ from .schema import (
     SCHEMA_VERSION,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
+    MAX_RESPONSE_BYTES,
     serialize_rational,
     serialize_span,
 )
 from .validator import parse_and_validate_raw_payload, validate_request_dict
 
 
+def _build_bounded_response(
+    res_dict: Dict[str, Any],
+    max_bytes: int = MAX_RESPONSE_BYTES,
+) -> Dict[str, Any]:
+    """Ensure response serialized length does not exceed maximum response byte ceiling.
+
+    If exceeded, fail closed with ERR_RESPONSE_LIMIT_EXCEEDED and definedness: None,
+    without truncating numbers or fabricating certificates.
+    """
+    try:
+        serialized = json.dumps(res_dict, separators=(",", ":")).encode("utf-8")
+        if len(serialized) <= max_bytes:
+            return res_dict
+    except Exception:
+        pass
+
+    op = res_dict.get("operation")
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": op,
+        "outcome": "RESOURCE_EXHAUSTED",
+        "status": "ERR_RESPONSE_LIMIT_EXCEEDED",
+        "error": {
+            "code": "ERR_RESPONSE_LIMIT_EXCEEDED",
+            "message": f"Serialized response exceeded maximum limit of {max_bytes} bytes.",
+            "span": None,
+        },
+        "definedness": None,
+        "is_provisional_evidence": False,
+    }
+
+
 def dispatch_request(
     payload: Union[str, bytes, Dict[str, Any]],
     budget: Optional[EvaluationBudget] = None,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
 ) -> Dict[str, Any]:
     """Validate and dispatch a versioned request over the S0-S3 mathematical kernel.
 
@@ -44,7 +78,7 @@ def dispatch_request(
         raw_dict = parse_and_validate_raw_payload(payload)
         req = validate_request_dict(raw_dict)
     except ProtocolError as err:
-        return {
+        return _build_bounded_response({
             "schema_version": SCHEMA_VERSION,
             "operation": err.operation,
             "outcome": "PROTOCOL_ERROR",
@@ -52,7 +86,7 @@ def dispatch_request(
             "error": err.to_dict(),
             "definedness": None,
             "is_provisional_evidence": False,
-        }
+        }, max_bytes=max_response_bytes)
 
     op = req["operation"]
     eq_str = req["equation"]
@@ -60,9 +94,9 @@ def dispatch_request(
     # Step 2: Parse Equation AST using S1 parser
     try:
         eq_ast = parse_equation(eq_str)
-    except (ParserError, LexerError) as err:
+    except MKEParserError as err:
         err_code = getattr(err, "code", f"ERR_SYNTAX_{type(err).__name__}")
-        return {
+        return _build_bounded_response({
             "schema_version": SCHEMA_VERSION,
             "operation": op,
             "outcome": "SYNTAX_ERROR",
@@ -72,9 +106,9 @@ def dispatch_request(
                 "message": err.message,
                 "span": serialize_span(err.span),
             },
-            "definedness": False,
+            "definedness": None,
             "is_provisional_evidence": False,
-        }
+        }, max_bytes=max_response_bytes)
 
     # Step 3: Operational dispatch
     if op == OPERATION_SOLVE:
@@ -124,7 +158,7 @@ def dispatch_request(
 
         evidence_dict = res.evidence.to_dict() if res.evidence is not None else None
 
-        return {
+        return _build_bounded_response({
             "schema_version": SCHEMA_VERSION,
             "operation": OPERATION_SOLVE,
             "outcome": outcome,
@@ -135,14 +169,14 @@ def dispatch_request(
             "error": error_payload,
             "is_provisional_evidence": evidence_dict is not None,
             "evidence": evidence_dict,
-        }
+        }, max_bytes=max_response_bytes)
 
     elif op == OPERATION_CHECK_CANDIDATE:
         cand_str = req["candidate"]
         try:
             cand_res = check_candidate(eq_ast, cand_str, budget=budget)
         except InvalidCandidateError as err:
-            return {
+            return _build_bounded_response({
                 "schema_version": SCHEMA_VERSION,
                 "operation": OPERATION_CHECK_CANDIDATE,
                 "outcome": "PROTOCOL_ERROR",
@@ -159,7 +193,7 @@ def dispatch_request(
                     "span": None,
                 },
                 "is_provisional_evidence": False,
-            }
+            }, max_bytes=max_response_bytes)
 
         if cand_res.status == CandidateCheckStatus.VALID:
             outcome = "SUCCESS"
@@ -213,7 +247,7 @@ def dispatch_request(
                 "span": serialize_span(cand_res.error_span),
             }
 
-        return {
+        return _build_bounded_response({
             "schema_version": SCHEMA_VERSION,
             "operation": OPERATION_CHECK_CANDIDATE,
             "outcome": outcome,
@@ -227,11 +261,11 @@ def dispatch_request(
             "error": error_payload,
             "is_provisional_evidence": True,
             "diagnostics": dict(cand_res.diagnostics),
-        }
+        }, max_bytes=max_response_bytes)
 
     else:
         # Fallback for unexpected operation
-        return {
+        return _build_bounded_response({
             "schema_version": SCHEMA_VERSION,
             "operation": op,
             "outcome": "PROTOCOL_ERROR",
@@ -243,13 +277,14 @@ def dispatch_request(
             },
             "definedness": None,
             "is_provisional_evidence": False,
-        }
+        }, max_bytes=max_response_bytes)
 
 
 def dispatch_json(
     payload: Union[str, bytes],
     budget: Optional[EvaluationBudget] = None,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
 ) -> str:
     """Convenience helper dispatching JSON string/bytes and returning compact JSON string."""
-    res_dict = dispatch_request(payload, budget=budget)
+    res_dict = dispatch_request(payload, budget=budget, max_response_bytes=max_response_bytes)
     return json.dumps(res_dict, separators=(",", ":"))
