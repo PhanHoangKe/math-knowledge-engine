@@ -22,6 +22,27 @@ from mke_product.worker.win32 import get_current_process_handle_count
 SCHEMA_VERSION = "mke.p02a.v1"
 
 
+def stabilize_appcontainer_runtime() -> None:
+    """Exclude one-time Windows profile/cache retirement from leak baselines.
+
+    Creating the process-local AppContainer profile transiently leaves two
+    userenv-managed handles in the host for roughly 15 seconds.  P1 measures
+    request ownership only after those OS initialization handles retire; the
+    strict per-case ``net_delta == 0`` invariant remains unchanged.
+    """
+    controller = WorkerController(timeout_sec=10.0)
+    for _ in range(20):
+        result = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        )
+        assert result["outcome"] == "SUCCESS", f"AppContainer forensic warmup failed: {result}"
+    controller.settle_quarantine(timeout=0.5)
+    del controller
+    gc.collect()
+    time.sleep(20.0)
+    gc.collect()
+
+
 def run_scenario_a_normal(n: int) -> Dict[str, Any]:
     """Scenario A: N normal requests (control baseline)."""
     controller = WorkerController(timeout_sec=2.0)
@@ -194,8 +215,10 @@ def run_scenario_d_late_duplication(n: int) -> Dict[str, Any]:
 
 def main():
     print("=" * 70)
-    print("MKE S4-B1: COMPLETE 16-CASE WINDOWS HANDLE FORENSICS MATRIX")
+    print("MKE S4-B2/P1: COMPLETE 16-CASE WINDOWS HANDLE FORENSICS MATRIX")
     print("=" * 70)
+    print("Stabilizing one-time AppContainer profile/runtime initialization...")
+    stabilize_appcontainer_runtime()
 
     test_matrix = [
         ("Scenario A (Normal Control)", run_scenario_a_normal, [5, 10, 20, 40]),

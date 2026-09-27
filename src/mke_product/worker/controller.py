@@ -29,6 +29,7 @@ from mke_product.protocol.validator import _measure_dict_bytes
 
 from .constants import (
     CREATE_SUSPENDED,
+    CREATE_UNICODE_ENVIRONMENT,
     DEFAULT_WORKER_TIMEOUT_SEC,
     DUPLICATE_SAME_ACCESS,
     ERROR_BROKEN_PIPE,
@@ -44,6 +45,7 @@ from .constants import (
     JOB_MEMORY_LIMIT_BYTES,
     PROCESS_MEMORY_LIMIT_BYTES,
     PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
     STARTF_USESTDHANDLES,
     STATUS_COMMITMENT_LIMIT,
     STILL_ACTIVE,
@@ -56,6 +58,12 @@ from .constants import (
     WORKER_RESOURCE_EXHAUSTED,
     WORKER_STARTUP_FAILURE,
     WORKER_TIMEOUT,
+)
+from .appcontainer import (
+    AppContainerLease,
+    cleanup_appcontainer_runtime,
+    get_appcontainer_manager,
+    verify_appcontainer_process_token,
 )
 from .win32 import (
     PROCESS_INFORMATION,
@@ -513,11 +521,23 @@ class WorkerController:
         self._unresolved_handles: List[SafeWin32Handle] = []
         self._unresolved_process_termination: Dict[int, Dict[str, Any]] = {}
         self._last_termination_evidence: Optional[Dict[str, Any]] = None
+        self._last_appcontainer_evidence: Optional[Dict[str, Any]] = None
+        self._deferred_appcontainer_leases: Dict[int, AppContainerLease] = {}
 
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
         self._python_exe = sys.executable
+        self._custom_worker_cmd = _worker_cmd
         self._worker_cmd = _worker_cmd or f'"{self._python_exe}" -m mke_product.worker.entrypoint'
+
+    def get_last_appcontainer_evidence(self) -> Optional[Dict[str, Any]]:
+        """Return the latest native pre-resume AppContainer verification."""
+        return dict(self._last_appcontainer_evidence) if self._last_appcontainer_evidence else None
+
+    @staticmethod
+    def cleanup_appcontainer_runtime() -> Dict[str, Any]:
+        """Delete staged assets/profile only if no child lease remains active."""
+        return cleanup_appcontainer_runtime()
 
     def get_unresolved_job_handles(self) -> List[SafeWin32Handle]:
         """Return list of active unresolved Job Object handle owners."""
@@ -673,6 +693,9 @@ class WorkerController:
                     if not evidence["termination_confirmed"]:
                         remaining_handles.append(h_owner)
                         continue
+                    lease = self._deferred_appcontainer_leases.pop(id(h_owner), None)
+                    if lease is not None:
+                        lease.release()
                     h_owner.unblock_close()
                 if h_owner.close(_inject_failure=False):
                     settled_count += 1
@@ -799,6 +822,9 @@ class WorkerController:
         _inject_termination_wait_failure: bool = False,
         _inject_exit_code_failure: bool = False,
         _inject_protected_job_config_cleanup_failure: bool = False,
+        _inject_appcontainer_attribute_failure: bool = False,
+        _inject_token_mismatch: bool = False,
+        _inject_sid_mismatch: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
@@ -841,6 +867,9 @@ class WorkerController:
                 _inject_termination_wait_failure=_inject_termination_wait_failure,
                 _inject_exit_code_failure=_inject_exit_code_failure,
                 _inject_protected_job_config_cleanup_failure=_inject_protected_job_config_cleanup_failure,
+                _inject_appcontainer_attribute_failure=_inject_appcontainer_attribute_failure,
+                _inject_token_mismatch=_inject_token_mismatch,
+                _inject_sid_mismatch=_inject_sid_mismatch,
                 _worker_cmd=_worker_cmd,
             )
         finally:
@@ -873,6 +902,9 @@ class WorkerController:
         _inject_termination_wait_failure: bool = False,
         _inject_exit_code_failure: bool = False,
         _inject_protected_job_config_cleanup_failure: bool = False,
+        _inject_appcontainer_attribute_failure: bool = False,
+        _inject_token_mismatch: bool = False,
+        _inject_sid_mismatch: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Internal execution body running under single-request lock."""
@@ -1032,8 +1064,22 @@ class WorkerController:
         pi = PROCESS_INFORMATION()
         attr_buf: Optional[Any] = None
         job_creation_failure: Optional[Dict[str, Any]] = None
+        appcontainer_lease: Optional[AppContainerLease] = None
+        appcontainer_lease_released = False
+        appcontainer_manager = get_appcontainer_manager()
+        security_capabilities: Optional[Any] = None
 
         try:
+            try:
+                appcontainer_lease = appcontainer_manager.acquire()
+                security_capabilities = appcontainer_manager.security_capabilities()
+            except Exception as exc:
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    f"Failed to prepare AppContainer worker runtime: {type(exc).__name__}.",
+                    operation=operation,
+                )
+
             # 1. Create and configure Windows Job Object
             if _inject_job_creation_failure:
                 return _build_controller_error(
@@ -1143,11 +1189,11 @@ class WorkerController:
                     operation=operation,
                 )
 
-            # 3. Configure PROC_THREAD_ATTRIBUTE_HANDLE_LIST (inheriting ONLY worker pipe ends)
+            # 3. Configure the strict handle allowlist and AppContainer identity.
             attr_size = ctypes.c_size_t(0)
-            kernel32.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(attr_size))
+            kernel32.InitializeProcThreadAttributeList(None, 2, 0, ctypes.byref(attr_size))
             attr_buf = ctypes.create_string_buffer(attr_size.value)
-            if not kernel32.InitializeProcThreadAttributeList(attr_buf, 1, 0, ctypes.byref(attr_size)):
+            if not kernel32.InitializeProcThreadAttributeList(attr_buf, 2, 0, ctypes.byref(attr_size)):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
@@ -1167,6 +1213,18 @@ class WorkerController:
                     operation=operation,
                 )
 
+            if _inject_appcontainer_attribute_failure or not kernel32.UpdateProcThreadAttribute(
+                attr_buf, 0, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+                ctypes.byref(security_capabilities), ctypes.sizeof(security_capabilities), None, None
+            ):
+                err = 5 if _inject_appcontainer_attribute_failure else ctypes.get_last_error()
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    f"Failed to update AppContainer security capabilities (win32 error {err}).",
+                    details={"win32_error": err},
+                    operation=operation,
+                )
+
             # 4. Prepare STARTUPINFOEXW and CreateProcessW with CREATE_SUSPENDED
             siex = STARTUPINFOEXW()
             siex.StartupInfo.cb = ctypes.sizeof(STARTUPINFOEXW)
@@ -1176,8 +1234,17 @@ class WorkerController:
             siex.StartupInfo.hStdError = stderr_write_owner.handle
             siex.lpAttributeList = ctypes.cast(attr_buf, ctypes.c_void_p)
 
-            cmd = _worker_cmd or self._worker_cmd
-            creation_flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED
+            custom_cmd = _worker_cmd if _worker_cmd is not None else self._custom_worker_cmd
+            try:
+                cmd = (
+                    appcontainer_manager.rewrite_python_command(custom_cmd)
+                    if custom_cmd is not None
+                    else appcontainer_manager.default_command()
+                )
+            except ValueError as exc:
+                return _build_controller_error(WORKER_STARTUP_FAILURE, str(exc), operation=operation)
+            environment = appcontainer_manager.environment_block()
+            creation_flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT
 
             if _inject_process_creation_failure:
                 return _build_controller_error(
@@ -1193,8 +1260,8 @@ class WorkerController:
                 None,
                 True,  # bInheritHandles
                 creation_flags,
-                None,
-                self._src_dir,
+                ctypes.cast(environment, ctypes.c_void_p),
+                str(appcontainer_manager.stage_root),
                 ctypes.byref(siex),
                 ctypes.byref(pi),
             )
@@ -1238,7 +1305,30 @@ class WorkerController:
                     operation=operation,
                 )
 
-            # 6. Resume primary thread
+            # 6. Verify the suspended child's native token before any code runs.
+            token_evidence = verify_appcontainer_process_token(
+                proc_owner.handle,
+                appcontainer_manager.sid,
+                inject_token_mismatch=_inject_token_mismatch,
+                inject_sid_mismatch=_inject_sid_mismatch,
+            )
+            token_evidence.update({
+                "profile_name": appcontainer_manager.profile_name,
+                "expected_sid": appcontainer_manager.sid_string,
+                "job_assignment_verified": True,
+                "process_was_resumed": False,
+            })
+            self._last_appcontainer_evidence = token_evidence
+            if not token_evidence.get("accepted"):
+                kernel32.TerminateProcess(proc_owner.handle, 1)
+                return _build_controller_error(
+                    WORKER_STARTUP_FAILURE,
+                    "Suspended worker failed AppContainer token verification.",
+                    details={"appcontainer_verification": token_evidence},
+                    operation=operation,
+                )
+
+            # 7. Resume only after Job assignment and token verification.
             if _inject_resume_failure:
                 kernel32.TerminateProcess(proc_owner.handle, 1)
                 return _build_controller_error(
@@ -1256,8 +1346,10 @@ class WorkerController:
                     f"ResumeThread failed for worker (win32 error {err}).",
                     operation=operation,
                 )
+            token_evidence["process_was_resumed"] = True
+            self._last_appcontainer_evidence = token_evidence
 
-            # 7. Establish full-lifecycle deadline before worker IPC
+            # 8. Establish full-lifecycle deadline before worker IPC
             deadline = time.monotonic() + effective_timeout
 
             # Write length-prefixed request to stdin pipe within full-lifecycle deadline
@@ -1386,6 +1478,9 @@ class WorkerController:
                     _inject_exit_code_failure=_inject_exit_code_failure,
                 )
                 if termination_evidence["termination_confirmed"]:
+                    if appcontainer_lease is not None and not appcontainer_lease_released:
+                        appcontainer_lease.release()
+                        appcontainer_lease_released = True
                     ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
                     if not ok:
                         cleanup_failures["process_handle"] = proc_owner.close_error
@@ -1401,6 +1496,8 @@ class WorkerController:
                         if proc_owner not in self._unresolved_handles:
                             self._unresolved_handles.append(proc_owner)
                         self._unresolved_process_termination[id(proc_owner)] = termination_evidence
+                        if appcontainer_lease is not None and not appcontainer_lease_released:
+                            self._deferred_appcontainer_leases[id(proc_owner)] = appcontainer_lease
 
             # Close worker primary thread handle
             if thread_owner is not None and thread_owner.raw_value() > 0:
@@ -1505,6 +1602,10 @@ class WorkerController:
                 with self._quarantine_lock:
                     self._unresolved_process_termination[id(proc_owner)] = post_job_evidence
                 if post_job_evidence["termination_confirmed"]:
+                    lease = self._deferred_appcontainer_leases.pop(id(proc_owner), None)
+                    if lease is not None:
+                        lease.release()
+                        appcontainer_lease_released = True
                     proc_owner.unblock_close()
                     cleanup_failures.pop("process_termination", None)
                     ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
@@ -1516,6 +1617,11 @@ class WorkerController:
                     else:
                         cleanup_failures["process_handle"] = proc_owner.close_error
                         cleanup_close_evidence["process_handle"] = proc_owner.close_evidence
+
+            # Preparation may have acquired a lease before CreateProcess failed.
+            if proc_owner is None and appcontainer_lease is not None and not appcontainer_lease_released:
+                appcontainer_lease.release()
+                appcontainer_lease_released = True
 
             if cleanup_failures:
                 # Fail closed: never return success or unqualified result if any handle cleanup failed

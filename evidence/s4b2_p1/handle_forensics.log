@@ -1,3 +1,35 @@
+======================================================================
+MKE S4-B2/P1: COMPLETE 16-CASE WINDOWS HANDLE FORENSICS MATRIX
+======================================================================
+Stabilizing one-time AppContainer profile/runtime initialization...
+
+--- Running Scenario A (Normal Control) ---
+  N= 5 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 3.70s
+  N=10 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 6.39s
+  N=20 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 12.02s
+  N=40 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 22.55s
+
+--- Running Scenario B (Write Timeouts & Quarantine) ---
+  N= 5 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 1.72s
+  N=10 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 2.64s
+  N=20 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 4.41s
+  N=40 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 7.99s
+
+--- Running Scenario C (Setup Timeouts & Hangs) ---
+  N= 5 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 1.36s
+  N=10 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 1.58s
+  N=20 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 2.00s
+  N=40 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 3.03s
+
+--- Running Scenario D (Late Duplication) ---
+  N= 5 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 0.62s
+  N=10 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 0.66s
+  N=20 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 0.69s
+  N=40 | Baseline: 201 | Final: 201 | Delta: +0 [PASS] | ActiveQ: 0 | Elapsed: 0.81s
+
+======================================================================
+ALL 16 / 16 FORENSIC SCENARIOS PASSED WITH STRICT ZERO HANDLE DELTA.
+======================================================================
 [
   {
     "scenario": "Scenario A: Normal Requests (Control)",
@@ -204,3 +236,5 @@
     "elapsed_sec": 0.813
   }
 ]
+
+Saved 16-case forensics results to C:\Users\kedep\.codex\worktrees\s4b1-native-failure\Math Knowledge Engine\handle_forensics_results.json

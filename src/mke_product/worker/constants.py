@@ -37,9 +37,11 @@ DEFAULT_WORKER_TIMEOUT_SEC: float = 10.0
 # Win32 Kernel Constants
 # ---------------------------------------------------------------------------
 CREATE_SUSPENDED: int = 0x00000004
+CREATE_UNICODE_ENVIRONMENT: int = 0x00000400
 EXTENDED_STARTUPINFO_PRESENT: int = 0x00080000
 STARTF_USESTDHANDLES: int = 0x00000100
 PROC_THREAD_ATTRIBUTE_HANDLE_LIST: int = 0x00020002
+PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES: int = 0x00020009
 HANDLE_FLAG_INHERIT: int = 0x00000001
 HANDLE_FLAG_PROTECT_FROM_CLOSE: int = 0x00000002
 
@@ -75,4 +77,10 @@ ERROR_COMMITMENT_LIMIT: int = 1455
 ERROR_NOT_ENOUGH_QUOTA: int = 1816
 STATUS_COMMITMENT_LIMIT: int = 0xC000012D  # 3221225773 in unsigned 32-bit
 DUPLICATE_SAME_ACCESS: int = 0x00000002
+
+# Process-token inspection used by the S4-B2/P1 pre-resume gate.
+TOKEN_QUERY: int = 0x0008
+TokenElevation: int = 20
+TokenIsAppContainer: int = 29
+TokenAppContainerSid: int = 31
 

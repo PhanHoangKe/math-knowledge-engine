@@ -13,7 +13,6 @@ H. Timeout and framing bounds.
 
 import base64
 import json
-import msvcrt
 import os
 import sys
 import tempfile
@@ -67,6 +66,7 @@ from mke_product.worker.controller import (
     WorkerController,
     dispatch_via_worker,
 )
+from mke_product.worker.appcontainer import get_appcontainer_manager
 from mke_product.worker.win32 import (
     PROCESS_INFORMATION,
     SECURITY_ATTRIBUTES,
@@ -873,33 +873,122 @@ class TestWindowsHandleConfinement(unittest.TestCase):
     """Test K: Prove unallowlisted inheritable handles are not inherited by worker."""
 
     def test_unallowlisted_handle_not_inherited(self):
-        fd, path = tempfile.mkstemp()
+        sa = SECURITY_ATTRIBUTES()
+        sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
+        sa.bInheritHandle = True
+        decoy = kernel32.CreateEventW(ctypes.byref(sa), True, False, None)
+        self.assertTrue(decoy)
         try:
-            os.set_inheritable(fd, True)
-            h = msvcrt.get_osfhandle(fd)
+            h = int(decoy)
 
             child_code = f"""
-import msvcrt, sys
+import ctypes, json, struct, sys
+from ctypes import wintypes
+k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+k32.GetFileType.argtypes = [wintypes.HANDLE]
+k32.GetFileType.restype = wintypes.DWORD
+header = sys.stdin.buffer.read(4)
+size = struct.unpack('>I', header)[0]
+sys.stdin.buffer.read(size)
+ctypes.set_last_error(0)
 try:
-    _ = msvcrt.open_osfhandle({h}, 0)
-    sys.exit(88)  # Leaked!
-except OSError:
-    sys.exit(77)  # Confined!
+    file_type = int(k32.GetFileType(wintypes.HANDLE({h})))
+    file_type_error = ctypes.get_last_error()
+except OSError as exc:
+    file_type = -1
+    file_type_error = int(getattr(exc, 'winerror', 6) or 6)
+result = {{
+    'decoy_event_accessible': file_type == 0 and file_type_error == 0,
+    'candidate_file_type': file_type,
+    'candidate_error': file_type_error,
+}}
+raw = json.dumps(result).encode('utf-8')
+sys.stdout.buffer.write(struct.pack('>I', len(raw)) + raw)
+sys.stdout.buffer.flush()
 """
             b64 = base64.b64encode(child_code.encode()).decode("ascii")
             cmd = f'"{sys.executable}" -c "import base64; exec(base64.b64decode(\'{b64}\'))"'
 
             controller = WorkerController(_worker_cmd=cmd)
             res = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
-            self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
-            self.assertEqual(res["status"], WORKER_EXIT_FAILURE)
-            # Exit code 77 confirms msvcrt.open_osfhandle raised OSError (ERROR_INVALID_HANDLE)
-            exit_code = res.get("error", {}).get("details", {}).get("exit_code")
-            self.assertEqual(exit_code, 77)
+            # A typed operation on the Event avoids false positives when an
+            # allowlisted pipe happens to reuse the same numeric handle value.
+            self.assertIn("decoy_event_accessible", res, res)
+            self.assertFalse(res["decoy_event_accessible"], res)
         finally:
-            os.close(fd)
-            if os.path.exists(path):
-                os.unlink(path)
+            safe_close_handle(decoy)
+
+
+class TestWindowsAppContainerIntegration(unittest.TestCase):
+    """S4-B2/P1: real worker execution under the verified AppContainer identity."""
+
+    request = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+
+    def test_real_solve_worker_is_verified_before_resume(self):
+        controller = WorkerController(timeout_sec=5.0)
+        result = controller.execute_request(self.request)
+        self.assertEqual(result["outcome"], "SUCCESS")
+        self.assertEqual(result["status"], "UNIQUE_ROOT")
+        self.assertEqual(result["root"]["numerator"], "1")
+        self.assertEqual(result["root"]["denominator"], "1")
+        evidence = controller.get_last_appcontainer_evidence()
+        self.assertTrue(evidence["accepted"])
+        self.assertTrue(evidence["is_appcontainer"])
+        self.assertTrue(evidence["sid_matches_profile"])
+        self.assertFalse(evidence["elevated"])
+        self.assertTrue(evidence["job_assignment_verified"])
+        self.assertTrue(evidence["verified_before_resume"])
+        self.assertTrue(evidence["process_was_resumed"])
+
+    def test_token_identity_mismatch_is_rejected_while_suspended(self):
+        controller = WorkerController(timeout_sec=5.0)
+        result = controller.execute_request(self.request, _inject_token_mismatch=True)
+        self.assertEqual(result["status"], WORKER_STARTUP_FAILURE)
+        evidence = controller.get_last_appcontainer_evidence()
+        self.assertFalse(evidence["accepted"])
+        self.assertFalse(evidence["is_appcontainer"])
+        self.assertFalse(evidence["process_was_resumed"])
+
+    def test_profile_sid_mismatch_is_rejected_while_suspended(self):
+        controller = WorkerController(timeout_sec=5.0)
+        result = controller.execute_request(self.request, _inject_sid_mismatch=True)
+        self.assertEqual(result["status"], WORKER_STARTUP_FAILURE)
+        evidence = controller.get_last_appcontainer_evidence()
+        self.assertFalse(evidence["accepted"])
+        self.assertFalse(evidence["sid_matches_profile"])
+        self.assertFalse(evidence["process_was_resumed"])
+
+    def test_security_capabilities_attribute_failure_is_fail_closed(self):
+        controller = WorkerController(timeout_sec=5.0)
+        result = controller.execute_request(
+            self.request, _inject_appcontainer_attribute_failure=True
+        )
+        self.assertEqual(result["status"], WORKER_STARTUP_FAILURE)
+        self.assertIn("security capabilities", result["error"]["message"])
+
+    def test_repeated_appcontainer_workers_do_not_accumulate_handles(self):
+        controller = WorkerController(timeout_sec=5.0)
+        before = get_current_process_handle_count()
+        for _ in range(8):
+            result = controller.execute_request(self.request)
+            self.assertEqual(result["outcome"], "SUCCESS")
+        controller.settle_quarantine(timeout=1.0)
+        after = get_current_process_handle_count()
+        self.assertLessEqual(after, before + 4)
+        self.assertEqual(controller.get_unresolved_count(), 0)
+
+    def test_profile_cleanup_refuses_active_child_lease_then_recovers(self):
+        manager = get_appcontainer_manager()
+        lease = manager.acquire()
+        try:
+            refused = manager.cleanup()
+            self.assertEqual(refused["state"], "REFUSED_ACTIVE_CHILDREN")
+            self.assertGreaterEqual(refused["active_children"], 1)
+        finally:
+            lease.release()
+        cleaned = manager.cleanup()
+        self.assertEqual(cleaned["state"], "CLEANED")
+        self.assertEqual(cleaned["active_children"], 0)
 
 
 class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):

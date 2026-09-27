@@ -1,0 +1,191 @@
+{
+  "milestone": "S4-B2/P1",
+  "request": {
+    "schema_version": "mke.p02a.v1",
+    "operation": "SOLVE",
+    "equation": "x=1"
+  },
+  "response": {
+    "schema_version": "mke.p02a.v1",
+    "operation": "SOLVE",
+    "outcome": "SUCCESS",
+    "status": "UNIQUE_ROOT",
+    "classification": "UNIQUE_ROOT",
+    "root": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "definedness": true,
+    "error": null,
+    "is_provisional_evidence": true,
+    "evidence": {
+      "equation_str": "Equation(Variable('x'), IntegerLiteral(1))",
+      "left_affine": [
+        {
+          "numerator": 1,
+          "denominator": 1
+        },
+        {
+          "numerator": 0,
+          "denominator": 1
+        }
+      ],
+      "right_affine": [
+        {
+          "numerator": 0,
+          "denominator": 1
+        },
+        {
+          "numerator": 1,
+          "denominator": 1
+        }
+      ],
+      "normalized_a": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "normalized_b": {
+        "numerator": -1,
+        "denominator": 1
+      },
+      "classification": "UNIQUE_ROOT",
+      "root": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "candidate_check": {
+        "status": "VALID",
+        "candidate": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "is_valid": true,
+        "is_defined": true,
+        "left_value": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "right_value": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "error_code": null,
+        "error_message": null,
+        "error_span": null,
+        "diagnostics": {
+          "exact_equality": "True",
+          "residual": "0",
+          "steps_left": "1",
+          "steps_right": "1",
+          "total_steps": "2"
+        }
+      },
+      "step_trace": [
+        [
+          "STEP_01_SCOPE_PREFLIGHT",
+          "PRE_SIMPLIFICATION_IN_SCOPE"
+        ],
+        [
+          "STEP_02_AFFINE_EXTRACTION",
+          "EXACT_AFFINE_CONVERSION"
+        ],
+        [
+          "STEP_03_EQUATION_REDUCTION",
+          "NORMALIZED_AX_PLUS_B_EQUALS_ZERO"
+        ],
+        [
+          "STEP_04_ROOT_ISOLATION",
+          "SOLVE_LINEAR_UNIQUE_ROOT"
+        ],
+        [
+          "STEP_05_INDEPENDENT_VERIFICATION",
+          "S2_CHECK_CANDIDATE_VALID"
+        ]
+      ],
+      "diagnostics": {
+        "root": "1",
+        "steps": "11"
+      }
+    }
+  },
+  "token_and_job": {
+    "query_ok": true,
+    "is_appcontainer": true,
+    "sid_matches_profile": true,
+    "elevated": false,
+    "verified_before_resume": true,
+    "query_error": 0,
+    "appcontainer_sid": "S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266",
+    "accepted": true,
+    "profile_name": "mke.product.worker.p1.9412.5b478af67ec7",
+    "expected_sid": "S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266",
+    "job_assignment_verified": true,
+    "process_was_resumed": true
+  },
+  "profile": {
+    "name": "mke.product.worker.p1.9412.5b478af67ec7",
+    "active_children_after_request": 0,
+    "cleanup_with_active_lease": {
+      "state": "REFUSED_ACTIVE_CHILDREN",
+      "active_children": 1,
+      "profile_name": "mke.product.worker.p1.9412.5b478af67ec7"
+    },
+    "cleanup_after_release": {
+      "state": "CLEANED",
+      "stage_removed": true,
+      "delete_hresult": 0,
+      "active_children": 0,
+      "profile_name": "mke.product.worker.p1.9412.5b478af67ec7"
+    }
+  },
+  "acl": {
+    "command": "icacls.exe <staged-root>",
+    "returncode": 0,
+    "stdout": "<staged-root> S-1-15-2-3806528880-355488706-611428116-2533308742-4095973609-990596519-19359266:(OI)(CI)(RX)\n                                                       NT AUTHORITY\\SYSTEM:(OI)(CI)(F)\n                                                       BUILTIN\\Administrators:(OI)(CI)(F)\n                                                       OWNER RIGHTS:(OI)(CI)(F)\n\nSuccessfully processed 1 files; Failed processing 0 files",
+    "stderr": "",
+    "intended_sid_rights": "(OI)(CI)RX"
+  },
+  "manifest_summary": {
+    "root_components": [
+      "runtime",
+      "src/mke_product",
+      "worker_bootstrap.py"
+    ],
+    "runtime_policy": {
+      "root_files": [
+        "python.exe",
+        "python*.dll",
+        "vcruntime*.dll"
+      ],
+      "included_directories": [
+        "DLLs",
+        "Lib"
+      ],
+      "excluded_directories": [
+        "site-packages",
+        "__pycache__",
+        "ensurepip",
+        "idlelib",
+        "test",
+        "tests",
+        "tkinter",
+        "turtledemo",
+        "venv"
+      ],
+      "source_policy": "Only src/mke_product/**/*.py",
+      "python_flags": [
+        "-I",
+        "-S",
+        "-B"
+      ],
+      "appcontainer_access": "(OI)(CI)RX"
+    },
+    "file_count": 673,
+    "total_bytes": 36388444,
+    "aggregate_sha256": "9B8915A38FF6890F6A6C315DCF6177AE03C9C12B107B77E6022395D185BB921B"
+  },
+  "scope_limitations": [
+    "No claim of complete filesystem isolation.",
+    "No claim of outbound network isolation."
+  ]
+}
