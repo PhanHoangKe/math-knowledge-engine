@@ -346,6 +346,7 @@ class WorkerController:
         self.timeout_sec = timeout_sec
         self._stdin_pipe_buffer_size = _stdin_pipe_buffer_size
         self._last_write_info: Optional[Dict[str, Any]] = None
+        self._last_job_owner: Optional[SafeWin32Handle] = None
         self._current_writer_thread: Optional[threading.Thread] = None
 
         # Reentrancy lock enforcing single-request-at-a-time contract
@@ -383,6 +384,7 @@ class WorkerController:
                 if thread_finished:
                     pipe_ok = True
                     if rec.handle is not None:
+                        rec.handle_val = rec.handle.raw_value()
                         pipe_ok = rec.handle.close()
                         rec.handle_closed = rec.handle.is_confirmed_closed()
                         rec.handle_close_error = rec.handle.close_error
@@ -391,6 +393,7 @@ class WorkerController:
 
                     thread_h_ok = True
                     if rec.thread_handle is not None:
+                        rec.thread_handle_val = rec.thread_handle.raw_value()
                         thread_h_ok = rec.thread_handle.close()
                         rec.thread_handle_closed = rec.thread_handle.is_confirmed_closed()
                         rec.thread_handle_close_error = rec.thread_handle.close_error
@@ -427,8 +430,8 @@ class WorkerController:
                     "record_id": r.record_id,
                     "thread_name": r.thread.name if r.thread is not None else "mke-ipc-writer",
                     "thread_alive": r.thread.is_alive() if r.thread is not None else False,
-                    "handle_val": r.handle_val,
-                    "thread_handle_val": r.thread_handle_val,
+                    "handle_val": r.handle.raw_value() if r.handle is not None else r.handle_val,
+                    "thread_handle_val": r.thread_handle.raw_value() if r.thread_handle is not None else r.thread_handle_val,
                     "handle_closed": r.handle.is_confirmed_closed() if r.handle is not None else r.handle_closed,
                     "thread_handle_closed": r.thread_handle.is_confirmed_closed() if r.thread_handle is not None else r.thread_handle_closed,
                     "handle_close_error": r.handle.close_error if r.handle is not None else r.handle_close_error,
@@ -649,13 +652,14 @@ class WorkerController:
             )
 
         # Track handles for guaranteed cleanup in finally block
+        h_job_owner: Optional[SafeWin32Handle] = None
         h_job: Optional[wintypes.HANDLE] = None
-        h_stdin_read = wintypes.HANDLE()
+        h_stdin_read = wintypes.HANDLE(0)
         pipe_owner: Optional[SafePipeHandle] = None
-        h_stdout_read = wintypes.HANDLE()
-        h_stdout_write = wintypes.HANDLE()
-        h_stderr_read = wintypes.HANDLE()
-        h_stderr_write = wintypes.HANDLE()
+        h_stdout_read = wintypes.HANDLE(0)
+        h_stdout_write = wintypes.HANDLE(0)
+        h_stderr_read = wintypes.HANDLE(0)
+        h_stderr_write = wintypes.HANDLE(0)
         pi = PROCESS_INFORMATION()
         attr_buf: Optional[Any] = None
 
@@ -668,13 +672,25 @@ class WorkerController:
                     operation=operation,
                 )
 
-            h_job, job_err = create_configured_job_object(
+            raw_job, job_err = create_configured_job_object(
                 process_memory_limit=self.process_memory_limit,
                 job_memory_limit=self.job_memory_limit,
             )
-            if not h_job or _inject_job_config_failure:
-                safe_close_handle(h_job)
+            if raw_job:
+                h_job_owner = SafeWin32Handle(raw_job, _inject_close_failure=_inject_job_close_failure)
+                h_job = h_job_owner.handle
+                self._last_job_owner = h_job_owner
+            else:
+                h_job_owner = None
                 h_job = None
+                self._last_job_owner = None
+
+            if not raw_job or _inject_job_config_failure:
+                if h_job_owner is not None:
+                    h_job_owner.close()
+                    h_job_owner = None
+                    h_job = None
+                    self._last_job_owner = None
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create or configure Job Object (win32 error {job_err}).",
@@ -803,12 +819,15 @@ class WorkerController:
                 )
 
             # Close worker ends of pipes in controller immediately after creation
-            safe_close_handle(h_stdin_read)
-            h_stdin_read = wintypes.HANDLE()
-            safe_close_handle(h_stdout_write)
-            h_stdout_write = wintypes.HANDLE()
-            safe_close_handle(h_stderr_write)
-            h_stderr_write = wintypes.HANDLE()
+            ok, _ = safe_close_handle(h_stdin_read)
+            if ok:
+                h_stdin_read = wintypes.HANDLE(0)
+            ok, _ = safe_close_handle(h_stdout_write)
+            if ok:
+                h_stdout_write = wintypes.HANDLE(0)
+            ok, _ = safe_close_handle(h_stderr_write)
+            if ok:
+                h_stderr_write = wintypes.HANDLE(0)
 
             # 5. Assign process to Job Object and verify assignment BEFORE resuming thread
             if _inject_assignment_failure:
@@ -967,10 +986,11 @@ class WorkerController:
             # 10. Guaranteed cleanup of all handles and attribute lists
             cleanup_failures: Dict[str, Any] = {}
 
-            if h_stdin_read.value:
-                if not safe_close_handle(h_stdin_read):
-                    cleanup_failures["stdin_read"] = ctypes.get_last_error()
-                h_stdin_read = wintypes.HANDLE()
+            if getattr(h_stdin_read, "value", h_stdin_read):
+                ok, err = safe_close_handle(h_stdin_read)
+                if not ok:
+                    cleanup_failures["stdin_read"] = err
+                h_stdin_read = wintypes.HANDLE(0)
 
             # Handle ownership invariant: close pipe_owner ONLY IF not quarantined
             if pipe_owner is not None and not pipe_owner.is_quarantined():
@@ -997,36 +1017,44 @@ class WorkerController:
                         )
                         self._quarantine.append(rec)
 
-            if h_stdout_read.value:
-                if not safe_close_handle(h_stdout_read):
-                    cleanup_failures["stdout_read"] = ctypes.get_last_error()
-                h_stdout_read = wintypes.HANDLE()
+            if getattr(h_stdout_read, "value", h_stdout_read):
+                ok, err = safe_close_handle(h_stdout_read)
+                if not ok:
+                    cleanup_failures["stdout_read"] = err
+                h_stdout_read = wintypes.HANDLE(0)
 
-            if h_stdout_write.value:
-                if not safe_close_handle(h_stdout_write):
-                    cleanup_failures["stdout_write"] = ctypes.get_last_error()
-                h_stdout_write = wintypes.HANDLE()
+            if getattr(h_stdout_write, "value", h_stdout_write):
+                ok, err = safe_close_handle(h_stdout_write)
+                if not ok:
+                    cleanup_failures["stdout_write"] = err
+                h_stdout_write = wintypes.HANDLE(0)
 
-            if h_stderr_read.value:
-                if not safe_close_handle(h_stderr_read):
-                    cleanup_failures["stderr_read"] = ctypes.get_last_error()
-                h_stderr_read = wintypes.HANDLE()
+            if getattr(h_stderr_read, "value", h_stderr_read):
+                ok, err = safe_close_handle(h_stderr_read)
+                if not ok:
+                    cleanup_failures["stderr_read"] = err
+                h_stderr_read = wintypes.HANDLE(0)
 
-            if h_stderr_write.value:
-                if not safe_close_handle(h_stderr_write):
-                    cleanup_failures["stderr_write"] = ctypes.get_last_error()
-                h_stderr_write = wintypes.HANDLE()
+            if getattr(h_stderr_write, "value", h_stderr_write):
+                ok, err = safe_close_handle(h_stderr_write)
+                if not ok:
+                    cleanup_failures["stderr_write"] = err
+                h_stderr_write = wintypes.HANDLE(0)
 
             if pi.hProcess:
                 # Ensure worker process terminates
                 kernel32.TerminateProcess(pi.hProcess, 0)
                 kernel32.WaitForSingleObject(pi.hProcess, 1000)
-                if not safe_close_handle(pi.hProcess):
-                    cleanup_failures["process_handle"] = ctypes.get_last_error()
+                ok, err = safe_close_handle(pi.hProcess)
+                if not ok:
+                    cleanup_failures["process_handle"] = err
+                pi.hProcess = 0
 
             if pi.hThread:
-                if not safe_close_handle(pi.hThread):
-                    cleanup_failures["thread_handle"] = ctypes.get_last_error()
+                ok, err = safe_close_handle(pi.hThread)
+                if not ok:
+                    cleanup_failures["thread_handle"] = err
+                pi.hThread = 0
 
             if attr_buf:
                 try:
@@ -1035,13 +1063,10 @@ class WorkerController:
                     cleanup_failures["attr_list"] = str(ex)
 
             # Closing Job Object handle triggers KILL_ON_JOB_CLOSE for any remaining child processes
-            if h_job:
-                if _inject_job_close_failure:
-                    safe_close_handle(h_job)
-                    cleanup_failures["job_object"] = 5  # ERROR_ACCESS_DENIED
-                else:
-                    if not safe_close_handle(h_job):
-                        cleanup_failures["job_object"] = ctypes.get_last_error()
+            if h_job_owner is not None:
+                h_job_owner.close(_inject_failure=_inject_job_close_failure)
+                if not h_job_owner.is_confirmed_closed():
+                    cleanup_failures["job_object"] = h_job_owner.close_error
 
             if cleanup_failures:
                 # Fail closed: never return success or unqualified result if any handle cleanup failed
@@ -1123,7 +1148,6 @@ class WorkerController:
                     barrier_writer_ready.set()
                     # Wait for controller to signal abort and permit proceeding
                     barrier_controller_proceed.wait(timeout=2.0)
-                    time.sleep(0.05)
 
                 dup_invoked[0] = True
                 if _inject_duplicate_handle_failure:
@@ -1217,14 +1241,67 @@ class WorkerController:
         writer_thread.start()
 
         if _inject_late_duplicate_handle:
-            # Step 2: Controller waits for writer barrier, then signals abort BEFORE DuplicateHandle runs
+            # Step 1: Controller waits for writer to reach barrier BEFORE DuplicateHandle
             barrier_writer_ready.wait(timeout=1.0)
-            setup_ok = setup_done.wait(timeout=0.02)
+
+            # Step 2: Abort precedes duplication
             abort_requested.set()
-            # Step 3: Controller allows writer to run DuplicateHandle
+
+            # Step 3: Register quarantine in ledger BEFORE releasing writer
+            pipe_owner.quarantine()
+            quarantined = True
+            with self._quarantine_lock:
+                self._quarantine_counter += 1
+                rec = QuarantineRecord(
+                    record_id=self._quarantine_counter,
+                    thread=writer_thread,
+                    handle=pipe_owner,
+                    thread_handle=thread_handle_owner,
+                    handle_val=pipe_owner.raw_value(),
+                    thread_handle_val=thread_handle_owner.raw_value(),
+                    handle_closed=pipe_owner.is_confirmed_closed(),
+                    thread_handle_closed=thread_handle_owner.is_confirmed_closed(),
+                    handle_close_error=pipe_owner.close_error,
+                    thread_handle_close_error=thread_handle_owner.close_error,
+                    created_at=time.monotonic(),
+                    settled=False,
+                    settled_at=None,
+                )
+                self._quarantine.append(rec)
+
+            self._last_write_info = {
+                "duplicate_handle_invoked": False,
+                "duplicate_handle_raw_val": 0,
+                "duplicate_handle_success": False,
+                "duplicate_handle_error": 0,
+                "write_entered": False,
+                "write_blocked_at_deadline": False,
+                "cancellation_requested": False,
+                "cancel_synchronous_io_called": False,
+                "cancel_synchronous_io_success": False,
+                "cancel_synchronous_io_return": None,
+                "cancel_synchronous_io_last_error": None,
+                "writer_thread_alive_before_cancel": False,
+                "writer_thread_alive_after_join": True,
+                "write_file_status": "PAUSED_BEFORE_DUPLICATE",
+                "writer_exited": False,
+                "all_handles_safely_released": False,
+                "handle_quarantined": True,
+                "bytes_written": 0,
+                "total_bytes": len(data),
+            }
+
+            # Step 4: Release paused writer thread to proceed with DuplicateHandle AFTER quarantine registration
             barrier_controller_proceed.set()
-        else:
-            setup_ok = setup_done.wait(timeout=0.02 if _inject_writer_setup_hang else 1.0)
+
+            return _build_controller_error(
+                WORKER_STARTUP_FAILURE,
+                "Writer thread setup timed out before DuplicateHandle completion.",
+                details={"setup_timed_out": True, "writer_exited": False, "handle_quarantined": True},
+                operation=operation,
+            )
+
+        setup_ok = setup_done.wait(timeout=0.02 if _inject_writer_setup_hang else 1.0)
 
         # Check DuplicateHandle status and setup completion before proceeding
         if not setup_ok or not dup_success[0] or _inject_late_duplicate_handle:

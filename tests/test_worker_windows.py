@@ -1330,7 +1330,7 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertEqual(controller.get_active_quarantine_count(), 0)
 
     def test_actual_late_duplication_sequence_exit_after_quarantine(self):
-        """Interleaving D (Actual Late Duplication): Worker pauses before DuplicateHandle until controller setup deadline."""
+        """Interleaving D (Actual Late Duplication): Writer paused at barrier, controller quarantines before releasing writer."""
         controller = WorkerController(
             timeout_sec=0.2,
             _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
@@ -1344,9 +1344,14 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertIsNotNone(controller._last_write_info)
         self.assertTrue(controller._last_write_info["handle_quarantined"])
 
-        # Allow writer thread to complete its delayed execution (0.05s) and close handles in finally:
-        time.sleep(0.2)
-        settled_count = controller.settle_quarantine(timeout=0.2)
+        # Immediately after execute_request returns, quarantine record is registered and active
+        self.assertEqual(controller.get_active_quarantine_count(), 1)
+        recs_initial = controller.get_quarantine_records()
+        self.assertEqual(len(recs_initial), 1)
+        self.assertFalse(recs_initial[0]["settled"])
+
+        # Settle quarantine: writer finishes post-abort duplicate handle, closes both handles, and exits
+        settled_count = controller.settle_quarantine(timeout=0.5)
         self.assertEqual(settled_count, 1)
         self.assertEqual(controller.get_active_quarantine_count(), 0)
 
@@ -1360,9 +1365,10 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertTrue(recs[0]["settled"])
         self.assertTrue(recs[0]["handle_closed"])
         self.assertTrue(recs[0]["thread_handle_closed"])
+        self.assertGreater(recs[0]["thread_handle_val"], 0)
 
     def test_job_object_close_failure_fails_closed_and_preserves_diagnostics(self):
-        """Job Object CloseHandle failure fails closed with WORKER_RESOURCE_EXHAUSTED and preserves diagnostics."""
+        """Job Object CloseHandle failure fails closed with WORKER_RESOURCE_EXHAUSTED and preserves unclosed handle ownership."""
         controller = WorkerController(timeout_sec=2.0)
         req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
         res = controller.execute_request(req, _inject_job_close_failure=True)
@@ -1373,6 +1379,49 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertEqual(res.get("error", {}).get("details", {}).get("job_close_error"), 5)
         self.assertIn("job_object", res.get("error", {}).get("details", {}).get("cleanup_failures", {}))
 
+        # Verify resource ownership was NOT lost: Job Object handle remains tracked and open in test double
+        self.assertIsNotNone(controller._last_job_owner)
+        job_owner = controller._last_job_owner
+        self.assertGreater(job_owner.raw_value(), 0)
+        self.assertTrue(job_owner.is_close_failed())
+        self.assertEqual(job_owner.close_error, 5)
+        self.assertFalse(job_owner.is_confirmed_closed())
+
+        # Documented recovery path: clear failure injection and close the owned Job Object handle cleanly
+        job_owner._inject_close_failure = False
+        close_ok = job_owner.close()
+        self.assertTrue(close_ok)
+        self.assertTrue(job_owner.is_confirmed_closed())
+        self.assertEqual(job_owner.close_error, 0)
+
+    def test_safe_close_handle_tuple_validation_detects_false_return(self):
+        """safe_close_handle tuple (False, err) is correctly unpacked and not treated as truthy."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+
+        original_safe_close = None
+        from mke_product.worker import controller as ctrl_mod
+        original_safe_close = ctrl_mod.safe_close_handle
+
+        try:
+            # Inject a test double for safe_close_handle returning (False, 6) for stdout_read
+            def mock_safe_close(handle):
+                # Call original close first to prevent handle leak
+                original_safe_close(handle)
+                # Return failure tuple
+                return (False, 6)
+
+            with mock.patch.object(ctrl_mod, "safe_close_handle", side_effect=mock_safe_close):
+                res = controller.execute_request(req)
+
+            # Cleanup failure MUST be detected and convert mathematical success into fail-closed error
+            self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+            self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+            self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+            self.assertIn("cleanup_failures", res.get("error", {}).get("details", {}))
+        finally:
+            pass
+
     def test_recovery_following_cleanup_failure(self):
         """WorkerController successfully recovers and executes subsequent requests on the same instance after cleanup failure."""
         controller = WorkerController(timeout_sec=2.0)
@@ -1382,6 +1431,11 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         res1 = controller.execute_request(req, _inject_job_close_failure=True)
         self.assertEqual(res1["status"], WORKER_RESOURCE_EXHAUSTED)
         self.assertFalse(res1.get("error", {}).get("details", {}).get("safe_cleanup"))
+
+        # Clear failure injection on tracked job owner to reap resource
+        if controller._last_job_owner:
+            controller._last_job_owner._inject_close_failure = False
+            controller._last_job_owner.close()
 
         # Request 2: Normal request on the same controller instance succeeds cleanly
         res2 = controller.execute_request(req)
