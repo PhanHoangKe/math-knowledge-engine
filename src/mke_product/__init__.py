@@ -10,8 +10,16 @@ from .evaluator import (
     CandidateCheckStatus,
     EvaluationBudget,
 )
+from .solver import (
+    solve_equation,
+    SolverResult,
+    SolverScopeStatus,
+    SolutionClassification,
+    SolverEvidence,
+    AffineForm,
+)
 
-__version__ = "0.2.0-s2"
+__version__ = "0.2.0-s3"
 
 __all__ = [
     "Rational",
@@ -23,4 +31,10 @@ __all__ = [
     "CandidateCheckResult",
     "CandidateCheckStatus",
     "EvaluationBudget",
+    "solve_equation",
+    "SolverResult",
+    "SolverScopeStatus",
+    "SolutionClassification",
+    "SolverEvidence",
+    "AffineForm",
 ]
