@@ -1,0 +1,127 @@
+{
+  "acl": {
+    "assigned_modify": {
+      "command": "icacls.exe C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p0-rtcnhk__\\assigned-write /grant:r *S-1-15-2-2944640253-1027260903-2424184391-1103996251-1825284997-3338775568-2171127379:(OI)(CI)M /Q",
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Successfully processed 1 files; Failed processing 0 files"
+    },
+    "runtime_rx": {
+      "command": "icacls.exe C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p0-rtcnhk__\\runtime /grant:r *S-1-15-2-2944640253-1027260903-2424184391-1103996251-1825284997-3338775568-2171127379:(OI)(CI)RX /Q",
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Successfully processed 1 files; Failed processing 0 files"
+    }
+  },
+  "disposable_root": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p0-rtcnhk__",
+  "disposable_root_removed": true,
+  "environment": {
+    "account": "phanhoangke\\kedep",
+    "is_user_an_admin": false,
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_source": "C:\\Users\\kedep\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python",
+    "token_elevation_error": 0,
+    "token_elevation_query_ok": true,
+    "token_is_elevated": false,
+    "windows_version": "10.0.26200"
+  },
+  "filesystem_observation": {
+    "allowed_file_exists": false,
+    "denied_file_exists": false
+  },
+  "fixtures": {
+    "tcp_fixture_closed_without_connection": true,
+    "tcp_received": false,
+    "udp_fixture_closed_without_datagram": true,
+    "udp_received": false
+  },
+  "launch": {
+    "attribute_list": {
+      "attribute_count": 2,
+      "expected_first_error": 122,
+      "first_call_error": 122,
+      "first_call_return": false,
+      "handle_list_error": 0,
+      "handle_list_ok": true,
+      "initialize_error": 0,
+      "initialize_ok": true,
+      "security_capabilities_error": 0,
+      "security_capabilities_ok": true,
+      "size": 72
+    },
+    "child": null,
+    "create_process_error": 87,
+    "create_process_ok": false,
+    "exit_code": null,
+    "raw_output": "",
+    "wait_result": null
+  },
+  "native_smoke_launch": {
+    "attribute_list": {
+      "attribute_count": 1,
+      "expected_first_error": 122,
+      "first_call_error": 122,
+      "first_call_return": false,
+      "handle_list_error": null,
+      "handle_list_ok": null,
+      "initialize_error": 0,
+      "initialize_ok": true,
+      "security_capabilities_error": 0,
+      "security_capabilities_ok": true,
+      "size": 48
+    },
+    "child": null,
+    "create_process_error": 87,
+    "create_process_ok": false,
+    "exit_code": null,
+    "raw_output": "",
+    "wait_result": null
+  },
+  "profile": {
+    "create_hresult": "0x00000000",
+    "create_succeeded": true,
+    "delete_hresult": "0x00000000",
+    "delete_succeeded": true,
+    "derive_hresult": "0x00000000",
+    "derived_sid_valid": true,
+    "name": "mke.s4b2.p0.12324.1790514876",
+    "returned_equals_derived": true,
+    "returned_sid_valid": true,
+    "sid": "S-1-15-2-2944640253-1027260903-2424184391-1103996251-1825284997-3338775568-2171127379"
+  },
+  "runtime_stage": {
+    "copied_root_files": [
+      "python.exe",
+      "python3.dll",
+      "python312.dll",
+      "vcruntime140.dll",
+      "vcruntime140_1.dll"
+    ],
+    "destination": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p0-rtcnhk__\\runtime",
+    "source": "C:\\Users\\kedep\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python",
+    "staged_bytes": 36084323
+  },
+  "schema": "mke-s4b2-p0-appcontainer-preflight-v1",
+  "security_only_launch": {
+    "attribute_list": {
+      "attribute_count": 1,
+      "expected_first_error": 122,
+      "first_call_error": 122,
+      "first_call_return": false,
+      "handle_list_error": null,
+      "handle_list_ok": null,
+      "initialize_error": 0,
+      "initialize_ok": true,
+      "security_capabilities_error": 0,
+      "security_capabilities_ok": true,
+      "size": 48
+    },
+    "child": null,
+    "create_process_error": 87,
+    "create_process_ok": false,
+    "exit_code": null,
+    "raw_output": "",
+    "wait_result": null
+  },
+  "started_utc": "2026-09-27T13:14:36Z"
+}

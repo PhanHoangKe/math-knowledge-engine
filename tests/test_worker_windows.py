@@ -74,6 +74,7 @@ from mke_product.worker.win32 import (
     assign_and_verify_process_in_job,
     create_configured_job_object,
     get_current_process_handle_count,
+    get_unresolved_job_object_cleanup_failures,
     kernel32,
     query_job_limits,
     query_job_peak_memory,
@@ -558,6 +559,47 @@ class TestWindowsFailurePaths(unittest.TestCase):
         self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
         self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
         self.assertIsNone(res["definedness"])
+
+    def test_combined_real_job_config_and_native_cleanup_failure_retains_owner(self):
+        """ERROR_INVALID_PARAMETER plus protected CloseHandle failure remains owned and fails closed."""
+        controller = WorkerController(process_memory_limit=0, job_memory_limit=0)
+        res = controller.execute_request(
+            self.sample_req,
+            _inject_protected_job_config_cleanup_failure=True,
+        )
+
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        details = res["error"]["details"]
+        self.assertFalse(details["safe_cleanup"])
+        self.assertEqual(details["job_creation_failure"]["configuration_error"], 87)
+        self.assertNotEqual(details["job_creation_failure"]["cleanup_error"], 0)
+        self.assertEqual(
+            details["job_creation_failure"]["cleanup_error"],
+            details["job_close_error"],
+        )
+        self.assertTrue(details["job_creation_failure"]["handle_valid_after_failure"])
+        self.assertIn("job_object", details["cleanup_failures"])
+        self.assertEqual(get_unresolved_job_object_cleanup_failures(), [])
+
+        owners = controller.get_unresolved_job_handles()
+        self.assertEqual(len(owners), 1)
+        owner = owners[0]
+        self.assertEqual(owner.close_evidence, CLOSE_EVIDENCE_NATIVE_FAILURE)
+        attempts = owner.close_attempts
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(owner.close_attempts, attempts)
+
+        flags = wintypes.DWORD()
+        self.assertTrue(bool(kernel32.GetHandleInformation(owner.handle, ctypes.byref(flags))))
+        self.assertTrue(flags.value & HANDLE_FLAG_PROTECT_FROM_CLOSE)
+        self.assertTrue(bool(kernel32.SetHandleInformation(
+            owner.handle,
+            HANDLE_FLAG_PROTECT_FROM_CLOSE,
+            0,
+        )))
+        self.assertTrue(owner.recover_native_close())
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(controller.get_unresolved_count(), 0)
 
     def test_injected_process_creation_failure(self):
         res = self.controller.execute_request(self.sample_req, _inject_process_creation_failure=True)

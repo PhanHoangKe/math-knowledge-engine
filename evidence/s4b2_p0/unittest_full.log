@@ -1,0 +1,519 @@
+test_accept_fraction_candidate (test_evaluator.TestCandidateInputValidation.test_accept_fraction_candidate) ... ok
+test_accept_integer_candidate (test_evaluator.TestCandidateInputValidation.test_accept_integer_candidate) ... ok
+test_accept_rational_candidate (test_evaluator.TestCandidateInputValidation.test_accept_rational_candidate) ... ok
+test_accept_string_candidate (test_evaluator.TestCandidateInputValidation.test_accept_string_candidate) ... ok
+test_reject_malformed_string_candidate (test_evaluator.TestCandidateInputValidation.test_reject_malformed_string_candidate) ... ok
+test_reject_non_equation_ast (test_evaluator.TestCandidateInputValidation.test_reject_non_equation_ast) ... ok
+test_reject_unsupported_candidate_types (test_evaluator.TestCandidateInputValidation.test_reject_unsupported_candidate_types) ... ok
+test_strictly_reject_boolean_candidate (test_evaluator.TestCandidateInputValidation.test_strictly_reject_boolean_candidate)
+In Python, bool is a subclass of int. It must be rejected. ... ok
+test_strictly_reject_float_candidate (test_evaluator.TestCandidateInputValidation.test_strictly_reject_float_candidate) ... ok
+test_evaluate_linear_expression (test_evaluator.TestDirectExpressionEvaluator.test_evaluate_linear_expression) ... ok
+test_evaluate_unbound_variable_raises (test_evaluator.TestDirectExpressionEvaluator.test_evaluate_unbound_variable_raises) ... ok
+test_evaluate_unsupported_ast_node_raises (test_evaluator.TestDirectExpressionEvaluator.test_evaluate_unsupported_ast_node_raises) ... ok
+test_candidate_string_extremely_long_ceiling (test_evaluator.TestEvaluationRemediationS2R1.test_candidate_string_extremely_long_ceiling)
+Classify oversize input as a resource failure before integer construction. ... ok
+test_candidate_string_leading_zero_abuse (test_evaluator.TestEvaluationRemediationS2R1.test_candidate_string_leading_zero_abuse)
+Leading zeros on multi-digit numbers are forbidden by strict grammar. ... ok
+test_candidate_string_malformed_fractions (test_evaluator.TestEvaluationRemediationS2R1.test_candidate_string_malformed_fractions)
+Reject malformed, multiple-slash, non-ASCII, and whitespace strings. ... ok
+test_candidate_string_valid_small_signed_rationals (test_evaluator.TestEvaluationRemediationS2R1.test_candidate_string_valid_small_signed_rationals)
+Valid small signed ASCII rational strings parse accurately into Rational. ... ok
+test_evaluation_budget_parameter_validation (test_evaluator.TestEvaluationRemediationS2R1.test_evaluation_budget_parameter_validation)
+Validate EvaluationBudget configuration: positive integers only, reject bool. ... ok
+test_mandatory_regression_shared_operation_budget (test_evaluator.TestEvaluationRemediationS2R1.test_mandatory_regression_shared_operation_budget)
+Mandatory regression: ... ok
+test_three_valued_definedness_contract (test_evaluator.TestEvaluationRemediationS2R1.test_three_valued_definedness_contract)
+Verify three-valued definedness contract: ... ok
+test_addition_and_subtraction_do_not_mask_domain_errors (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_addition_and_subtraction_do_not_mask_domain_errors)
+0 + (1/x) = 0 and 0 - (x^0) = 0 at x=0 must be DOMAIN_ERROR. ... ok
+test_constant_zero_to_zero_fails_domain (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_constant_zero_to_zero_fails_domain)
+0^0 = 1 parsed with constant 0^0 must fail with DOMAIN_ERROR. ... ok
+test_grouped_negated_x_squared (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_grouped_negated_x_squared)
+(-x)^2 = 1 at x=1 evaluates to (-1)^2 = 1 -> VALID. ... ok
+test_linear_equation_invalid_candidate (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_linear_equation_invalid_candidate)
+2*x + 3 = 7 at x=3 evaluates to 9=7 -> INVALID. ... ok
+test_linear_equation_valid_candidate (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_linear_equation_valid_candidate)
+2*x + 3 = 7 at x=2 evaluates to 7=7 -> VALID. ... ok
+test_literal_division_by_zero (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_literal_division_by_zero)
+Literal 1/0 in expression causes DOMAIN_ERROR. ... ok
+test_multiplication_by_zero_does_not_mask_division_by_zero_left (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_multiplication_by_zero_does_not_mask_division_by_zero_left)
+0 * (1/x) = 0 at x=0 must NEVER mask the division by zero in the right operand. ... ok
+test_multiplication_by_zero_does_not_mask_division_by_zero_right (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_multiplication_by_zero_does_not_mask_division_by_zero_right)
+(1/x) * 0 = 0 at x=0 must NEVER mask the division by zero in the left operand. ... ok
+test_multiplication_by_zero_does_not_mask_zero_to_zero (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_multiplication_by_zero_does_not_mask_zero_to_zero)
+0 * (x^0) = 0 at x=0 must be DOMAIN_ERROR because 0^0 is undefined. ... ok
+test_negated_x_squared (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_negated_x_squared)
+-x^2 = 1 parsed as -(x^2). At x=1, left is -1, right is 1 -> INVALID. ... ok
+test_nested_denominators (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_nested_denominators)
+1/(1/(x-2)) = 1: x=2 is DOMAIN_ERROR; x=3 is VALID. ... ok
+test_quadratic_equation_both_roots (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_quadratic_equation_both_roots)
+x^2 - 4 = 0: x=2 and x=-2 are valid solutions. ... ok
+test_quadratic_equation_non_root (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_quadratic_equation_non_root)
+x^2 - 4 = 0 at x=1 evaluates to -3=0 -> INVALID. ... ok
+test_rational_fraction_division_by_zero_at_singularity (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_rational_fraction_division_by_zero_at_singularity)
+(x-1)/(x-1) = 1 at x=1 must fail with DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_rational_fraction_valid_away_from_singularity (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_rational_fraction_valid_away_from_singularity)
+(x-1)/(x-1) = 1 at x=2 evaluates to 1=1 -> VALID. ... ok
+test_shifted_variable_raised_to_zero_at_singularity (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_shifted_variable_raised_to_zero_at_singularity)
+(x-1)^0 = 1 at x=1 must fail with DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_variable_raised_to_zero_at_singularity (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_variable_raised_to_zero_at_singularity)
+x^0 = 1 at x=0 must fail with DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_variable_raised_to_zero_away_from_singularity (test_evaluator.TestEvaluatorMandatoryRepresentativeCases.test_variable_raised_to_zero_away_from_singularity)
+x^0 = 1 at x=2 evaluates to 1=1 -> VALID. ... ok
+test_equal_values_with_tight_budget (test_evaluator.TestResidualBudgetRemediationS2R2.test_equal_values_with_tight_budget)
+Equal values yield residual 0, which safely fits tight integer bit budget. ... ok
+test_negative_residual_difference_exceeding_budget (test_evaluator.TestResidualBudgetRemediationS2R2.test_negative_residual_difference_exceeding_budget)
+Negative difference (left < right): ... ok
+test_negative_residual_difference_fitting_budget (test_evaluator.TestResidualBudgetRemediationS2R2.test_negative_residual_difference_fitting_budget)
+Negative difference (left < right) fitting normal budget: ... ok
+test_normal_budget_invalid_candidate (test_evaluator.TestResidualBudgetRemediationS2R2.test_normal_budget_invalid_candidate)
+Normal budget with x = 1/7, candidate 1/5: ... ok
+test_residual_exceeding_integer_bit_budget_returns_resource_exhausted (test_evaluator.TestResidualBudgetRemediationS2R2.test_residual_exceeding_integer_bit_budget_returns_resource_exhausted)
+Required regression: ... ok
+test_ast_immutability_preservation (test_evaluator.TestResourceBoundsAndImmutability.test_ast_immutability_preservation) ... ok
+test_candidate_bit_budget_exhaustion (test_evaluator.TestResourceBoundsAndImmutability.test_candidate_bit_budget_exhaustion) ... ok
+test_integer_bit_budget_exhaustion (test_evaluator.TestResourceBoundsAndImmutability.test_integer_bit_budget_exhaustion) ... ok
+test_operation_budget_exhaustion (test_evaluator.TestResourceBoundsAndImmutability.test_operation_budget_exhaustion) ... ok
+test_static_extraction_of_domain_obligations (test_evaluator.TestResourceBoundsAndImmutability.test_static_extraction_of_domain_obligations) ... ok
+test_ast_immutability (test_parser.TestASTImmutabilityAndInspection.test_ast_immutability) ... ok
+test_ast_traversal_and_variables (test_parser.TestASTImmutabilityAndInspection.test_ast_traversal_and_variables) ... ok
+test_inspection_dict (test_parser.TestASTImmutabilityAndInspection.test_inspection_dict) ... ok
+test_reject_number_parentheses (test_parser.TestImplicitMultiplicationVarieties.test_reject_number_parentheses) ... ok
+test_reject_parentheses_number (test_parser.TestImplicitMultiplicationVarieties.test_reject_parentheses_number) ... ok
+test_reject_parentheses_parentheses (test_parser.TestImplicitMultiplicationVarieties.test_reject_parentheses_parentheses) ... ok
+test_reject_parentheses_variable (test_parser.TestImplicitMultiplicationVarieties.test_reject_parentheses_variable) ... ok
+test_reject_spaced_implicit (test_parser.TestImplicitMultiplicationVarieties.test_reject_spaced_implicit) ... ok
+test_reject_variable_parentheses (test_parser.TestImplicitMultiplicationVarieties.test_reject_variable_parentheses) ... ok
+test_max_input_length_exceeded (test_parser.TestInputBoundsSafety.test_max_input_length_exceeded) ... ok
+test_max_nesting_depth_exceeded (test_parser.TestInputBoundsSafety.test_max_nesting_depth_exceeded) ... ok
+test_empty_equation_sides (test_parser.TestMalformedInputsAndInvalidSymbols.test_empty_equation_sides) ... ok
+test_invalid_characters (test_parser.TestMalformedInputsAndInvalidSymbols.test_invalid_characters) ... ok
+test_missing_equation_equals (test_parser.TestMalformedInputsAndInvalidSymbols.test_missing_equation_equals) ... ok
+test_multiple_equation_equals (test_parser.TestMalformedInputsAndInvalidSymbols.test_multiple_equation_equals) ... ok
+test_unmatched_parentheses (test_parser.TestMalformedInputsAndInvalidSymbols.test_unmatched_parentheses) ... ok
+test_unsupported_variable (test_parser.TestMalformedInputsAndInvalidSymbols.test_unsupported_variable) ... ok
+test_division_left_associative (test_parser.TestOperatorPrecedenceAndAssociativity.test_division_left_associative) ... ok
+test_mixed_add_sub_mul_div (test_parser.TestOperatorPrecedenceAndAssociativity.test_mixed_add_sub_mul_div) ... ok
+test_mul_precedes_add (test_parser.TestOperatorPrecedenceAndAssociativity.test_mul_precedes_add) ... ok
+test_power_precedes_mul (test_parser.TestOperatorPrecedenceAndAssociativity.test_power_precedes_mul) ... ok
+test_subtraction_left_associative (test_parser.TestOperatorPrecedenceAndAssociativity.test_subtraction_left_associative) ... ok
+test_case_constant_indeterminate_zero_to_zero (test_parser.TestParserMandatoryRepresentativeCases.test_case_constant_indeterminate_zero_to_zero) ... ok
+test_case_grouped_neg_x_squared (test_parser.TestParserMandatoryRepresentativeCases.test_case_grouped_neg_x_squared) ... ok
+test_case_implicit_multiplication_fractional (test_parser.TestParserMandatoryRepresentativeCases.test_case_implicit_multiplication_fractional) ... ok
+test_case_implicit_multiplication_simple (test_parser.TestParserMandatoryRepresentativeCases.test_case_implicit_multiplication_simple) ... ok
+test_case_linear_explicit (test_parser.TestParserMandatoryRepresentativeCases.test_case_linear_explicit) ... ok
+test_case_neg_x_squared (test_parser.TestParserMandatoryRepresentativeCases.test_case_neg_x_squared) ... ok
+test_case_quadratic_equation (test_parser.TestParserMandatoryRepresentativeCases.test_case_quadratic_equation) ... ok
+test_case_rational_fraction_preservation (test_parser.TestParserMandatoryRepresentativeCases.test_case_rational_fraction_preservation) ... ok
+test_case_unsupported_exponent_value (test_parser.TestParserMandatoryRepresentativeCases.test_case_unsupported_exponent_value) ... ok
+test_case_variable_exponent_zero (test_parser.TestParserMandatoryRepresentativeCases.test_case_variable_exponent_zero) ... ok
+test_ascii_only_digits_and_unicode_rejection (test_parser.TestParserRemediationS1R1.test_ascii_only_digits_and_unicode_rejection) ... ok
+test_ast_and_token_immutability (test_parser.TestParserRemediationS1R1.test_ast_and_token_immutability) ... ok
+test_literal_exponent_grammar_enforcement (test_parser.TestParserRemediationS1R1.test_literal_exponent_grammar_enforcement) ... ok
+test_span_immutability (test_parser.TestParserRemediationS1R1.test_span_immutability) ... ok
+test_token_count_boundaries (test_parser.TestParserRemediationS1R1.test_token_count_boundaries) ... ok
+test_unary_precedence_audit_structure (test_parser.TestParserRemediationS1R1.test_unary_precedence_audit_structure) ... ok
+test_reject_unary_after_binary_without_grouping (test_parser.TestUnaryPlacementAndGrammarConstraints.test_reject_unary_after_binary_without_grouping) ... ok
+test_valid_unary_in_grouped_expression (test_parser.TestUnaryPlacementAndGrammarConstraints.test_valid_unary_in_grouped_expression) ... ok
+test_valid_unary_leading_expression (test_parser.TestUnaryPlacementAndGrammarConstraints.test_valid_unary_leading_expression) ... ok
+test_candidate_domain_error_division_by_zero (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_domain_error_division_by_zero)
+(x-1)/(x-1)=1 with candidate 1 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_candidate_domain_error_zero_to_zero (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_domain_error_zero_to_zero)
+x^0=1 with candidate 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_candidate_invalid (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_invalid)
+2*x=4 with candidate 3 -> INVALID. ... ok
+test_candidate_resource_exhausted (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_resource_exhausted)
+Candidate check resource budget exhaustion yields UNKNOWN definedness. ... ok
+test_candidate_tiny_nonzero_rational_residual (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_tiny_nonzero_rational_residual)
+x = 1/7 with candidate 1/5 -> residual 2/35. ... ok
+test_candidate_valid (test_protocol.TestProtocolCheckCandidateDispatch.test_candidate_valid)
+(x-1)/(x-1)=1 with candidate 2 -> VALID. ... ok
+test_candidate_whitespace_rejected_at_protocol_boundary (test_protocol.TestProtocolRemediationS4AR1.test_candidate_whitespace_rejected_at_protocol_boundary)
+Candidate string with leading, trailing, or internal whitespace is strictly rejected. ... ok
+test_dict_input_size_limit_enforced (test_protocol.TestProtocolRemediationS4AR1.test_dict_input_size_limit_enforced)
+Dict payload exceeding 4096 bytes is rejected without unbounded serialization. ... ok
+test_duplicate_json_keys_rejected (test_protocol.TestProtocolRemediationS4AR1.test_duplicate_json_keys_rejected)
+Duplicate JSON object keys must be rejected before mathematical dispatch. ... ok
+test_excessive_json_nesting_rejected (test_protocol.TestProtocolRemediationS4AR1.test_excessive_json_nesting_rejected)
+Excessive JSON nesting handled safely without uncaught recursion errors. ... ok
+test_excessive_parenthesis_nesting_check_candidate_caught_cleanly (test_protocol.TestProtocolRemediationS4AR1.test_excessive_parenthesis_nesting_check_candidate_caught_cleanly)
+Equation exceeding 16 parenthesis levels caught for CHECK_CANDIDATE. ... ok
+test_excessive_parenthesis_nesting_solve_caught_cleanly (test_protocol.TestProtocolRemediationS4AR1.test_excessive_parenthesis_nesting_solve_caught_cleanly)
+Equation exceeding 16 parenthesis levels caught for SOLVE. ... ok
+test_excessive_tokens_check_candidate_caught_cleanly (test_protocol.TestProtocolRemediationS4AR1.test_excessive_tokens_check_candidate_caught_cleanly)
+Equation within 256 characters but exceeding 64 tokens caught for CHECK_CANDIDATE. ... ok
+test_excessive_tokens_solve_caught_cleanly (test_protocol.TestProtocolRemediationS4AR1.test_excessive_tokens_solve_caught_cleanly)
+Equation within 256 characters but exceeding 64 tokens caught for SOLVE. ... ok
+test_non_string_dict_key_rejected (test_protocol.TestProtocolRemediationS4AR1.test_non_string_dict_key_rejected)
+Non-string dictionary key rejected with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_response_size_limit_fails_closed (test_protocol.TestProtocolRemediationS4AR1.test_response_size_limit_fails_closed)
+Response exceeding MAX_RESPONSE_BYTES fails closed with ERR_RESPONSE_LIMIT_EXCEEDED. ... ok
+test_syntax_error_definedness_null (test_protocol.TestProtocolRemediationS4AR1.test_syntax_error_definedness_null)
+SYNTAX_ERROR returns definedness null, not false. ... ok
+test_dict_multibyte_unicode_oversized_in_unexpected_field (test_protocol.TestProtocolRemediationS4AR2.test_dict_multibyte_unicode_oversized_in_unexpected_field)
+Dict with oversized multibyte Unicode in unexpected field triggers ERR_PAYLOAD_TOO_LARGE. ... ok
+test_dict_rejects_unsupported_value_types (test_protocol.TestProtocolRemediationS4AR2.test_dict_rejects_unsupported_value_types)
+Dict payload with unsupported value types is rejected predictably with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_invalid_unicode_isolated_surrogates_in_dict (test_protocol.TestProtocolRemediationS4AR2.test_invalid_unicode_isolated_surrogates_in_dict)
+Isolated Unicode surrogate in dict payload is caught as ERR_PROTOCOL_JSON_DECODE. ... ok
+test_invalid_unicode_isolated_surrogates_in_string (test_protocol.TestProtocolRemediationS4AR2.test_invalid_unicode_isolated_surrogates_in_string)
+Isolated Unicode surrogate in string payload is caught as ERR_PROTOCOL_JSON_DECODE. ... ok
+test_invalid_unicode_malformed_utf8_bytes (test_protocol.TestProtocolRemediationS4AR2.test_invalid_unicode_malformed_utf8_bytes)
+Malformed UTF-8 bytes payload is caught as ERR_PROTOCOL_JSON_DECODE without uncaught exceptions. ... ok
+test_json_error_classification_duplicate_keys (test_protocol.TestProtocolRemediationS4AR2.test_json_error_classification_duplicate_keys)
+Valid JSON with duplicate object keys produces ERR_PROTOCOL_MALFORMED_STRUCTURE. ... ok
+test_json_error_classification_incorrect_root_structure (test_protocol.TestProtocolRemediationS4AR2.test_json_error_classification_incorrect_root_structure)
+Valid JSON with non-dict root produces ERR_PROTOCOL_MALFORMED_STRUCTURE. ... ok
+test_json_error_classification_malformed_syntax (test_protocol.TestProtocolRemediationS4AR2.test_json_error_classification_malformed_syntax)
+Malformed JSON string produces ERR_PROTOCOL_JSON_DECODE (not malformed structure). ... ok
+test_json_nesting_ceiling_deep_arrays (test_protocol.TestProtocolRemediationS4AR2.test_json_nesting_ceiling_deep_arrays)
+Deeply nested arrays exceeding MAX_JSON_NESTING_DEPTH fail with ERR_PROTOCOL_MALFORMED_STRUCTURE. ... ok
+test_json_nesting_ceiling_enforced_on_otherwise_valid_request (test_protocol.TestProtocolRemediationS4AR2.test_json_nesting_ceiling_enforced_on_otherwise_valid_request)
+Otherwise valid request wrapped in structures exceeding MAX_JSON_NESTING_DEPTH (16) fails with ERR_PROTOCOL_MALFORMED_STRUCTURE. ... ok
+test_response_limit_default_max_response_bytes (test_protocol.TestProtocolRemediationS4AR2.test_response_limit_default_max_response_bytes)
+Default MAX_RESPONSE_BYTES=16384 satisfies serialized limit invariant. ... ok
+test_response_limit_rejects_invalid_configuration (test_protocol.TestProtocolRemediationS4AR2.test_response_limit_rejects_invalid_configuration)
+max_response_bytes smaller than MIN_RESPONSE_BYTES (512) is rejected with ValueError. ... ok
+test_response_limit_valid_smaller_ceiling (test_protocol.TestProtocolRemediationS4AR2.test_response_limit_valid_smaller_ceiling)
+A valid smaller ceiling (e.g. 512) enforces serialized limit and fails closed when exceeded. ... ok
+test_valid_ordinary_request_within_nesting_ceiling (test_protocol.TestProtocolRemediationS4AR2.test_valid_ordinary_request_within_nesting_ceiling)
+Valid ordinary request parses and executes normally within nesting ceiling. ... ok
+test_dict_escaped_control_chars_quotes_and_backslashes (test_protocol.TestProtocolRemediationS4AR3.test_dict_escaped_control_chars_quotes_and_backslashes)
+Dict string byte calculation accurately accounts for 2-byte single-char escapes and 6-byte hex escapes. ... ok
+test_dict_multibyte_utf8_byte_accounting (test_protocol.TestProtocolRemediationS4AR3.test_dict_multibyte_utf8_byte_accounting)
+Dict string byte calculation accurately accounts for multibyte UTF-8 characters. ... ok
+test_dict_u0000_700_repetitions_rejected_as_payload_too_large (test_protocol.TestProtocolRemediationS4AR3.test_dict_u0000_700_repetitions_rejected_as_payload_too_large)
+Dict containing 700 U+0000 control chars in unexpected field exceeds 4096 JSON bytes and is rejected as ERR_PAYLOAD_TOO_LARGE. ... ok
+test_raw_json_escaped_isolated_surrogate_rejected (test_protocol.TestProtocolRemediationS4AR3.test_raw_json_escaped_isolated_surrogate_rejected)
+Raw ASCII JSON payload with escaped isolated surrogate (e.g. \ud800) yields ERR_PROTOCOL_JSON_DECODE. ... ok
+test_raw_json_ordinary_escaped_unicode_handled_correctly (test_protocol.TestProtocolRemediationS4AR3.test_raw_json_ordinary_escaped_unicode_handled_correctly)
+Ordinary escaped Unicode (e.g. \u0078 for 'x') executes normally, while non-ASCII (\u03c0 for '\u03c0') triggers ERR_PROTOCOL_INPUT_LIMIT. ... ok
+test_solve_domain_set_r (test_protocol.TestProtocolSolveDispatch.test_solve_domain_set_r)
+x = x -> DomainSet(R). ... ok
+test_solve_domain_set_r_constant_identity (test_protocol.TestProtocolSolveDispatch.test_solve_domain_set_r_constant_identity)
+1 = 1 -> DomainSet(R). ... ok
+test_solve_empty_set_constant_contradiction (test_protocol.TestProtocolSolveDispatch.test_solve_empty_set_constant_contradiction)
+1 = 2 -> EmptySet. ... ok
+test_solve_empty_set_zero_times_x_equals_constant (test_protocol.TestProtocolSolveDispatch.test_solve_empty_set_zero_times_x_equals_constant)
+0*x = 5 -> EmptySet. ... ok
+test_solve_fractional_coefficients (test_protocol.TestProtocolSolveDispatch.test_solve_fractional_coefficients)
+(1/2)*x + (3/4) = 0 -> root = -3/2. ... ok
+test_solve_mixed_hazard_owner_ruling_a (test_protocol.TestProtocolSolveDispatch.test_solve_mixed_hazard_owner_ruling_a)
+Owner Decision MKE-S3-ADR-001: Proven constant domain error takes precedence. ... ok
+test_solve_nonlinear_scope_abstention (test_protocol.TestProtocolSolveDispatch.test_solve_nonlinear_scope_abstention)
+x^2 - 4 = 0 -> OUT_OF_SCOPE, OUT_OF_SCOPE_NONLINEAR. ... ok
+test_solve_resource_exhausted (test_protocol.TestProtocolSolveDispatch.test_solve_resource_exhausted)
+Budget exhaustion produces RESOURCE_EXHAUSTED outcome and UNKNOWN (null) definedness. ... ok
+test_solve_syntax_error (test_protocol.TestProtocolSolveDispatch.test_solve_syntax_error)
+Malformed mathematical syntax yields SYNTAX_ERROR with accurate span. ... ok
+test_solve_unique_root (test_protocol.TestProtocolSolveDispatch.test_solve_unique_root)
+2*x+3=7 -> SUCCESS, UNIQUE_ROOT, root=2. ... ok
+test_solve_variable_exponent_zero_abstention (test_protocol.TestProtocolSolveDispatch.test_solve_variable_exponent_zero_abstention)
+x^0 = 1 -> OUT_OF_SCOPE, OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_exact_rational_decimal_string_serialization (test_protocol.TestProtocolValidationAndSecurity.test_exact_rational_decimal_string_serialization)
+Ensure no float representation appears anywhere in serialized numbers. ... ok
+test_invalid_types_on_solve (test_protocol.TestProtocolValidationAndSecurity.test_invalid_types_on_solve)
+Non-string fields rejected with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_json_bool_candidate_rejected (test_protocol.TestProtocolValidationAndSecurity.test_json_bool_candidate_rejected)
+JSON boolean candidate is rejected with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_json_float_candidate_rejected (test_protocol.TestProtocolValidationAndSecurity.test_json_float_candidate_rejected)
+JSON float candidate is rejected with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_json_null_candidate_rejected (test_protocol.TestProtocolValidationAndSecurity.test_json_null_candidate_rejected)
+JSON null candidate is rejected with ERR_PROTOCOL_INVALID_TYPE. ... ok
+test_json_roundtrip_bytes_and_str (test_protocol.TestProtocolValidationAndSecurity.test_json_roundtrip_bytes_and_str)
+Convenience dispatch_json accepts both bytes and string. ... ok
+test_malformed_candidate_string_rejected (test_protocol.TestProtocolValidationAndSecurity.test_malformed_candidate_string_rejected)
+Malformed rational string rejected as PROTOCOL_ERROR. ... ok
+test_missing_required_fields (test_protocol.TestProtocolValidationAndSecurity.test_missing_required_fields)
+Missing required fields rejected with ERR_PROTOCOL_MISSING_FIELD. ... ok
+test_non_ascii_equation_rejected (test_protocol.TestProtocolValidationAndSecurity.test_non_ascii_equation_rejected)
+Equation with non-ASCII characters rejected with ERR_PROTOCOL_INPUT_LIMIT. ... ok
+test_oversized_equation_rejected (test_protocol.TestProtocolValidationAndSecurity.test_oversized_equation_rejected)
+Equation exceeding 256 characters rejected with ERR_PROTOCOL_INPUT_LIMIT. ... ok
+test_oversized_payload_rejected (test_protocol.TestProtocolValidationAndSecurity.test_oversized_payload_rejected)
+Payload exceeding 4096 bytes is rejected before parsing. ... ok
+test_provisional_evidence_flag_consistency (test_protocol.TestProtocolValidationAndSecurity.test_provisional_evidence_flag_consistency)
+Verify is_provisional_evidence flag is consistent across outcomes. ... ok
+test_unexpected_extra_fields (test_protocol.TestProtocolValidationAndSecurity.test_unexpected_extra_fields)
+Extra disallowed fields rejected under strict allowlist. ... ok
+test_unsupported_operation (test_protocol.TestProtocolValidationAndSecurity.test_unsupported_operation)
+Unknown operation is rejected deterministically. ... ok
+test_unsupported_protocol_version (test_protocol.TestProtocolValidationAndSecurity.test_unsupported_protocol_version)
+Unsupported schema_version is rejected deterministically. ... ok
+test_addition (test_rational.TestRationalArithmetic.test_addition) ... ok
+test_division (test_rational.TestRationalArithmetic.test_division) ... ok
+test_division_by_zero (test_rational.TestRationalArithmetic.test_division_by_zero) ... ok
+test_multiplication (test_rational.TestRationalArithmetic.test_multiplication) ... ok
+test_subtraction (test_rational.TestRationalArithmetic.test_subtraction) ... ok
+test_unary_operations (test_rational.TestRationalArithmetic.test_unary_operations) ... ok
+test_deterministic_representations (test_rational.TestRationalBoundaryAndExtremeCases.test_deterministic_representations) ... ok
+test_hashable_and_set_dict_membership (test_rational.TestRationalBoundaryAndExtremeCases.test_hashable_and_set_dict_membership) ... ok
+test_immutability (test_rational.TestRationalBoundaryAndExtremeCases.test_immutability) ... ok
+test_large_exact_integers (test_rational.TestRationalBoundaryAndExtremeCases.test_large_exact_integers) ... ok
+test_tiny_nonzero_quantities (test_rational.TestRationalBoundaryAndExtremeCases.test_tiny_nonzero_quantities) ... ok
+test_exact_equality (test_rational.TestRationalComparisonsAndEquality.test_exact_equality) ... ok
+test_ordering (test_rational.TestRationalComparisonsAndEquality.test_ordering) ... ok
+test_sign_and_properties (test_rational.TestRationalComparisonsAndEquality.test_sign_and_properties) ... ok
+test_canonical_reduction (test_rational.TestRationalConstruction.test_canonical_reduction) ... ok
+test_invalid_types_and_float_rejection (test_rational.TestRationalConstruction.test_invalid_types_and_float_rejection) ... ok
+test_negative_denominator_normalization (test_rational.TestRationalConstruction.test_negative_denominator_normalization) ... ok
+test_string_parsing (test_rational.TestRationalConstruction.test_string_parsing) ... ok
+test_zero_denominator_rejection (test_rational.TestRationalConstruction.test_zero_denominator_rejection) ... ok
+test_zero_numerator (test_rational.TestRationalConstruction.test_zero_numerator) ... ok
+test_boolean_semantics (test_rational.TestRegressionS0R1.test_boolean_semantics) ... ok
+test_hash_consistency_with_int_and_fraction (test_rational.TestRegressionS0R1.test_hash_consistency_with_int_and_fraction) ... ok
+test_mixed_type_dict_lookup (test_rational.TestRegressionS0R1.test_mixed_type_dict_lookup) ... ok
+test_mixed_type_set_membership_and_cardinality (test_rational.TestRegressionS0R1.test_mixed_type_set_membership_and_cardinality) ... ok
+test_issue1_exponent_zero_binding_addition_left (test_solver.TestScopePreflightRemediationS3R1.test_issue1_exponent_zero_binding_addition_left)
+x^0 + x^2 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_issue1_exponent_zero_binding_addition_right (test_solver.TestScopePreflightRemediationS3R1.test_issue1_exponent_zero_binding_addition_right)
+x^2 + x^0 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_issue1_exponent_zero_binding_denominator (test_solver.TestScopePreflightRemediationS3R1.test_issue1_exponent_zero_binding_denominator)
+1/(x^0) = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_issue1_exponent_zero_binding_multiplication (test_solver.TestScopePreflightRemediationS3R1.test_issue1_exponent_zero_binding_multiplication)
+x*(x^0) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_issue1_exponent_zero_binding_nested_power (test_solver.TestScopePreflightRemediationS3R1.test_issue1_exponent_zero_binding_nested_power)
+(x^0)^2 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_issue2_constant_undefinedness_division_by_zero_left (test_solver.TestScopePreflightRemediationS3R1.test_issue2_constant_undefinedness_division_by_zero_left)
+1/0 + x^2 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_issue2_constant_undefinedness_division_by_zero_right (test_solver.TestScopePreflightRemediationS3R1.test_issue2_constant_undefinedness_division_by_zero_right)
+x^2 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_issue2_constant_undefinedness_zero_to_zero_left (test_solver.TestScopePreflightRemediationS3R1.test_issue2_constant_undefinedness_zero_to_zero_left)
+0^0 + x/(x-1) = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_issue2_constant_undefinedness_zero_to_zero_right (test_solver.TestScopePreflightRemediationS3R1.test_issue2_constant_undefinedness_zero_to_zero_right)
+x/(x-1) + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_permutation_invariance_nonlinear_and_rational (test_solver.TestScopePreflightRemediationS3R1.test_permutation_invariance_nonlinear_and_rational)
+Permutation invariance between nonlinear and rational fraction. ... ok
+test_simultaneous_exponent_zero_and_constant_undefinedness (test_solver.TestScopePreflightRemediationS3R1.test_simultaneous_exponent_zero_and_constant_undefinedness)
+Equation with both x^0 and 1/0 is rejected with deterministic domain error. ... ok
+test_ast_immutability (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_ast_immutability)
+Solving an equation does not mutate the original AST. ... ok
+test_constant_denominator_zero_expression_rejected (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_constant_denominator_zero_expression_rejected)
+x/(2-2) = 1 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_independent_verification_failure_fails_closed (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_independent_verification_failure_fails_closed)
+Simulate S2 check_candidate returning INVALID to verify fail-closed behavior. ... ok
+test_independent_verification_resource_exhaustion_fails_closed (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_independent_verification_resource_exhaustion_fails_closed)
+Simulate S2 check_candidate returning RESOURCE_EXHAUSTED to verify fail-closed behavior. ... ok
+test_integer_bit_budget_exhaustion_in_solver (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_integer_bit_budget_exhaustion_in_solver)
+Solver respects EvaluationBudget max_integer_bits. ... ok
+test_large_rational_coefficients (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_large_rational_coefficients)
+1000000*x + 2000000 = 5000000 -> x = 3. ... ok
+test_negative_signs_and_grouping (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_negative_signs_and_grouping)
+-(2*x - 4) = 8 -> -2*x + 4 = 8 -> -2*x = 4 -> x = -2. ... ok
+test_operation_budget_exhaustion_in_solver (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_operation_budget_exhaustion_in_solver)
+Solver respects EvaluationBudget max_operations. ... ok
+test_shifted_variable_raised_to_zero_rejected (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_shifted_variable_raised_to_zero_rejected)
+(x-1)^0 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_type_error_on_non_equation (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_type_error_on_non_equation)
+solve_equation raises TypeError if passed something other than an Equation AST. ... ok
+test_variable_multiplied_by_variable_expression_rejected (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_variable_multiplied_by_variable_expression_rejected)
+x*x = 1 -> OUT_OF_SCOPE_NONLINEAR. ... ok
+test_variable_subtraction_cancellation_preserves_nonlinear_rejection (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_variable_subtraction_cancellation_preserves_nonlinear_rejection)
+(x-x)*x = 0 -> multiplying two variable expressions is OUT_OF_SCOPE_NONLINEAR. ... ok
+test_variable_terms_on_both_sides (test_solver.TestSolverAlgebraicVarietiesAndProperties.test_variable_terms_on_both_sides)
+5*x + 3 = 2*x + 9 -> 3*x = 6 -> x = 2. ... ok
+test_budget_exhaustion_during_affine_extraction (test_solver.TestSolverFinalRemediationS3R2.test_budget_exhaustion_during_affine_extraction)
+Exhausting shared operation budget during affine extraction fails closed. ... ok
+test_budget_exhaustion_during_preflight_constant_subexpression (test_solver.TestSolverFinalRemediationS3R2.test_budget_exhaustion_during_preflight_constant_subexpression)
+Exhausting operation budget during preflight constant subexpression evaluation fails closed. ... ok
+test_budget_exhaustion_during_preflight_traversal (test_solver.TestSolverFinalRemediationS3R2.test_budget_exhaustion_during_preflight_traversal)
+Exhausting operation budget during preflight traversal fails closed. ... ok
+test_exponent_zero_precedence_over_nonlinear_multiplication (test_solver.TestSolverFinalRemediationS3R2.test_exponent_zero_precedence_over_nonlinear_multiplication)
+x*(x^0) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_exponent_zero_precedence_over_quadratic_power (test_solver.TestSolverFinalRemediationS3R2.test_exponent_zero_precedence_over_quadratic_power)
+x^0 + x^2 = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_exponent_zero_precedence_over_quadratic_power_reversed (test_solver.TestSolverFinalRemediationS3R2.test_exponent_zero_precedence_over_quadratic_power_reversed)
+x^2 + x^0 = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_exponent_zero_precedence_over_rational_fraction (test_solver.TestSolverFinalRemediationS3R2.test_exponent_zero_precedence_over_rational_fraction)
+(x^0)/(x-1) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_mixed_hazard_div_zero_and_nonlinear_right (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_div_zero_and_nonlinear_right)
+1/0 + x^2 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_mixed_hazard_div_zero_and_rational_fraction_right (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_div_zero_and_rational_fraction_right)
+1/0 + x/(x-1) = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_mixed_hazard_nonlinear_and_div_zero_left (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_nonlinear_and_div_zero_left)
+x^2 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_mixed_hazard_rational_fraction_and_div_zero_left (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_rational_fraction_and_div_zero_left)
+x/(x-1) + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_mixed_hazard_rational_fraction_and_zero_to_zero_left (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_rational_fraction_and_zero_to_zero_left)
+x/(x-1) + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_mixed_hazard_zero_to_zero_and_rational_fraction_right (test_solver.TestSolverFinalRemediationS3R2.test_mixed_hazard_zero_to_zero_and_rational_fraction_right)
+0^0 + x/(x-1) = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_multiple_domain_errors_preserves_domain_error_category (test_solver.TestSolverFinalRemediationS3R2.test_multiple_domain_errors_preserves_domain_error_category)
+1/0 + 0^0 = 0 and 0^0 + 1/0 = 0 both guarantee DOMAIN_ERROR category. ... ok
+test_no_regression_all_reals (test_solver.TestSolverFinalRemediationS3R2.test_no_regression_all_reals)
+x + 1 = x + 1 -> DomainSet(R). ... ok
+test_no_regression_empty_set (test_solver.TestSolverFinalRemediationS3R2.test_no_regression_empty_set)
+x + 1 = x + 2 -> EmptySet. ... ok
+test_no_regression_unique_root (test_solver.TestSolverFinalRemediationS3R2.test_no_regression_unique_root)
+3*x + 6 = 0 -> UNIQUE_ROOT, x = -2. ... ok
+test_owner_decision_a_div_zero_and_exponent_zero_right (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_div_zero_and_exponent_zero_right)
+1/0 + x^0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_owner_decision_a_div_zero_and_shifted_var_exponent_zero (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_div_zero_and_shifted_var_exponent_zero)
+1/(2-2) + (x-1)^0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_owner_decision_a_exponent_zero_and_div_zero_left (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_exponent_zero_and_div_zero_left)
+x^0 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_owner_decision_a_exponent_zero_and_zero_to_zero_left (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_exponent_zero_and_zero_to_zero_left)
+x^0 + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_owner_decision_a_shifted_var_exponent_zero_and_div_zero (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_shifted_var_exponent_zero_and_div_zero)
+(x-1)^0 + 1/(2-2) = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO. ... ok
+test_owner_decision_a_zero_to_zero_and_exponent_zero_right (test_solver.TestSolverFinalRemediationS3R2.test_owner_decision_a_zero_to_zero_and_exponent_zero_right)
+0^0 + x^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO. ... ok
+test_resource_exhaustion_never_produces_solution_classification (test_solver.TestSolverFinalRemediationS3R2.test_resource_exhaustion_never_produces_solution_classification)
+Ensure RESOURCE_EXHAUSTED never returns UNIQUE_ROOT, DomainSet(R), or EmptySet. ... ok
+test_s2_independent_verification_present_and_valid (test_solver.TestSolverFinalRemediationS3R2.test_s2_independent_verification_present_and_valid)
+Unique root solution includes verified S2 candidate check result. ... ok
+test_contradiction_constant_inequality (test_solver.TestSolverMandatoryRegressions.test_contradiction_constant_inequality)
+1 = 2 -> EmptySet. ... ok
+test_contradiction_zero_times_x_equals_constant (test_solver.TestSolverMandatoryRegressions.test_contradiction_zero_times_x_equals_constant)
+0*x = 5 -> EmptySet. ... ok
+test_domain_error_constant_zero_to_zero (test_solver.TestSolverMandatoryRegressions.test_domain_error_constant_zero_to_zero)
+0^0 = 1 -> DOMAIN_ERROR. ... ok
+test_domain_error_literal_division_by_zero (test_solver.TestSolverMandatoryRegressions.test_domain_error_literal_division_by_zero)
+1/0 = 0 -> DOMAIN_ERROR. ... ok
+test_domain_error_multiplication_by_zero_does_not_mask (test_solver.TestSolverMandatoryRegressions.test_domain_error_multiplication_by_zero_does_not_mask)
+0*(1/0) = 0 -> DOMAIN_ERROR. ... ok
+test_identity_constant_equals_constant (test_solver.TestSolverMandatoryRegressions.test_identity_constant_equals_constant)
+1 = 1 -> DomainSet(R). ... ok
+test_identity_variable_equals_variable (test_solver.TestSolverMandatoryRegressions.test_identity_variable_equals_variable)
+x = x -> DomainSet(R). ... ok
+test_identity_zero_times_x_equals_zero (test_solver.TestSolverMandatoryRegressions.test_identity_zero_times_x_equals_zero)
+0*x = 0 -> DomainSet(R). ... ok
+test_linear_basic_integer_coefficients (test_solver.TestSolverMandatoryRegressions.test_linear_basic_integer_coefficients)
+2*x + 3 = 7 -> UNIQUE_ROOT, x = 2. ... ok
+test_linear_division_by_constant (test_solver.TestSolverMandatoryRegressions.test_linear_division_by_constant)
+x/2 + 1 = 0 -> UNIQUE_ROOT, x = -2. ... ok
+test_linear_fractional_coefficients (test_solver.TestSolverMandatoryRegressions.test_linear_fractional_coefficients)
+(1/2)*x + (3/4) = 0 -> UNIQUE_ROOT, x = -3/2. ... ok
+test_linear_negative_coefficient (test_solver.TestSolverMandatoryRegressions.test_linear_negative_coefficient)
+-3*x + 9 = 0 -> UNIQUE_ROOT, x = 3. ... ok
+test_out_of_scope_quadratic_cancellation (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_quadratic_cancellation)
+x^2 - x^2 = 0 -> OUT_OF_SCOPE_NONLINEAR. ... ok
+test_out_of_scope_quadratic_expression (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_quadratic_expression)
+x^2 - 4 = 0 -> OUT_OF_SCOPE_NONLINEAR. ... ok
+test_out_of_scope_rational_fraction (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_rational_fraction)
+(x-1)/(x-1) = 1 -> OUT_OF_SCOPE_RATIONAL_FRACTION. ... ok
+test_out_of_scope_variable_exponent_zero (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_variable_exponent_zero)
+x^0 = 1 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_out_of_scope_zero_times_quadratic (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_zero_times_quadratic)
+0*x^2 = 0 -> OUT_OF_SCOPE_NONLINEAR. ... ok
+test_out_of_scope_zero_times_variable_exponent_zero (test_solver.TestSolverMandatoryRegressions.test_out_of_scope_zero_times_variable_exponent_zero)
+0*x^0 = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO. ... ok
+test_affine_extraction_boundary_exhaustion (test_solver.TestSolverResourceExhaustionBoundariesS3R3.test_affine_extraction_boundary_exhaustion)
+Affine-extraction boundary: equation x=1. ... ok
+test_constant_evaluation_boundary_exhaustion (test_solver.TestSolverResourceExhaustionBoundariesS3R3.test_constant_evaluation_boundary_exhaustion)
+Constant-evaluation boundary: equation x/0=0. ... ok
+test_resource_exhaustion_never_produces_solved_classification_exhaustive (test_solver.TestSolverResourceExhaustionBoundariesS3R3.test_resource_exhaustion_never_produces_solved_classification_exhaustive)
+Verify that across all stages, resource exhaustion never yields UNIQUE_ROOT, DomainSet(R), or EmptySet. ... ok
+test_root_isolation_boundary_exhaustion (test_solver.TestSolverResourceExhaustionBoundariesS3R3.test_root_isolation_boundary_exhaustion)
+Root-isolation boundary: equation x=1. ... ok
+test_s2_separate_budget_preservation (test_solver.TestSolverResourceExhaustionBoundariesS3R3.test_s2_separate_budget_preservation)
+Verify that S2 independent verification receives its own budget and is not exhausted by S3 steps. ... ok
+test_breakaway_from_job_rejected (test_worker_windows.TestWindowsBreakawayRejection.test_breakaway_from_job_rejected) ... ok
+test_actual_late_duplication_sequence_exit_after_quarantine (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_actual_late_duplication_sequence_exit_after_quarantine)
+Interleaving D (Actual Late Duplication): Writer paused at barrier, controller quarantines before releasing writer. ... ok
+test_cancel_synchronous_io_failure_handled_safely (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_cancel_synchronous_io_failure_handled_safely)
+If CancelSynchronousIo returns False, telemetry records failure and worker is terminated. ... ok
+test_combined_uncertain_termination_and_job_close_failure_fails_closed (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_combined_uncertain_termination_and_job_close_failure_fails_closed)
+Unconfirmed termination plus Job close failure retains containment ownership. ... ok
+test_delayed_writer_termination_quarantines_handle (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_delayed_writer_termination_quarantines_handle)
+If writer thread does not exit within join deadline, handle is not closed and cleanup is not falsely claimed. ... ok
+test_duplicate_handle_failure_aborts_before_write (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_duplicate_handle_failure_aborts_before_write)
+If DuplicateHandle fails, WriteFile is never entered, request fails closed cleanly. ... ok
+test_error_envelope_deterministic_fallback_on_serialization_failure (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_error_envelope_deterministic_fallback_on_serialization_failure)
+_build_controller_error returns a minimal deterministic envelope when JSON serialization fails. ... ok
+test_failed_termination_request_retains_job_containment (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_failed_termination_request_retains_job_containment)
+A failed termination request leaves the live child owned by the unresolved Job. ... ok
+test_failed_termination_wait_is_not_confirmation (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_failed_termination_wait_is_not_confirmation)
+WAIT_FAILED is retained as uncertainty until Job containment recovery completes. ... ok
+test_genuine_native_close_failure_is_not_blindly_retried (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_genuine_native_close_failure_is_not_blindly_retried)
+A protected real handle produces native failure and requires explicit recovery. ... ok
+test_independent_repeated_requests_reset_telemetry (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_independent_repeated_requests_reset_telemetry)
+Repeated requests on the same controller reset telemetry cleanly without stale state. ... ok
+test_injected_close_handle_failure_preserves_quarantine_diagnostics (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_injected_close_handle_failure_preserves_quarantine_diagnostics)
+When CloseHandle fails on quarantined handle, quarantine record remains unsettled with diagnostics. ... ok
+test_invalid_stale_handle_is_recorded_not_closed_or_retried (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_invalid_stale_handle_is_recorded_not_closed_or_retried)
+A stale numeric value is not treated as proof of ownership or successful cleanup. ... ok
+test_job_object_close_failure_fails_closed_and_preserves_diagnostics (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_job_object_close_failure_fails_closed_and_preserves_diagnostics)
+Job Object CloseHandle failure fails closed with WORKER_RESOURCE_EXHAUSTED and preserves unclosed handle ownership. ... ok
+test_no_double_close_on_pipe_handle (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_no_double_close_on_pipe_handle)
+Verify that controller pipe handles are closed exactly once, never double-closed. ... ok
+test_normal_execution_pipe_close_failure_quarantines_and_fails_closed (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_normal_execution_pipe_close_failure_quarantines_and_fails_closed)
+Normal completion with injected pipe close failure fails closed and registers quarantine diagnostics. ... ok
+test_normal_write_completion_guards_active_writer (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_normal_write_completion_guards_active_writer)
+Normal write completion fails closed and quarantines handle if writer thread is still active. ... ok
+test_persistent_job_ledger_tracks_multiple_unresolved_handles (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_persistent_job_ledger_tracks_multiple_unresolved_handles)
+Persistent Job ledger maintains bounded tracking across multiple requests without orphaning handles. ... ok
+test_process_and_thread_handle_close_failure_fails_closed_and_preserves_ownership (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_process_and_thread_handle_close_failure_fails_closed_and_preserves_ownership)
+Process and primary thread handle close failure fails closed and preserves ownership. ... ok
+test_quarantine_capacity_limit_rejects_requests (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_quarantine_capacity_limit_rejects_requests)
+Active quarantine queue bounded at MAX_ACTIVE_QUARANTINE (32) rejects new requests with WORKER_RESOURCE_EXHAUSTED. ... ok
+test_quarantined_handle_released_after_delayed_writer_eventual_exit (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_quarantined_handle_released_after_delayed_writer_eventual_exit)
+Quarantined handle is safely released when delayed writer thread eventually finishes. ... ok
+test_recovery_following_cleanup_failure (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_recovery_following_cleanup_failure)
+WorkerController successfully recovers and executes subsequent requests on the same instance after cleanup failure. ... ok
+test_repeated_write_timeouts_no_kernel_handle_leak (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_repeated_write_timeouts_no_kernel_handle_leak)
+Repeated write timeouts on the same controller do not leak Windows kernel handles (0 delta). ... ok
+test_safe_win32_handle_four_state_lifecycle (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_safe_win32_handle_four_state_lifecycle)
+SafeWin32Handle transitions through distinct states: OPEN -> CLOSING -> CONFIRMED_CLOSED / CLOSE_FAILED. ... ok
+test_safe_win32_handle_native_handle_verification (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_safe_win32_handle_native_handle_verification)
+SafeWin32Handle verifies genuine native handle state transitions with Win32 APIs. ... ok
+test_single_request_contract_concurrent_execution_rejected (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_single_request_contract_concurrent_execution_rejected)
+WorkerController rejects concurrent execute_request calls atomically with WORKER_RESOURCE_EXHAUSTED. ... ok
+test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership)
+Stdout pipe close failure fails closed and preserves unclosed handle in persistent ledger. ... ok
+test_writer_setup_hang_quarantines_handle (test_worker_windows.TestWindowsCancellationAndHandleOwnership.test_writer_setup_hang_quarantines_handle)
+Writer setup hang/timeout quarantines handle and avoids premature close while writer is active. ... ok
+test_controller_accepts_chinese_chars_within_byte_limit_before_worker (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_accepts_chinese_chars_within_byte_limit_before_worker)
+700 repetitions of U+4E2D (2100 bytes) serializes within 4096 bytes and reaches Job creation. ... ok
+test_controller_bounds_error_envelope_under_huge_details (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_bounds_error_envelope_under_huge_details)
+Internal error builder truncates or falls back so serialized error never exceeds IPC_MAX_RESPONSE_BYTES. ... ok
+test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation)
+Reproduce Chinese character byte expansion: 1400 chars (4200 bytes) rejected before Job creation. ... ok
+test_controller_rejects_cyclic_dictionary (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_cyclic_dictionary) ... ok
+test_controller_rejects_isolated_surrogates (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_isolated_surrogates) ... ok
+test_controller_rejects_non_string_keys (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_non_string_keys) ... ok
+test_controller_rejects_oversized_operation_and_bounds_error_envelope (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_oversized_operation_and_bounds_error_envelope)
+Oversized untrusted operation string (>16 KiB) is rejected, normalized to UNKNOWN, and response is bounded. ... ok
+test_controller_rejects_oversized_payload (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_oversized_payload) ... ok
+test_controller_rejects_raw_string_oversized_operation_bounded (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_raw_string_oversized_operation_bounded)
+Oversized raw string request is rejected, normalized to UNKNOWN, and response strictly <= IPC_MAX_RESPONSE_BYTES. ... ok
+test_controller_rejects_unsupported_types (test_worker_windows.TestWindowsControllerInputBoundary.test_controller_rejects_unsupported_types) ... ok
+test_combined_real_job_config_and_native_cleanup_failure_retains_owner (test_worker_windows.TestWindowsFailurePaths.test_combined_real_job_config_and_native_cleanup_failure_retains_owner)
+ERROR_INVALID_PARAMETER plus protected CloseHandle failure remains owned and fails closed. ... ok
+test_injected_assignment_failure (test_worker_windows.TestWindowsFailurePaths.test_injected_assignment_failure) ... ok
+test_injected_job_config_failure (test_worker_windows.TestWindowsFailurePaths.test_injected_job_config_failure) ... ok
+test_injected_job_creation_failure (test_worker_windows.TestWindowsFailurePaths.test_injected_job_creation_failure) ... ok
+test_injected_process_creation_failure (test_worker_windows.TestWindowsFailurePaths.test_injected_process_creation_failure) ... ok
+test_injected_resume_failure (test_worker_windows.TestWindowsFailurePaths.test_injected_resume_failure) ... ok
+test_unallowlisted_handle_not_inherited (test_worker_windows.TestWindowsHandleConfinement.test_unallowlisted_handle_not_inherited) ... ok
+test_job_memory_limit_exceeded_aggregate (test_worker_windows.TestWindowsJobMemoryLimit.test_job_memory_limit_exceeded_aggregate)
+Two concurrent processes in same Job Object: second process exceeds aggregate Job limit with readiness handshake. ... ok
+test_job_memory_limit_isolated_control_succeeds (test_worker_windows.TestWindowsJobMemoryLimit.test_job_memory_limit_isolated_control_succeeds)
+Isolated control: prove identical Worker 2 allocation succeeds under 80 MiB per-process limit with generous Job limit. ... ok
+test_kill_on_job_close_terminates_worker (test_worker_windows.TestWindowsKillOnJobClose.test_kill_on_job_close_terminates_worker) ... ok
+test_check_candidate_domain_error (test_worker_windows.TestWindowsMathematicalRegression.test_check_candidate_domain_error) ... ok
+test_check_candidate_invalid (test_worker_windows.TestWindowsMathematicalRegression.test_check_candidate_invalid) ... ok
+test_check_candidate_valid (test_worker_windows.TestWindowsMathematicalRegression.test_check_candidate_valid) ... ok
+test_solve_contradiction_empty_set (test_worker_windows.TestWindowsMathematicalRegression.test_solve_contradiction_empty_set) ... ok
+test_solve_domain_error_div_zero (test_worker_windows.TestWindowsMathematicalRegression.test_solve_domain_error_div_zero) ... ok
+test_solve_identity_all_reals (test_worker_windows.TestWindowsMathematicalRegression.test_solve_identity_all_reals) ... ok
+test_solve_linear_fractional_coefficients (test_worker_windows.TestWindowsMathematicalRegression.test_solve_linear_fractional_coefficients) ... ok
+test_solve_linear_unique_root (test_worker_windows.TestWindowsMathematicalRegression.test_solve_linear_unique_root) ... ok
+test_solve_out_of_scope_nonlinear (test_worker_windows.TestWindowsMathematicalRegression.test_solve_out_of_scope_nonlinear) ... ok
+test_process_memory_limit_exceeded_disposable_worker (test_worker_windows.TestWindowsProcessMemoryLimit.test_process_memory_limit_exceeded_disposable_worker)
+Worker attempting 300 MiB commit fails closed as WORKER_RESOURCE_EXHAUSTED. ... ok
+test_process_memory_within_limit_succeeds (test_worker_windows.TestWindowsProcessMemoryLimit.test_process_memory_within_limit_succeeds)
+Worker allocating 50 MiB within 256 MiB limit succeeds cleanly. ... ok
+test_strict_utf8_payload_rejection (test_worker_windows.TestWindowsStrictUtf8Ipc.test_strict_utf8_payload_rejection) ... ok
+test_worker_assigned_to_job_before_thread_resumed (test_worker_windows.TestWindowsSuspendedStartup.test_worker_assigned_to_job_before_thread_resumed) ... ok
+test_worker_payload_too_large (test_worker_windows.TestWindowsTimeoutAndFraming.test_worker_payload_too_large) ... ok
+test_worker_timeout_during_ipc_write_non_reading_worker (test_worker_windows.TestWindowsTimeoutAndFraming.test_worker_timeout_during_ipc_write_non_reading_worker)
+Dedicated non-reading worker fixture: prove full-lifecycle timeout covers IPC write phase. ... ok
+test_worker_timeout_fails_closed (test_worker_windows.TestWindowsTimeoutAndFraming.test_worker_timeout_fails_closed)
+Dedicated blocking fixture: prove worker timeout strictly fails closed without race. ... ok
+
+----------------------------------------------------------------------
+Ran 310 tests in 16.512s
+
+OK

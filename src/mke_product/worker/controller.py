@@ -62,6 +62,7 @@ from .win32 import (
     SECURITY_ATTRIBUTES,
     STARTUPINFOEXW,
     assign_and_verify_process_in_job,
+    claim_last_job_object_cleanup_failure,
     create_configured_job_object,
     kernel32,
     query_job_peak_memory,
@@ -424,6 +425,27 @@ class SafeWin32Handle:
         """
         return self.close(_inject_failure=False, _allow_native_retry=True)
 
+    def adopt_native_close_failure(
+        self,
+        error: int,
+        *,
+        handle_valid_after_failure: Optional[bool] = None,
+    ) -> None:
+        """Adopt an already-attempted ambiguous native close without retrying it."""
+        with self._lock:
+            self._close_attempts = max(self._close_attempts, 1)
+            self._native_close_attempted = True
+            self._close_evidence = CLOSE_EVIDENCE_NATIVE_FAILURE
+            self._close_error = error
+            self._close_success = False
+            self._state = STATE_CLOSE_FAILED
+            if handle_valid_after_failure is True:
+                self._validity_after_close = HANDLE_VALID
+            elif handle_valid_after_failure is False:
+                self._validity_after_close = HANDLE_INVALID
+            else:
+                self._validity_after_close = HANDLE_VALIDITY_UNKNOWN
+
 
 class SafePipeHandle(SafeWin32Handle):
     """Specialized wrapper for pipe handles."""
@@ -776,6 +798,7 @@ class WorkerController:
         _inject_termination_wait_timeout: bool = False,
         _inject_termination_wait_failure: bool = False,
         _inject_exit_code_failure: bool = False,
+        _inject_protected_job_config_cleanup_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
@@ -817,6 +840,7 @@ class WorkerController:
                 _inject_termination_wait_timeout=_inject_termination_wait_timeout,
                 _inject_termination_wait_failure=_inject_termination_wait_failure,
                 _inject_exit_code_failure=_inject_exit_code_failure,
+                _inject_protected_job_config_cleanup_failure=_inject_protected_job_config_cleanup_failure,
                 _worker_cmd=_worker_cmd,
             )
         finally:
@@ -848,6 +872,7 @@ class WorkerController:
         _inject_termination_wait_timeout: bool = False,
         _inject_termination_wait_failure: bool = False,
         _inject_exit_code_failure: bool = False,
+        _inject_protected_job_config_cleanup_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Internal execution body running under single-request lock."""
@@ -1006,6 +1031,7 @@ class WorkerController:
         thread_owner: Optional[SafeThreadHandle] = None
         pi = PROCESS_INFORMATION()
         attr_buf: Optional[Any] = None
+        job_creation_failure: Optional[Dict[str, Any]] = None
 
         try:
             # 1. Create and configure Windows Job Object
@@ -1019,8 +1045,19 @@ class WorkerController:
             raw_job, job_err = create_configured_job_object(
                 process_memory_limit=self.process_memory_limit,
                 job_memory_limit=self.job_memory_limit,
+                _protect_from_close_on_failure=_inject_protected_job_config_cleanup_failure,
             )
-            if raw_job:
+            failed_cleanup_owner = claim_last_job_object_cleanup_failure()
+            if failed_cleanup_owner is not None:
+                job_creation_failure = failed_cleanup_owner.as_dict()
+                h_job_owner = SafeWin32Handle(failed_cleanup_owner.handle)
+                h_job_owner.adopt_native_close_failure(
+                    failed_cleanup_owner.cleanup_error,
+                    handle_valid_after_failure=failed_cleanup_owner.handle_valid_after_failure,
+                )
+                h_job = h_job_owner.handle
+                self._last_job_owner = h_job_owner
+            elif raw_job:
                 h_job_owner = SafeWin32Handle(raw_job, _inject_close_failure=_inject_job_close_failure)
                 h_job = h_job_owner.handle
                 self._last_job_owner = h_job_owner
@@ -1033,7 +1070,10 @@ class WorkerController:
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create or configure Job Object (win32 error {job_err}).",
-                    details={"win32_error": job_err},
+                    details={
+                        "win32_error": job_err,
+                        "job_creation_failure": job_creation_failure,
+                    },
                     operation=operation,
                 )
 
@@ -1488,6 +1528,7 @@ class WorkerController:
                         "cleanup_failures": cleanup_failures,
                         "cleanup_close_evidence": cleanup_close_evidence,
                         "job_close_error": cleanup_failures.get("job_object"),
+                        "job_creation_failure": job_creation_failure,
                         "process_termination": self._last_termination_evidence,
                         "unresolved_count": self.get_unresolved_count(),
                     },

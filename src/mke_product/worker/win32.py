@@ -1,7 +1,10 @@
 """Win32 ctypes interfaces and safe abstractions for Job Objects and process containment."""
 
 import sys
-from typing import Any, List, Optional, Tuple, Union
+import threading
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 if sys.platform != "win32":
     raise ImportError("mke_product.worker.win32 is only supported on Windows operating systems.")
@@ -15,6 +18,7 @@ from .constants import (
     ERROR_INSUFFICIENT_BUFFER,
     ERROR_NOT_ENOUGH_QUOTA,
     HANDLE_FLAG_INHERIT,
+    HANDLE_FLAG_PROTECT_FROM_CLOSE,
     JOB_OBJECT_LIMIT_JOB_MEMORY,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     JOB_OBJECT_LIMIT_PROCESS_MEMORY,
@@ -234,6 +238,97 @@ kernel32.GetProcessHandleCount.argtypes = [wintypes.HANDLE, ctypes.POINTER(winty
 kernel32.GetProcessHandleCount.restype = wintypes.BOOL
 
 
+@dataclass(frozen=True)
+class JobObjectCleanupFailure:
+    """Ownership record for a Job whose configuration and native cleanup both failed."""
+
+    failure_id: int
+    handle_value: int
+    configuration_error: int
+    cleanup_error: int
+    handle_valid_after_failure: Optional[bool]
+    validity_error: int
+    created_at: float
+
+    @property
+    def handle(self) -> wintypes.HANDLE:
+        return wintypes.HANDLE(self.handle_value)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "failure_id": self.failure_id,
+            "handle_value": self.handle_value,
+            "configuration_error": self.configuration_error,
+            "cleanup_error": self.cleanup_error,
+            "handle_valid_after_failure": self.handle_valid_after_failure,
+            "validity_error": self.validity_error,
+            "created_at": self.created_at,
+        }
+
+
+_job_cleanup_lock = threading.Lock()
+_job_cleanup_failures: Dict[int, JobObjectCleanupFailure] = {}
+_job_cleanup_counter = 0
+_job_cleanup_thread_state = threading.local()
+
+
+def _record_job_object_cleanup_failure(
+    h_job: wintypes.HANDLE,
+    configuration_error: int,
+    cleanup_error: int,
+) -> JobObjectCleanupFailure:
+    """Persist ownership when configuration cleanup cannot confirm native release."""
+    global _job_cleanup_counter
+    flags = wintypes.DWORD()
+    ctypes.set_last_error(0)
+    validity_ok = bool(kernel32.GetHandleInformation(h_job, ctypes.byref(flags)))
+    validity_error = 0 if validity_ok else ctypes.get_last_error()
+    handle_valid: Optional[bool] = validity_ok if validity_ok or validity_error == 6 else None
+    with _job_cleanup_lock:
+        _job_cleanup_counter += 1
+        record = JobObjectCleanupFailure(
+            failure_id=_job_cleanup_counter,
+            handle_value=int(h_job),
+            configuration_error=configuration_error,
+            cleanup_error=cleanup_error,
+            handle_valid_after_failure=handle_valid,
+            validity_error=validity_error,
+            created_at=time.monotonic(),
+        )
+        _job_cleanup_failures[record.failure_id] = record
+    _job_cleanup_thread_state.last_failure_id = record.failure_id
+    return record
+
+
+def claim_last_job_object_cleanup_failure() -> Optional[JobObjectCleanupFailure]:
+    """Transfer the calling thread's latest failed-cleanup ownership to its controller."""
+    failure_id = getattr(_job_cleanup_thread_state, "last_failure_id", None)
+    if failure_id is None:
+        return None
+    _job_cleanup_thread_state.last_failure_id = None
+    with _job_cleanup_lock:
+        return _job_cleanup_failures.pop(failure_id, None)
+
+
+def get_unresolved_job_object_cleanup_failures() -> List[Dict[str, Any]]:
+    """Return diagnostics for unclaimed failed Job cleanup owners."""
+    with _job_cleanup_lock:
+        return [record.as_dict() for record in _job_cleanup_failures.values()]
+
+
+def recover_job_object_cleanup_failure(failure_id: int) -> Tuple[bool, int]:
+    """Explicitly retry a retained Job close after its native failure cause is corrected."""
+    with _job_cleanup_lock:
+        record = _job_cleanup_failures.get(failure_id)
+    if record is None:
+        return False, 6
+    ok, err = safe_close_handle(record.handle)
+    if ok:
+        with _job_cleanup_lock:
+            _job_cleanup_failures.pop(failure_id, None)
+    return ok, err
+
+
 # ---------------------------------------------------------------------------
 # Safe Abstractions & Helper Functions
 # ---------------------------------------------------------------------------
@@ -279,6 +374,7 @@ def is_current_process_in_job() -> Tuple[bool, int]:
 def create_configured_job_object(
     process_memory_limit: int = PROCESS_MEMORY_LIMIT_BYTES,
     job_memory_limit: int = JOB_MEMORY_LIMIT_BYTES,
+    _protect_from_close_on_failure: bool = False,
 ) -> Tuple[Optional[wintypes.HANDLE], int]:
     """Create a Windows Job Object configured with S4-B1 resource limits.
 
@@ -288,6 +384,10 @@ def create_configured_job_object(
     - JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
     - Strictly does NOT enable breakaway flags.
     """
+    # A caller must never claim a stale record from an earlier invocation on
+    # the same thread.  Any older unclaimed owner remains visible in the
+    # process-wide ledger for explicit recovery.
+    _job_cleanup_thread_state.last_failure_id = None
     h_job = kernel32.CreateJobObjectW(None, None)
     if not h_job:
         return None, ctypes.get_last_error()
@@ -309,7 +409,15 @@ def create_configured_job_object(
     )
     if not res:
         err = ctypes.get_last_error()
-        safe_close_handle(h_job)
+        if _protect_from_close_on_failure:
+            kernel32.SetHandleInformation(
+                h_job,
+                HANDLE_FLAG_PROTECT_FROM_CLOSE,
+                HANDLE_FLAG_PROTECT_FROM_CLOSE,
+            )
+        close_ok, close_err = safe_close_handle(h_job)
+        if not close_ok:
+            _record_job_object_cleanup_failure(h_job, err, close_err)
         return None, err
 
     return h_job, 0
