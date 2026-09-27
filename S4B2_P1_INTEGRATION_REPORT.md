@@ -130,4 +130,3 @@ and lifecycle safety.  It does **not** establish complete filesystem isolation
 or outbound/loopback network isolation.  Dedicated positive and negative
 filesystem and TCP/UDP experiments remain required before either guarantee can
 be claimed.  S4-B2 is not declared complete, and no P2 work was started.
-

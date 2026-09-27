@@ -117,4 +117,3 @@ evidence directories and accepted product commits remain unchanged.
 This evidence does not claim complete filesystem isolation or network
 isolation.  It supports only the S4-B2/P1 AppContainer worker-integration gate.
 Independent audit and Project Owner approval remain pending.
-
