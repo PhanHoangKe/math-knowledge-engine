@@ -54,7 +54,7 @@ from mke_product.worker.constants import (
     WORKER_STARTUP_FAILURE,
     WORKER_TIMEOUT,
 )
-from mke_product.worker.controller import WorkerController, dispatch_via_worker
+from mke_product.worker.controller import SafeWin32Handle, WorkerController, dispatch_via_worker
 from mke_product.worker.win32 import (
     PROCESS_INFORMATION,
     SECURITY_ATTRIBUTES,
@@ -1312,10 +1312,10 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         unsettled = [r for r in recs if not r["settled"]]
         self.assertGreaterEqual(len(unsettled), 1)
         for u in unsettled:
-            if u["handle_val"] is not None:
+            if u["handle_val"]:
                 self.assertFalse(u["handle_closed"])
                 self.assertNotEqual(u["handle_close_error"], 0)
-            if u["thread_handle_val"] is not None:
+            if u["thread_handle_val"]:
                 self.assertFalse(u["thread_handle_closed"])
                 self.assertNotEqual(u["thread_handle_close_error"], 0)
 
@@ -1382,45 +1382,127 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         # Verify resource ownership was NOT lost: Job Object handle remains tracked and open in test double
         self.assertIsNotNone(controller._last_job_owner)
         job_owner = controller._last_job_owner
-        self.assertGreater(job_owner.raw_value(), 0)
+        raw_val = job_owner.raw_value()
+        self.assertGreater(raw_val, 0)
         self.assertTrue(job_owner.is_close_failed())
         self.assertEqual(job_owner.close_error, 5)
         self.assertFalse(job_owner.is_confirmed_closed())
+        self.assertEqual(len(controller.get_unresolved_job_handles()), 1)
 
-        # Documented recovery path: clear failure injection and close the owned Job Object handle cleanly
-        job_owner._inject_close_failure = False
-        close_ok = job_owner.close()
-        self.assertTrue(close_ok)
+        # Confirm native handle status using Win32 API: handle is genuinely OPEN in Windows kernel
+        flags = wintypes.DWORD()
+        is_handle_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_val), ctypes.byref(flags))
+        self.assertTrue(bool(is_handle_valid))
+
+        # Automatic reconciliation on subsequent request WITHOUT manually closing the handle in the test
+        res2 = controller.execute_request(req)
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertEqual(res2["status"], "UNIQUE_ROOT")
+        self.assertEqual(len(controller.get_unresolved_job_handles()), 0)
         self.assertTrue(job_owner.is_confirmed_closed())
-        self.assertEqual(job_owner.close_error, 0)
 
-    def test_safe_close_handle_tuple_validation_detects_false_return(self):
-        """safe_close_handle tuple (False, err) is correctly unpacked and not treated as truthy."""
+        # Confirm native handle status: handle is now CONFIRMED CLOSED in Windows kernel
+        is_handle_still_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_val), ctypes.byref(flags))
+        self.assertFalse(bool(is_handle_still_valid))
+        self.assertEqual(ctypes.get_last_error(), 6)  # ERROR_INVALID_HANDLE
+
+    def test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership(self):
+        """Stdout pipe close failure fails closed and preserves unclosed handle in persistent ledger."""
         controller = WorkerController(timeout_sec=2.0)
         req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
 
-        original_safe_close = None
-        from mke_product.worker import controller as ctrl_mod
-        original_safe_close = ctrl_mod.safe_close_handle
+        res = controller.execute_request(req, _inject_stdout_close_failure=True)
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertIn("stdout_read", res.get("error", {}).get("details", {}).get("cleanup_failures", {}))
 
-        try:
-            # Inject a test double for safe_close_handle returning (False, 6) for stdout_read
-            def mock_safe_close(handle):
-                # Call original close first to prevent handle leak
-                original_safe_close(handle)
-                # Return failure tuple
-                return (False, 6)
+        # Verify handle is tracked in unresolved handles ledger
+        unresolved = controller.get_unresolved_handles()
+        self.assertEqual(len(unresolved), 1)
+        pipe_owner = unresolved[0]
+        raw_val = pipe_owner.raw_value()
+        self.assertGreater(raw_val, 0)
+        self.assertTrue(pipe_owner.is_close_failed())
 
-            with mock.patch.object(ctrl_mod, "safe_close_handle", side_effect=mock_safe_close):
-                res = controller.execute_request(req)
+        # Native verification: handle is genuinely OPEN in OS
+        flags = wintypes.DWORD()
+        is_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_val), ctypes.byref(flags))
+        self.assertTrue(bool(is_valid))
 
-            # Cleanup failure MUST be detected and convert mathematical success into fail-closed error
-            self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
-            self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
-            self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
-            self.assertIn("cleanup_failures", res.get("error", {}).get("details", {}))
-        finally:
-            pass
+        # Subsequent request automatically reconciles without manual intervention
+        res2 = controller.execute_request(req)
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertEqual(len(controller.get_unresolved_handles()), 0)
+        self.assertTrue(pipe_owner.is_confirmed_closed())
+
+        # Native verification: handle is now confirmed closed
+        is_still_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_val), ctypes.byref(flags))
+        self.assertFalse(bool(is_still_valid))
+        self.assertEqual(ctypes.get_last_error(), 6)
+
+    def test_process_and_thread_handle_close_failure_fails_closed_and_preserves_ownership(self):
+        """Process and primary thread handle close failure fails closed and preserves ownership."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+
+        res = controller.execute_request(
+            req,
+            _inject_process_close_failure=True,
+            _inject_thread_close_failure=True,
+        )
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        failures = res.get("error", {}).get("details", {}).get("cleanup_failures", {})
+        self.assertIn("process_handle", failures)
+        self.assertIn("thread_handle", failures)
+
+        # Verify both handles tracked in unresolved ledger
+        unresolved = controller.get_unresolved_handles()
+        self.assertEqual(len(unresolved), 2)
+
+        # Subsequent request automatically reconciles without manual intervention
+        res2 = controller.execute_request(req)
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertEqual(len(controller.get_unresolved_handles()), 0)
+
+    def test_safe_win32_handle_native_handle_verification(self):
+        """SafeWin32Handle verifies genuine native handle state transitions with Win32 APIs."""
+        raw_event = kernel32.CreateEventW(None, True, False, None)
+        self.assertGreater(raw_event, 0)
+
+        # Wrap in SafeWin32Handle with injected failure
+        h_safe = SafeWin32Handle(raw_event, _inject_close_failure=True)
+        self.assertTrue(h_safe.is_open())
+        self.assertEqual(h_safe.raw_value(), raw_event)
+
+        # Close with injected failure: does NOT close OS handle, transitions to CLOSE_FAILED
+        ok = h_safe.close()
+        self.assertFalse(ok)
+        self.assertTrue(h_safe.is_close_failed())
+        self.assertEqual(h_safe.close_error, 5)
+        self.assertEqual(h_safe.raw_value(), raw_event)
+
+        # Verify with OS API: handle is still valid and open
+        flags = wintypes.DWORD()
+        is_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_event), ctypes.byref(flags))
+        self.assertTrue(bool(is_valid))
+
+        # Reconcile / close cleanly without failure injection
+        ok2 = h_safe.close(_inject_failure=False)
+        self.assertTrue(ok2)
+        self.assertTrue(h_safe.is_confirmed_closed())
+        self.assertEqual(h_safe.close_error, 0)
+
+        # Verify with OS API: handle is now invalid / closed
+        is_still_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_event), ctypes.byref(flags))
+        self.assertFalse(bool(is_still_valid))
+        self.assertEqual(ctypes.get_last_error(), 6)
+
+        # Double close is idempotent and does not error
+        ok3 = h_safe.close()
+        self.assertTrue(ok3)
 
     def test_recovery_following_cleanup_failure(self):
         """WorkerController successfully recovers and executes subsequent requests on the same instance after cleanup failure."""
@@ -1432,17 +1514,41 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertEqual(res1["status"], WORKER_RESOURCE_EXHAUSTED)
         self.assertFalse(res1.get("error", {}).get("details", {}).get("safe_cleanup"))
 
-        # Clear failure injection on tracked job owner to reap resource
-        if controller._last_job_owner:
-            controller._last_job_owner._inject_close_failure = False
-            controller._last_job_owner.close()
-
-        # Request 2: Normal request on the same controller instance succeeds cleanly
+        # Request 2: Normal request on the same controller instance succeeds cleanly WITHOUT ANY manual intervention
         res2 = controller.execute_request(req)
         self.assertEqual(res2["outcome"], "SUCCESS")
         self.assertEqual(res2["status"], "UNIQUE_ROOT")
         self.assertEqual(res2.get("root", {}).get("numerator"), "1")
         self.assertEqual(res2.get("root", {}).get("denominator"), "1")
+
+    def test_persistent_job_ledger_tracks_multiple_unresolved_handles(self):
+        """Persistent Job ledger maintains bounded tracking across multiple requests without orphaning handles."""
+        controller = WorkerController(timeout_sec=2.0)
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+
+        # Request 1: Injected Job close failure fails closed and records Job 1
+        res1 = controller.execute_request(req, _inject_job_close_failure=True)
+        self.assertEqual(res1["status"], WORKER_RESOURCE_EXHAUSTED)
+        job1 = controller._last_job_owner
+        self.assertIsNotNone(job1)
+        raw_job1 = job1.raw_value()
+        self.assertEqual(len(controller.get_unresolved_job_handles()), 1)
+
+        # Now simulate permanent unclosable state on Job 1 by patching close to fail
+        with mock.patch.object(job1, "close", return_value=False):
+            # Request 2: Normal request fails closed because Job 1 cannot be reconciled
+            res2 = controller.execute_request(req)
+            self.assertEqual(res2["status"], WORKER_RESOURCE_EXHAUSTED)
+            self.assertFalse(res2.get("error", {}).get("details", {}).get("safe_cleanup"))
+            self.assertIn("unresolved native handle(s)", res2.get("error", {}).get("message", ""))
+            # Job 1 is still tracked and not orphaned
+            self.assertIn(job1, controller._unresolved_job_handles)
+
+        # Request 3: When Job 1 is reconcilable, subsequent request succeeds cleanly
+        res3 = controller.execute_request(req)
+        self.assertEqual(res3["outcome"], "SUCCESS")
+        self.assertEqual(len(controller.get_unresolved_job_handles()), 0)
+        self.assertTrue(job1.is_confirmed_closed())
 
     def test_single_request_contract_concurrent_execution_rejected(self):
         """WorkerController rejects concurrent execute_request calls atomically with WORKER_RESOURCE_EXHAUSTED."""

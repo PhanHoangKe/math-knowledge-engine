@@ -5,7 +5,7 @@
 **Status:** **PENDING INDEPENDENT AUDIT**  
 **Working Repository:** `d:\mke-product` (`PhanHoangKe/math-knowledge-engine`)  
 **Branch:** `product/p02a-foundation`  
-**Baseline Commit:** `8fe327e7ad534e5481c2a6c738b563d0d2b18d86`  
+**Baseline Commit:** `e9bf1e3f937806ee927490edc4cc67aaaefcf65c`  
 **Historical Workspace (Read-Only):** `d:\Math Knowledge Engine` (Verified pristine, Git digest `3ddc40899...`)  
 **Implementation Agent:** Antigravity (Anty)  
 **Chief Architect & Independent Auditor:** ChatGPT  
@@ -18,9 +18,9 @@
 This report documents the final acceptance and remediation verification for milestone **MKE PRODUCT-02A-S4-B1**. All audit findings from independent reviews have been resolved and verified with empirical evidence:
 
 1. **Genuine Late Duplication Synchronization:** Implemented explicit synchronization barriers (`barrier_writer_proceed`, `barrier_controller_proceed`) ensuring that under late duplication failure injection, `kernel32.DuplicateHandle()` runs *strictly after* controller abort, capturing real non-zero handle ownership in `SafeThreadHandle`, verifying `WriteFile` is never called, and confirming dual closure and quarantine settlement.
-2. **Security-Critical Cleanup Audit & Fail-Closed Guarantee:** Audited all Win32 handle cleanup paths in `WorkerController._execute_request_locked` (`h_job`, `pi.hProcess`, `pi.hThread`, `pipe_owner`, stdio pipes, thread attribute lists). Corrected tuple unpacking (`ok, err = safe_close_handle(...)`), added Job Object test double, and confirmed that any teardown failure immediately fails closed with `WORKER_RESOURCE_EXHAUSTED` and `safe_cleanup: False`, preserving handle ownership.
+2. **Persistent Resource Ownership & Fail-Closed Guarantee:** Audited all Win32 handle cleanup paths in `WorkerController._execute_request_locked` (`h_job`, `pi.hProcess`, `pi.hThread`, `pipe_owner`, stdio pipes, thread attribute lists). Wrapped all handles in `SafeWin32Handle` wrappers with bounded persistent ledgers (`_unresolved_job_handles`, `_unresolved_handles`). Verified automatic reconciliation on subsequent requests and strict fail-closed enforcement when handles cannot be released.
 3. **Comprehensive Regression & Forensics Validation:**
-   - **301 / 301 unit and integration tests passed (100%)**, comprising all 246 baseline mathematical tests and 55 Windows containment tests.
+   - **304 / 304 unit and integration tests passed (100%)**, comprising all 246 baseline mathematical tests and 58 Windows containment and handle ownership tests.
    - **16 / 16 forensic matrix scenarios passed with exact $\Delta = 0$ net handle growth** across $N \in \{5, 10, 20, 40\}$ iterations for control, write timeout, setup hang, and late duplication scenarios.
 4. **S4-B2 Preflight Architectural Proposal:** Completed comprehensive 10-point evaluation of Windows AppContainer isolation, confirming standard-user feasibility, complete outbound network denial, filesystem write confinement, and Job Object compatibility.
 

@@ -308,7 +308,12 @@ class SafePipeHandle(SafeWin32Handle):
 
 
 class SafeThreadHandle(SafeWin32Handle):
-    """Specialized wrapper for duplicated thread handles."""
+    """Specialized wrapper for duplicated and primary thread handles."""
+    pass
+
+
+class SafeProcessHandle(SafeWin32Handle):
+    """Specialized wrapper for worker process handles."""
     pass
 
 
@@ -357,10 +362,67 @@ class WorkerController:
         self._quarantine_counter: int = 0
         self._quarantine_lock: threading.Lock = threading.Lock()
 
+        # Thread-safe bounded persistent ledgers for unresolved handles across requests (Task 1 & Task 2)
+        self._unresolved_job_handles: List[SafeWin32Handle] = []
+        self._unresolved_handles: List[SafeWin32Handle] = []
+
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
         self._python_exe = sys.executable
         self._worker_cmd = _worker_cmd or f'"{self._python_exe}" -m mke_product.worker.entrypoint'
+
+    def get_unresolved_job_handles(self) -> List[SafeWin32Handle]:
+        """Return list of active unresolved Job Object handle owners."""
+        with self._quarantine_lock:
+            return [h for h in self._unresolved_job_handles if not h.is_confirmed_closed()]
+
+    def get_unresolved_handles(self) -> List[SafeWin32Handle]:
+        """Return list of active unresolved general handle owners."""
+        with self._quarantine_lock:
+            return [h for h in self._unresolved_handles if not h.is_confirmed_closed()]
+
+    def get_unresolved_count(self) -> int:
+        """Return total count of active unresolved handles."""
+        with self._quarantine_lock:
+            return (
+                sum(1 for h in self._unresolved_job_handles if not h.is_confirmed_closed()) +
+                sum(1 for h in self._unresolved_handles if not h.is_confirmed_closed())
+            )
+
+    def reconcile_unresolved_resources(self) -> int:
+        """Reconcile and attempt safe close of any previously unresolved handles without failure injection.
+
+        Returns:
+            Count of newly settled handles.
+        """
+        settled_count = 0
+        with self._quarantine_lock:
+            # 1. Reconcile unresolved job objects
+            remaining_jobs: List[SafeWin32Handle] = []
+            for job_owner in self._unresolved_job_handles:
+                if job_owner.is_confirmed_closed():
+                    settled_count += 1
+                    continue
+                # Attempt safe close with native API without failure injection
+                if job_owner.close(_inject_failure=False):
+                    settled_count += 1
+                else:
+                    remaining_jobs.append(job_owner)
+            self._unresolved_job_handles = remaining_jobs
+
+            # 2. Reconcile unresolved general handles
+            remaining_handles: List[SafeWin32Handle] = []
+            for h_owner in self._unresolved_handles:
+                if h_owner.is_confirmed_closed():
+                    settled_count += 1
+                    continue
+                if h_owner.close(_inject_failure=False):
+                    settled_count += 1
+                else:
+                    remaining_handles.append(h_owner)
+            self._unresolved_handles = remaining_handles
+
+        return settled_count
 
     def settle_quarantine(self, timeout: float = 0.0) -> int:
         """Reap and safely release quarantined pipe/thread handles whose worker threads have terminated.
@@ -420,6 +482,9 @@ class WorkerController:
             if self._current_writer_thread and not self._current_writer_thread.is_alive():
                 self._current_writer_thread = None
 
+        # Also reconcile unresolved handle ledgers
+        self.reconcile_unresolved_resources()
+
         return settled_count
 
     def get_quarantine_records(self) -> List[Dict[str, Any]]:
@@ -466,6 +531,10 @@ class WorkerController:
         _inject_late_duplicate_handle: bool = False,
         _inject_close_handle_failure: bool = False,
         _inject_job_close_failure: bool = False,
+        _inject_process_close_failure: bool = False,
+        _inject_thread_close_failure: bool = False,
+        _inject_stdout_close_failure: bool = False,
+        _inject_stderr_close_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
@@ -499,6 +568,10 @@ class WorkerController:
                 _inject_late_duplicate_handle=_inject_late_duplicate_handle,
                 _inject_close_handle_failure=_inject_close_handle_failure,
                 _inject_job_close_failure=_inject_job_close_failure,
+                _inject_process_close_failure=_inject_process_close_failure,
+                _inject_thread_close_failure=_inject_thread_close_failure,
+                _inject_stdout_close_failure=_inject_stdout_close_failure,
+                _inject_stderr_close_failure=_inject_stderr_close_failure,
                 _worker_cmd=_worker_cmd,
             )
         finally:
@@ -522,6 +595,10 @@ class WorkerController:
         _inject_late_duplicate_handle: bool = False,
         _inject_close_handle_failure: bool = False,
         _inject_job_close_failure: bool = False,
+        _inject_process_close_failure: bool = False,
+        _inject_thread_close_failure: bool = False,
+        _inject_stdout_close_failure: bool = False,
+        _inject_stderr_close_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Internal execution body running under single-request lock."""
@@ -531,8 +608,9 @@ class WorkerController:
         self._last_write_info = None
         self._current_writer_thread = None
 
-        # Settle any previously completed quarantined handles before beginning new request
+        # Settle any previously completed quarantined handles and reconcile unresolved resources
         self.settle_quarantine(timeout=0.0)
+        self.reconcile_unresolved_resources()
 
         # Enforce active quarantine capacity ceiling
         active_count = self.get_active_quarantine_count()
@@ -541,6 +619,21 @@ class WorkerController:
                 WORKER_RESOURCE_EXHAUSTED,
                 f"Active quarantined handle capacity exceeded ({active_count}/{MAX_ACTIVE_QUARANTINE}). Refusing new request.",
                 details={"active_quarantine_count": active_count, "max_active_quarantine": MAX_ACTIVE_QUARANTINE},
+                operation=operation,
+            )
+
+        # Enforce unresolved handle ceiling / fail-closed if unresolved handles remain (Task 1 & Task 2)
+        unresolved_count = self.get_unresolved_count()
+        if unresolved_count > 0:
+            return _build_controller_error(
+                WORKER_RESOURCE_EXHAUSTED,
+                f"WorkerController has {unresolved_count} unresolved native handle(s) from previous request teardown. Refusing new request.",
+                details={
+                    "safe_cleanup": False,
+                    "unresolved_count": unresolved_count,
+                    "unresolved_job_count": len(self.get_unresolved_job_handles()),
+                    "unresolved_handle_count": len(self.get_unresolved_handles()),
+                },
                 operation=operation,
             )
 
@@ -651,15 +744,17 @@ class WorkerController:
                 operation=operation,
             )
 
-        # Track handles for guaranteed cleanup in finally block
+        # Track handle owners for guaranteed cleanup in finally block
         h_job_owner: Optional[SafeWin32Handle] = None
         h_job: Optional[wintypes.HANDLE] = None
-        h_stdin_read = wintypes.HANDLE(0)
+        stdin_read_owner: Optional[SafePipeHandle] = None
         pipe_owner: Optional[SafePipeHandle] = None
-        h_stdout_read = wintypes.HANDLE(0)
-        h_stdout_write = wintypes.HANDLE(0)
-        h_stderr_read = wintypes.HANDLE(0)
-        h_stderr_write = wintypes.HANDLE(0)
+        stdout_read_owner: Optional[SafePipeHandle] = None
+        stdout_write_owner: Optional[SafePipeHandle] = None
+        stderr_read_owner: Optional[SafePipeHandle] = None
+        stderr_write_owner: Optional[SafePipeHandle] = None
+        proc_owner: Optional[SafeProcessHandle] = None
+        thread_owner: Optional[SafeThreadHandle] = None
         pi = PROCESS_INFORMATION()
         attr_buf: Optional[Any] = None
 
@@ -686,11 +781,6 @@ class WorkerController:
                 self._last_job_owner = None
 
             if not raw_job or _inject_job_config_failure:
-                if h_job_owner is not None:
-                    h_job_owner.close()
-                    h_job_owner = None
-                    h_job = None
-                    self._last_job_owner = None
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create or configure Job Object (win32 error {job_err}).",
@@ -703,31 +793,41 @@ class WorkerController:
             sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
             sa.bInheritHandle = True
 
+            raw_stdin_read = wintypes.HANDLE()
             raw_stdin_write = wintypes.HANDLE()
-            if not kernel32.CreatePipe(ctypes.byref(h_stdin_read), ctypes.byref(raw_stdin_write), ctypes.byref(sa), self._stdin_pipe_buffer_size):
+            if not kernel32.CreatePipe(ctypes.byref(raw_stdin_read), ctypes.byref(raw_stdin_write), ctypes.byref(sa), self._stdin_pipe_buffer_size):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create stdin pipe (win32 error {err}).",
                     operation=operation,
                 )
+            stdin_read_owner = SafePipeHandle(raw_stdin_read)
             pipe_owner = SafePipeHandle(raw_stdin_write, _inject_close_failure=_inject_close_handle_failure)
 
-            if not kernel32.CreatePipe(ctypes.byref(h_stdout_read), ctypes.byref(h_stdout_write), ctypes.byref(sa), 0):
+            raw_stdout_read = wintypes.HANDLE()
+            raw_stdout_write = wintypes.HANDLE()
+            if not kernel32.CreatePipe(ctypes.byref(raw_stdout_read), ctypes.byref(raw_stdout_write), ctypes.byref(sa), 0):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create stdout pipe (win32 error {err}).",
                     operation=operation,
                 )
+            stdout_read_owner = SafePipeHandle(raw_stdout_read, _inject_close_failure=_inject_stdout_close_failure)
+            stdout_write_owner = SafePipeHandle(raw_stdout_write)
 
-            if not kernel32.CreatePipe(ctypes.byref(h_stderr_read), ctypes.byref(h_stderr_write), ctypes.byref(sa), 0):
+            raw_stderr_read = wintypes.HANDLE()
+            raw_stderr_write = wintypes.HANDLE()
+            if not kernel32.CreatePipe(ctypes.byref(raw_stderr_read), ctypes.byref(raw_stderr_write), ctypes.byref(sa), 0):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create stderr pipe (win32 error {err}).",
                     operation=operation,
                 )
+            stderr_read_owner = SafePipeHandle(raw_stderr_read, _inject_close_failure=_inject_stderr_close_failure)
+            stderr_write_owner = SafePipeHandle(raw_stderr_write)
 
             # Ensure controller pipe ends are strictly NOT inheritable
             if not kernel32.SetHandleInformation(pipe_owner.handle, HANDLE_FLAG_INHERIT, 0):
@@ -738,7 +838,7 @@ class WorkerController:
                     operation=operation,
                 )
 
-            if not kernel32.SetHandleInformation(h_stdout_read, HANDLE_FLAG_INHERIT, 0):
+            if not kernel32.SetHandleInformation(stdout_read_owner.handle, HANDLE_FLAG_INHERIT, 0):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
@@ -746,7 +846,7 @@ class WorkerController:
                     operation=operation,
                 )
 
-            if not kernel32.SetHandleInformation(h_stderr_read, HANDLE_FLAG_INHERIT, 0):
+            if not kernel32.SetHandleInformation(stderr_read_owner.handle, HANDLE_FLAG_INHERIT, 0):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
@@ -766,7 +866,7 @@ class WorkerController:
                     operation=operation,
                 )
 
-            inherited_handles = (wintypes.HANDLE * 3)(h_stdin_read, h_stdout_write, h_stderr_write)
+            inherited_handles = (wintypes.HANDLE * 3)(stdin_read_owner.handle, stdout_write_owner.handle, stderr_write_owner.handle)
             if not kernel32.UpdateProcThreadAttribute(
                 attr_buf, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
                 ctypes.byref(inherited_handles), ctypes.sizeof(inherited_handles), None, None
@@ -782,9 +882,9 @@ class WorkerController:
             siex = STARTUPINFOEXW()
             siex.StartupInfo.cb = ctypes.sizeof(STARTUPINFOEXW)
             siex.StartupInfo.dwFlags = STARTF_USESTDHANDLES
-            siex.StartupInfo.hStdInput = h_stdin_read
-            siex.StartupInfo.hStdOutput = h_stdout_write
-            siex.StartupInfo.hStdError = h_stderr_write
+            siex.StartupInfo.hStdInput = stdin_read_owner.handle
+            siex.StartupInfo.hStdOutput = stdout_write_owner.handle
+            siex.StartupInfo.hStdError = stderr_write_owner.handle
             siex.lpAttributeList = ctypes.cast(attr_buf, ctypes.c_void_p)
 
             cmd = _worker_cmd or self._worker_cmd
@@ -818,31 +918,29 @@ class WorkerController:
                     operation=operation,
                 )
 
+            # Wrap process and primary thread immediately upon creation
+            proc_owner = SafeProcessHandle(pi.hProcess, _inject_close_failure=_inject_process_close_failure)
+            thread_owner = SafeThreadHandle(pi.hThread, _inject_close_failure=_inject_thread_close_failure)
+
             # Close worker ends of pipes in controller immediately after creation
-            ok, _ = safe_close_handle(h_stdin_read)
-            if ok:
-                h_stdin_read = wintypes.HANDLE(0)
-            ok, _ = safe_close_handle(h_stdout_write)
-            if ok:
-                h_stdout_write = wintypes.HANDLE(0)
-            ok, _ = safe_close_handle(h_stderr_write)
-            if ok:
-                h_stderr_write = wintypes.HANDLE(0)
+            stdin_read_owner.close()
+            stdout_write_owner.close()
+            stderr_write_owner.close()
 
             # 5. Assign process to Job Object and verify assignment BEFORE resuming thread
             if _inject_assignment_failure:
                 # Terminate suspended process immediately and fail closed
-                kernel32.TerminateProcess(pi.hProcess, 1)
+                kernel32.TerminateProcess(proc_owner.handle, 1)
                 return _build_controller_error(
                     WORKER_ASSIGNMENT_FAILURE,
                     "Injected failure during Job Object assignment.",
                     operation=operation,
                 )
 
-            assign_ok, assign_err = assign_and_verify_process_in_job(h_job, pi.hProcess)
+            assign_ok, assign_err = assign_and_verify_process_in_job(h_job, proc_owner.handle)
             if not assign_ok:
                 # Terminate suspended process immediately and fail closed
-                kernel32.TerminateProcess(pi.hProcess, 1)
+                kernel32.TerminateProcess(proc_owner.handle, 1)
                 return _build_controller_error(
                     WORKER_ASSIGNMENT_FAILURE,
                     f"Failed to assign or verify worker process in Job Object (win32 error {assign_err}).",
@@ -852,17 +950,17 @@ class WorkerController:
 
             # 6. Resume primary thread
             if _inject_resume_failure:
-                kernel32.TerminateProcess(pi.hProcess, 1)
+                kernel32.TerminateProcess(proc_owner.handle, 1)
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     "Injected failure during thread resumption.",
                     operation=operation,
                 )
 
-            suspend_count = kernel32.ResumeThread(pi.hThread)
+            suspend_count = kernel32.ResumeThread(thread_owner.handle)
             if suspend_count == 0xFFFFFFFF:
                 err = ctypes.get_last_error()
-                kernel32.TerminateProcess(pi.hProcess, 1)
+                kernel32.TerminateProcess(proc_owner.handle, 1)
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"ResumeThread failed for worker (win32 error {err}).",
@@ -880,7 +978,7 @@ class WorkerController:
                 pipe_owner,
                 msg,
                 deadline,
-                pi.hProcess,
+                proc_owner.handle,
                 h_job,
                 operation=operation,
                 _inject_duplicate_handle_failure=_inject_duplicate_handle_failure,
@@ -907,7 +1005,7 @@ class WorkerController:
                             handle=pipe_owner,
                             thread_handle=None,
                             handle_val=pipe_owner.raw_value(),
-                            thread_handle_val=None,
+                            thread_handle_val=0,
                             handle_closed=False,
                             thread_handle_closed=True,
                             handle_close_error=pipe_owner.close_error,
@@ -931,7 +1029,7 @@ class WorkerController:
 
             # 8. Bounded read from stdout pipe with same effective deadline
             response_header = self._read_exact_bytes(
-                h_stdout_read, pi.hProcess, IPC_HEADER_SIZE, deadline, h_job, h_stderr=h_stderr_read, operation=operation
+                stdout_read_owner.handle, proc_owner.handle, IPC_HEADER_SIZE, deadline, h_job, h_stderr=stderr_read_owner.handle, operation=operation
             )
 
             if isinstance(response_header, dict):
@@ -948,7 +1046,7 @@ class WorkerController:
                 )
 
             response_body = self._read_exact_bytes(
-                h_stdout_read, pi.hProcess, resp_length, deadline, h_job, h_stderr=h_stderr_read, operation=operation
+                stdout_read_owner.handle, proc_owner.handle, resp_length, deadline, h_job, h_stderr=stderr_read_owner.handle, operation=operation
             )
             if isinstance(response_body, dict):
                 return response_body
@@ -986,75 +1084,90 @@ class WorkerController:
             # 10. Guaranteed cleanup of all handles and attribute lists
             cleanup_failures: Dict[str, Any] = {}
 
-            if getattr(h_stdin_read, "value", h_stdin_read):
-                ok, err = safe_close_handle(h_stdin_read)
+            # Terminate and close worker process handle
+            if proc_owner is not None and proc_owner.raw_value() > 0:
+                if proc_owner.is_open():
+                    kernel32.TerminateProcess(proc_owner.handle, 0)
+                    kernel32.WaitForSingleObject(proc_owner.handle, 1000)
+                ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
                 if not ok:
-                    cleanup_failures["stdin_read"] = err
-                h_stdin_read = wintypes.HANDLE(0)
+                    cleanup_failures["process_handle"] = proc_owner.close_error
+                    with self._quarantine_lock:
+                        if proc_owner not in self._unresolved_handles:
+                            self._unresolved_handles.append(proc_owner)
+
+            # Close worker primary thread handle
+            if thread_owner is not None and thread_owner.raw_value() > 0:
+                ok = thread_owner.close(_inject_failure=_inject_thread_close_failure)
+                if not ok:
+                    cleanup_failures["thread_handle"] = thread_owner.close_error
+                    with self._quarantine_lock:
+                        if thread_owner not in self._unresolved_handles:
+                            self._unresolved_handles.append(thread_owner)
+
+            # Close all pipe handles through their safe wrappers
+            for name, owner, inj in [
+                ("stdin_read", stdin_read_owner, False),
+                ("stdout_read", stdout_read_owner, _inject_stdout_close_failure),
+                ("stdout_write", stdout_write_owner, False),
+                ("stderr_read", stderr_read_owner, _inject_stderr_close_failure),
+                ("stderr_write", stderr_write_owner, False),
+            ]:
+                if owner is not None and owner.raw_value() > 0 and not owner.is_confirmed_closed():
+                    ok = owner.close(_inject_failure=inj)
+                    if not ok:
+                        cleanup_failures[name] = owner.close_error
+                        with self._quarantine_lock:
+                            if owner not in self._unresolved_handles:
+                                self._unresolved_handles.append(owner)
 
             # Handle ownership invariant: close pipe_owner ONLY IF not quarantined
-            if pipe_owner is not None and not pipe_owner.is_quarantined():
-                pipe_owner.close(_inject_failure=_inject_close_handle_failure)
-                if not pipe_owner.is_confirmed_closed():
+            if pipe_owner is not None and not pipe_owner.is_quarantined() and not pipe_owner.is_confirmed_closed():
+                writer_alive = (self._current_writer_thread is not None and self._current_writer_thread.is_alive())
+                if writer_alive:
                     pipe_owner.quarantine()
-                    cleanup_failures["pipe_owner"] = pipe_owner.close_error
+                    cleanup_failures["pipe_owner"] = "STILL_WRITING"
                     with self._quarantine_lock:
                         self._quarantine_counter += 1
                         rec = QuarantineRecord(
                             record_id=self._quarantine_counter,
-                            thread=None,
+                            thread=self._current_writer_thread,
                             handle=pipe_owner,
                             thread_handle=None,
                             handle_val=pipe_owner.raw_value(),
-                            thread_handle_val=None,
+                            thread_handle_val=0,
                             handle_closed=False,
                             thread_handle_closed=True,
-                            handle_close_error=pipe_owner.close_error,
+                            handle_close_error=0,
                             thread_handle_close_error=0,
                             created_at=time.monotonic(),
                             settled=False,
                             settled_at=None,
                         )
                         self._quarantine.append(rec)
-
-            if getattr(h_stdout_read, "value", h_stdout_read):
-                ok, err = safe_close_handle(h_stdout_read)
-                if not ok:
-                    cleanup_failures["stdout_read"] = err
-                h_stdout_read = wintypes.HANDLE(0)
-
-            if getattr(h_stdout_write, "value", h_stdout_write):
-                ok, err = safe_close_handle(h_stdout_write)
-                if not ok:
-                    cleanup_failures["stdout_write"] = err
-                h_stdout_write = wintypes.HANDLE(0)
-
-            if getattr(h_stderr_read, "value", h_stderr_read):
-                ok, err = safe_close_handle(h_stderr_read)
-                if not ok:
-                    cleanup_failures["stderr_read"] = err
-                h_stderr_read = wintypes.HANDLE(0)
-
-            if getattr(h_stderr_write, "value", h_stderr_write):
-                ok, err = safe_close_handle(h_stderr_write)
-                if not ok:
-                    cleanup_failures["stderr_write"] = err
-                h_stderr_write = wintypes.HANDLE(0)
-
-            if pi.hProcess:
-                # Ensure worker process terminates
-                kernel32.TerminateProcess(pi.hProcess, 0)
-                kernel32.WaitForSingleObject(pi.hProcess, 1000)
-                ok, err = safe_close_handle(pi.hProcess)
-                if not ok:
-                    cleanup_failures["process_handle"] = err
-                pi.hProcess = 0
-
-            if pi.hThread:
-                ok, err = safe_close_handle(pi.hThread)
-                if not ok:
-                    cleanup_failures["thread_handle"] = err
-                pi.hThread = 0
+                else:
+                    ok = pipe_owner.close(_inject_failure=_inject_close_handle_failure)
+                    if not ok:
+                        pipe_owner.quarantine()
+                        cleanup_failures["pipe_owner"] = pipe_owner.close_error
+                        with self._quarantine_lock:
+                            self._quarantine_counter += 1
+                            rec = QuarantineRecord(
+                                record_id=self._quarantine_counter,
+                                thread=None,
+                                handle=pipe_owner,
+                                thread_handle=None,
+                                handle_val=pipe_owner.raw_value(),
+                                thread_handle_val=0,
+                                handle_closed=False,
+                                thread_handle_closed=True,
+                                handle_close_error=pipe_owner.close_error,
+                                thread_handle_close_error=0,
+                                created_at=time.monotonic(),
+                                settled=False,
+                                settled_at=None,
+                            )
+                            self._quarantine.append(rec)
 
             if attr_buf:
                 try:
@@ -1063,10 +1176,13 @@ class WorkerController:
                     cleanup_failures["attr_list"] = str(ex)
 
             # Closing Job Object handle triggers KILL_ON_JOB_CLOSE for any remaining child processes
-            if h_job_owner is not None:
+            if h_job_owner is not None and not h_job_owner.is_confirmed_closed():
                 h_job_owner.close(_inject_failure=_inject_job_close_failure)
                 if not h_job_owner.is_confirmed_closed():
                     cleanup_failures["job_object"] = h_job_owner.close_error
+                    with self._quarantine_lock:
+                        if h_job_owner not in self._unresolved_job_handles:
+                            self._unresolved_job_handles.append(h_job_owner)
 
             if cleanup_failures:
                 # Fail closed: never return success or unqualified result if any handle cleanup failed
