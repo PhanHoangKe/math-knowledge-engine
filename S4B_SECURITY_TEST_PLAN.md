@@ -111,15 +111,20 @@ This document defines the verification strategy, security test cases, observed k
 
 ---
 
-### Requirement H: Deterministic Full-Lifecycle Timeout
+### Requirement H: Deterministic Full-Lifecycle Timeout & Safe IPC Write Cancellation
 - **Test:** `TestWindowsTimeoutAndFraming` (3 tests)
   - `test_worker_payload_too_large`: Verifies oversized payload (> 4096 bytes) is rejected as `ERR_PAYLOAD_TOO_LARGE`.
-  - `test_worker_timeout_fails_closed`: Uses dedicated blocking fixture (5.0s sleep with 0.2s timeout), proving strict `outcome: RESOURCE_EXHAUSTED` and `status: WORKER_TIMEOUT` without timing races, duration $< 1.5$s, and immediate process cleanup.
-  - `test_worker_timeout_during_ipc_write_non_reading_worker`: Proves single effective deadline covers IPC writing to a non-reading worker with near-maximum payload (4000+ bytes) over 1024-byte pipe buffer, terminating worker and joining writer thread deterministically.
+  - `test_worker_timeout_fails_closed`: Uses dedicated blocking fixture (5.0s sleep with 0.2s timeout), proving strict `outcome: RESOURCE_EXHAUSTED` and `status: WORKER_TIMEOUT` without timing races, duration $< 1.5$s, reporting `details.timeout_phase: "READ"` and immediate process cleanup.
+  - `test_worker_timeout_during_ipc_write_non_reading_worker`: Proves single effective deadline covers IPC writing to a non-reading worker with near-maximum payload (4000+ bytes) over 1024-byte pipe buffer. Verified kernel instrumentation:
+    * Writer thread pseudo-handle duplicated to real handle via `DuplicateHandle(..., GetCurrentThread(), ...)`
+    * Kernel cancellation executed via `kernel32.CancelSynchronousIo(hWriterThread)`
+    * Writer thread verified alive before cancel, joined, and confirmed terminated (`writer_thread_alive_after_join: False`) BEFORE pipe handle is closed
+    * Factual kernel evidence recorded in `_last_write_info`: `write_entered: True`, `write_blocked_at_deadline: True`, `cancel_synchronous_io_called: True`, `writer_thread_alive_before_cancel: True`, `writer_thread_alive_after_join: False`
+    * Reports exact timeout phase: `details.timeout_phase: "WRITE"`.
 - **Status:** PASS (Verified).
 
-### Requirement I: Controller Input Boundary Pre-Validation
-- **Test:** `TestWindowsControllerInputBoundary` (7 tests)
+### Requirement I: Controller Input Boundary Pre-Validation & Bounded Error Envelopes
+- **Test:** `TestWindowsControllerInputBoundary` (10 tests)
   - `test_controller_rejects_cyclic_dictionary`: Cyclic structure rejected before serialization as `ERR_PAYLOAD_TOO_LARGE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
   - `test_controller_rejects_non_string_keys`: Non-string keys rejected as `ERR_PROTOCOL_INVALID_TYPE`.
   - `test_controller_rejects_unsupported_types`: Sets / complex types rejected as `ERR_PROTOCOL_INVALID_TYPE`.
@@ -127,6 +132,9 @@ This document defines the verification strategy, security test cases, observed k
   - `test_controller_rejects_isolated_surrogates`: Isolated surrogates rejected as `ERR_PROTOCOL_JSON_DECODE`.
   - `test_controller_rejects_chinese_chars_exceeding_byte_limit_before_job_creation`: 1400 Chinese characters (4200 bytes) rejected as `ERR_PAYLOAD_TOO_LARGE` before Job Object creation (`_inject_job_creation_failure=True` not reached).
   - `test_controller_accepts_chinese_chars_within_byte_limit_before_worker`: 700 Chinese characters (2100 bytes) serialize safely under `ensure_ascii=False` within bounds and advance to Job Object creation.
+  - `test_controller_rejects_oversized_operation_and_bounds_error_envelope`: Proves 50,000-char operation string is normalized to `"UNKNOWN"`, not reflected in output, rejected as `ERR_PAYLOAD_TOO_LARGE`, and serialized error response is bounded $\le 16384$ bytes.
+  - `test_controller_rejects_raw_string_oversized_operation_bounded`: Proves oversized raw JSON string request with 20,000-char operation is rejected, normalized, and bounded.
+  - `test_controller_bounds_error_envelope_under_huge_details`: Proves controller error builder strictly enforces `IPC_MAX_RESPONSE_BYTES` ceiling even under oversized messages/details.
 - **Status:** PASS (Verified).
 
 ### Requirement J: Strict UTF-8 IPC Transport

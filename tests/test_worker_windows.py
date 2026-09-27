@@ -38,6 +38,7 @@ from mke_product.worker.constants import (
     CREATE_BREAKAWAY_FROM_JOB,
     CREATE_SUSPENDED,
     DEFAULT_WORKER_TIMEOUT_SEC,
+    IPC_MAX_RESPONSE_BYTES,
     JOB_OBJECT_LIMIT_BREAKAWAY_OK,
     JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
     PROCESS_MEMORY_LIMIT_BYTES,
@@ -641,6 +642,7 @@ class TestWindowsTimeoutAndFraming(unittest.TestCase):
 
         self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
         self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertEqual(res.get("error", {}).get("details", {}).get("timeout_phase"), "READ")
         self.assertIsNone(res["definedness"])
         self.assertLess(elapsed, 1.5)
 
@@ -664,6 +666,13 @@ class TestWindowsTimeoutAndFraming(unittest.TestCase):
 
         self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
         self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertEqual(res.get("error", {}).get("details", {}).get("timeout_phase"), "WRITE")
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertTrue(controller._last_write_info["write_entered"])
+        self.assertTrue(controller._last_write_info["write_blocked_at_deadline"])
+        self.assertTrue(controller._last_write_info["cancel_synchronous_io_called"])
+        self.assertTrue(controller._last_write_info["writer_thread_alive_before_cancel"])
+        self.assertFalse(controller._last_write_info["writer_thread_alive_after_join"])
         self.assertIsNone(res["definedness"])
         self.assertLess(elapsed, 1.5)
 
@@ -736,6 +745,51 @@ class TestWindowsControllerInputBoundary(unittest.TestCase):
         # Reaching the injected job creation failure proves it passed serialization validation
         self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
         self.assertEqual(res["status"], WORKER_STARTUP_FAILURE)
+
+    def test_controller_rejects_oversized_operation_and_bounds_error_envelope(self):
+        """Oversized untrusted operation string (>16 KiB) is rejected, normalized to UNKNOWN, and response is bounded."""
+        huge_op = "SOLVE_" + "A" * 50000
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": huge_op,
+            "equation": "x=1",
+        }
+        res = self.controller.execute_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertEqual(res["operation"], "UNKNOWN")
+        self.assertNotIn("A" * 100, json.dumps(res))
+        serialized = json.dumps(res, ensure_ascii=False).encode("utf-8")
+        self.assertLessEqual(len(serialized), IPC_MAX_RESPONSE_BYTES)
+
+    def test_controller_rejects_raw_string_oversized_operation_bounded(self):
+        """Oversized raw string request is rejected, normalized to UNKNOWN, and response strictly <= IPC_MAX_RESPONSE_BYTES."""
+        raw_req = json.dumps({
+            "schema_version": SCHEMA_VERSION,
+            "operation": "X" * 20000,
+            "equation": "x=1",
+        })
+        res = self.controller.execute_request(raw_req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertEqual(res["operation"], "UNKNOWN")
+        self.assertNotIn("X" * 100, json.dumps(res))
+        serialized = json.dumps(res, ensure_ascii=False).encode("utf-8")
+        self.assertLessEqual(len(serialized), IPC_MAX_RESPONSE_BYTES)
+
+    def test_controller_bounds_error_envelope_under_huge_details(self):
+        """Internal error builder truncates or falls back so serialized error never exceeds IPC_MAX_RESPONSE_BYTES."""
+        from mke_product.worker.controller import _build_controller_error
+        huge_details = {"leak": "Z" * 30000}
+        envelope = _build_controller_error(
+            "ERR_INTERNAL",
+            "Something failed",
+            details=huge_details,
+            operation="ATTACK_" + "B" * 1000,
+        )
+        self.assertEqual(envelope["operation"], "UNKNOWN")
+        serialized = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
+        self.assertLessEqual(len(serialized), IPC_MAX_RESPONSE_BYTES)
 
 
 class TestWindowsStrictUtf8Ipc(unittest.TestCase):

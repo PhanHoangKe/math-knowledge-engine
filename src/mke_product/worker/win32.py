@@ -212,6 +212,22 @@ kernel32.UpdateProcThreadAttribute.restype = wintypes.BOOL
 
 kernel32.DeleteProcThreadAttributeList.argtypes = [ctypes.c_void_p]
 
+kernel32.GetCurrentProcess.argtypes = []
+kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+
+kernel32.GetCurrentThread.argtypes = []
+kernel32.GetCurrentThread.restype = wintypes.HANDLE
+
+kernel32.DuplicateHandle.argtypes = [
+    wintypes.HANDLE, wintypes.HANDLE, wintypes.HANDLE,
+    ctypes.POINTER(wintypes.HANDLE), wintypes.DWORD, wintypes.BOOL, wintypes.DWORD
+]
+kernel32.DuplicateHandle.restype = wintypes.BOOL
+
+kernel32.CancelSynchronousIo.argtypes = [wintypes.HANDLE]
+kernel32.CancelSynchronousIo.restype = wintypes.BOOL
+
+
 
 # ---------------------------------------------------------------------------
 # Safe Abstractions & Helper Functions

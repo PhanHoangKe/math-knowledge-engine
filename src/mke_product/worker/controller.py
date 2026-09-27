@@ -29,9 +29,11 @@ from mke_product.protocol.validator import _measure_dict_bytes
 from .constants import (
     CREATE_SUSPENDED,
     DEFAULT_WORKER_TIMEOUT_SEC,
+    DUPLICATE_SAME_ACCESS,
     ERROR_BROKEN_PIPE,
     ERROR_COMMITMENT_LIMIT,
     ERROR_NOT_ENOUGH_QUOTA,
+    ERROR_OPERATION_ABORTED,
     EXTENDED_STARTUPINFO_PRESENT,
     HANDLE_FLAG_INHERIT,
     IPC_HEADER_SIZE,
@@ -74,27 +76,62 @@ def _sanitize_error_text(text: str) -> str:
     return sanitized.strip()
 
 
+ALLOWED_OPERATIONS = {"SOLVE", "CHECK_CANDIDATE"}
+
+
+def _normalize_operation(op: Any) -> str:
+    """Normalize operation to documented identifiers, preventing reflection of oversized/untrusted strings."""
+    if isinstance(op, str) and op in ALLOWED_OPERATIONS:
+        return op
+    return "UNKNOWN"
+
+
 def _build_controller_error(
     status: str,
     message: str,
     details: Optional[Dict[str, Any]] = None,
-    operation: str = "UNKNOWN",
+    operation: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Construct structured fail-closed error envelope matching S4 protocol taxonomy."""
+    """Construct structured fail-closed error envelope matching S4 protocol taxonomy and IPC response limits."""
+    norm_op = _normalize_operation(operation)
     outcome = "RESOURCE_EXHAUSTED" if status in (WORKER_RESOURCE_EXHAUSTED, WORKER_TIMEOUT) else "PROTOCOL_ERROR"
-    return {
+    sanitized_msg = _sanitize_error_text(message)
+
+    envelope = {
         "schema_version": SCHEMA_VERSION,
-        "operation": operation,
+        "operation": norm_op,
         "outcome": outcome,
         "status": status,
         "definedness": None,
         "is_provisional_evidence": False,
         "error": {
             "code": status,
-            "message": _sanitize_error_text(message),
+            "message": sanitized_msg[:1024],
             "details": details or {},
         },
     }
+
+    # Strict enforcement of IPC_MAX_RESPONSE_BYTES ceiling
+    try:
+        raw_json = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
+        if len(raw_json) > IPC_MAX_RESPONSE_BYTES:
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "operation": norm_op,
+                "outcome": outcome,
+                "status": status,
+                "definedness": None,
+                "is_provisional_evidence": False,
+                "error": {
+                    "code": status,
+                    "message": "Error response truncated to satisfy protocol response limit.",
+                    "details": {"max_response_bytes": IPC_MAX_RESPONSE_BYTES},
+                },
+            }
+    except Exception:
+        pass
+
+    return envelope
 
 
 class WorkerController:
@@ -112,6 +149,7 @@ class WorkerController:
         self.job_memory_limit = job_memory_limit
         self.timeout_sec = timeout_sec
         self._stdin_pipe_buffer_size = _stdin_pipe_buffer_size
+        self._last_write_info: Optional[Dict[str, Any]] = None
 
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
@@ -132,11 +170,11 @@ class WorkerController:
         """Execute request inside a disposable sandboxed worker and return the response."""
         effective_timeout = timeout_sec if timeout_sec is not None else self.timeout_sec
 
-        # Extract operation if available for error envelopes
+        # Extract normalized operation for error envelopes to prevent untrusted string reflection
         operation = "UNKNOWN"
         if isinstance(request, dict):
-            if "operation" in request and isinstance(request["operation"], str):
-                operation = request["operation"]
+            if "operation" in request:
+                operation = _normalize_operation(request["operation"])
             # Bounded pre-validation before any serialization to prevent denial of service in controller
             try:
                 _measure_dict_bytes(request, max_bytes=IPC_MAX_REQUEST_BYTES)
@@ -213,8 +251,8 @@ class WorkerController:
                 )
             try:
                 parsed = json.loads(request)
-                if isinstance(parsed, dict) and "operation" in parsed and isinstance(parsed["operation"], str):
-                    operation = parsed["operation"]
+                if isinstance(parsed, dict) and "operation" in parsed:
+                    operation = _normalize_operation(parsed["operation"])
             except Exception:
                 pass
 
@@ -229,8 +267,8 @@ class WorkerController:
                 )
             try:
                 parsed = json.loads(raw_payload.decode("utf-8"))
-                if isinstance(parsed, dict) and "operation" in parsed and isinstance(parsed["operation"], str):
-                    operation = parsed["operation"]
+                if isinstance(parsed, dict) and "operation" in parsed:
+                    operation = _normalize_operation(parsed["operation"])
             except Exception:
                 pass
 
@@ -528,6 +566,7 @@ class WorkerController:
         self,
         h_process: wintypes.HANDLE,
         h_job: Optional[wintypes.HANDLE],
+        timeout_phase: str = "UNKNOWN",
         operation: str = "UNKNOWN",
     ) -> Dict[str, Any]:
         """Build structured timeout error after terminating worker."""
@@ -535,8 +574,9 @@ class WorkerController:
         peak_proc, peak_job, _ = query_job_peak_memory(h_job) if h_job else (0, 0, 0)
         return _build_controller_error(
             WORKER_TIMEOUT,
-            f"Worker execution timed out after {self.timeout_sec} seconds.",
+            f"Worker execution timed out during {timeout_phase} phase after {self.timeout_sec} seconds.",
             details={
+                "timeout_phase": timeout_phase,
                 "timeout_sec": self.timeout_sec,
                 "peak_process_bytes": peak_proc,
                 "peak_job_bytes": peak_job,
@@ -557,8 +597,22 @@ class WorkerController:
         write_error = [None]
         bytes_written_total = [0]
         write_done = threading.Event()
+        write_started = threading.Event()
+        h_thread_real = wintypes.HANDLE()
 
         def _writer():
+            cur_proc = kernel32.GetCurrentProcess()
+            cur_th = kernel32.GetCurrentThread()
+            kernel32.DuplicateHandle(
+                cur_proc,
+                cur_th,
+                cur_proc,
+                ctypes.byref(h_thread_real),
+                0,
+                False,
+                DUPLICATE_SAME_ACCESS,
+            )
+            write_started.set()
             try:
                 total = 0
                 while total < len(data):
@@ -580,15 +634,16 @@ class WorkerController:
 
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
         writer_thread.start()
+        write_started.wait(timeout=1.0)
+
+        write_timed_out = False
+        abnormal_exit_code = None
 
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                # Full-lifecycle deadline expired during IPC write!
-                kernel32.TerminateProcess(h_process, 0x00000102)
-                safe_close_handle(h_pipe)
-                writer_thread.join(timeout=1.0)
-                return self._handle_worker_timeout(h_process, h_job, operation=operation)
+                write_timed_out = True
+                break
 
             if write_done.wait(timeout=min(0.02, remaining)):
                 break
@@ -597,13 +652,62 @@ class WorkerController:
             exit_code = wintypes.DWORD()
             if kernel32.GetExitCodeProcess(h_process, ctypes.byref(exit_code)):
                 if exit_code.value != 259:  # STILL_ACTIVE
-                    safe_close_handle(h_pipe)
-                    writer_thread.join(timeout=1.0)
-                    return self._handle_worker_abnormal_exit(
-                        h_process, h_job, exit_code.value, operation=operation
-                    )
+                    abnormal_exit_code = exit_code.value
+                    break
 
-        writer_thread.join(timeout=1.0)
+        if write_timed_out:
+            write_blocked_at_deadline = not write_done.is_set()
+            writer_thread_alive_before = writer_thread.is_alive()
+            cancel_called = False
+            cancel_ok = False
+            if h_thread_real.value:
+                cancel_called = True
+                cancel_ok = bool(kernel32.CancelSynchronousIo(h_thread_real))
+
+            kernel32.TerminateProcess(h_process, 0x00000102)
+            writer_thread.join(timeout=2.0)
+            writer_thread_alive_after = writer_thread.is_alive()
+
+            self._last_write_info = {
+                "write_entered": True,
+                "write_blocked_at_deadline": write_blocked_at_deadline,
+                "cancel_synchronous_io_called": cancel_called,
+                "cancel_synchronous_io_success": cancel_ok,
+                "writer_thread_alive_before_cancel": writer_thread_alive_before,
+                "writer_thread_alive_after_join": writer_thread_alive_after,
+                "bytes_written": bytes_written_total[0],
+                "total_bytes": len(data),
+            }
+
+            safe_close_handle(h_thread_real)
+            safe_close_handle(h_pipe)
+            return self._handle_worker_timeout(
+                h_process, h_job, timeout_phase="WRITE", operation=operation
+            )
+
+        if abnormal_exit_code is not None:
+            if h_thread_real.value:
+                kernel32.CancelSynchronousIo(h_thread_real)
+            writer_thread.join(timeout=2.0)
+            safe_close_handle(h_thread_real)
+            safe_close_handle(h_pipe)
+            return self._handle_worker_abnormal_exit(
+                h_process, h_job, abnormal_exit_code, operation=operation
+            )
+
+        writer_thread.join(timeout=2.0)
+        safe_close_handle(h_thread_real)
+
+        self._last_write_info = {
+            "write_entered": True,
+            "write_blocked_at_deadline": False,
+            "cancel_synchronous_io_called": False,
+            "cancel_synchronous_io_success": False,
+            "writer_thread_alive_before_cancel": False,
+            "writer_thread_alive_after_join": False,
+            "bytes_written": bytes_written_total[0],
+            "total_bytes": len(data),
+        }
 
         if write_error[0] is not None:
             exit_code = wintypes.DWORD()
@@ -635,14 +739,14 @@ class WorkerController:
         while len(accumulated) < num_bytes:
             now = time.monotonic()
             if now >= deadline:
-                return self._handle_worker_timeout(h_process, h_job, operation=operation)
+                return self._handle_worker_timeout(h_process, h_job, timeout_phase="READ", operation=operation)
 
             avail = wintypes.DWORD(0)
             peek_res = kernel32.PeekNamedPipe(h_pipe, None, 0, None, ctypes.byref(avail), None)
             if not peek_res:
                 err = ctypes.get_last_error()
                 # Broken pipe means worker process closed pipe (exited or crashed)
-                return self._handle_worker_abnormal_exit(h_process, h_job, err, h_stderr=h_stderr)
+                return self._handle_worker_abnormal_exit(h_process, h_job, err, h_stderr=h_stderr, operation=operation)
 
             if avail.value > 0:
                 to_read = min(num_bytes - len(accumulated), avail.value)
@@ -651,14 +755,14 @@ class WorkerController:
                 read_res = kernel32.ReadFile(h_pipe, buf, to_read, ctypes.byref(bytes_read), None)
                 if not read_res or bytes_read.value == 0:
                     err = ctypes.get_last_error()
-                    return self._handle_worker_abnormal_exit(h_process, h_job, err, h_stderr=h_stderr)
+                    return self._handle_worker_abnormal_exit(h_process, h_job, err, h_stderr=h_stderr, operation=operation)
                 accumulated.extend(buf.raw[: bytes_read.value])
             else:
                 # Check if process has terminated while no data is available
                 wait_res = kernel32.WaitForSingleObject(h_process, 0)
                 if wait_res == WAIT_OBJECT_0:
                     # Process died without writing expected data
-                    return self._handle_worker_abnormal_exit(h_process, h_job, 0, h_stderr=h_stderr)
+                    return self._handle_worker_abnormal_exit(h_process, h_job, 0, h_stderr=h_stderr, operation=operation)
                 time.sleep(0.01)
 
         return bytes(accumulated)
@@ -669,6 +773,7 @@ class WorkerController:
         h_job: Optional[wintypes.HANDLE],
         pipe_error: int,
         h_stderr: Optional[wintypes.HANDLE] = None,
+        operation: str = "UNKNOWN",
     ) -> Dict[str, Any]:
         """Diagnose worker failure upon pipe disconnect without fallback math execution."""
         exit_code = wintypes.DWORD()
@@ -707,6 +812,7 @@ class WorkerController:
                     "job_memory_limit": self.job_memory_limit,
                     "stderr": stderr_msg,
                 },
+                operation=operation,
             )
 
         return _build_controller_error(
@@ -718,6 +824,7 @@ class WorkerController:
                 "peak_process_bytes": peak_proc,
                 "stderr": stderr_msg,
             },
+            operation=operation,
         )
 
 
