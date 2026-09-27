@@ -1,7 +1,7 @@
 {
   "milestone": "S4-B2/P1-R2",
-  "timestamp_utc": "2026-09-27T16:06:36Z",
-  "host_pid": 15704,
+  "timestamp_utc": "2026-09-27T16:16:23Z",
+  "host_pid": 19512,
   "python_executable": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
   "steps": {
     "step_1_request_execution": {
@@ -16,10 +16,10 @@
         "elevated": false,
         "verified_before_resume": true,
         "query_error": 0,
-        "appcontainer_sid": "S-1-15-2-149233022-3546115846-924607214-3487547319-1493492006-3772496795-2838100524",
+        "appcontainer_sid": "S-1-15-2-2115420257-287583902-1995397269-3341226206-4026199114-4293705251-2275394115",
         "accepted": true,
-        "profile_name": "mke.product.worker.p1.15704.ec89805dd01f",
-        "expected_sid": "S-1-15-2-149233022-3546115846-924607214-3487547319-1493492006-3772496795-2838100524",
+        "profile_name": "mke.product.worker.p1.19512.c7b522ef1904",
+        "expected_sid": "S-1-15-2-2115420257-287583902-1995397269-3341226206-4026199114-4293705251-2275394115",
         "job_assignment_verified": true,
         "process_was_resumed": true
       },
@@ -42,12 +42,12 @@
     "step_2_unresolved_containment_and_liveness": {
       "process_owners_count": 1,
       "job_owners_count": 1,
-      "host_pid": 15704,
-      "child_pid": 18880,
+      "host_pid": 19512,
+      "child_pid": 14700,
       "child_pid_valid_and_distinct": true,
-      "proc_owner_raw_handle": 796,
+      "proc_owner_raw_handle": 696,
       "proc_owner_blocked_reason": "PROCESS_TERMINATION_UNCONFIRMED",
-      "job_owner_raw_handle": 704,
+      "job_owner_raw_handle": 500,
       "wait_single_object_0ms_result": 258,
       "child_is_alive_during_uncertainty": true
     },
@@ -55,7 +55,7 @@
       "cleanup_result": {
         "state": "REFUSED_ACTIVE_CHILDREN",
         "active_children": 1,
-        "profile_name": "mke.product.worker.p1.15704.ec89805dd01f"
+        "profile_name": "mke.product.worker.p1.19512.c7b522ef1904"
       },
       "refused_as_expected": true,
       "active_children_count": 1
@@ -81,7 +81,7 @@
         "stage_error": null,
         "delete_hresult": 0,
         "active_children": 0,
-        "profile_name": "mke.product.worker.p1.15704.ec89805dd01f"
+        "profile_name": "mke.product.worker.p1.19512.c7b522ef1904"
       },
       "cleaned_as_expected": true,
       "stage_removed": true,
@@ -104,9 +104,9 @@
   },
   "experiment_verdict": true,
   "initial_profile": {
-    "profile_name": "mke.product.worker.p1.15704.ec89805dd01f",
-    "sid_string": "S-1-15-2-149233022-3546115846-924607214-3487547319-1493492006-3772496795-2838100524",
-    "stage_root": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-tgikefy5",
-    "python_exe": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-tgikefy5\\runtime\\python.exe"
+    "profile_name": "mke.product.worker.p1.19512.c7b522ef1904",
+    "sid_string": "S-1-15-2-2115420257-287583902-1995397269-3341226206-4026199114-4293705251-2275394115",
+    "stage_root": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-71z9y8v5",
+    "python_exe": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-71z9y8v5\\runtime\\python.exe"
   }
 }

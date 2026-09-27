@@ -184,21 +184,37 @@ def run_real_lifecycle_experiment() -> dict:
         evidence["experiment_verdict"] = all(checks.values())
 
     finally:
-        # Failure-path recovery: ensure resources are safely reclaimed even if assertions fail
+        # Safe failure-path recovery: reconcile only through controller mechanisms.
+        # NEVER call manager._release() directly or delete profile if termination is unconfirmed.
         try:
+            # If Job Object is still open and unconfirmed, attempt native close to terminate child via KILL_ON_JOB_CLOSE
             if job_owner and not job_owner.is_confirmed_closed():
                 job_owner.close(_inject_failure=False)
-            if proc_owner and not proc_owner.is_confirmed_closed():
-                kernel32.TerminateProcess(proc_owner.handle, 0)
-                kernel32.WaitForSingleObject(proc_owner.handle, 1000)
-            if controller:
+
+            # If controller exists, reconcile unresolved resources using native exit confirmation
+            if controller is not None:
+                # Wait briefly for process exit if proc_owner exists and is open
+                if proc_owner and proc_owner.handle:
+                    kernel32.WaitForSingleObject(proc_owner.handle, 2000)
                 controller.reconcile_unresolved_resources()
-            if manager.active_children > 0:
-                while manager.active_children > 0:
-                    manager._release()
-            manager.cleanup()
+
+            # Check if manager still has active children or unresolved handles
+            if manager.active_children == 0:
+                # All leases released through legitimate reconciliation; safe to cleanup
+                manager.cleanup()
+            else:
+                # Active leases remain because child termination could not be confirmed.
+                # In accordance with strict audit requirements:
+                # - Preserve ownership diagnostics.
+                # - Do not force-release the lease.
+                # - Do not delete profile or staged runtime.
+                # - Invalidate experiment verdict and fail closed.
+                evidence["emergency_recovery_state"] = "ACTIVE_LEASES_RETAINED_TERMINATION_UNCONFIRMED"
+                evidence["unresolved_active_children"] = manager.active_children
+                evidence["experiment_verdict"] = False
         except Exception as cleanup_err:
             evidence["emergency_cleanup_error"] = str(cleanup_err)
+            evidence["experiment_verdict"] = False
 
     return evidence
 
@@ -206,15 +222,38 @@ def run_real_lifecycle_experiment() -> dict:
 if __name__ == "__main__":
     result = run_real_lifecycle_experiment()
     output_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p1_r2" / "real_process_lifecycle_evidence.json"
+    output_raw_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p1_r2" / "real_process_lifecycle_raw.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    print(json.dumps(result, indent=2))
+    json_str = json.dumps(result, indent=2)
+    output_path.write_text(json_str, encoding="utf-8")
+    print(json_str)
 
-    if result.get("experiment_verdict") is True:
-        print(f"\n[PASS] Real-Process Lifecycle Evidence saved to: {output_path}")
+    has_cleanup_error = bool(result.get("emergency_cleanup_error"))
+    has_unconfirmed_leases = (result.get("emergency_recovery_state") == "ACTIVE_LEASES_RETAINED_TERMINATION_UNCONFIRMED")
+    verdict = result.get("experiment_verdict") is True and not has_cleanup_error and not has_unconfirmed_leases
+
+    summary_text = json_str + "\n"
+    if verdict:
+        msg = f"\n[PASS] Real-Process Lifecycle Evidence saved to: {output_path}"
+        print(msg)
+        summary_text += msg + "\n"
+        output_raw_path.write_text(summary_text, encoding="utf-8")
         sys.exit(0)
     else:
         failed_checks = [k for k, v in result.get("mandatory_checks", {}).items() if not v]
-        print(f"\n[FAIL] Real-Process Lifecycle verification failed on checks: {failed_checks}")
+        msg = f"\n[FAIL] Real-Process Lifecycle verification failed on checks: {failed_checks}"
+        print(msg)
+        summary_text += msg + "\n"
+        if has_cleanup_error:
+            err_msg = f"       Emergency cleanup error: {result.get('emergency_cleanup_error')}"
+            print(err_msg)
+            summary_text += err_msg + "\n"
+        if has_unconfirmed_leases:
+            leases_msg = f"       Unresolved active leases: {result.get('unresolved_active_children')}"
+            print(leases_msg)
+            summary_text += leases_msg + "\n"
+        output_raw_path.write_text(summary_text, encoding="utf-8")
         sys.exit(1)
+
+
 

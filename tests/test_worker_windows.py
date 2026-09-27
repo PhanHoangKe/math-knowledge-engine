@@ -1170,6 +1170,112 @@ class TestWindowsAppContainerIntegration(unittest.TestCase):
             cleaned = mgr.cleanup()
             self.assertEqual(cleaned["state"], "CLEANED")
 
+    def test_uncertain_termination_preserves_lease_and_refuses_cleanup(self):
+        """Reconciliation never releases child lease or deletes profile while termination is unconfirmed."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        manager = get_appcontainer_manager()
+
+        res = controller.execute_request(
+            self.request,
+            _inject_terminate_process_failure=True,
+            _inject_termination_wait_timeout=True,
+            _inject_job_close_failure=True,
+        )
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+
+        # Confirm child is alive and handles are unresolved
+        proc_owners = [h for h in controller.get_unresolved_handles() if isinstance(h, SafeProcessHandle)]
+        job_owners = controller.get_unresolved_job_handles()
+        self.assertEqual(len(proc_owners), 1)
+        self.assertEqual(len(job_owners), 1)
+        proc_owner = proc_owners[0]
+        job_owner = job_owners[0]
+
+        try:
+            self.assertEqual(kernel32.WaitForSingleObject(proc_owner.handle, 0), WAIT_TIMEOUT)
+
+            # First reconciliation: job_owner is safely closed and settled, but proc_owner is still running
+            # so proc_owner is NOT settled and child lease is NOT released.
+            settled = controller.reconcile_unresolved_resources()
+            self.assertEqual(settled, 1)  # Only Job Object settled
+            self.assertEqual(controller.get_unresolved_count(), 1)  # proc_owner remains unresolved
+            self.assertGreaterEqual(manager.active_children, 1)
+
+            # Attempt cleanup while lease is active -> must refuse and preserve staging directory
+            refused = manager.cleanup()
+            self.assertEqual(refused["state"], "REFUSED_ACTIVE_CHILDREN")
+            self.assertIsNotNone(manager.stage_root)
+            self.assertTrue(manager.stage_root.exists())
+
+            # Wait for KILL_ON_JOB_CLOSE termination to complete
+            self.assertEqual(kernel32.WaitForSingleObject(proc_owner.handle, 5000), WAIT_OBJECT_0)
+
+            # Now reconcile -> confirms termination, releases lease, and settles process handle
+            settled_proc = controller.reconcile_unresolved_resources()
+            self.assertEqual(settled_proc, 1)
+            self.assertEqual(controller.get_unresolved_count(), 0)
+            self.assertEqual(manager.active_children, 0)
+
+            # Final cleanup succeeds
+            cleaned = manager.cleanup()
+            self.assertEqual(cleaned["state"], "CLEANED")
+        finally:
+            if proc_owner and not proc_owner.is_confirmed_closed():
+                kernel32.TerminateProcess(proc_owner.handle, 0)
+                kernel32.WaitForSingleObject(proc_owner.handle, 2000)
+            controller.reconcile_unresolved_resources()
+            if manager.active_children == 0:
+                manager.cleanup()
+
+
+    def test_harness_safe_recovery_never_force_releases_active_leases_on_uncertainty(self):
+        """Emergency recovery never force-releases leases or deletes runtime if termination remains unconfirmed."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        manager = get_appcontainer_manager()
+
+        res = controller.execute_request(
+            self.request,
+            _inject_terminate_process_failure=True,
+            _inject_termination_wait_timeout=True,
+            _inject_job_close_failure=True,
+        )
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+
+        proc_owners = [h for h in controller.get_unresolved_handles() if isinstance(h, SafeProcessHandle)]
+        job_owners = controller.get_unresolved_job_handles()
+        proc_owner = proc_owners[0]
+        job_owner = job_owners[0]
+
+        # Simulate safe emergency recovery under uncertain termination (Job close failure simulated)
+        emergency_state = None
+        try:
+            # Reconcile without closing Job (child remains alive)
+            controller.reconcile_unresolved_resources()
+            if manager.active_children == 0:
+                manager.cleanup()
+            else:
+                emergency_state = "ACTIVE_LEASES_RETAINED_TERMINATION_UNCONFIRMED"
+        finally:
+            # Verify the invariant: lease was NOT force-released, profile was NOT deleted
+            self.assertEqual(emergency_state, "ACTIVE_LEASES_RETAINED_TERMINATION_UNCONFIRMED")
+            self.assertGreaterEqual(manager.active_children, 1)
+            self.assertTrue(manager.stage_root.exists())
+
+            # Now safely terminate and reconcile
+            job_owner.close(_inject_failure=False)
+            kernel32.WaitForSingleObject(proc_owner.handle, 5000)
+            controller.reconcile_unresolved_resources()
+            self.assertEqual(manager.active_children, 0)
+            cleaned = manager.cleanup()
+            self.assertEqual(cleaned["state"], "CLEANED")
+
+
 
 
 

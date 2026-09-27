@@ -414,6 +414,8 @@ Atomic lock in acquire() ensures concurrent cleanup cannot delete the profile be
 test_cleanup_idempotent_when_already_cleaned (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_concurrent_lease_release_is_strictly_idempotent_and_thread_safe (test_worker_windows.TestWindowsAppContainerIntegration)
 Concurrent calls to release() on the same AppContainerLease instance decrement count exactly once. ... ok
+test_harness_safe_recovery_never_force_releases_active_leases_on_uncertainty (test_worker_windows.TestWindowsAppContainerIntegration)
+Emergency recovery never force-releases leases or deletes runtime if termination remains unconfirmed. ... ok
 test_partial_preparation_failure_cleans_up_or_preserves_diagnostics (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_profile_cleanup_refuses_active_child_lease_then_recovers (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_profile_deletion_failure_preserves_sid_and_recovers (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
@@ -425,6 +427,8 @@ test_repeated_appcontainer_workers_do_not_accumulate_handles (test_worker_window
 test_security_capabilities_attribute_failure_is_fail_closed (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_staging_directory_deletion_failure_preserves_state_and_recovers (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_token_identity_mismatch_is_rejected_while_suspended (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
+test_uncertain_termination_preserves_lease_and_refuses_cleanup (test_worker_windows.TestWindowsAppContainerIntegration)
+Reconciliation never releases child lease or deletes profile while termination is unconfirmed. ... ok
 test_unresolved_cleanup_prevents_unsafe_profile_reuse (test_worker_windows.TestWindowsAppContainerIntegration) ... ok
 test_breakaway_from_job_rejected (test_worker_windows.TestWindowsBreakawayRejection) ... ok
 test_actual_late_duplication_sequence_exit_after_quarantine (test_worker_windows.TestWindowsCancellationAndHandleOwnership)
@@ -531,6 +535,6 @@ test_worker_timeout_fails_closed (test_worker_windows.TestWindowsTimeoutAndFrami
 Dedicated blocking fixture: prove worker timeout strictly fails closed without race. ... ok
 
 ----------------------------------------------------------------------
-Ran 324 tests in 33.059s
+Ran 326 tests in 35.200s
 
 OK
