@@ -68,11 +68,11 @@ Requests are validated against explicit conservative bounds BEFORE AST parsing o
 
 | Parameter | Limit | Failure Code |
 | :--- | :--- | :--- |
-| **Max Payload Size** | 4,096 bytes (UTF-8) | `ERR_PAYLOAD_TOO_LARGE` |
+| **Max Payload Size** | 4,096 bytes (UTF-8, escape-aware for dicts) | `ERR_PAYLOAD_TOO_LARGE` |
 | **Max Response Size** | 16,384 bytes (16 KiB default) | `ERR_RESPONSE_LIMIT_EXCEEDED` |
 | **Min Response Size** | 512 bytes (enforceable floor) | `ValueError` (invalid config) |
 | **Max JSON Nesting Depth** | 16 levels (`{}` or `[]`) | `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
-| **JSON Encoding** | Strict UTF-8 JSON object | `ERR_PROTOCOL_JSON_DECODE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
+| **JSON Encoding** | Strict UTF-8 JSON object (no surrogates) | `ERR_PROTOCOL_JSON_DECODE` / `ERR_PROTOCOL_MALFORMED_STRUCTURE` |
 | **Max Equation Length** | 256 ASCII characters | `ERR_PROTOCOL_INPUT_LIMIT` |
 | **Max Token Count** | 64 tokens | `InputBoundsExceededError` |
 | **Max Nesting Depth** | 16 parenthesis levels | `InputBoundsExceededError` |
@@ -90,12 +90,12 @@ Every response unambiguously reports the protocol version, requested operation, 
 2. `SYNTAX_ERROR`: Mathematical expression could not be parsed according to S1 EBNF grammar (definedness `null`).
 3. `PROTOCOL_ERROR`: Request framing violation, schema mismatch, invalid data types, extra fields, malformed candidate string, or transport decode errors:
    - Malformed JSON syntax $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
-   - Isolated Unicode surrogates / unencodable chars $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
+   - Escaped isolated Unicode surrogates (`\ud800`–`\udfff`) in JSON text or dict strings $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
    - Invalid UTF-8 bytes $\implies$ `ERR_PROTOCOL_JSON_DECODE`.
    - Root not a JSON object $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
    - Duplicate JSON object keys $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
    - JSON nesting depth $> 16$ levels $\implies$ `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
-   - Dict payload $> 4096$ UTF-8 bytes $\implies$ `ERR_PAYLOAD_TOO_LARGE`.
+   - Dict payload $> 4096$ JSON-escaped UTF-8 bytes $\implies$ `ERR_PAYLOAD_TOO_LARGE`.
    - Non-string keys or unsupported value types $\implies$ `ERR_PROTOCOL_INVALID_TYPE`.
 4. `DOMAIN_ERROR`: Expression contains proven mathematical undefinedness in $\mathbb{R}$ ($1/0$, $0^0$). Reserved exclusively for definedness `false`.
 5. `OUT_OF_SCOPE`: Equation contains constructs outside S3 affine linear capability ($x^2$, $x \cdot x$, $x^0$, variable denominators) (definedness `null`).

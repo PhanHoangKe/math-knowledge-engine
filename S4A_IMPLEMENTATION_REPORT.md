@@ -96,49 +96,39 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 Output:
 ```
-Ran 241 tests in 0.035s
+Ran 246 tests in 0.040s
 
 OK
 ```
 
-### 5.2 Test Inventory (241 Total Tests)
+### 5.2 Test Inventory (246 Total Tests)
 - **S0 Rational Core (`tests/test_rational.py`):** 24 tests.
 - **S1 Parser & Immutable AST (`tests/test_parser.py`):** 41 tests.
 - **S2 Semantic Evaluation & Verification (`tests/test_evaluator.py`):** 47 tests.
 - **S3 Linear Equation Solver (`tests/test_solver.py`):** 72 tests.
-- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 57 tests:
+- **S4-A Protocol & Dispatcher (`tests/test_protocol.py`):** 62 tests:
   - *SOLVE Operations (11 tests)*
   - *CHECK_CANDIDATE Operations (6 tests)*
   - *Validation, Security & Framing (15 tests)*
   - *S4-A-R1 Boundary Remediations (11 tests)*
-  - *S4-A-R2 Final Boundary Corrections (14 tests):*
-    * `test_response_limit_rejects_invalid_configuration`: Rejects `max_response_bytes < MIN_RESPONSE_BYTES` (512) with `ValueError`.
-    * `test_response_limit_valid_smaller_ceiling`: Valid smaller ceiling (512 bytes) enforces serialized limit invariant, fails closed with `ERR_RESPONSE_LIMIT_EXCEEDED` on oversized payload, and validates `dispatch_json`.
-    * `test_response_limit_default_max_response_bytes`: Default `MAX_RESPONSE_BYTES = 16384` satisfies serialized limit invariant.
-    * `test_json_error_classification_malformed_syntax`: Malformed JSON syntax produces `ERR_PROTOCOL_JSON_DECODE`.
-    * `test_json_error_classification_incorrect_root_structure`: Non-dict JSON roots produce `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
-    * `test_json_error_classification_duplicate_keys`: Duplicate JSON keys produce `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
-    * `test_invalid_unicode_isolated_surrogates_in_string`: Isolated Unicode surrogates in string payload produce `ERR_PROTOCOL_JSON_DECODE`.
-    * `test_invalid_unicode_isolated_surrogates_in_dict`: Isolated Unicode surrogates in dict payload produce `ERR_PROTOCOL_JSON_DECODE`.
-    * `test_invalid_unicode_malformed_utf8_bytes`: Malformed UTF-8 bytes produce `ERR_PROTOCOL_JSON_DECODE`.
-    * `test_dict_multibyte_unicode_oversized_in_unexpected_field`: Multibyte Unicode dict value exceeding 4096 bytes triggers `ERR_PAYLOAD_TOO_LARGE` before unexpected-field checks.
-    * `test_dict_rejects_unsupported_value_types`: Unsupported dictionary value types rejected predictably with `ERR_PROTOCOL_INVALID_TYPE`.
-    * `test_json_nesting_ceiling_enforced_on_otherwise_valid_request`: Request wrapped in structures exceeding 16 levels fails with `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
-    * `test_json_nesting_ceiling_deep_arrays`: Deeply nested arrays exceeding 16 levels fail with `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
-    * `test_valid_ordinary_request_within_nesting_ceiling`: Valid ordinary request within nesting ceiling executes normally.
+  - *S4-A-R2 Final Boundary Corrections (14 tests)*
+  - *S4-A-R3 Two-Case Closure Regressions (5 tests):*
+    * `test_dict_u0000_700_repetitions_rejected_as_payload_too_large`: Dict with 700 repetitions of `U+0000` in unexpected field exceeds 4096 JSON bytes and is rejected as `ERR_PAYLOAD_TOO_LARGE` before unexpected-field checks.
+    * `test_dict_escaped_control_chars_quotes_and_backslashes`: Accurate accounting for 2-byte single-character escapes (`\n`, `"`, `\`) and 6-byte hex escapes.
+    * `test_dict_multibyte_utf8_byte_accounting`: Accurate accounting for multibyte UTF-8 characters (e.g. 3-byte CJK scalar).
+    * `test_raw_json_escaped_isolated_surrogate_rejected`: Raw ASCII JSON payload containing escaped isolated surrogates (`\ud800`, `\udfff`) deterministically yields `ERR_PROTOCOL_JSON_DECODE`.
+    * `test_raw_json_ordinary_escaped_unicode_handled_correctly`: Ordinary escaped ASCII (`\u0078`) parses and solves normally (`UNIQUE_ROOT`), while non-ASCII (`\u03c0`) is rejected with `ERR_PROTOCOL_INPUT_LIMIT`.
 
-### 5.3 S4-A-R2 Final Remediation Summary
-1. **Response Limit Invariant:** Validated `max_response_bytes >= MIN_RESPONSE_BYTES` (512 bytes floor). Guaranteed that fallback envelope satisfies serialized ceiling. Rejected invalid configurations with `ValueError`.
-2. **JSON Error Classification:** Caught `json.JSONDecodeError` before `ValueError`, accurately distinguishing `ERR_PROTOCOL_JSON_DECODE` (malformed JSON syntax) from `ERR_PROTOCOL_MALFORMED_STRUCTURE` (non-dict root, duplicate keys, excessive nesting).
-3. **Invalid Unicode Handling:** Intercepted `UnicodeEncodeError` and `UnicodeDecodeError` on transport inputs, deterministically mapping isolated surrogates and malformed bytes to `ERR_PROTOCOL_JSON_DECODE` with zero unhandled tracebacks.
-4. **Equivalent Dictionary Byte Bounds:** Replaced arbitrary character-count estimates with genuine UTF-8 byte calculation (`_measure_dict_bytes`) without unbounded serialization. Enforced byte ceiling before field-level checks. Predictably rejected unsupported types and non-string keys.
-5. **JSON Nesting Control:** Defined `MAX_JSON_NESTING_DEPTH = 16`. Enforced nesting ceilings before parsing or during dictionary measurement, raising `ERR_PROTOCOL_MALFORMED_STRUCTURE`.
+### 5.3 S4-A-R3 Final Closure Summary
+1. **Conservative, Escape-Aware Dictionary JSON Byte Accounting:** Replaced simple raw UTF-8 string measurement with escape-aware JSON string measurement (`_measure_json_string_bytes`). Accurately counts 2 surrounding double quotes, 2 bytes for quotes `\"` and backslashes `\\`, 2 bytes for single-character control escapes (`\b`, `\t`, `\n`, `\f`, `\r`), 6 bytes for other control characters `< 0x20` (`\u00XX`), and genuine UTF-8 byte lengths for multibyte Unicode scalars. Enforces `MAX_PAYLOAD_BYTES = 4096` before field validation without unbounded serialization.
+2. **Escaped Unicode Surrogates Handling:** Implemented `_validate_no_surrogates` across JSON object hooks and parse results. Detects isolated Unicode surrogates (`0xD800 <= ord(ch) <= 0xDFFF`) resulting from JSON escape sequences (such as `\ud800`), mapping them deterministically to `ERR_PROTOCOL_JSON_DECODE` (`outcome: PROTOCOL_ERROR`, `status: ERR_PROTOCOL_JSON_DECODE`, `definedness: null`). Valid Unicode escapes (`\u0078`) and non-ASCII rejection are preserved.
 
 ### 5.4 Holdout Dataset Isolation
-The 241 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
+The 246 tests reported above represent executed developer verification and regression suites in the open product repository. The 80 sealed holdout cases remain completely unaccessed and reserved for independent certification.
 
 ---
 
 ## 6. Protected Workspace Integrity
 - Protected historical repository (`d:\Math Knowledge Engine`) was checked read-only: hash `a5615ff5909d1582ac21f3278900865b8534d6ffd5f8918ab2ef5a38cfa37f76` preserved without modification.
 - All development conducted exclusively in `d:\mke-product`.
+

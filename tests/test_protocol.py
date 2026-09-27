@@ -976,5 +976,118 @@ class TestProtocolRemediationS4AR2(unittest.TestCase):
         self.assertTrue(res["definedness"])
 
 
+class TestProtocolRemediationS4AR3(unittest.TestCase):
+    """Regression tests for S4-A-R3 closure: escape-aware dict byte accounting and Unicode surrogates."""
+
+    def test_dict_u0000_700_repetitions_rejected_as_payload_too_large(self):
+        """Dict containing 700 U+0000 control chars in unexpected field exceeds 4096 JSON bytes and is rejected as ERR_PAYLOAD_TOO_LARGE."""
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": "\x00" * 700,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertEqual(res["error"]["code"], "ERR_PAYLOAD_TOO_LARGE")
+        self.assertIsNone(res["definedness"])
+
+    def test_dict_escaped_control_chars_quotes_and_backslashes(self):
+        """Dict string byte calculation accurately accounts for 2-byte single-char escapes and 6-byte hex escapes."""
+        # 2050 quotes -> 4100 bytes for quotes alone > 4096 MAX_PAYLOAD_BYTES
+        req_quotes = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": '"' * 2050,
+        }
+        res_quotes = dispatch_request(req_quotes)
+        self.assertEqual(res_quotes["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_quotes["status"], "ERR_PAYLOAD_TOO_LARGE")
+
+        # 2050 backslashes -> 4100 bytes > 4096 MAX_PAYLOAD_BYTES
+        req_bs = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": "\\" * 2050,
+        }
+        res_bs = dispatch_request(req_bs)
+        self.assertEqual(res_bs["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_bs["status"], "ERR_PAYLOAD_TOO_LARGE")
+
+        # 2050 newlines (\n) -> 4100 bytes > 4096 MAX_PAYLOAD_BYTES
+        req_nl = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": "\n" * 2050,
+        }
+        res_nl = dispatch_request(req_nl)
+        self.assertEqual(res_nl["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_nl["status"], "ERR_PAYLOAD_TOO_LARGE")
+
+    def test_dict_multibyte_utf8_byte_accounting(self):
+        """Dict string byte calculation accurately accounts for multibyte UTF-8 characters."""
+        # 3-byte unicode character: \u4e2d (CJK character)
+        # 1400 chars * 3 bytes = 4200 bytes > 4096 MAX_PAYLOAD_BYTES
+        req = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "x=1",
+            "unexpected_field": "\u4e2d" * 1400,
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PAYLOAD_TOO_LARGE")
+
+    def test_raw_json_escaped_isolated_surrogate_rejected(self):
+        """Raw ASCII JSON payload with escaped isolated surrogate (e.g. \\ud800) yields ERR_PROTOCOL_JSON_DECODE."""
+        payload = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "\\ud800=0"}'
+        res = dispatch_request(payload)
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertEqual(res["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res["definedness"])
+
+        # Also test trailing surrogate \udfff
+        payload_trailing = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "\\udfff=0"}'
+        res_trailing = dispatch_request(payload_trailing)
+        self.assertEqual(res_trailing["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_trailing["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertEqual(res_trailing["error"]["code"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res_trailing["definedness"])
+
+        # In dict form with isolated surrogate in string
+        req_dict = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": OPERATION_SOLVE,
+            "equation": "\ud800=0",
+        }
+        res_dict = dispatch_request(req_dict)
+        self.assertEqual(res_dict["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_dict["status"], "ERR_PROTOCOL_JSON_DECODE")
+        self.assertIsNone(res_dict["definedness"])
+
+    def test_raw_json_ordinary_escaped_unicode_handled_correctly(self):
+        """Ordinary escaped Unicode (e.g. \\u0078 for 'x') executes normally, while non-ASCII (\\u03c0 for 'π') triggers ERR_PROTOCOL_INPUT_LIMIT."""
+        # \u0078 is ASCII 'x' -> 'x=1'
+        payload_valid = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "\\u0078=1"}'
+        res_valid = dispatch_request(payload_valid)
+        self.assertEqual(res_valid["outcome"], "SUCCESS")
+        self.assertEqual(res_valid["status"], "UNIQUE_ROOT")
+        self.assertEqual(res_valid["root"], {"numerator": "1", "denominator": "1"})
+
+        # \u03c0 is non-ASCII Greek pi -> valid Unicode scalar, but rejected by protocol ASCII requirement
+        payload_pi = '{"schema_version": "mke.p02a.v1", "operation": "SOLVE", "equation": "\\u03c0*x=1"}'
+        res_pi = dispatch_request(payload_pi)
+        self.assertEqual(res_pi["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res_pi["status"], "ERR_PROTOCOL_INPUT_LIMIT")
+        self.assertEqual(res_pi["error"]["code"], "ERR_PROTOCOL_INPUT_LIMIT")
+        self.assertIn("ASCII", res_pi["error"]["message"])
+
+
 if __name__ == "__main__":
     unittest.main()
+

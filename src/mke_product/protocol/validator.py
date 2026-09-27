@@ -27,12 +27,36 @@ from .schema import (
 )
 
 
+def _validate_no_surrogates(val: Any) -> None:
+    """Validate that value contains no isolated Unicode surrogates (U+D800 - U+DFFF).
+
+    Raises:
+        ProtocolJsonDecodeError: if an isolated surrogate is found.
+    """
+    if isinstance(val, str):
+        for ch in val:
+            cp = ord(ch)
+            if 0xD800 <= cp <= 0xDFFF:
+                raise ProtocolJsonDecodeError(
+                    f"JSON payload contains invalid Unicode scalar value (isolated surrogate: U+{cp:04X})."
+                )
+    elif isinstance(val, list):
+        for item in val:
+            _validate_no_surrogates(item)
+    elif isinstance(val, dict):
+        for k, v in val.items():
+            _validate_no_surrogates(k)
+            _validate_no_surrogates(v)
+
+
 def _reject_duplicate_keys_hook(pairs: List[Tuple[Any, Any]]) -> Dict[Any, Any]:
-    """Strict JSON object hook rejecting duplicate keys before dispatch."""
+    """Strict JSON object hook rejecting duplicate keys and isolated surrogates."""
     d: Dict[Any, Any] = {}
     for key, value in pairs:
         if key in d:
             raise ProtocolStructureError(f"Duplicate JSON object key detected: {key!r}")
+        _validate_no_surrogates(key)
+        _validate_no_surrogates(value)
         d[key] = value
     return d
 
@@ -68,10 +92,47 @@ def check_json_nesting_depth(json_str: str, max_depth: int = MAX_JSON_NESTING_DE
                     depth -= 1
 
 
+def _measure_json_string_bytes(s: str) -> int:
+    r"""Calculate the exact UTF-8 byte length of string `s` as encoded in JSON, including surrounding quotes.
+
+    Accounts for:
+    - Surrounding quotes: 2 bytes
+    - Escaped quotes `\"` and backslashes `\\`: 2 bytes each
+    - Single-character escapes (`\b`, `\t`, `\n`, `\f`, `\r`): 2 bytes each
+    - 6-byte hex escapes (`\u00XX`) for all other control characters (< 0x20): 6 bytes each
+    - Multibyte UTF-8 characters: exact UTF-8 encoded byte count
+    - Isolated surrogates: raises ProtocolJsonDecodeError
+    """
+    total = 2  # surrounding double quotes
+    for ch in s:
+        cp = ord(ch)
+        if cp < 0x20:
+            if ch in ("\b", "\t", "\n", "\f", "\r"):
+                total += 2
+            else:
+                total += 6  # \u00XX
+        elif ch in ('"', "\\"):
+            total += 2  # \" or \\
+        elif 0xD800 <= cp <= 0xDFFF:
+            raise ProtocolJsonDecodeError(
+                f"Dictionary string contains invalid Unicode scalar value (isolated surrogate: U+{cp:04X})."
+            )
+        elif cp <= 0x7F:
+            total += 1
+        elif cp <= 0x7FF:
+            total += 2
+        elif cp <= 0xFFFF:
+            total += 3
+        else:
+            total += 4
+    return total
+
+
 def _measure_value_bytes(
     val: Any,
     current_depth: int,
     max_depth: int,
+    max_bytes: int = MAX_PAYLOAD_BYTES,
 ) -> int:
     """Conservatively calculate UTF-8 byte representation for a dictionary value.
 
@@ -86,13 +147,7 @@ def _measure_value_bytes(
         )
 
     if isinstance(val, str):
-        try:
-            b = val.encode("utf-8")
-            return len(b) + 2  # including quotes
-        except UnicodeEncodeError as err:
-            raise ProtocolJsonDecodeError(
-                f"Dictionary string value contains unencodable Unicode surrogates: {err}"
-            )
+        return _measure_json_string_bytes(val)
     elif isinstance(val, bool):
         return 4 if val else 5  # true / false
     elif isinstance(val, (int, float)):
@@ -104,14 +159,14 @@ def _measure_value_bytes(
             val,
             current_depth=current_depth + 1,
             max_depth=max_depth,
-            max_bytes=MAX_PAYLOAD_BYTES,
+            max_bytes=max_bytes,
         )
     elif isinstance(val, list):
         return _measure_list_bytes(
             val,
             current_depth=current_depth + 1,
             max_depth=max_depth,
-            max_bytes=MAX_PAYLOAD_BYTES,
+            max_bytes=max_bytes,
         )
     else:
         raise ProtocolInvalidTypeError(
@@ -130,8 +185,14 @@ def _measure_list_bytes(
             f"JSON nesting depth exceeds maximum limit of {max_depth} levels."
         )
     total = 2  # '[]'
+    first = True
     for item in lst:
-        total += _measure_value_bytes(item, current_depth=current_depth, max_depth=max_depth) + 1
+        item_len = _measure_value_bytes(item, current_depth=current_depth, max_depth=max_depth, max_bytes=max_bytes)
+        if not first:
+            total += 1  # comma
+        else:
+            first = False
+        total += item_len
         if total > max_bytes:
             raise ProtocolPayloadTooLargeError(
                 f"Dict payload size ({total} bytes) exceeds maximum limit of {max_bytes} bytes."
@@ -150,20 +211,20 @@ def _measure_dict_bytes(
             f"JSON nesting depth exceeds maximum limit of {max_depth} levels."
         )
     total = 2  # '{}'
+    first = True
     for k, v in d.items():
         if type(k) is not str:
             raise ProtocolInvalidTypeError(
                 f"Dictionary keys must be strings, got {type(k).__name__}."
             )
-        try:
-            k_bytes = k.encode("utf-8")
-        except UnicodeEncodeError as err:
-            raise ProtocolJsonDecodeError(
-                f"Dictionary key contains unencodable Unicode surrogates: {err}"
-            )
-        k_len = len(k_bytes) + 2  # "key"
-        v_len = _measure_value_bytes(v, current_depth=current_depth, max_depth=max_depth)
-        total += k_len + 1 + v_len + 1  # "key":val,
+        k_len = _measure_json_string_bytes(k)
+        v_len = _measure_value_bytes(v, current_depth=current_depth, max_depth=max_depth, max_bytes=max_bytes)
+        entry_len = k_len + 1 + v_len  # "k":v
+        if not first:
+            entry_len += 1  # comma
+        else:
+            first = False
+        total += entry_len
         if total > max_bytes:
             raise ProtocolPayloadTooLargeError(
                 f"Dict payload size ({total} bytes) exceeds maximum limit of {max_bytes} bytes."
@@ -176,7 +237,7 @@ def parse_and_validate_raw_payload(payload: Union[str, bytes, Dict[str, Any]]) -
 
     Enforces:
     1. Maximum byte-length ceiling BEFORE JSON parsing.
-    2. Genuinely enforceable UTF-8 byte calculation on dict inputs without unbounded serialization.
+    2. Conservative, escape-aware UTF-8 byte calculation on dict inputs without unbounded serialization.
     3. Strict JSON UTF-8 decoding with duplicate key rejection.
     4. Safe handling of excessive JSON nesting and isolated Unicode surrogates.
     5. Root object must be a dict with string keys (rejects JSON arrays, primitives, null).
@@ -213,6 +274,8 @@ def parse_and_validate_raw_payload(payload: Union[str, bytes, Dict[str, Any]]) -
             raise ProtocolJsonDecodeError(f"Malformed JSON payload: {err.msg}")
         except (RecursionError, ValueError) as err:
             raise ProtocolStructureError(f"Excessive nesting or malformed JSON structure: {err}")
+
+        _validate_no_surrogates(decoded)
 
     elif isinstance(payload, dict):
         # Strict dictionary validation with exact UTF-8 byte calculation
