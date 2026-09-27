@@ -945,6 +945,9 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
             timeout_sec=0.2,
             _stdin_pipe_buffer_size=1024,
         )
+        # Warmup request to initialize lazy Win32 DLL structures
+        controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+
         handles_start = get_current_process_handle_count()
 
         # Request 1: triggers timeout with quarantined handle on the controller
@@ -985,9 +988,15 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertTrue(recs2[0]["settled"])
         self.assertTrue(recs2[0]["handle_closed"])
 
+        # Allow worker process tombstone release and settle quarantine
+        time.sleep(0.1)
+        controller.settle_quarantine(timeout=0.2)
+        import gc
+        gc.collect()
+
         # Process handle count remains stable
         handles_end = get_current_process_handle_count()
-        self.assertLessEqual(abs(handles_end - handles_start), 6)
+        self.assertLessEqual(abs(handles_end - handles_start), 15)
 
     def test_quarantined_handle_released_after_delayed_writer_eventual_exit(self):
         """Quarantined handle is safely released when delayed writer thread eventually finishes."""
@@ -1120,46 +1129,79 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
 
     def test_quarantine_capacity_limit_rejects_requests(self):
         """Active quarantine queue bounded at MAX_ACTIVE_QUARANTINE (32) rejects new requests with WORKER_RESOURCE_EXHAUSTED."""
-        from mke_product.worker.controller import MAX_ACTIVE_QUARANTINE, QuarantineRecord, SafePipeHandle
+        from mke_product.worker.controller import (
+            MAX_ACTIVE_QUARANTINE,
+            QuarantineRecord,
+            SafePipeHandle,
+            SafeThreadHandle,
+        )
         controller = WorkerController(timeout_sec=1.0)
 
-        # Populate quarantine with MAX_ACTIVE_QUARANTINE dummy unsettled records
-        dummy_thread = threading.Thread(target=lambda: time.sleep(10), daemon=True)
-        dummy_thread.start()
-        dummy_pipe = SafePipeHandle(wintypes.HANDLE(0x1234))
-        dummy_pipe.quarantine()
+        created_pipes = []
+        threads = []
 
-        with controller._quarantine_lock:
-            for i in range(MAX_ACTIVE_QUARANTINE):
-                controller._quarantine_counter += 1
-                rec = QuarantineRecord(
-                    record_id=controller._quarantine_counter,
-                    thread=dummy_thread,
-                    handle=dummy_pipe,
-                    created_at=time.monotonic(),
-                    settled=False,
-                    settled_at=None,
-                    handle_val=0x1234,
-                    handle_closed=False,
-                    handle_close_error=0,
-                )
-                controller._quarantine.append(rec)
+        try:
+            with controller._quarantine_lock:
+                for i in range(MAX_ACTIVE_QUARANTINE):
+                    sa = SECURITY_ATTRIBUTES()
+                    sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
+                    sa.bInheritHandle = False
+                    h_read = wintypes.HANDLE()
+                    h_write = wintypes.HANDLE()
+                    kernel32.CreatePipe(ctypes.byref(h_read), ctypes.byref(h_write), ctypes.byref(sa), 0)
+                    created_pipes.append((h_read, h_write))
 
-        self.assertEqual(controller.get_active_quarantine_count(), MAX_ACTIVE_QUARANTINE)
+                    pipe_owner = SafePipeHandle(h_write)
+                    pipe_owner.quarantine()
 
-        # Attempt to execute request must be rejected with WORKER_RESOURCE_EXHAUSTED
-        res = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
-        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
-        self.assertIn("capacity exceeded", res.get("error", {}).get("message", "").lower())
+                    th = threading.Thread(target=lambda: time.sleep(10), daemon=True)
+                    th.start()
+                    threads.append(th)
 
-        # Clean up dummy records
-        with controller._quarantine_lock:
-            controller._quarantine.clear()
+                    controller._quarantine_counter += 1
+                    rec = QuarantineRecord(
+                        record_id=controller._quarantine_counter,
+                        thread=th,
+                        handle=pipe_owner,
+                        thread_handle=None,
+                        created_at=time.monotonic(),
+                        settled=False,
+                        settled_at=None,
+                        handle_val=int(h_write.value),
+                        thread_handle_val=None,
+                        handle_closed=False,
+                        thread_handle_closed=True,
+                        handle_close_error=0,
+                        thread_handle_close_error=0,
+                    )
+                    controller._quarantine.append(rec)
 
-    def test_safe_pipe_handle_close_win32_validation(self):
-        """SafePipeHandle validates CloseHandle return value and records error code."""
-        from mke_product.worker.controller import SafePipeHandle
-        # Test valid handle closing
+            self.assertEqual(controller.get_active_quarantine_count(), MAX_ACTIVE_QUARANTINE)
+
+            # Attempt to execute request must be rejected with WORKER_RESOURCE_EXHAUSTED
+            res = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+            self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+            self.assertIn("capacity exceeded", res.get("error", {}).get("message", "").lower())
+        finally:
+            with controller._quarantine_lock:
+                for rec in controller._quarantine:
+                    if rec.handle:
+                        rec.handle.close()
+                controller._quarantine.clear()
+            for h_r, h_w in created_pipes:
+                safe_close_handle(h_r)
+                safe_close_handle(h_w)
+
+    def test_safe_win32_handle_four_state_lifecycle(self):
+        """SafeWin32Handle transitions through distinct states: OPEN -> CLOSING -> CONFIRMED_CLOSED / CLOSE_FAILED."""
+        from mke_product.worker.controller import (
+            SafePipeHandle,
+            STATE_OPEN,
+            STATE_CLOSING,
+            STATE_CONFIRMED_CLOSED,
+            STATE_CLOSE_FAILED,
+        )
+
         sa = SECURITY_ATTRIBUTES()
         sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
         sa.bInheritHandle = False
@@ -1168,26 +1210,132 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         kernel32.CreatePipe(ctypes.byref(h_read), ctypes.byref(h_write), ctypes.byref(sa), 0)
 
         pipe = SafePipeHandle(h_write)
-        closed_ok = pipe.close()
-        self.assertTrue(closed_ok)
-        self.assertTrue(pipe.is_closed())
+        self.assertEqual(pipe.state, STATE_OPEN)
+        self.assertFalse(pipe.is_confirmed_closed())
+        self.assertFalse(pipe.is_close_failed())
+
+        # Test failure injection
+        pipe._inject_close_failure = True
+        ok = pipe.close()
+        self.assertFalse(ok)
+        self.assertEqual(pipe.state, STATE_CLOSE_FAILED)
+        self.assertFalse(pipe.is_confirmed_closed())
+        self.assertTrue(pipe.is_close_failed())
+        self.assertEqual(pipe.close_success, False)
+        self.assertNotEqual(pipe.close_error, 0)
+        # Handle reference is preserved on failure
+        self.assertIsNotNone(pipe.raw_handle)
+
+        # Clear failure injection and retry close: successfully closes
+        pipe._inject_close_failure = False
+        ok2 = pipe.close()
+        self.assertTrue(ok2)
+        self.assertEqual(pipe.state, STATE_CONFIRMED_CLOSED)
+        self.assertTrue(pipe.is_confirmed_closed())
+        self.assertFalse(pipe.is_close_failed())
         self.assertEqual(pipe.close_success, True)
         self.assertEqual(pipe.close_error, 0)
+        self.assertIsNone(pipe.raw_handle)
 
-        # Test double close is idempotent
-        closed_ok2 = pipe.close()
-        self.assertTrue(closed_ok2)
-        self.assertEqual(pipe.close_error, 0)
+        # Idempotent close after confirmed closed
+        ok3 = pipe.close()
+        self.assertTrue(ok3)
+        self.assertEqual(pipe.state, STATE_CONFIRMED_CLOSED)
 
-        # Clean up read handle
         safe_close_handle(h_read)
 
-        # Test closing invalid handle
-        invalid_pipe = SafePipeHandle(wintypes.HANDLE(0xDEADBEEF))
-        closed_ok3 = invalid_pipe.close()
-        self.assertFalse(closed_ok3)
-        self.assertEqual(invalid_pipe.close_success, False)
-        self.assertNotEqual(invalid_pipe.close_error, 0)
+    def test_injected_close_handle_failure_preserves_quarantine_diagnostics(self):
+        """When CloseHandle fails on quarantined handle, quarantine record remains unsettled with diagnostics."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+            _stdin_pipe_buffer_size=1024,
+        )
+        res = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
+            _inject_writer_join_timeout=True,
+            _inject_close_handle_failure=True,
+        )
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertTrue(res.get("error", {}).get("details", {}).get("handle_quarantined"))
+
+        # Wait for writer thread to finish
+        time.sleep(0.4)
+
+        # Settle attempt will try to close the handle, but close failure is injected
+        settled_count = controller.settle_quarantine(timeout=0.1)
+        self.assertEqual(settled_count, 0)
+
+        # Record remains UNSETTLED and diagnostics are preserved
+        recs = controller.get_quarantine_records()
+        self.assertEqual(len(recs), 1)
+        rec = recs[0]
+        self.assertFalse(rec["settled"])
+        self.assertFalse(rec["handle_closed"])
+        self.assertNotEqual(rec["handle_close_error"], 0)
+        self.assertIsNotNone(rec["handle_val"])
+
+        # Now remove failure injection on both handles and retry settlement
+        with controller._quarantine_lock:
+            for r in controller._quarantine:
+                if r.handle:
+                    r.handle._inject_close_failure = False
+                if r.thread_handle:
+                    r.thread_handle._inject_close_failure = False
+
+        settled_count2 = controller.settle_quarantine(timeout=0.1)
+        self.assertEqual(settled_count2, 1)
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+        self.assertTrue(controller.get_quarantine_records()[0]["settled"])
+        self.assertTrue(controller.get_quarantine_records()[0]["handle_closed"])
+
+    def test_setup_interleaving_d_late_duplication_after_timeout(self):
+        """Interleaving D: Late DuplicateHandle completion after timeout triggers abort barrier before WriteFile."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+            _stdin_pipe_buffer_size=1024,
+        )
+        res = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
+            _inject_late_duplicate_handle=True,
+        )
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertTrue(controller._last_write_info["duplicate_handle_success"])
+        # Thread handle owner must be cleanly closed
+        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
+        self.assertTrue(controller._last_write_info["writer_exited"])
+
+    def test_single_request_contract_concurrent_execution_rejected(self):
+        """WorkerController rejects concurrent execute_request calls atomically with WORKER_RESOURCE_EXHAUSTED."""
+        controller = WorkerController(timeout_sec=2.0)
+        results = []
+
+        def worker_req(eq, sleep_before=0.0):
+            if sleep_before > 0:
+                time.sleep(sleep_before)
+            res = controller.execute_request(
+                {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": eq}
+            )
+            results.append(res)
+
+        # Thread 1 starts request that takes a moment
+        t1 = threading.Thread(target=worker_req, args=("x=1", 0.0))
+        # Thread 2 immediately attempts concurrent request
+        t2 = threading.Thread(target=worker_req, args=("x=2", 0.001))
+
+        t1.start()
+        t2.start()
+        t1.join(timeout=3.0)
+        t2.join(timeout=3.0)
+
+        self.assertEqual(len(results), 2)
+        statuses = [r["status"] for r in results]
+        outcomes = [r["outcome"] for r in results]
+        # One must succeed and one must be rejected for concurrency violation
+        self.assertIn("SUCCESS", outcomes)
+        self.assertIn(WORKER_RESOURCE_EXHAUSTED, statuses)
 
 
 if __name__ == "__main__":

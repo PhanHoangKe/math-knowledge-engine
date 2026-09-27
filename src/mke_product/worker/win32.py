@@ -241,15 +241,18 @@ def safe_close_handle(handle: Optional[Union[wintypes.HANDLE, int]]) -> Tuple[bo
     Returns:
         (success: bool, win32_error: int)
     """
-    if handle and handle != wintypes.HANDLE(0).value and handle != wintypes.HANDLE(-1).value:
-        try:
-            res = kernel32.CloseHandle(handle)
-            if not res:
-                return False, ctypes.get_last_error()
-            return True, 0
-        except Exception:
-            return False, -1
-    return True, 0
+    if handle is None:
+        return True, 0
+    val = handle.value if isinstance(handle, wintypes.HANDLE) else handle
+    if val is None or val in (0, -1, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF):
+        return True, 0
+    try:
+        res = kernel32.CloseHandle(handle)
+        if not res:
+            return False, ctypes.get_last_error()
+        return True, 0
+    except Exception:
+        return False, -1
 
 
 def get_current_process_handle_count() -> int:
