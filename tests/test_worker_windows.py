@@ -40,6 +40,7 @@ from mke_product.worker.constants import (
     CREATE_BREAKAWAY_FROM_JOB,
     CREATE_SUSPENDED,
     DEFAULT_WORKER_TIMEOUT_SEC,
+    HANDLE_FLAG_PROTECT_FROM_CLOSE,
     IPC_MAX_RESPONSE_BYTES,
     JOB_OBJECT_LIMIT_BREAKAWAY_OK,
     JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
@@ -54,7 +55,18 @@ from mke_product.worker.constants import (
     WORKER_STARTUP_FAILURE,
     WORKER_TIMEOUT,
 )
-from mke_product.worker.controller import SafeWin32Handle, WorkerController, dispatch_via_worker
+from mke_product.worker.controller import (
+    CLOSE_EVIDENCE_CONFIRMED_CLOSED,
+    CLOSE_EVIDENCE_INJECTED_BEFORE_CLOSE,
+    CLOSE_EVIDENCE_INVALID_HANDLE,
+    CLOSE_EVIDENCE_NATIVE_FAILURE,
+    HANDLE_INVALID,
+    HANDLE_VALID,
+    SafeProcessHandle,
+    SafeWin32Handle,
+    WorkerController,
+    dispatch_via_worker,
+)
 from mke_product.worker.win32 import (
     PROCESS_INFORMATION,
     SECURITY_ATTRIBUTES,
@@ -1482,6 +1494,8 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(h_safe.is_close_failed())
         self.assertEqual(h_safe.close_error, 5)
+        self.assertEqual(h_safe.close_evidence, CLOSE_EVIDENCE_INJECTED_BEFORE_CLOSE)
+        self.assertFalse(h_safe.native_close_attempted)
         self.assertEqual(h_safe.raw_value(), raw_event)
 
         # Verify with OS API: handle is still valid and open
@@ -1494,6 +1508,7 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         self.assertTrue(ok2)
         self.assertTrue(h_safe.is_confirmed_closed())
         self.assertEqual(h_safe.close_error, 0)
+        self.assertEqual(h_safe.close_evidence, CLOSE_EVIDENCE_CONFIRMED_CLOSED)
 
         # Verify with OS API: handle is now invalid / closed
         is_still_valid = kernel32.GetHandleInformation(wintypes.HANDLE(raw_event), ctypes.byref(flags))
@@ -1503,6 +1518,182 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         # Double close is idempotent and does not error
         ok3 = h_safe.close()
         self.assertTrue(ok3)
+
+    def test_genuine_native_close_failure_is_not_blindly_retried(self):
+        """A protected real handle produces native failure and requires explicit recovery."""
+        raw_event = kernel32.CreateEventW(None, True, False, None)
+        self.assertGreater(raw_event, 0)
+        owner = SafeWin32Handle(raw_event)
+
+        protected = kernel32.SetHandleInformation(
+            wintypes.HANDLE(raw_event),
+            HANDLE_FLAG_PROTECT_FROM_CLOSE,
+            HANDLE_FLAG_PROTECT_FROM_CLOSE,
+        )
+        self.assertTrue(bool(protected))
+
+        self.assertFalse(owner.close())
+        self.assertEqual(owner.close_evidence, CLOSE_EVIDENCE_NATIVE_FAILURE)
+        self.assertTrue(owner.native_close_attempted)
+        self.assertEqual(owner.validity_before_close, HANDLE_VALID)
+        self.assertEqual(owner.validity_after_close, HANDLE_VALID)
+        first_attempts = owner.close_attempts
+
+        flags = wintypes.DWORD()
+        self.assertTrue(bool(kernel32.GetHandleInformation(owner.handle, ctypes.byref(flags))))
+        self.assertTrue(flags.value & HANDLE_FLAG_PROTECT_FROM_CLOSE)
+
+        # The persistent ledger does not issue a second native CloseHandle.
+        controller = WorkerController()
+        controller._unresolved_handles.append(owner)
+        self.assertEqual(controller.reconcile_unresolved_resources(), 0)
+        self.assertIn(owner, controller.get_unresolved_handles())
+        self.assertEqual(owner.close_attempts, first_attempts)
+
+        unprotected = kernel32.SetHandleInformation(
+            owner.handle,
+            HANDLE_FLAG_PROTECT_FROM_CLOSE,
+            0,
+        )
+        self.assertTrue(bool(unprotected))
+        # Correcting the external condition is insufficient without explicit authorization.
+        self.assertFalse(owner.close())
+        self.assertEqual(owner.close_attempts, first_attempts)
+        self.assertTrue(owner.recover_native_close())
+        self.assertEqual(owner.close_evidence, CLOSE_EVIDENCE_CONFIRMED_CLOSED)
+        self.assertTrue(owner.is_confirmed_closed())
+        self.assertEqual(controller.reconcile_unresolved_resources(), 1)
+        self.assertEqual(controller.get_unresolved_count(), 0)
+
+        ctypes.set_last_error(0)
+        self.assertFalse(bool(kernel32.GetHandleInformation(wintypes.HANDLE(raw_event), ctypes.byref(flags))))
+        self.assertEqual(ctypes.get_last_error(), 6)
+
+    def test_invalid_stale_handle_is_recorded_not_closed_or_retried(self):
+        """A stale numeric value is not treated as proof of ownership or successful cleanup."""
+        raw_event = kernel32.CreateEventW(None, True, False, None)
+        self.assertGreater(raw_event, 0)
+        owner = SafeWin32Handle(raw_event)
+        # Construct the owner first so its lock allocation cannot reuse the just-closed value.
+        self.assertTrue(bool(kernel32.CloseHandle(wintypes.HANDLE(raw_event))))
+
+        self.assertFalse(owner.close())
+        self.assertEqual(owner.close_evidence, CLOSE_EVIDENCE_INVALID_HANDLE)
+        self.assertEqual(owner.validity_before_close, HANDLE_INVALID)
+        self.assertFalse(owner.native_close_attempted)
+        self.assertFalse(owner.is_confirmed_closed())
+        self.assertEqual(owner.close_error, 6)
+        first_attempts = owner.close_attempts
+        self.assertFalse(owner.close(_inject_failure=False))
+        self.assertEqual(owner.close_attempts, first_attempts)
+
+    def test_combined_uncertain_termination_and_job_close_failure_fails_closed(self):
+        """Unconfirmed termination plus Job close failure retains containment ownership."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(
+            req,
+            _inject_termination_wait_timeout=True,
+            _inject_job_close_failure=True,
+        )
+
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        details = res["error"]["details"]
+        self.assertFalse(details["safe_cleanup"])
+        self.assertIn("process_termination", details["cleanup_failures"])
+        self.assertIn("job_object", details["cleanup_failures"])
+        evidence = details["process_termination"]
+        self.assertEqual(evidence["state"], "TERMINATION_UNCERTAIN_OR_FAILED")
+        self.assertEqual(evidence["termination_request_state"], "REQUESTED_SUCCESSFULLY")
+        self.assertEqual(evidence["termination_confirmation_state"], "UNCERTAIN_OR_FAILED")
+        self.assertTrue(evidence["termination_requested"])
+        self.assertTrue(evidence["termination_request_succeeded"])
+        self.assertFalse(evidence["termination_confirmed"])
+        self.assertEqual(evidence["wait_result"], WAIT_TIMEOUT)
+
+        jobs = controller.get_unresolved_job_handles()
+        handles = controller.get_unresolved_handles()
+        self.assertEqual(len(jobs), 1)
+        process_owners = [h for h in handles if isinstance(h, SafeProcessHandle)]
+        self.assertEqual(len(process_owners), 1)
+        process_owner = process_owners[0]
+        self.assertEqual(process_owner.close_blocked_reason, "PROCESS_TERMINATION_UNCONFIRMED")
+
+        flags = wintypes.DWORD()
+        self.assertTrue(bool(kernel32.GetHandleInformation(jobs[0].handle, ctypes.byref(flags))))
+        self.assertTrue(bool(kernel32.GetHandleInformation(process_owner.handle, ctypes.byref(flags))))
+
+        # The real termination request was issued; establish raw evidence before recovery.
+        self.assertEqual(kernel32.WaitForSingleObject(process_owner.handle, 5000), WAIT_OBJECT_0)
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(controller.get_unresolved_count(), 0)
+        self.assertTrue(jobs[0].is_confirmed_closed())
+        self.assertTrue(process_owner.is_confirmed_closed())
+
+    def test_failed_termination_wait_is_not_confirmation(self):
+        """WAIT_FAILED is retained as uncertainty until Job containment recovery completes."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(
+            req,
+            _inject_termination_wait_failure=True,
+            _inject_job_close_failure=True,
+        )
+
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        evidence = res["error"]["details"]["process_termination"]
+        self.assertEqual(evidence["state"], "TERMINATION_UNCERTAIN_OR_FAILED")
+        self.assertEqual(evidence["termination_request_state"], "REQUESTED_SUCCESSFULLY")
+        self.assertEqual(evidence["termination_confirmation_state"], "UNCERTAIN_OR_FAILED")
+        self.assertEqual(evidence["wait_result"], 0xFFFFFFFF)
+        self.assertFalse(evidence["termination_confirmed"])
+        process_owner = next(
+            h for h in controller.get_unresolved_handles() if isinstance(h, SafeProcessHandle)
+        )
+        self.assertEqual(kernel32.WaitForSingleObject(process_owner.handle, 5000), WAIT_OBJECT_0)
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(controller.get_unresolved_count(), 0)
+
+    def test_failed_termination_request_retains_job_containment(self):
+        """A failed termination request leaves the live child owned by the unresolved Job."""
+        controller = WorkerController(
+            timeout_sec=0.2,
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+        )
+        req = {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"}
+        res = controller.execute_request(
+            req,
+            _inject_terminate_process_failure=True,
+            _inject_termination_wait_timeout=True,
+            _inject_job_close_failure=True,
+        )
+
+        self.assertEqual(res["status"], WORKER_RESOURCE_EXHAUSTED)
+        evidence = res["error"]["details"]["process_termination"]
+        self.assertEqual(evidence["termination_request_state"], "REQUEST_FAILED")
+        self.assertEqual(evidence["termination_confirmation_state"], "UNCERTAIN_OR_FAILED")
+        self.assertFalse(evidence["termination_request_succeeded"])
+        self.assertFalse(evidence["termination_confirmed"])
+        self.assertEqual(evidence["terminate_error"], 5)
+
+        job_owner = controller.get_unresolved_job_handles()[0]
+        process_owner = next(
+            h for h in controller.get_unresolved_handles() if isinstance(h, SafeProcessHandle)
+        )
+        self.assertEqual(kernel32.WaitForSingleObject(process_owner.handle, 0), WAIT_TIMEOUT)
+
+        # Explicitly recover the pre-call injected Job close. KILL_ON_JOB_CLOSE then
+        # terminates the still-contained child; only after proof may its handle close.
+        self.assertTrue(job_owner.close(_inject_failure=False))
+        self.assertEqual(kernel32.WaitForSingleObject(process_owner.handle, 5000), WAIT_OBJECT_0)
+        controller.reconcile_unresolved_resources()
+        self.assertEqual(controller.get_unresolved_count(), 0)
 
     def test_recovery_following_cleanup_failure(self):
         """WorkerController successfully recovers and executes subsequent requests on the same instance after cleanup failure."""

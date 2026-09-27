@@ -181,6 +181,9 @@ kernel32.CreatePipe.restype = wintypes.BOOL
 kernel32.SetHandleInformation.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD]
 kernel32.SetHandleInformation.restype = wintypes.BOOL
 
+kernel32.GetHandleInformation.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+kernel32.GetHandleInformation.restype = wintypes.BOOL
+
 kernel32.PeekNamedPipe.argtypes = [
     wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
     ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)

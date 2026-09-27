@@ -33,6 +33,7 @@ from .constants import (
     DUPLICATE_SAME_ACCESS,
     ERROR_BROKEN_PIPE,
     ERROR_COMMITMENT_LIMIT,
+    ERROR_INVALID_HANDLE,
     ERROR_NOT_ENOUGH_QUOTA,
     ERROR_OPERATION_ABORTED,
     EXTENDED_STARTUPINFO_PRESENT,
@@ -45,7 +46,9 @@ from .constants import (
     PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
     STARTF_USESTDHANDLES,
     STATUS_COMMITMENT_LIMIT,
+    STILL_ACTIVE,
     WAIT_OBJECT_0,
+    WAIT_FAILED,
     WAIT_TIMEOUT,
     WORKER_ASSIGNMENT_FAILURE,
     WORKER_EXIT_FAILURE,
@@ -159,6 +162,16 @@ STATE_CLOSING = "CLOSING"
 STATE_CONFIRMED_CLOSED = "CONFIRMED_CLOSED"
 STATE_CLOSE_FAILED = "CLOSE_FAILED"
 
+CLOSE_EVIDENCE_NONE = "NONE"
+CLOSE_EVIDENCE_INJECTED_BEFORE_CLOSE = "INJECTED_BEFORE_CLOSE"
+CLOSE_EVIDENCE_NATIVE_FAILURE = "NATIVE_CLOSE_FAILURE"
+CLOSE_EVIDENCE_INVALID_HANDLE = "INVALID_OR_STALE_HANDLE"
+CLOSE_EVIDENCE_CONFIRMED_CLOSED = "CONFIRMED_SUCCESSFUL_CLOSURE"
+
+HANDLE_VALID = "VALID"
+HANDLE_INVALID = "INVALID"
+HANDLE_VALIDITY_UNKNOWN = "UNKNOWN"
+
 
 class SafeWin32Handle:
     """Thread-safe, atomic single-ownership wrapper around a Win32 HANDLE with strict state tracking.
@@ -192,6 +205,11 @@ class SafeWin32Handle:
         self._close_attempts: int = 0
         self._quarantined: bool = False
         self._inject_close_failure: bool = _inject_close_failure
+        self._close_evidence: str = CLOSE_EVIDENCE_NONE
+        self._native_close_attempted: bool = False
+        self._validity_before_close: str = HANDLE_VALIDITY_UNKNOWN
+        self._validity_after_close: str = HANDLE_VALIDITY_UNKNOWN
+        self._close_blocked_reason: Optional[str] = None
 
     def set_handle(self, handle: Union[wintypes.HANDLE, int]) -> None:
         with self._lock:
@@ -204,6 +222,11 @@ class SafeWin32Handle:
             self._state = STATE_OPEN if self._raw_val else STATE_CONFIRMED_CLOSED
             self._close_success = (self._state == STATE_CONFIRMED_CLOSED)
             self._close_error = 0
+            self._close_evidence = CLOSE_EVIDENCE_NONE
+            self._native_close_attempted = False
+            self._validity_before_close = HANDLE_VALIDITY_UNKNOWN
+            self._validity_after_close = HANDLE_VALIDITY_UNKNOWN
+            self._close_blocked_reason = None
 
     @property
     def handle(self) -> wintypes.HANDLE:
@@ -242,6 +265,50 @@ class SafeWin32Handle:
         with self._lock:
             return self._close_attempts
 
+    @property
+    def close_evidence(self) -> str:
+        with self._lock:
+            return self._close_evidence
+
+    @property
+    def native_close_attempted(self) -> bool:
+        with self._lock:
+            return self._native_close_attempted
+
+    @property
+    def validity_before_close(self) -> str:
+        with self._lock:
+            return self._validity_before_close
+
+    @property
+    def validity_after_close(self) -> str:
+        with self._lock:
+            return self._validity_after_close
+
+    @property
+    def close_blocked_reason(self) -> Optional[str]:
+        with self._lock:
+            return self._close_blocked_reason
+
+    def block_close(self, reason: str) -> None:
+        """Prevent handle release while another native ownership invariant is unresolved."""
+        with self._lock:
+            self._close_blocked_reason = reason
+
+    def unblock_close(self) -> None:
+        with self._lock:
+            self._close_blocked_reason = None
+
+    def _query_validity_locked(self) -> Tuple[str, int]:
+        flags = wintypes.DWORD()
+        ctypes.set_last_error(0)
+        if kernel32.GetHandleInformation(self._handle, ctypes.byref(flags)):
+            return HANDLE_VALID, 0
+        err = ctypes.get_last_error()
+        if err == ERROR_INVALID_HANDLE:
+            return HANDLE_INVALID, err
+        return HANDLE_VALIDITY_UNKNOWN, err
+
     def is_quarantined(self) -> bool:
         with self._lock:
             return self._quarantined
@@ -267,15 +334,39 @@ class SafeWin32Handle:
         with self._lock:
             self._quarantined = True
 
-    def close(self, _inject_failure: Optional[bool] = None) -> bool:
-        """Atomically close the underlying handle and confirm Win32 status."""
+    def close(
+        self,
+        _inject_failure: Optional[bool] = None,
+        *,
+        _allow_native_retry: bool = False,
+    ) -> bool:
+        """Close with explicit Win32 evidence and a conservative recovery policy.
+
+        Pre-call injected failures are retryable because CloseHandle was never invoked.
+        A genuine native failure is ambiguous and is never retried implicitly; callers
+        must first correct the native condition and explicitly set
+        ``_allow_native_retry=True``. Invalid/stale values are retained as diagnostic
+        evidence and are not treated as successful closure. A numeric value alone is
+        never used as proof of ownership or validity.
+        """
         with self._lock:
             if self._state == STATE_CONFIRMED_CLOSED:
                 return True
             if not self._handle or not self._handle.value:
                 self._state = STATE_CONFIRMED_CLOSED
                 self._close_success = True
+                self._close_evidence = CLOSE_EVIDENCE_CONFIRMED_CLOSED
                 return True
+
+            if self._close_blocked_reason is not None:
+                return False
+
+            if (
+                self._state == STATE_CLOSE_FAILED
+                and self._close_evidence in (CLOSE_EVIDENCE_NATIVE_FAILURE, CLOSE_EVIDENCE_INVALID_HANDLE)
+                and not _allow_native_retry
+            ):
+                return False
 
             self._close_attempts += 1
             self._state = STATE_CLOSING
@@ -283,23 +374,55 @@ class SafeWin32Handle:
 
             inject = self._inject_close_failure if _inject_failure is None else _inject_failure
             if inject:
-                ok = False
-                err = 5  # ERROR_ACCESS_DENIED
-            else:
-                ok, err = safe_close_handle(h)
+                validity, _ = self._query_validity_locked()
+                self._validity_before_close = validity
+                self._validity_after_close = validity
+                self._native_close_attempted = False
+                self._close_evidence = CLOSE_EVIDENCE_INJECTED_BEFORE_CLOSE
+                self._state = STATE_CLOSE_FAILED
+                self._close_success = False
+                self._close_error = 5  # ERROR_ACCESS_DENIED
+                return False
 
+            validity, validity_err = self._query_validity_locked()
+            self._validity_before_close = validity
+            if validity == HANDLE_INVALID:
+                self._native_close_attempted = False
+                self._close_evidence = CLOSE_EVIDENCE_INVALID_HANDLE
+                self._state = STATE_CLOSE_FAILED
+                self._close_success = False
+                self._close_error = validity_err
+                self._validity_after_close = HANDLE_INVALID
+                return False
+
+            self._native_close_attempted = True
+            ok, err = safe_close_handle(h)
             if ok:
+                after, _ = self._query_validity_locked()
+                self._validity_after_close = after
+                self._close_evidence = CLOSE_EVIDENCE_CONFIRMED_CLOSED
                 self._state = STATE_CONFIRMED_CLOSED
                 self._handle = wintypes.HANDLE(0)
                 self._close_success = True
                 self._close_error = 0
                 return True
             else:
+                after, _ = self._query_validity_locked()
+                self._validity_after_close = after
+                self._close_evidence = CLOSE_EVIDENCE_NATIVE_FAILURE
                 self._state = STATE_CLOSE_FAILED
                 self._close_success = False
                 self._close_error = err
-                # Retain self._handle and self._raw_val for diagnostic preservation
                 return False
+
+    def recover_native_close(self) -> bool:
+        """Explicitly retry after an operator/test has corrected a native close condition.
+
+        This is intentionally separate from ledger reconciliation so a genuine,
+        ambiguous CloseHandle failure can never be retried as a side effect of a
+        later request.
+        """
+        return self.close(_inject_failure=False, _allow_native_retry=True)
 
 
 class SafePipeHandle(SafeWin32Handle):
@@ -352,6 +475,7 @@ class WorkerController:
         self._stdin_pipe_buffer_size = _stdin_pipe_buffer_size
         self._last_write_info: Optional[Dict[str, Any]] = None
         self._last_job_owner: Optional[SafeWin32Handle] = None
+        self._last_process_owner: Optional[SafeProcessHandle] = None
         self._current_writer_thread: Optional[threading.Thread] = None
 
         # Reentrancy lock enforcing single-request-at-a-time contract
@@ -365,6 +489,8 @@ class WorkerController:
         # Thread-safe bounded persistent ledgers for unresolved handles across requests (Task 1 & Task 2)
         self._unresolved_job_handles: List[SafeWin32Handle] = []
         self._unresolved_handles: List[SafeWin32Handle] = []
+        self._unresolved_process_termination: Dict[int, Dict[str, Any]] = {}
+        self._last_termination_evidence: Optional[Dict[str, Any]] = None
 
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
@@ -389,8 +515,109 @@ class WorkerController:
                 sum(1 for h in self._unresolved_handles if not h.is_confirmed_closed())
             )
 
+    def get_last_termination_evidence(self) -> Optional[Dict[str, Any]]:
+        """Return a copy of the latest process-termination evidence."""
+        return dict(self._last_termination_evidence) if self._last_termination_evidence else None
+
+    def _observe_process_termination(
+        self,
+        owner: SafeProcessHandle,
+        wait_ms: int = 0,
+    ) -> Dict[str, Any]:
+        """Observe termination without issuing a new termination request."""
+        exit_code = wintypes.DWORD()
+        ctypes.set_last_error(0)
+        exit_ok = bool(kernel32.GetExitCodeProcess(owner.handle, ctypes.byref(exit_code)))
+        exit_error = 0 if exit_ok else ctypes.get_last_error()
+        ctypes.set_last_error(0)
+        wait_result = int(kernel32.WaitForSingleObject(owner.handle, wait_ms))
+        wait_error = ctypes.get_last_error() if wait_result == WAIT_FAILED else 0
+        confirmed = bool(exit_ok and exit_code.value != STILL_ACTIVE and wait_result == WAIT_OBJECT_0)
+        return {
+            "state": "ALREADY_TERMINATED" if confirmed else "TERMINATION_UNCERTAIN_OR_FAILED",
+            "termination_request_state": "NOT_REQUIRED_ALREADY_TERMINATED" if confirmed else "NOT_REQUESTED",
+            "termination_confirmation_state": "CONFIRMED" if confirmed else "UNCERTAIN_OR_FAILED",
+            "already_terminated": confirmed,
+            "termination_requested": False,
+            "termination_request_succeeded": False,
+            "termination_confirmed": confirmed,
+            "terminate_error": 0,
+            "wait_result": wait_result,
+            "wait_error": wait_error,
+            "exit_code_query_succeeded": exit_ok,
+            "exit_code_error": exit_error,
+            "exit_code": int(exit_code.value) if exit_ok else None,
+        }
+
+    def _terminate_and_confirm_process(
+        self,
+        owner: SafeProcessHandle,
+        *,
+        _inject_terminate_process_failure: bool = False,
+        _inject_termination_wait_timeout: bool = False,
+        _inject_termination_wait_failure: bool = False,
+        _inject_exit_code_failure: bool = False,
+    ) -> Dict[str, Any]:
+        """Request termination when needed and require wait plus exit-code confirmation."""
+        initial = self._observe_process_termination(owner, wait_ms=0)
+        if initial["termination_confirmed"]:
+            self._last_termination_evidence = initial
+            return initial
+
+        if _inject_terminate_process_failure:
+            terminate_ok = False
+            terminate_error = 5
+        else:
+            ctypes.set_last_error(0)
+            terminate_ok = bool(kernel32.TerminateProcess(owner.handle, 0))
+            terminate_error = 0 if terminate_ok else ctypes.get_last_error()
+
+        if _inject_termination_wait_failure:
+            wait_result = WAIT_FAILED
+            wait_error = 6
+        elif _inject_termination_wait_timeout:
+            wait_result = WAIT_TIMEOUT
+            wait_error = 0
+        else:
+            ctypes.set_last_error(0)
+            wait_result = int(kernel32.WaitForSingleObject(owner.handle, 1000))
+            wait_error = ctypes.get_last_error() if wait_result == WAIT_FAILED else 0
+
+        exit_code = wintypes.DWORD()
+        if _inject_exit_code_failure:
+            exit_ok = False
+            exit_error = 6
+        else:
+            ctypes.set_last_error(0)
+            exit_ok = bool(kernel32.GetExitCodeProcess(owner.handle, ctypes.byref(exit_code)))
+            exit_error = 0 if exit_ok else ctypes.get_last_error()
+
+        confirmed = bool(wait_result == WAIT_OBJECT_0 and exit_ok and exit_code.value != STILL_ACTIVE)
+        evidence = {
+            "state": "TERMINATION_CONFIRMED" if confirmed else "TERMINATION_UNCERTAIN_OR_FAILED",
+            "termination_request_state": "REQUESTED_SUCCESSFULLY" if terminate_ok else "REQUEST_FAILED",
+            "termination_confirmation_state": "CONFIRMED" if confirmed else "UNCERTAIN_OR_FAILED",
+            "already_terminated": False,
+            "termination_requested": True,
+            "termination_request_succeeded": terminate_ok,
+            "termination_confirmed": confirmed,
+            "terminate_error": terminate_error,
+            "wait_result": wait_result,
+            "wait_error": wait_error,
+            "exit_code_query_succeeded": exit_ok,
+            "exit_code_error": exit_error,
+            "exit_code": int(exit_code.value) if exit_ok else None,
+        }
+        self._last_termination_evidence = evidence
+        return evidence
+
     def reconcile_unresolved_resources(self) -> int:
-        """Reconcile and attempt safe close of any previously unresolved handles without failure injection.
+        """Reconcile only resources with non-ambiguous recovery evidence.
+
+        Injected pre-call failures may be retried because CloseHandle was not called.
+        Genuine native close failures and invalid/stale handles remain owned and
+        recorded until an explicit ``recover_native_close`` call. Deferred process
+        handles are released only after wait plus exit-code confirmation.
 
         Returns:
             Count of newly settled handles.
@@ -415,9 +642,19 @@ class WorkerController:
             for h_owner in self._unresolved_handles:
                 if h_owner.is_confirmed_closed():
                     settled_count += 1
+                    self._unresolved_process_termination.pop(id(h_owner), None)
                     continue
+                if isinstance(h_owner, SafeProcessHandle) and h_owner.close_blocked_reason:
+                    evidence = self._observe_process_termination(h_owner, wait_ms=0)
+                    self._last_termination_evidence = evidence
+                    self._unresolved_process_termination[id(h_owner)] = evidence
+                    if not evidence["termination_confirmed"]:
+                        remaining_handles.append(h_owner)
+                        continue
+                    h_owner.unblock_close()
                 if h_owner.close(_inject_failure=False):
                     settled_count += 1
+                    self._unresolved_process_termination.pop(id(h_owner), None)
                 else:
                     remaining_handles.append(h_owner)
             self._unresolved_handles = remaining_handles
@@ -535,6 +772,10 @@ class WorkerController:
         _inject_thread_close_failure: bool = False,
         _inject_stdout_close_failure: bool = False,
         _inject_stderr_close_failure: bool = False,
+        _inject_terminate_process_failure: bool = False,
+        _inject_termination_wait_timeout: bool = False,
+        _inject_termination_wait_failure: bool = False,
+        _inject_exit_code_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
@@ -572,6 +813,10 @@ class WorkerController:
                 _inject_thread_close_failure=_inject_thread_close_failure,
                 _inject_stdout_close_failure=_inject_stdout_close_failure,
                 _inject_stderr_close_failure=_inject_stderr_close_failure,
+                _inject_terminate_process_failure=_inject_terminate_process_failure,
+                _inject_termination_wait_timeout=_inject_termination_wait_timeout,
+                _inject_termination_wait_failure=_inject_termination_wait_failure,
+                _inject_exit_code_failure=_inject_exit_code_failure,
                 _worker_cmd=_worker_cmd,
             )
         finally:
@@ -599,6 +844,10 @@ class WorkerController:
         _inject_thread_close_failure: bool = False,
         _inject_stdout_close_failure: bool = False,
         _inject_stderr_close_failure: bool = False,
+        _inject_terminate_process_failure: bool = False,
+        _inject_termination_wait_timeout: bool = False,
+        _inject_termination_wait_failure: bool = False,
+        _inject_exit_code_failure: bool = False,
         _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Internal execution body running under single-request lock."""
@@ -920,6 +1169,7 @@ class WorkerController:
 
             # Wrap process and primary thread immediately upon creation
             proc_owner = SafeProcessHandle(pi.hProcess, _inject_close_failure=_inject_process_close_failure)
+            self._last_process_owner = proc_owner
             thread_owner = SafeThreadHandle(pi.hThread, _inject_close_failure=_inject_thread_close_failure)
 
             # Close worker ends of pipes in controller immediately after creation
@@ -1083,18 +1333,34 @@ class WorkerController:
         finally:
             # 10. Guaranteed cleanup of all handles and attribute lists
             cleanup_failures: Dict[str, Any] = {}
+            cleanup_close_evidence: Dict[str, Any] = {}
+            process_termination_deferred = False
 
-            # Terminate and close worker process handle
+            # Terminate and close the worker only after positive native evidence.
             if proc_owner is not None and proc_owner.raw_value() > 0:
-                if proc_owner.is_open():
-                    kernel32.TerminateProcess(proc_owner.handle, 0)
-                    kernel32.WaitForSingleObject(proc_owner.handle, 1000)
-                ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
-                if not ok:
-                    cleanup_failures["process_handle"] = proc_owner.close_error
+                termination_evidence = self._terminate_and_confirm_process(
+                    proc_owner,
+                    _inject_terminate_process_failure=_inject_terminate_process_failure,
+                    _inject_termination_wait_timeout=_inject_termination_wait_timeout,
+                    _inject_termination_wait_failure=_inject_termination_wait_failure,
+                    _inject_exit_code_failure=_inject_exit_code_failure,
+                )
+                if termination_evidence["termination_confirmed"]:
+                    ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
+                    if not ok:
+                        cleanup_failures["process_handle"] = proc_owner.close_error
+                        cleanup_close_evidence["process_handle"] = proc_owner.close_evidence
+                        with self._quarantine_lock:
+                            if proc_owner not in self._unresolved_handles:
+                                self._unresolved_handles.append(proc_owner)
+                else:
+                    process_termination_deferred = True
+                    proc_owner.block_close("PROCESS_TERMINATION_UNCONFIRMED")
+                    cleanup_failures["process_termination"] = termination_evidence
                     with self._quarantine_lock:
                         if proc_owner not in self._unresolved_handles:
                             self._unresolved_handles.append(proc_owner)
+                        self._unresolved_process_termination[id(proc_owner)] = termination_evidence
 
             # Close worker primary thread handle
             if thread_owner is not None and thread_owner.raw_value() > 0:
@@ -1180,9 +1446,36 @@ class WorkerController:
                 h_job_owner.close(_inject_failure=_inject_job_close_failure)
                 if not h_job_owner.is_confirmed_closed():
                     cleanup_failures["job_object"] = h_job_owner.close_error
+                    cleanup_close_evidence["job_object"] = h_job_owner.close_evidence
                     with self._quarantine_lock:
                         if h_job_owner not in self._unresolved_job_handles:
                             self._unresolved_job_handles.append(h_job_owner)
+
+            # A successfully closed KILL_ON_JOB_CLOSE Job Object supplies a second
+            # containment-backed opportunity to confirm termination. If the Job
+            # Object itself remains unresolved, retain both owners and do not guess.
+            if (
+                process_termination_deferred
+                and proc_owner is not None
+                and h_job_owner is not None
+                and h_job_owner.is_confirmed_closed()
+            ):
+                post_job_evidence = self._observe_process_termination(proc_owner, wait_ms=1000)
+                self._last_termination_evidence = post_job_evidence
+                with self._quarantine_lock:
+                    self._unresolved_process_termination[id(proc_owner)] = post_job_evidence
+                if post_job_evidence["termination_confirmed"]:
+                    proc_owner.unblock_close()
+                    cleanup_failures.pop("process_termination", None)
+                    ok = proc_owner.close(_inject_failure=_inject_process_close_failure)
+                    if ok:
+                        with self._quarantine_lock:
+                            if proc_owner in self._unresolved_handles:
+                                self._unresolved_handles.remove(proc_owner)
+                            self._unresolved_process_termination.pop(id(proc_owner), None)
+                    else:
+                        cleanup_failures["process_handle"] = proc_owner.close_error
+                        cleanup_close_evidence["process_handle"] = proc_owner.close_evidence
 
             if cleanup_failures:
                 # Fail closed: never return success or unqualified result if any handle cleanup failed
@@ -1193,7 +1486,10 @@ class WorkerController:
                         "safe_cleanup": False,
                         "handle_quarantined": True if (pipe_owner and pipe_owner.is_quarantined()) else False,
                         "cleanup_failures": cleanup_failures,
+                        "cleanup_close_evidence": cleanup_close_evidence,
                         "job_close_error": cleanup_failures.get("job_object"),
+                        "process_termination": self._last_termination_evidence,
+                        "unresolved_count": self.get_unresolved_count(),
                     },
                     operation=operation,
                 )
@@ -1206,8 +1502,7 @@ class WorkerController:
         operation: str = "UNKNOWN",
         safe_cleanup: bool = True,
     ) -> Dict[str, Any]:
-        """Build structured timeout error after terminating worker."""
-        kernel32.TerminateProcess(h_process, 0x00000102)
+        """Build a timeout error; centralized teardown establishes termination evidence."""
         peak_proc, peak_job, _ = query_job_peak_memory(h_job) if h_job else (0, 0, 0)
         return _build_controller_error(
             WORKER_TIMEOUT,

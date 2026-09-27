@@ -1,77 +1,63 @@
-# MKE PRODUCT-02A-S4-B1 FINAL ACCEPTANCE REPORT
+# MKE PRODUCT-02A-S4-B1 Acceptance Report
 
-**Project:** Math Knowledge Engine (MKE)  
-**Milestone:** PRODUCT-02A-S4-B1 (Windows Process Containment & Job Object Quarantine)  
-**Status:** **PENDING INDEPENDENT AUDIT**  
-**Working Repository:** `d:\mke-product` (`PhanHoangKe/math-knowledge-engine`)  
-**Branch:** `product/p02a-foundation`  
-**Baseline Commit:** `e9bf1e3f937806ee927490edc4cc67aaaefcf65c`  
-**Historical Workspace (Read-Only):** `d:\Math Knowledge Engine` (Verified pristine, Git digest `3ddc40899...`)  
-**Implementation Agent:** Antigravity (Anty)  
-**Chief Architect & Independent Auditor:** ChatGPT  
-**Approval Authority:** Project Owner (Kế Phan Hoàng)  
+**Project:** Math Knowledge Engine
 
----
+**Milestone:** PRODUCT-02A-S4-B1 — Windows Process Containment and Job Object Quarantine
 
-## 1. Executive Summary
+**Status:** **PENDING INDEPENDENT AUDIT**
 
-This report documents the final acceptance and remediation verification for milestone **MKE PRODUCT-02A-S4-B1**. All audit findings from independent reviews have been resolved and verified with empirical evidence:
+**Branch:** `product/p02a-foundation`
 
-1. **Genuine Late Duplication Synchronization:** Implemented explicit synchronization barriers (`barrier_writer_proceed`, `barrier_controller_proceed`) ensuring that under late duplication failure injection, `kernel32.DuplicateHandle()` runs *strictly after* controller abort, capturing real non-zero handle ownership in `SafeThreadHandle`, verifying `WriteFile` is never called, and confirming dual closure and quarantine settlement.
-2. **Persistent Resource Ownership & Fail-Closed Guarantee:** Audited all Win32 handle cleanup paths in `WorkerController._execute_request_locked` (`h_job`, `pi.hProcess`, `pi.hThread`, `pipe_owner`, stdio pipes, thread attribute lists). Wrapped all handles in `SafeWin32Handle` wrappers with bounded persistent ledgers (`_unresolved_job_handles`, `_unresolved_handles`). Verified automatic reconciliation on subsequent requests and strict fail-closed enforcement when handles cannot be released.
-3. **Comprehensive Regression & Forensics Validation:**
-   - **304 / 304 unit and integration tests passed (100%)**, comprising all 246 baseline mathematical tests and 58 Windows containment and handle ownership tests.
-   - **16 / 16 forensic matrix scenarios passed with exact $\Delta = 0$ net handle growth** across $N \in \{5, 10, 20, 40\}$ iterations for control, write timeout, setup hang, and late duplication scenarios.
-4. **S4-B2 Preflight Architectural Proposal:** Completed comprehensive 10-point evaluation of Windows AppContainer isolation, confirming standard-user feasibility, complete outbound network denial, filesystem write confinement, and Job Object compatibility.
+**Gate baseline:** `549054072b397a63db25082e33bf08a13412742c`
 
----
+**Approval authority:** Project Owner
 
-## 2. Milestone Verification Summary
+## Current Gate Result
 
-| Category | Requirement | Target | Achieved Result | Status |
-|---|---|:---:|:---:|:---:|
-| **Baseline Math Tests** | Rational arithmetic, parser, solver, evaluator, protocol | 246 / 246 | **246 / 246 PASS** | **PASS** |
-| **Windows Containment Tests** | Job limits, suspended startup, breakaway denial, timeouts, quarantine | 54 / 54 | **54 / 54 PASS** | **PASS** |
-| **Total Test Suite** | Full product suite execution | 300 / 300 | **300 / 300 PASS** | **PASS** |
-| **Forensics Matrix** | Handle delta over 16 failure scenarios ($N=5,10,20,40$) | $\Delta = 0$ | **Exact $\Delta = 0$ in all 16 cases** | **PASS** |
-| **Quarantine Settlement** | Unsettled quarantine records after recovery | 0 | **0 (100% Settled)** | **PASS** |
-| **Late Duplication Probe** | Real handle captured post-abort, WriteFile bypassed | Verified | **Invoked=True, RawVal>0, Status=ABORTED_BEFORE_WRITE, Bytes=0** | **PASS** |
-| **Teardown Fail-Closed** | Job Object close failure returns RESOURCE_EXHAUSTED | Verified | **SafeCleanup=False, JobCloseError=5, Status=RESOURCE_EXHAUSTED** | **PASS** |
-| **Historical Baseline** | Read-only historical repository untouched | Pristine | **Pristine SHA-256 baseline verified** | **PASS** |
+The S4-B1 native failure final gate is **PASS, pending independent audit**. This is an implementation/test result, not an independent approval and not authorization to begin S4-B2.
 
----
+| Requirement | Actual result | Disposition |
+|---|---|---|
+| Injected and genuine native close failures distinguished | Explicit evidence states; real protected-handle test | PASS |
+| Genuine ambiguous `CloseHandle` failure not blindly retried | Automatic ledger/quarantine retries suppressed; explicit recovery required | PASS |
+| Invalid/stale handle behavior | `GetHandleInformation` classification; never falsely marked closed | PASS |
+| Successful close confirmation | Successful native result recorded as confirmed closure | PASS |
+| Termination lifecycle evidence | Already terminated, request outcome, wait result, and exit-code confirmation recorded independently | PASS |
+| Timeout/failed wait not treated as termination | Injected `WAIT_TIMEOUT` and `WAIT_FAILED` tests | PASS |
+| Combined termination uncertainty plus Job close failure | Explicit fail-closed response; process and Job ownership retained; safe containment recovery proved | PASS |
+| Mathematical/protocol regression | 246 / 246 | PASS |
+| Complete test suite | 309 / 309 | PASS |
+| Windows containment/ownership module | 63 / 63 | PASS |
+| 16-case handle forensics | 16 / 16, delta 0 in every case | PASS |
 
-## 3. Detailed Verification Results
+## Architecture Preserved
 
-### Phase 1: Genuine Late Duplication Verification
-- Synchronization barriers (`barrier_writer_ready`, `barrier_controller_proceed`) prevent race conditions during writer thread setup.
-- In `test_actual_late_duplication_sequence_exit_after_quarantine`:
-  - Worker enters setup and delays at barrier until controller aborts.
-  - Controller aborts and establishes quarantine record.
-  - Writer proceeds to execute `kernel32.DuplicateHandle()`, captures real non-zero handle value (`duplicate_handle_raw_val > 0`).
-  - Worker detects `abort_requested.is_set()`, sets `write_file_status = "ABORTED_BEFORE_WRITE"`, and returns without calling `WriteFile` (`bytes_written == 0`).
-  - Quarantine settlement safely closes both thread and pipe handles.
+- Disposable worker and Job Object design unchanged.
+- `KILL_ON_JOB_CLOSE` containment preserved.
+- No mathematical or protocol semantics changed.
+- Genuine late-duplication and persistent ownership behaviors preserved.
+- Cleanup ambiguity always overrides an otherwise successful response with an explicit fail-closed error.
+- No S4-B2 implementation was started.
 
-### Phase 2: Security-Critical Teardown Verification
-- In `test_job_object_close_failure_fails_closed_and_preserves_diagnostics`:
-  - Injected `_inject_job_close_failure=True` forces failure in `safe_close_handle(h_job)`.
-  - Teardown records `cleanup_failures["job_object"] = 5`.
-  - Controller overrides response to `outcome: "RESOURCE_EXHAUSTED"`, `status: "WORKER_RESOURCE_EXHAUSTED"`, `details: {"safe_cleanup": False, "job_close_error": 5}`.
-- In `test_recovery_following_cleanup_failure`:
-  - Request 1 fails closed upon cleanup failure.
-  - Request 2 on same controller executes normally and succeeds (`status: "UNIQUE_ROOT"`), proving full recovery without controller poisoning.
+## Evidence
 
-### Phase 3: 16-Case Forensic Matrix
-The complete matrix test in `scripts/handle_forensics.py` ran all 16 cases:
-- **Scenario A (Normal Control):** $N \in \{5, 10, 20, 40\} \to \Delta = 0$, ActiveQ = 0.
-- **Scenario B (Write Timeouts & Quarantine):** $N \in \{5, 10, 20, 40\} \to \Delta = 0$, ActiveQ = 0, Settled = 100%.
-- **Scenario C (Setup Timeouts & Hangs):** $N \in \{5, 10, 20, 40\} \to \Delta = 0$, ActiveQ = 0, Settled = 100%.
-- **Scenario D (Late Duplication):** $N \in \{5, 10, 20, 40\} \to \Delta = 0$, ActiveQ = 0, Settled = 100%.
+See:
 
----
+- `S4B1_NATIVE_FAILURE_REPORT.md`
+- `S4B1_NATIVE_FAILURE_EVIDENCE.md`
+- `evidence/s4b1_native_failure/unittest_full.log`
+- `evidence/s4b1_native_failure/handle_forensics.log`
+- `evidence/s4b1_native_failure/historical_integrity.log`
+- `handle_forensics_results.json`
 
-## 4. Final Recommendation
+## Historical Workspace
 
-Milestone **MKE PRODUCT-02A-S4-B1** has satisfied all acceptance criteria, passed independent static review remediation, and demonstrated zero handle leaks across high-volume stress testing.
+`D:\Math Knowledge Engine` was inspected read-only and left untouched. It was already dirty and on `dev02a-method-knowledge-base`; therefore this report does not repeat the earlier inaccurate claim that it was pristine. Its committed-tree digest and selected direct working-file SHA-256 measurements are recorded as separate evidence forms. They do not prove every working-file byte.
 
-**Recommendation:** Formally accept and close milestone S4-B1. Authorize transition to milestone **PRODUCT-02A-S4-B2** (Windows Filesystem Confinement & Outbound Network Denial).
+## Limitations
+
+The remaining limitations are documented in `S4B1_NATIVE_FAILURE_REPORT.md`, principally the Windows handle-value reuse limitation and the deliberate fail-closed behavior after an unresolved genuine native failure.
+
+## Milestone Status
+
+**PENDING INDEPENDENT AUDIT**
