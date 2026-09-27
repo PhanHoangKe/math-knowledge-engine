@@ -39,7 +39,7 @@ def stabilize_appcontainer_runtime() -> None:
     controller.settle_quarantine(timeout=0.5)
     del controller
     gc.collect()
-    time.sleep(20.0)
+    time.sleep(26.0)
     gc.collect()
 
 

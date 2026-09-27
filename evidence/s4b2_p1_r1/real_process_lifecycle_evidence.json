@@ -1,0 +1,96 @@
+{
+  "milestone": "S4-B2/P1-R1",
+  "timestamp_utc": "2026-09-27T15:49:48Z",
+  "host_pid": 17496,
+  "python_executable": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+  "steps": {
+    "step_1_request_execution": {
+      "status": "WORKER_RESOURCE_EXHAUSTED",
+      "outcome": "RESOURCE_EXHAUSTED",
+      "expected_status": "WORKER_RESOURCE_EXHAUSTED",
+      "status_matches_expected": true,
+      "appcontainer_pre_resume_evidence": {
+        "query_ok": true,
+        "is_appcontainer": true,
+        "sid_matches_profile": true,
+        "elevated": false,
+        "verified_before_resume": true,
+        "query_error": 0,
+        "appcontainer_sid": "S-1-15-2-1059672774-1819004139-4153386656-599327788-2246165093-1501359369-401030560",
+        "accepted": true,
+        "profile_name": "mke.product.worker.p1.17496.6d7e5c563bad",
+        "expected_sid": "S-1-15-2-1059672774-1819004139-4153386656-599327788-2246165093-1501359369-401030560",
+        "job_assignment_verified": true,
+        "process_was_resumed": true
+      },
+      "termination_evidence": {
+        "state": "TERMINATION_UNCERTAIN_OR_FAILED",
+        "termination_request_state": "REQUEST_FAILED",
+        "termination_confirmation_state": "UNCERTAIN_OR_FAILED",
+        "already_terminated": false,
+        "termination_requested": true,
+        "termination_request_succeeded": false,
+        "termination_confirmed": false,
+        "terminate_error": 5,
+        "wait_result": 258,
+        "wait_error": 0,
+        "exit_code_query_succeeded": true,
+        "exit_code_error": 0,
+        "exit_code": 259
+      }
+    },
+    "step_2_unresolved_containment_and_liveness": {
+      "process_owners_count": 1,
+      "job_owners_count": 1,
+      "proc_owner_raw_handle": 824,
+      "proc_owner_blocked_reason": "PROCESS_TERMINATION_UNCONFIRMED",
+      "job_owner_raw_handle": 784,
+      "wait_single_object_0ms_result": 258,
+      "child_is_alive_during_uncertainty": true
+    },
+    "step_3_cleanup_refusal_while_lease_active": {
+      "cleanup_result": {
+        "state": "REFUSED_ACTIVE_CHILDREN",
+        "active_children": 1,
+        "profile_name": "mke.product.worker.p1.17496.6d7e5c563bad"
+      },
+      "refused_as_expected": true,
+      "active_children_count": 1
+    },
+    "step_4_native_termination_proof": {
+      "job_close_succeeded": true,
+      "job_is_confirmed_closed": true,
+      "wait_single_object_5000ms_result": 0,
+      "child_termination_confirmed": true,
+      "exit_code_query_succeeded": true,
+      "exit_code": 0
+    },
+    "step_5_reconciliation_and_lease_release": {
+      "settled_count": 2,
+      "unresolved_count_remaining": 0,
+      "active_children_remaining": 0,
+      "lease_released_as_expected": true
+    },
+    "step_6_final_profile_cleanup": {
+      "cleanup_result": {
+        "state": "CLEANED",
+        "stage_removed": true,
+        "stage_error": null,
+        "delete_hresult": 0,
+        "active_children": 0,
+        "profile_name": "mke.product.worker.p1.17496.6d7e5c563bad"
+      },
+      "cleaned_as_expected": true,
+      "stage_removed": true,
+      "delete_hresult": 0,
+      "manager_has_unresolved_cleanup": false
+    }
+  },
+  "initial_profile": {
+    "profile_name": "mke.product.worker.p1.17496.6d7e5c563bad",
+    "sid_string": "S-1-15-2-1059672774-1819004139-4153386656-599327788-2246165093-1501359369-401030560",
+    "stage_root": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-epzy0sop",
+    "python_exe": "C:\\Users\\kedep\\AppData\\Local\\Temp\\mke-s4b2-p1-epzy0sop\\runtime\\python.exe"
+  },
+  "experiment_verdict": true
+}
