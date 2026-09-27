@@ -7,8 +7,9 @@ import struct
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 if sys.platform != "win32":
     raise ImportError("WorkerController is only supported on Windows operating systems.")
@@ -147,6 +148,70 @@ def _build_controller_error(
     return envelope
 
 
+# ---------------------------------------------------------------------------
+# Safe Handle Ownership & Quarantine
+# ---------------------------------------------------------------------------
+
+class SafePipeHandle:
+    """Thread-safe, atomic single-ownership wrapper around a Win32 pipe HANDLE.
+
+    Guarantees:
+    - Exactly-once Win32 CloseHandle execution.
+    - Quarantined handles are protected from premature caller closing.
+    - Idempotent close() calls across thread callbacks and controller settlement.
+    """
+
+    def __init__(self, handle: wintypes.HANDLE) -> None:
+        self._handle = handle
+        self._raw_val = int(handle.value) if handle and handle.value else 0
+        self._lock = threading.Lock()
+        self._closed = False
+        self._quarantined = False
+
+    @property
+    def handle(self) -> wintypes.HANDLE:
+        with self._lock:
+            return self._handle
+
+    @property
+    def raw_val(self) -> int:
+        return self._raw_val
+
+    def is_quarantined(self) -> bool:
+        with self._lock:
+            return self._quarantined
+
+    def is_closed(self) -> bool:
+        with self._lock:
+            return self._closed
+
+    def quarantine(self) -> None:
+        with self._lock:
+            self._quarantined = True
+
+    def close(self) -> bool:
+        """Atomically close the underlying handle if not already closed."""
+        with self._lock:
+            if self._closed or not self._handle or not self._handle.value:
+                return False
+            h = self._handle
+            self._handle = wintypes.HANDLE(0)
+            self._closed = True
+            safe_close_handle(h)
+            return True
+
+
+@dataclass
+class QuarantineRecord:
+    """Tracks a quarantined pipe handle awaiting worker thread exit."""
+    record_id: int
+    thread: Optional[threading.Thread]
+    handle: SafePipeHandle
+    created_at: float
+    settled: bool = False
+    settled_at: Optional[float] = None
+
+
 class WorkerController:
     """Manages creation, execution, and containment of disposable sandboxed workers."""
 
@@ -165,10 +230,70 @@ class WorkerController:
         self._last_write_info: Optional[Dict[str, Any]] = None
         self._current_writer_thread: Optional[threading.Thread] = None
 
+        # Thread-safe persistent quarantine ledger across requests
+        self._quarantine: List[QuarantineRecord] = []
+        self._quarantine_counter: int = 0
+        self._quarantine_lock: threading.Lock = threading.Lock()
+
         # Resolve fixed allowlisted entry point and src root
         self._src_dir = str(Path(__file__).resolve().parents[2])
         self._python_exe = sys.executable
         self._worker_cmd = _worker_cmd or f'"{self._python_exe}" -m mke_product.worker.entrypoint'
+
+    def settle_quarantine(self, timeout: float = 0.0) -> int:
+        """Reap and safely release quarantined pipe handles whose worker threads have terminated.
+
+        Args:
+            timeout: Maximum seconds to wait on each active unsettled thread. Defaults to 0.0 (non-blocking).
+
+        Returns:
+            Number of newly settled quarantine records.
+        """
+        settled_count = 0
+        with self._quarantine_lock:
+            for rec in self._quarantine:
+                if rec.settled:
+                    continue
+                if rec.thread is not None:
+                    if rec.thread.is_alive() and timeout > 0:
+                        rec.thread.join(timeout=timeout)
+                    if not rec.thread.is_alive():
+                        rec.handle.close()
+                        rec.settled = True
+                        rec.settled_at = time.monotonic()
+                        rec.thread = None  # Release Python Thread object to free underlying OS handles
+                        settled_count += 1
+
+            # Bounded retention: retain all unsettled records plus up to 64 settled records
+            unsettled = [r for r in self._quarantine if not r.settled]
+            settled = [r for r in self._quarantine if r.settled]
+            if len(settled) > 64:
+                settled = settled[-64:]
+            self._quarantine = unsettled + settled
+
+        return settled_count
+
+    def get_quarantine_records(self) -> List[Dict[str, Any]]:
+        """Return a snapshot list of quarantine records for telemetry and verification."""
+        with self._quarantine_lock:
+            return [
+                {
+                    "record_id": r.record_id,
+                    "thread_name": r.thread.name if r.thread is not None else "mke-ipc-writer",
+                    "thread_alive": r.thread.is_alive() if r.thread is not None else False,
+                    "handle_val": r.handle.raw_val,
+                    "handle_closed": r.handle.is_closed(),
+                    "created_at": r.created_at,
+                    "settled": r.settled,
+                    "settled_at": r.settled_at,
+                }
+                for r in self._quarantine
+            ]
+
+    def get_active_quarantine_count(self) -> int:
+        """Return count of currently unsettled quarantined handles."""
+        with self._quarantine_lock:
+            return sum(1 for r in self._quarantine if not r.settled)
 
     def execute_request(
         self,
@@ -183,6 +308,8 @@ class WorkerController:
         _inject_duplicate_handle_failure: bool = False,
         _inject_cancel_io_failure: bool = False,
         _inject_writer_join_timeout: bool = False,
+        _inject_normal_write_join_timeout: bool = False,
+        _worker_cmd: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute request inside a disposable sandboxed worker and return the response."""
         effective_timeout = timeout_sec if timeout_sec is not None else self.timeout_sec
@@ -190,6 +317,9 @@ class WorkerController:
         # Reset per-request cancellation and write telemetry before every request
         self._last_write_info = None
         self._current_writer_thread = None
+
+        # Settle any previously completed quarantined handles before beginning new request
+        self.settle_quarantine(timeout=0.0)
 
         # Extract normalized operation for error envelopes to prevent untrusted string reflection
         operation = "UNKNOWN"
@@ -303,7 +433,7 @@ class WorkerController:
         # Track handles for guaranteed cleanup in finally block
         h_job: Optional[wintypes.HANDLE] = None
         h_stdin_read = wintypes.HANDLE()
-        h_stdin_write = wintypes.HANDLE()
+        pipe_owner: Optional[SafePipeHandle] = None
         h_stdout_read = wintypes.HANDLE()
         h_stdout_write = wintypes.HANDLE()
         h_stderr_read = wintypes.HANDLE()
@@ -339,13 +469,15 @@ class WorkerController:
             sa.nLength = ctypes.sizeof(SECURITY_ATTRIBUTES)
             sa.bInheritHandle = True
 
-            if not kernel32.CreatePipe(ctypes.byref(h_stdin_read), ctypes.byref(h_stdin_write), ctypes.byref(sa), self._stdin_pipe_buffer_size):
+            raw_stdin_write = wintypes.HANDLE()
+            if not kernel32.CreatePipe(ctypes.byref(h_stdin_read), ctypes.byref(raw_stdin_write), ctypes.byref(sa), self._stdin_pipe_buffer_size):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
                     f"Failed to create stdin pipe (win32 error {err}).",
                     operation=operation,
                 )
+            pipe_owner = SafePipeHandle(raw_stdin_write)
 
             if not kernel32.CreatePipe(ctypes.byref(h_stdout_read), ctypes.byref(h_stdout_write), ctypes.byref(sa), 0):
                 err = ctypes.get_last_error()
@@ -364,7 +496,7 @@ class WorkerController:
                 )
 
             # Ensure controller pipe ends are strictly NOT inheritable
-            if not kernel32.SetHandleInformation(h_stdin_write, HANDLE_FLAG_INHERIT, 0):
+            if not kernel32.SetHandleInformation(pipe_owner.handle, HANDLE_FLAG_INHERIT, 0):
                 err = ctypes.get_last_error()
                 return _build_controller_error(
                     WORKER_STARTUP_FAILURE,
@@ -421,7 +553,7 @@ class WorkerController:
             siex.StartupInfo.hStdError = h_stderr_write
             siex.lpAttributeList = ctypes.cast(attr_buf, ctypes.c_void_p)
 
-            cmd = self._worker_cmd
+            cmd = _worker_cmd or self._worker_cmd
             creation_flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED
 
             if _inject_process_creation_failure:
@@ -508,7 +640,7 @@ class WorkerController:
             msg = header + raw_payload
 
             write_res = self._write_exact_bytes_with_timeout(
-                h_stdin_write,
+                pipe_owner,
                 msg,
                 deadline,
                 pi.hProcess,
@@ -517,13 +649,14 @@ class WorkerController:
                 _inject_duplicate_handle_failure=_inject_duplicate_handle_failure,
                 _inject_cancel_io_failure=_inject_cancel_io_failure,
                 _inject_writer_join_timeout=_inject_writer_join_timeout,
+                _inject_normal_write_join_timeout=_inject_normal_write_join_timeout,
             )
             if isinstance(write_res, dict):
                 return write_res
 
             # Close stdin write handle to signal EOF to worker
-            safe_close_handle(h_stdin_write)
-            h_stdin_write = wintypes.HANDLE()
+            if pipe_owner is not None:
+                pipe_owner.close()
 
             # 8. Bounded read from stdout pipe with same effective deadline
             response_header = self._read_exact_bytes(
@@ -571,20 +704,9 @@ class WorkerController:
             safe_close_handle(h_stdin_read)
             h_stdin_read = wintypes.HANDLE()
 
-            # Handle ownership invariant: close h_stdin_write ONLY IF writer is not active
-            if h_stdin_write.value:
-                writer_alive = (
-                    self._current_writer_thread is not None
-                    and self._current_writer_thread.is_alive()
-                )
-                if not writer_alive:
-                    safe_close_handle(h_stdin_write)
-                    h_stdin_write = wintypes.HANDLE()
-                else:
-                    # Writer thread is still active; quarantine handle to prevent unsafe closure or reuse
-                    if self._last_write_info:
-                        self._last_write_info["all_handles_safely_released"] = False
-                    h_stdin_write = wintypes.HANDLE()
+            # Handle ownership invariant: close pipe_owner ONLY IF not quarantined
+            if pipe_owner is not None and not pipe_owner.is_quarantined():
+                pipe_owner.close()
 
             safe_close_handle(h_stdout_read)
             h_stdout_read = wintypes.HANDLE()
@@ -637,7 +759,7 @@ class WorkerController:
 
     def _write_exact_bytes_with_timeout(
         self,
-        h_pipe: wintypes.HANDLE,
+        pipe_owner: SafePipeHandle,
         data: bytes,
         deadline: float,
         h_process: wintypes.HANDLE,
@@ -646,6 +768,7 @@ class WorkerController:
         _inject_duplicate_handle_failure: bool = False,
         _inject_cancel_io_failure: bool = False,
         _inject_writer_join_timeout: bool = False,
+        _inject_normal_write_join_timeout: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Write exact bytes to pipe within full-lifecycle deadline, handling partial writes and blocking worker."""
         write_error = [None]
@@ -692,7 +815,7 @@ class WorkerController:
                     chunk = data[total:]
                     written = wintypes.DWORD()
                     write_in_progress.set()
-                    ok = kernel32.WriteFile(h_pipe, chunk, len(chunk), ctypes.byref(written), None)
+                    ok = kernel32.WriteFile(pipe_owner.handle, chunk, len(chunk), ctypes.byref(written), None)
                     err = ctypes.get_last_error()
                     write_in_progress.clear()
                     if not ok:
@@ -715,10 +838,13 @@ class WorkerController:
                 write_error[0] = ex
                 write_status[0] = f"EXCEPTION_{type(ex).__name__}"
             finally:
-                if _inject_writer_join_timeout:
-                    time.sleep(0.3)
                 write_in_progress.clear()
                 write_done.set()
+                if _inject_writer_join_timeout or _inject_normal_write_join_timeout:
+                    time.sleep(0.3)
+                # Deferred release: if quarantined, safely close handle upon thread termination
+                if pipe_owner.is_quarantined():
+                    pipe_owner.close()
 
         writer_thread = threading.Thread(target=_writer, daemon=True, name="mke-ipc-writer")
         self._current_writer_thread = writer_thread
@@ -794,6 +920,22 @@ class WorkerController:
             writer_thread.join(timeout=join_timeout)
             writer_exited = not writer_thread.is_alive()
 
+            quarantined = False
+            if not writer_exited:
+                pipe_owner.quarantine()
+                quarantined = True
+                with self._quarantine_lock:
+                    self._quarantine_counter += 1
+                    rec = QuarantineRecord(
+                        record_id=self._quarantine_counter,
+                        thread=writer_thread,
+                        handle=pipe_owner,
+                        created_at=time.monotonic(),
+                        settled=False,
+                        settled_at=None,
+                    )
+                    self._quarantine.append(rec)
+
             self._last_write_info = {
                 "duplicate_handle_success": True,
                 "duplicate_handle_error": 0,
@@ -809,6 +951,7 @@ class WorkerController:
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
                 "all_handles_safely_released": writer_exited,
+                "handle_quarantined": quarantined,
                 "bytes_written": bytes_written_total[0],
                 "total_bytes": len(data),
             }
@@ -825,6 +968,7 @@ class WorkerController:
                         "timeout_phase": "WRITE",
                         "safe_cleanup": False,
                         "writer_exited": False,
+                        "handle_quarantined": True,
                         "cancel_synchronous_io_return": cancel_ret,
                         "cancel_synchronous_io_last_error": cancel_err,
                         "timeout_sec": self.timeout_sec,
@@ -850,6 +994,22 @@ class WorkerController:
             safe_close_handle(h_thread_real)
             h_thread_real = wintypes.HANDLE()
 
+            quarantined = False
+            if not writer_exited:
+                pipe_owner.quarantine()
+                quarantined = True
+                with self._quarantine_lock:
+                    self._quarantine_counter += 1
+                    rec = QuarantineRecord(
+                        record_id=self._quarantine_counter,
+                        thread=writer_thread,
+                        handle=pipe_owner,
+                        created_at=time.monotonic(),
+                        settled=False,
+                        settled_at=None,
+                    )
+                    self._quarantine.append(rec)
+
             self._last_write_info = {
                 "duplicate_handle_success": True,
                 "duplicate_handle_error": 0,
@@ -865,6 +1025,7 @@ class WorkerController:
                 "write_file_status": write_status[0],
                 "writer_exited": writer_exited,
                 "all_handles_safely_released": writer_exited,
+                "handle_quarantined": quarantined,
                 "bytes_written": bytes_written_total[0],
                 "total_bytes": len(data),
             }
@@ -873,10 +1034,27 @@ class WorkerController:
                 h_process, h_job, abnormal_exit_code, operation=operation
             )
 
-        writer_thread.join(timeout=2.0)
+        join_timeout = 0.001 if _inject_normal_write_join_timeout else 2.0
+        writer_thread.join(timeout=join_timeout)
         writer_exited = not writer_thread.is_alive()
         safe_close_handle(h_thread_real)
         h_thread_real = wintypes.HANDLE()
+
+        quarantined = False
+        if not writer_exited:
+            pipe_owner.quarantine()
+            quarantined = True
+            with self._quarantine_lock:
+                self._quarantine_counter += 1
+                rec = QuarantineRecord(
+                    record_id=self._quarantine_counter,
+                    thread=writer_thread,
+                    handle=pipe_owner,
+                    created_at=time.monotonic(),
+                    settled=False,
+                    settled_at=None,
+                )
+                self._quarantine.append(rec)
 
         self._last_write_info = {
             "duplicate_handle_success": True,
@@ -893,9 +1071,23 @@ class WorkerController:
             "write_file_status": write_status[0],
             "writer_exited": writer_exited,
             "all_handles_safely_released": writer_exited,
+            "handle_quarantined": quarantined,
             "bytes_written": bytes_written_total[0],
             "total_bytes": len(data),
         }
+
+        if not writer_exited:
+            return _build_controller_error(
+                WORKER_TIMEOUT,
+                "Worker writer thread failed to exit cleanly after write completion.",
+                details={
+                    "timeout_phase": "WRITE",
+                    "safe_cleanup": False,
+                    "writer_exited": False,
+                    "handle_quarantined": True,
+                },
+                operation=operation,
+            )
 
         if write_error[0] is not None:
             exit_code = wintypes.DWORD()

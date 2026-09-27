@@ -227,6 +227,8 @@ kernel32.DuplicateHandle.restype = wintypes.BOOL
 kernel32.CancelSynchronousIo.argtypes = [wintypes.HANDLE]
 kernel32.CancelSynchronousIo.restype = wintypes.BOOL
 
+kernel32.GetProcessHandleCount.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+kernel32.GetProcessHandleCount.restype = wintypes.BOOL
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +242,14 @@ def safe_close_handle(handle: Optional[wintypes.HANDLE]) -> None:
             kernel32.CloseHandle(handle)
         except Exception:
             pass
+
+
+def get_current_process_handle_count() -> int:
+    """Return the total number of open Windows kernel handles for the current process."""
+    count = wintypes.DWORD(0)
+    if kernel32.GetProcessHandleCount(kernel32.GetCurrentProcess(), ctypes.byref(count)):
+        return count.value
+    return -1
 
 
 def is_current_process_in_job() -> Tuple[bool, int]:

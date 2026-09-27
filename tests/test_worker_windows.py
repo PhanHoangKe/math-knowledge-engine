@@ -60,6 +60,7 @@ from mke_product.worker.win32 import (
     STARTUPINFOW,
     assign_and_verify_process_in_job,
     create_configured_job_object,
+    get_current_process_handle_count,
     kernel32,
     query_job_limits,
     query_job_peak_memory,
@@ -941,23 +942,139 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         """Repeated requests on the same controller reset telemetry cleanly without stale state."""
         controller = WorkerController(
             timeout_sec=0.2,
+            _stdin_pipe_buffer_size=1024,
+        )
+        handles_start = get_current_process_handle_count()
+
+        # Request 1: triggers timeout with quarantined handle on the controller
+        res1 = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
+            _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+            _inject_writer_join_timeout=True,
+        )
+        self.assertEqual(res1["status"], WORKER_TIMEOUT)
+        self.assertTrue(controller._last_write_info["cancellation_requested"])
+        self.assertFalse(controller._last_write_info["writer_exited"])
+        self.assertFalse(controller._last_write_info["all_handles_safely_released"])
+        self.assertTrue(controller._last_write_info["handle_quarantined"])
+
+        # Verify quarantine record was added to controller
+        recs1 = controller.get_quarantine_records()
+        self.assertGreaterEqual(len(recs1), 1)
+
+        # Allow writer thread to finish sleeping
+        time.sleep(0.35)
+
+        # Request 2: normal solve ON THE SAME CONTROLLER INSTANCE
+        res2 = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"},
+            timeout_sec=2.0,
+        )
+        self.assertEqual(res2["outcome"], "SUCCESS")
+        self.assertIsNotNone(controller._last_write_info)
+        self.assertFalse(controller._last_write_info["cancellation_requested"])
+        self.assertFalse(controller._last_write_info["write_blocked_at_deadline"])
+        self.assertTrue(controller._last_write_info["writer_exited"])
+        self.assertTrue(controller._last_write_info["all_handles_safely_released"])
+        self.assertFalse(controller._last_write_info["handle_quarantined"])
+
+        # Prior quarantine records are preserved on the same controller and settled
+        recs2 = controller.get_quarantine_records()
+        self.assertGreaterEqual(len(recs2), 1)
+        self.assertTrue(recs2[0]["settled"])
+        self.assertTrue(recs2[0]["handle_closed"])
+
+        # Process handle count remains stable
+        handles_end = get_current_process_handle_count()
+        self.assertLessEqual(abs(handles_end - handles_start), 6)
+
+    def test_quarantined_handle_released_after_delayed_writer_eventual_exit(self):
+        """Quarantined handle is safely released when delayed writer thread eventually finishes."""
+        controller = WorkerController(
+            timeout_sec=0.2,
             _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
             _stdin_pipe_buffer_size=1024,
         )
-        # Request 1: triggers timeout
-        res1 = controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000})
-        self.assertEqual(res1["status"], WORKER_TIMEOUT)
-        self.assertTrue(controller._last_write_info["cancellation_requested"])
+        res = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
+            _inject_writer_join_timeout=True,
+        )
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertTrue(res.get("error", {}).get("details", {}).get("handle_quarantined"))
 
-        # Request 2: normal solve controller
-        controller2 = WorkerController()
-        res2 = controller2.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
-        self.assertEqual(res2["outcome"], "SUCCESS")
-        self.assertIsNotNone(controller2._last_write_info)
-        self.assertFalse(controller2._last_write_info["cancellation_requested"])
-        self.assertFalse(controller2._last_write_info["write_blocked_at_deadline"])
-        self.assertTrue(controller2._last_write_info["writer_exited"])
-        self.assertTrue(controller2._last_write_info["all_handles_safely_released"])
+        # Verify active quarantine record exists
+        recs = controller.get_quarantine_records()
+        self.assertEqual(len(recs), 1)
+        rec = recs[0]
+        self.assertFalse(rec["settled"])
+
+        # Wait for writer thread to finish sleep(0.3)
+        time.sleep(0.4)
+
+        # Reaping/settling verifies handle is closed and marks record settled
+        settled_count = controller.settle_quarantine(timeout=0.1)
+        self.assertGreaterEqual(settled_count, 0)
+        recs_after = controller.get_quarantine_records()
+        self.assertTrue(recs_after[0]["settled"])
+        self.assertTrue(recs_after[0]["handle_closed"])
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+
+    def test_repeated_write_timeouts_no_kernel_handle_leak(self):
+        """Repeated write timeouts on the same controller do not leak Windows kernel handles."""
+        controller = WorkerController(
+            timeout_sec=0.15,
+            _stdin_pipe_buffer_size=1024,
+        )
+        # Warmup single request
+        controller.execute_request({"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"})
+
+        baseline_handles = get_current_process_handle_count()
+        self.assertGreater(baseline_handles, 0)
+
+        # Execute 5 repeated write timeouts with quarantined handles
+        for _ in range(5):
+            res = controller.execute_request(
+                {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=" + "1" * 4000},
+                _worker_cmd=f'"{sys.executable}" -c "import time; time.sleep(5)"',
+                _inject_writer_join_timeout=True,
+            )
+            self.assertEqual(res["status"], WORKER_TIMEOUT)
+
+        # Allow all writer threads to finish sleeping
+        time.sleep(0.4)
+        controller.settle_quarantine(timeout=0.5)
+        import gc
+        gc.collect()
+
+        # Settle check: all records settled
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+
+        final_handles = get_current_process_handle_count()
+        # Verify no leaking handle accumulation (Windows OS maintains ~1 tombstone handle per terminated process)
+        handle_diff = final_handles - baseline_handles
+        self.assertLessEqual(handle_diff, 8, f"Handle leak detected: baseline={baseline_handles}, final={final_handles}")
+
+    def test_normal_write_completion_guards_active_writer(self):
+        """Normal write completion fails closed and quarantines handle if writer thread is still active."""
+        controller = WorkerController(timeout_sec=1.0)
+        res = controller.execute_request(
+            {"schema_version": SCHEMA_VERSION, "operation": "SOLVE", "equation": "x=1"},
+            _inject_normal_write_join_timeout=True,
+        )
+        # Must fail closed instead of returning premature SUCCESS with active writer thread
+        self.assertEqual(res["status"], WORKER_TIMEOUT)
+        self.assertFalse(res.get("error", {}).get("details", {}).get("safe_cleanup"))
+        self.assertTrue(res.get("error", {}).get("details", {}).get("handle_quarantined"))
+
+        # Verify handle was quarantined
+        self.assertEqual(controller.get_active_quarantine_count(), 1)
+
+        # Wait for thread to finish delayed exit
+        time.sleep(0.4)
+        controller.settle_quarantine(timeout=0.1)
+        self.assertEqual(controller.get_active_quarantine_count(), 0)
+        self.assertTrue(controller.get_quarantine_records()[-1]["settled"])
 
     def test_error_envelope_deterministic_fallback_on_serialization_failure(self):
         """_build_controller_error returns a minimal deterministic envelope when JSON serialization fails."""
