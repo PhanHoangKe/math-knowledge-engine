@@ -1,7 +1,7 @@
 """Main deterministic linear equation solver for MKE Product."""
 
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Dict
 
 from ..parser.ast import Equation
 from ..evaluator.budget import EvaluationBudget
@@ -18,10 +18,10 @@ from .result import (
     SolverEvidence,
     SolverResult,
 )
+from .tracker import OperationTracker
 from .scope import check_equation_scope
 from .affine import (
     extract_affine,
-    OperationTracker,
     _check_bits,
 )
 
@@ -34,17 +34,30 @@ def solve_equation(
 
     Guarantees:
     - Pre-simplification inspection rejects non-linear terms, x^0, and variable denominators.
+    - Owner Decision MKE-S3-ADR-001: Proven constant-domain undefinedness takes precedence
+      over variable-dependent exponent-zero scope abstention.
     - Constant undefinedness (e.g. division by 0, 0^0) produces DOMAIN_ERROR.
-    - For unique roots, result is submitted to independent S2 check_candidate().
+    - Single shared S3 operation budget covers preflight traversal, variable-dependency
+      memoization, constant-expression evaluations, affine extraction, and solver reduction arithmetic.
+    - For unique roots, result is submitted to independent S2 check_candidate() with its own budget,
+      maintaining modular separation between solver search and independent verification.
     - Never uses floating-point numbers, heuristics, or external symbolic libraries.
+    - Never returns UNIQUE_ROOT, DomainSet(R), or EmptySet if resource limits are exhausted.
     """
     if not isinstance(equation, Equation):
         raise TypeError(f"solve_equation requires an Equation AST, got: {type(equation).__name__}")
 
     effective_budget = budget if budget is not None else EvaluationBudget()
+    tracker = OperationTracker(effective_budget)
+    var_memo: Dict[int, bool] = {}
 
-    # Step 1: Pre-simplification safety inspection
-    scope_failure = check_equation_scope(equation, effective_budget)
+    # Step 1: Pre-simplification safety inspection with shared resource tracking
+    scope_failure = check_equation_scope(
+        equation,
+        effective_budget,
+        tracker=tracker,
+        var_memo=var_memo,
+    )
     if scope_failure is not None:
         status, err_code, err_msg, span = scope_failure
         return SolverResult(
@@ -55,13 +68,14 @@ def solve_equation(
             error_span=span,
         )
 
-    # Step 2: Exact affine extraction
-    tracker = OperationTracker(effective_budget)
+    # Step 2: Exact affine extraction (sharing tracker and memoized variable info)
     try:
-        aff_l = extract_affine(equation.left, effective_budget, tracker)
-        aff_r = extract_affine(equation.right, effective_budget, tracker)
+        aff_l = extract_affine(equation.left, effective_budget, tracker, var_memo=var_memo)
+        aff_r = extract_affine(equation.right, effective_budget, tracker, var_memo=var_memo)
 
+        tracker.count_step(equation.span)
         norm_a = aff_l.a - aff_r.a
+        tracker.count_step(equation.span)
         norm_b = aff_l.b - aff_r.b
         _check_bits(norm_a, effective_budget, None)
         _check_bits(norm_b, effective_budget, None)
@@ -95,6 +109,7 @@ def solve_equation(
     # Case A: Unique root (a != 0)
     if not norm_a.is_zero:
         try:
+            tracker.count_step(equation.span)
             root = -norm_b / norm_a
             _check_bits(root, effective_budget, None)
         except EvaluationResourceLimitError as err:
@@ -106,6 +121,8 @@ def solve_equation(
             )
 
         # Independent verification via S2 candidate verifier
+        # S2 runs as an independent verification pass with its own evaluation budget,
+        # preserving modular separation between solver engine and candidate certification.
         candidate_check = check_candidate(equation, root, budget=effective_budget)
 
         if candidate_check.status == CandidateCheckStatus.VALID:

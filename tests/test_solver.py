@@ -385,5 +385,224 @@ class TestScopePreflightRemediationS3R1(unittest.TestCase):
         self.assertEqual(res1.error_code, res2.error_code)
 
 
+
+class TestSolverFinalRemediationS3R2(unittest.TestCase):
+    """Regressions for MKE PRODUCT-02A-S3-R2 final solver remediation and Owner Decision ADR-001."""
+
+    # 1. Owner Decision A: Proven constant domain error takes precedence over x^0
+    def test_owner_decision_a_exponent_zero_and_div_zero_left(self):
+        """x^0 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("x^0 + 1/0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_owner_decision_a_div_zero_and_exponent_zero_right(self):
+        """1/0 + x^0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("1/0 + x^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_owner_decision_a_exponent_zero_and_zero_to_zero_left(self):
+        """x^0 + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("x^0 + 0^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    def test_owner_decision_a_zero_to_zero_and_exponent_zero_right(self):
+        """0^0 + x^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("0^0 + x^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    def test_owner_decision_a_shifted_var_exponent_zero_and_div_zero(self):
+        """(x-1)^0 + 1/(2-2) = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("(x-1)^0 + 1/(2-2) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_owner_decision_a_div_zero_and_shifted_var_exponent_zero(self):
+        """1/(2-2) + (x-1)^0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("1/(2-2) + (x-1)^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    # 2. Reordered mixed-hazard expressions
+    def test_mixed_hazard_nonlinear_and_div_zero_left(self):
+        """x^2 + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("x^2 + 1/0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_mixed_hazard_div_zero_and_nonlinear_right(self):
+        """1/0 + x^2 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("1/0 + x^2 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_mixed_hazard_rational_fraction_and_div_zero_left(self):
+        """x/(x-1) + 1/0 = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("x/(x-1) + 1/0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_mixed_hazard_div_zero_and_rational_fraction_right(self):
+        """1/0 + x/(x-1) = 0 -> DOMAIN_ERROR_DIVISION_BY_ZERO."""
+        eq = parse_equation("1/0 + x/(x-1) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+
+    def test_mixed_hazard_rational_fraction_and_zero_to_zero_left(self):
+        """x/(x-1) + 0^0 = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("x/(x-1) + 0^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    def test_mixed_hazard_zero_to_zero_and_rational_fraction_right(self):
+        """0^0 + x/(x-1) = 0 -> DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO."""
+        eq = parse_equation("0^0 + x/(x-1) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    # 3. Multiple distinct proven constant-domain failures
+    def test_multiple_domain_errors_preserves_domain_error_category(self):
+        """1/0 + 0^0 = 0 and 0^0 + 1/0 = 0 both guarantee DOMAIN_ERROR category."""
+        eq1 = parse_equation("1/0 + 0^0 = 0")
+        eq2 = parse_equation("0^0 + 1/0 = 0")
+        res1 = solve_equation(eq1)
+        res2 = solve_equation(eq2)
+        self.assertEqual(res1.status, SolverScopeStatus.DOMAIN_ERROR)
+        self.assertEqual(res2.status, SolverScopeStatus.DOMAIN_ERROR)
+        # AST pre-order tie-break gives leftmost domain error
+        self.assertEqual(res1.error_code, "DOMAIN_ERROR_DIVISION_BY_ZERO")
+        self.assertEqual(res2.error_code, "DOMAIN_ERROR_UNDEFINED_ZERO_TO_ZERO")
+
+    # 4. Variable-dependent power-zero precedence where no constant-domain violation exists
+    def test_exponent_zero_precedence_over_nonlinear_multiplication(self):
+        """x*(x^0) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x*(x^0) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_exponent_zero_precedence_over_quadratic_power(self):
+        """x^0 + x^2 = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x^0 + x^2 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_exponent_zero_precedence_over_quadratic_power_reversed(self):
+        """x^2 + x^0 = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("x^2 + x^0 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    def test_exponent_zero_precedence_over_rational_fraction(self):
+        """(x^0)/(x-1) = 0 -> OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO."""
+        eq = parse_equation("(x^0)/(x-1) = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.OUT_OF_SCOPE)
+        self.assertEqual(res.error_code, "OUT_OF_SCOPE_VARIABLE_EXPONENT_ZERO")
+
+    # 5. Shared S3 preflight/extraction resource budget
+    def test_budget_exhaustion_during_preflight_traversal(self):
+        """Exhausting operation budget during preflight traversal fails closed."""
+        eq = parse_equation("2*x + 3 = 7")
+        budget = EvaluationBudget(max_operations=2)
+        res = solve_equation(eq, budget=budget)
+        self.assertEqual(res.status, SolverScopeStatus.RESOURCE_EXHAUSTED)
+        self.assertEqual(res.error_code, "ERR_RESOURCE_EXHAUSTED_STEP_LIMIT")
+        self.assertIsNone(res.classification)
+        self.assertIsNone(res.root)
+
+    def test_budget_exhaustion_during_preflight_constant_subexpression(self):
+        """Exhausting operation budget during preflight constant subexpression evaluation fails closed."""
+        eq = parse_equation("x + (1 + 1 + 1 + 1)/(2 - 2) = 0")
+        # Preflight visits nodes, then tries to evaluate constant denominator which exceeds tight budget
+        budget = EvaluationBudget(max_operations=6)
+        res = solve_equation(eq, budget=budget)
+        self.assertEqual(res.status, SolverScopeStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res.classification)
+
+    def test_budget_exhaustion_during_affine_extraction(self):
+        """Exhausting shared operation budget during affine extraction fails closed."""
+        eq = parse_equation("2*x + 3 = 4*x + 5")
+        # Give enough steps for preflight (~15 steps), but not enough for full extraction (~25 steps)
+        budget = EvaluationBudget(max_operations=18)
+        res = solve_equation(eq, budget=budget)
+        self.assertEqual(res.status, SolverScopeStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res.classification)
+        self.assertIsNone(res.root)
+
+    def test_resource_exhaustion_never_produces_solution_classification(self):
+        """Ensure RESOURCE_EXHAUSTED never returns UNIQUE_ROOT, DomainSet(R), or EmptySet."""
+        ident_eq = parse_equation("x = x")
+        contra_eq = parse_equation("1 = 2")
+        tight_budget = EvaluationBudget(max_operations=1)
+
+        res_ident = solve_equation(ident_eq, budget=tight_budget)
+        res_contra = solve_equation(contra_eq, budget=tight_budget)
+
+        self.assertEqual(res_ident.status, SolverScopeStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res_ident.classification)
+        self.assertFalse(res_ident.is_all_reals)
+
+        self.assertEqual(res_contra.status, SolverScopeStatus.RESOURCE_EXHAUSTED)
+        self.assertIsNone(res_contra.classification)
+        self.assertFalse(res_contra.is_empty_set)
+
+    # 6. S2 independent verification contract
+    def test_s2_independent_verification_present_and_valid(self):
+        """Unique root solution includes verified S2 candidate check result."""
+        eq = parse_equation("3*x + 9 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.IN_SCOPE)
+        self.assertEqual(res.classification, SolutionClassification.UNIQUE_ROOT)
+        self.assertEqual(res.root, Rational(-3, 1))
+        self.assertIsNotNone(res.evidence)
+        self.assertIsNotNone(res.evidence.candidate_check)
+        self.assertEqual(res.evidence.candidate_check.status, CandidateCheckStatus.VALID)
+
+    # 7. No regression to the three supported linear solution classifications
+    def test_no_regression_unique_root(self):
+        """3*x + 6 = 0 -> UNIQUE_ROOT, x = -2."""
+        eq = parse_equation("3*x + 6 = 0")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.IN_SCOPE)
+        self.assertTrue(res.is_unique_root)
+        self.assertEqual(res.root, Rational(-2, 1))
+
+    def test_no_regression_all_reals(self):
+        """x + 1 = x + 1 -> DomainSet(R)."""
+        eq = parse_equation("x + 1 = x + 1")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.IN_SCOPE)
+        self.assertTrue(res.is_all_reals)
+        self.assertEqual(res.classification, SolutionClassification.ALL_REALS)
+        self.assertIsNone(res.root)
+
+    def test_no_regression_empty_set(self):
+        """x + 1 = x + 2 -> EmptySet."""
+        eq = parse_equation("x + 1 = x + 2")
+        res = solve_equation(eq)
+        self.assertEqual(res.status, SolverScopeStatus.IN_SCOPE)
+        self.assertTrue(res.is_empty_set)
+        self.assertEqual(res.classification, SolutionClassification.NO_SOLUTION)
+        self.assertIsNone(res.root)
+
+
 if __name__ == "__main__":
     unittest.main()
