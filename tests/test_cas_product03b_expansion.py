@@ -579,5 +579,90 @@ class TestProduct03BR1SoundnessAndCounterexamples:
         assert res.mathematical_status == EngineStatus.RESOURCE_EXHAUSTED
         assert "timed out" in res.error_message.lower()
 
+    # -------------------------------------------------------------------------
+    # Pre-Dispatch Bounded Constant Arithmetic & Giant Power Safety Tests
+    # -------------------------------------------------------------------------
+    def test_giant_constant_power_zero_exponent_pre_dispatch_fast(self, router: EngineRouter):
+        """(2^1000000000000)^0 must not trigger trillion-bit integer exponentiation in parent process."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import inspect_ast_safety, prove_constant_zero_status
+
+        ast = parse_cas_expression("(2^1000000000000)^0")
+        t0 = time.monotonic()
+        inspect_ast_safety(ast)
+        elapsed = time.monotonic() - t0
+        assert elapsed < 0.05, f"Pre-dispatch safety check took {elapsed:.4f}s, expected < 0.05s"
+        assert prove_constant_zero_status(ast) == "NONZERO"
+
+    def test_giant_constant_power_division_pre_dispatch_fast(self):
+        """1/(2^1000000000000) must prove non-zero denominator in O(1) without evaluating 2^1000000000000."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import inspect_ast_safety, prove_constant_zero_status
+
+        ast = parse_cas_expression("1 / (2^1000000000000)")
+        t0 = time.monotonic()
+        inspect_ast_safety(ast)
+        elapsed = time.monotonic() - t0
+        assert elapsed < 0.05, f"Pre-dispatch safety check took {elapsed:.4f}s, expected < 0.05s"
+        assert prove_constant_zero_status(ast.right) == "NONZERO"
+
+    def test_giant_constant_structural_cancellation_zero_power(self, router: EngineRouter):
+        """(2^1000000000000 - 2^1000000000000)^0 is proven 0^0 structurally in O(tree size) without giant integer arithmetic."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import DomainRestrictionError, inspect_ast_safety, prove_constant_zero_status
+
+        ast = parse_cas_expression("(2^1000000000000 - 2^1000000000000)^0")
+        assert prove_constant_zero_status(ast.base) == "ZERO"
+
+        with pytest.raises(DomainRestrictionError) as exc_info:
+            inspect_ast_safety(ast)
+        assert "0^0" in str(exc_info.value) or "undefined" in str(exc_info.value).lower()
+
+    def test_small_safe_constant_powers_correctness(self, router: EngineRouter):
+        """Small safe constant powers and exact domain undefinedness are evaluated correctly."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import (
+            DivisionByZeroError,
+            DomainRestrictionError,
+            evaluate_constant_ast,
+            inspect_ast_safety,
+        )
+
+        # 1. Valid power
+        ast_val = parse_cas_expression("2^3 + 1")
+        assert evaluate_constant_ast(ast_val) == 9
+
+        # 2. Provable 0^0 on small constant base
+        ast_00 = parse_cas_expression("(3^2 - 9)^0")
+        with pytest.raises(DomainRestrictionError):
+            inspect_ast_safety(ast_00)
+
+        # 3. Provable division by zero on small constant denominator
+        ast_div0 = parse_cas_expression("1 / (2^4 - 16)")
+        with pytest.raises(DivisionByZeroError):
+            inspect_ast_safety(ast_div0)
+
+    def test_constant_evaluation_resource_limits(self):
+        """Direct evaluate_constant_ast enforces strict exponent and bit-length budgets."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import ConstantEvalResourceLimitError, evaluate_constant_ast
+
+        # Exponent exceeds MAX_CONSTANT_EXPONENT (256)
+        ast_exp = parse_cas_expression("2^500")
+        with pytest.raises(ConstantEvalResourceLimitError) as exc_info:
+            evaluate_constant_ast(ast_exp)
+        assert "exceeds maximum evaluation budget" in str(exc_info.value)
+
+    def test_undecidable_constant_base_domain_certainty_contract(self):
+        """Expressions with unproven constant subtrees must not receive PROVEN_REALS."""
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty
+
+        # Constant base that exceeds evaluation limits and is not structurally proven non-zero
+        ast = parse_cas_expression("(2^500 - 3^300)^0")
+        certainty = assess_domain_certainty(ast, [])
+        assert certainty == "NOT_FULLY_DETERMINED"
+
+
 
 

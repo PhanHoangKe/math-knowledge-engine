@@ -64,40 +64,225 @@ def check_input_bounds(raw_input: str) -> None:
         )
 
 
-def evaluate_constant_ast(node: ASTNode) -> sympy.Rational:
-    """Safely evaluate an ASTNode containing no variables to an exact rational value."""
-    if len(node.variables()) > 0:
-        raise ValueError("Node contains variables, cannot evaluate as constant.")
+MAX_CONSTANT_EVAL_STEPS = 100
+MAX_CONSTANT_EXPONENT = 256
+MAX_CONSTANT_INTEGER_BITS = 1024
+
+
+class ConstantEvalResourceLimitError(SafetyError):
+    """Raised when constant arithmetic evaluation exceeds pre-dispatch resource bounds."""
+    pass
+
+
+def ast_nodes_structurally_equal(a: ASTNode, b: ASTNode) -> bool:
+    """Check if two AST subtrees are structurally identical without evaluating arithmetic."""
+    if type(a) is not type(b):
+        if isinstance(a, Group):
+            return ast_nodes_structurally_equal(a.inner, b)
+        if isinstance(b, Group):
+            return ast_nodes_structurally_equal(a, b.inner)
+        if isinstance(a, (Power, CASPower)) and isinstance(b, (Power, CASPower)):
+            return (
+                a.exponent.value == b.exponent.value
+                and ast_nodes_structurally_equal(a.base, b.base)
+            )
+        return False
+
+    if isinstance(a, IntegerLiteral):
+        return a.value == b.value
+    elif isinstance(a, Variable):
+        return a.name == b.name
+    elif isinstance(a, Group):
+        return ast_nodes_structurally_equal(a.inner, b.inner)
+    elif isinstance(a, UnaryOp):
+        return a.op == b.op and ast_nodes_structurally_equal(a.operand, b.operand)
+    elif isinstance(a, BinaryOp):
+        return (
+            a.op == b.op
+            and ast_nodes_structurally_equal(a.left, b.left)
+            and ast_nodes_structurally_equal(a.right, b.right)
+        )
+    elif isinstance(a, (Power, CASPower)):
+        return (
+            a.exponent.value == b.exponent.value
+            and ast_nodes_structurally_equal(a.base, b.base)
+        )
+    return False
+
+
+def _eval_constant_bounded(
+    node: ASTNode,
+    steps: List[int],
+    max_steps: int,
+    max_exp: int,
+    max_bits: int,
+) -> sympy.Rational:
+    """Internal bounded evaluator enforcing strict step counts, exponents, and bit lengths."""
+    steps[0] += 1
+    if steps[0] > max_steps:
+        raise ConstantEvalResourceLimitError(
+            f"Constant evaluation exceeded maximum step budget of {max_steps} steps."
+        )
+
     if isinstance(node, IntegerLiteral):
+        if node.value.bit_length() > max_bits:
+            raise ConstantEvalResourceLimitError(
+                f"Integer literal bit length ({node.value.bit_length()}) exceeds budget of {max_bits} bits."
+            )
         return sympy.Integer(node.value)
+
     elif isinstance(node, Group):
-        return evaluate_constant_ast(node.inner)
+        return _eval_constant_bounded(node.inner, steps, max_steps, max_exp, max_bits)
+
     elif isinstance(node, UnaryOp):
-        val = evaluate_constant_ast(node.operand)
-        return val if node.op == "+" else -val
+        val = _eval_constant_bounded(node.operand, steps, max_steps, max_exp, max_bits)
+        res = val if node.op == "+" else -val
+        return res
+
     elif isinstance(node, BinaryOp):
-        left_val = evaluate_constant_ast(node.left)
-        right_val = evaluate_constant_ast(node.right)
+        left_val = _eval_constant_bounded(node.left, steps, max_steps, max_exp, max_bits)
+        right_val = _eval_constant_bounded(node.right, steps, max_steps, max_exp, max_bits)
+
         if node.op == "+":
-            return left_val + right_val
+            res = left_val + right_val
         elif node.op == "-":
-            return left_val - right_val
+            res = left_val - right_val
         elif node.op == "*":
-            return left_val * right_val
+            res = left_val * right_val
         elif node.op == "/":
             if right_val == 0:
                 raise DivisionByZeroError("Division by zero constant is undefined.")
-            return left_val / right_val
+            res = left_val / right_val
         else:
             raise ValueError(f"Unsupported binary operator in constant evaluation: {node.op!r}")
+
+        if max(res.p.bit_length(), res.q.bit_length()) > max_bits:
+            raise ConstantEvalResourceLimitError(
+                f"Intermediate arithmetic result exceeds maximum bit-length budget of {max_bits} bits."
+            )
+        return res
+
     elif isinstance(node, (Power, CASPower)):
-        base_val = evaluate_constant_ast(node.base)
         exp_val = int(node.exponent.value)
-        if base_val == 0 and exp_val == 0:
-            raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
-        return base_val ** exp_val
+        if exp_val < 0:
+            raise ConstantEvalResourceLimitError("Negative exponents not evaluated in pre-dispatch constant check.")
+
+        if exp_val == 0:
+            base_val = _eval_constant_bounded(node.base, steps, max_steps, max_exp, max_bits)
+            if base_val == 0:
+                raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+            return sympy.Integer(1)
+
+        if exp_val > max_exp:
+            raise ConstantEvalResourceLimitError(
+                f"Constant exponent {exp_val} exceeds maximum evaluation budget of {max_exp}."
+            )
+
+        base_val = _eval_constant_bounded(node.base, steps, max_steps, max_exp, max_bits)
+        if base_val == 0:
+            return sympy.Integer(0)
+
+        est_bits = max(base_val.p.bit_length(), base_val.q.bit_length()) * exp_val
+        if est_bits > max_bits:
+            raise ConstantEvalResourceLimitError(
+                f"Estimated exponentiation bit-length ({est_bits}) exceeds budget of {max_bits} bits."
+            )
+
+        res = base_val ** exp_val
+        if max(res.p.bit_length(), res.q.bit_length()) > max_bits:
+            raise ConstantEvalResourceLimitError(
+                f"Exponentiation result exceeds bit-length budget of {max_bits} bits."
+            )
+        return res
+
     else:
         raise TypeError(f"Unknown AST node type: {type(node).__name__}")
+
+
+def evaluate_constant_ast(
+    node: ASTNode,
+    max_steps: int = MAX_CONSTANT_EVAL_STEPS,
+    max_exp: int = MAX_CONSTANT_EXPONENT,
+    max_bits: int = MAX_CONSTANT_INTEGER_BITS,
+) -> sympy.Rational:
+    """Safely evaluate an ASTNode containing no variables to an exact rational value within bounded budgets."""
+    if len(node.variables()) > 0:
+        raise ValueError("Node contains variables, cannot evaluate as constant.")
+    steps = [0]
+    return _eval_constant_bounded(node, steps, max_steps, max_exp, max_bits)
+
+
+def prove_constant_zero_status(node: ASTNode) -> str:
+    """Conservatively prove whether a constant AST subtree is 'ZERO', 'NONZERO', or 'UNDECIDABLE'.
+
+    Guarantees:
+    - Never triggers giant integer exponentiations (e.g. 2^1000000000000) or unbounded memory allocation.
+    - Proves non-zero constant powers in O(1) without integer expansion.
+    - Proves structural cancellations like A - A in O(tree size) without expansion.
+    - Falls back to bounded evaluation within strict step and bit limits.
+    - Returns 'UNDECIDABLE' if exact determination exceeds budgets.
+    """
+    if len(node.variables()) > 0:
+        return "UNDECIDABLE"
+
+    # 1. Structural reasoning pass (zero arithmetic computation)
+    if isinstance(node, IntegerLiteral):
+        return "ZERO" if node.value == 0 else "NONZERO"
+
+    elif isinstance(node, Group):
+        return prove_constant_zero_status(node.inner)
+
+    elif isinstance(node, UnaryOp):
+        return prove_constant_zero_status(node.operand)
+
+    elif isinstance(node, (Power, CASPower)):
+        exp_val = int(node.exponent.value)
+        if exp_val == 0:
+            b_status = prove_constant_zero_status(node.base)
+            if b_status == "ZERO":
+                raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+            elif b_status == "NONZERO":
+                return "NONZERO"
+            return "UNDECIDABLE"
+        elif exp_val > 0:
+            b_status = prove_constant_zero_status(node.base)
+            if b_status == "ZERO":
+                return "ZERO"
+            elif b_status == "NONZERO":
+                # For any real b != 0 and integer e > 0, b^e != 0
+                return "NONZERO"
+            return "UNDECIDABLE"
+
+    elif isinstance(node, BinaryOp):
+        if node.op == "-":
+            if ast_nodes_structurally_equal(node.left, node.right):
+                return "ZERO"
+        elif node.op == "*":
+            l_status = prove_constant_zero_status(node.left)
+            r_status = prove_constant_zero_status(node.right)
+            if l_status == "NONZERO" and r_status == "NONZERO":
+                return "NONZERO"
+            if l_status == "ZERO" or r_status == "ZERO":
+                return "ZERO"
+        elif node.op == "/":
+            r_status = prove_constant_zero_status(node.right)
+            if r_status == "ZERO":
+                raise DivisionByZeroError("Division by zero constant is undefined.")
+            if r_status == "NONZERO":
+                l_status = prove_constant_zero_status(node.left)
+                if l_status == "ZERO":
+                    return "ZERO"
+                elif l_status == "NONZERO":
+                    return "NONZERO"
+
+    # 2. Bounded arithmetic evaluation fallback
+    try:
+        val = evaluate_constant_ast(node)
+        return "ZERO" if val == 0 else "NONZERO"
+    except (DomainRestrictionError, DivisionByZeroError):
+        raise
+    except Exception:
+        return "UNDECIDABLE"
 
 
 def inspect_ast_safety(node: ASTNode) -> None:
@@ -105,10 +290,10 @@ def inspect_ast_safety(node: ASTNode) -> None:
 
     CRITICAL RESOURCE-ISOLATION INVARIANT:
     This function runs in the unsupervised pre-dispatch path (router and entrypoints).
-    It executes only lightweight O(AST size) structural checks and constant subtree arithmetic
-    via evaluate_constant_ast(). It NEVER invokes unconstrained symbolic operations
-    (such as sympy.simplify, sympy.solve, or sympy.Poly) on variable subtrees in the parent process.
-    All untrusted-input-dependent symbolic checks are strictly deferred to the supervised child worker.
+    It executes only lightweight structural checks and bounded constant reasoning.
+    It NEVER invokes unconstrained symbolic operations on variable subtrees, nor does it
+    perform unbounded integer exponentiation or arithmetic on giant constant subtrees.
+    All expensive or undecidable constant computations are safely deferred to supervised execution.
     """
     for n in node.walk():
         if isinstance(n, IntegerLiteral):
@@ -118,16 +303,15 @@ def inspect_ast_safety(node: ASTNode) -> None:
                 )
         elif isinstance(n, (Power, CASPower)):
             # Check for statically provable 0^0 on constant subtrees
-            if n.exponent.value == 0:
-                if len(n.base.variables()) == 0:
-                    b_val = evaluate_constant_ast(n.base)
-                    if b_val == 0:
-                        raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+            if n.exponent.value == 0 and len(n.base.variables()) == 0:
+                zero_status = prove_constant_zero_status(n.base)
+                if zero_status == "ZERO":
+                    raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
         elif isinstance(n, BinaryOp) and n.op == "/":
             # Check for statically provable division by zero on constant subtrees
             if len(n.right.variables()) == 0:
-                denom_val = evaluate_constant_ast(n.right)
-                if denom_val == 0:
+                zero_status = prove_constant_zero_status(n.right)
+                if zero_status == "ZERO":
                     raise DivisionByZeroError("Division by zero constant is undefined.")
 
 
@@ -388,7 +572,10 @@ def is_domain_determination_complete(node: Optional[ASTNode], restrictions: List
 
             denom_vars = denom.variables()
             if not denom_vars:
-                # Constant denominator: non-zero check
+                # Constant denominator: must be provably non-zero to assert real domain
+                zero_status = prove_constant_zero_status(denom)
+                if zero_status != "NONZERO":
+                    return False
                 continue
 
             # Univariate polynomial denominator
@@ -434,7 +621,10 @@ def is_domain_determination_complete(node: Optional[ASTNode], restrictions: List
                 if n.exponent.value == 0:
                     base_vars = n.base.variables()
                     if not base_vars:
-                        # Constant base: non-zero verified by inspect_ast_safety
+                        # Constant base: must be provably non-zero to assert real domain
+                        zero_status = prove_constant_zero_status(n.base)
+                        if zero_status != "NONZERO":
+                            return False
                         continue
                     if not is_polynomial_ast(n.base):
                         return False
