@@ -597,6 +597,8 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         self.assertIn("CÚ PHÁP HỢP LỆ", syntax_status.text)
 
         # 3. Solution value has KaTeX rendering
+        solution_var = self.driver.find_element(By.ID, "res-solution-var")
+        self.assertEqual(solution_var.text.strip(), "")
         solution_val = self.driver.find_element(By.ID, "res-solution-val")
         self.assertTrue("katex" in solution_val.get_attribute("innerHTML"))
         self.assertIn("8", solution_val.text)

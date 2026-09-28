@@ -222,7 +222,34 @@ def parse_safe_numeric_bound(val: Any, name: str = "bound") -> Union[int, float,
     raise TypeError(f"Invalid type for option '{name}': {type(val).__name__}. Expected numeric type or numeric string.")
 
 
-def sanitize_execution_options(options: Dict[str, Any]) -> Dict[str, Any]:
+FORBIDDEN_CLIENT_OPTION_KEYS = {
+    "in_process",
+    "sleep_seconds",
+    "engine_override",
+    "timeout_sec",
+    "simulate",
+    "direct",
+    "internal",
+}
+
+
+def sanitize_client_options(options: Dict[str, Any]) -> Dict[str, Any]:
+    """Strictly sanitize untrusted client options from HTTP API requests.
+    
+    Rejects any internal execution controls (in_process, sleep_seconds, timeout_sec, engine_override).
+    Only permits safe mathematical parameters: plotting bounds, sampling points, derivative orders, variables.
+    """
+    if not isinstance(options, dict):
+        raise ValueError("'options' must be a JSON object dictionary.")
+
+    for k in options:
+        if k in FORBIDDEN_CLIENT_OPTION_KEYS:
+            raise ValueError(f"Client-supplied internal execution option '{k}' is forbidden.")
+
+    return sanitize_execution_options(options, allow_internal=False)
+
+
+def sanitize_execution_options(options: Dict[str, Any], allow_internal: bool = True) -> Dict[str, Any]:
     """Sanitize and validate all execution options passed to CAS operations."""
     if not isinstance(options, dict):
         return {}
@@ -233,23 +260,23 @@ def sanitize_execution_options(options: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(k, str) or len(k) > 64:
             raise ValueError(f"Invalid option key: {k!r}")
 
-        if k in ("lower", "upper", "x_min", "x_max"):
+        if k in ("lower", "upper", "lower_bound", "upper_bound", "x_min", "x_max"):
             sanitized[k] = parse_safe_numeric_bound(v, name=k)
-        elif k in ("order", "num_points", "points"):
+        elif k in ("order", "num_points", "points", "samples"):
             bound_val = parse_safe_numeric_bound(v, name=k)
             if isinstance(bound_val, (float, sympy.Rational)) and not bound_val == int(bound_val):
                 raise ValueError(f"Option '{k}' must be an integer, got: {v}")
             int_val = int(bound_val)
             if k == "order" and (int_val < 1 or int_val > 10):
                 raise ValueError(f"Derivative order must be between 1 and 10, got: {int_val}")
-            if k in ("num_points", "points") and (int_val < 2 or int_val > MAX_PLOT_POINTS):
+            if k in ("num_points", "points", "samples") and (int_val < 2 or int_val > MAX_PLOT_POINTS):
                 raise ValueError(f"Plot points must be between 2 and {MAX_PLOT_POINTS}, got: {int_val}")
             sanitized[k] = int_val
         elif k in ("variable", "var"):
             if not isinstance(v, str) or not re.match(r"^[a-zA-Z]$", v):
                 raise ValueError(f"Invalid variable name: {v!r}. Must be a single letter.")
             sanitized["variable"] = v
-        elif k in ("engine_override", "in_process", "sleep_seconds", "timeout_sec"):
+        elif allow_internal and k in ("engine_override", "in_process", "sleep_seconds", "timeout_sec"):
             if k == "engine_override":
                 if not isinstance(v, str) or not re.match(r"^[a-zA-Z0-9_-]+$", v):
                     raise ValueError(f"Invalid engine override name: {v!r}")
@@ -294,12 +321,24 @@ def is_polynomial_ast(node: ASTNode) -> bool:
 
 
 def assess_domain_certainty(node: Optional[ASTNode], restrictions: List[str]) -> str:
-    """Classify mathematical domain certainty for expression/equation."""
+    """Classify mathematical domain certainty for expression/equation/system/inequality."""
     if node is None:
         return "NOT_FULLY_DETERMINED"
-    if restrictions:
-        return "EXPLICIT_EXCLUSIONS"
-    if is_polynomial_ast(node):
+    
+    if is_polynomial_ast(node) and not restrictions:
         return "PROVEN_REALS"
+    
+    if restrictions:
+        # Check if all restrictions are strictly verified point exclusions on univariate real expressions
+        is_complete_point_exclusions = True
+        for r in restrictions:
+            # Matches pattern like "x != 1", "x != -3/2", "x != 0"
+            if not re.match(r"^[a-zA-Z]\s*!=\s*[-+]?\d+(\s*/\s*[-+]?\d+)?$", r):
+                is_complete_point_exclusions = False
+                break
+        if is_complete_point_exclusions:
+            return "EXPLICIT_EXCLUSIONS"
+        return "NOT_FULLY_DETERMINED"
+    
     return "NOT_FULLY_DETERMINED"
 

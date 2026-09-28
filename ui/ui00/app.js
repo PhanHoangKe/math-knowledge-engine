@@ -1136,8 +1136,8 @@
       }
     } else if (op === 'SOLVE_SYSTEM') {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Nghiệm Hệ Phương Trình Tuyến Tính' : 'Linear System Solution';
-      if (solutionVar) solutionVar.textContent = '(x, y)';
-      if (solutionEq) solutionEq.textContent = '=';
+      if (solutionVar) solutionVar.textContent = '';
+      if (solutionEq) solutionEq.textContent = '';
       if (solutionVal) {
         const solLatex = data.latex_output || data.symbolic_result || 'N/A';
         renderMath(solutionVal, solLatex, false);

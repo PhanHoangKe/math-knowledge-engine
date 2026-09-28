@@ -34,6 +34,7 @@ from .safety import (
     assess_domain_certainty,
     extract_domain_restrictions,
     inspect_ast_safety,
+    is_polynomial_ast,
     parse_safe_numeric_bound,
     sanitize_execution_options,
 )
@@ -261,6 +262,12 @@ def _execute_solve_system(ast_node: ASTNode, sym_obj: Any, response: ExecutionRe
         response.error_message = "Expected a system of linear equations"
         return
 
+    # Enforce original AST polynomial scope: must not contain variable denominators
+    if not is_polynomial_ast(ast_node):
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = "Systems with variable denominators or non-polynomial terms are out of scope for linear solver v0"
+        return
+
     if len(ast_node.equations) != 2 or len(sym_obj) != 2:
         response.mathematical_status = EngineStatus.OUT_OF_SCOPE
         response.error_message = "Only 2x2 linear systems are supported in v0"
@@ -356,6 +363,12 @@ def _execute_solve_inequality(ast_node: ASTNode, sym_obj: Any, response: Executi
     if not isinstance(ast_node, Inequality) or not hasattr(sym_obj, "lhs"):
         response.mathematical_status = EngineStatus.INVALID_INPUT
         response.error_message = "Expected an inequality relation"
+        return
+
+    # Enforce original AST polynomial scope: must not contain variable denominators
+    if not is_polynomial_ast(ast_node):
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = "Inequalities with variable denominators or non-polynomial expressions are out of scope for v0 polynomial inequality solver"
         return
 
     diff_expr = sympy.cancel(sym_obj.lhs - sym_obj.rhs)

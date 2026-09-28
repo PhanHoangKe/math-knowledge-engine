@@ -283,3 +283,91 @@ class TestProduct03BSecurityAndIntegrity:
         )
         res = router.execute(req)
         assert res.mathematical_status == EngineStatus.SECURITY_REJECTED
+
+
+class TestProduct03BR1SoundnessAndCounterexamples:
+    """Test suite for P03B-R1 Counterexamples A-E and Domain Soundness."""
+
+    def test_counterexample_a_strict_inequality_variable_denominator(self, router: EngineRouter):
+        """Counterexample A: (x-1)/(x-1) > 0 must be rejected with OUT_OF_SCOPE, not (-oo, oo)."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_INEQUALITY,
+            raw_input="(x-1)/(x-1) > 0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.OUT_OF_SCOPE
+        assert "variable denominators" in res.error_message or "out of scope" in res.error_message
+
+    def test_counterexample_b_nonstrict_inequality_variable_denominator(self, router: EngineRouter):
+        """Counterexample B: (x-1)/(x-1) >= 0 must be rejected with OUT_OF_SCOPE, not (-oo, oo)."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_INEQUALITY,
+            raw_input="(x-1)/(x-1) >= 0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.OUT_OF_SCOPE
+        assert "variable denominators" in res.error_message or "out of scope" in res.error_message
+
+    def test_counterexample_c_system_variable_denominator(self, router: EngineRouter):
+        """Counterexample C: (x-1)/(x-1) = 1, y = 2 must be rejected with OUT_OF_SCOPE."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_SYSTEM,
+            raw_input="(x-1)/(x-1) = 1, y = 2",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.OUT_OF_SCOPE
+        assert "variable denominators" in res.error_message or "out of scope" in res.error_message
+
+    def test_counterexample_d_linear_system_success(self, router: EngineRouter):
+        """Counterexample D: 2*x + 3*y = 5, x - y = 1 returns SUCCESS (x = 8/5, y = 3/5)."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_SYSTEM,
+            raw_input="2*x + 3*y = 5, x - y = 1",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert "x = 8/5" in res.symbolic_result
+        assert "y = 3/5" in res.symbolic_result
+        assert res.verification_evidence["system_type"] == "unique"
+
+    def test_counterexample_e_quadratic_inequality_success(self, router: EngineRouter):
+        """Counterexample E: x^2 - 4 > 0 returns SUCCESS ((-oo, -2) U (2, oo))."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_INEQUALITY,
+            raw_input="x^2 - 4 > 0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "(-oo, -2) U (2, oo)"
+        assert res.domain_certainty == DomainCertainty.PROVEN_REALS
+
+    def test_domain_certainty_univariate_rational_point_exclusions(self, router: EngineRouter):
+        """Single point exclusions yield EXPLICIT_EXCLUSIONS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x^2 - 1)/(x - 1)",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.domain_certainty == DomainCertainty.EXPLICIT_EXCLUSIONS
+        assert "x != 1" in res.domain_restrictions
+
+    def test_domain_certainty_multivariate_denominator_not_fully_determined(self):
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty, extract_domain_restrictions
+        ast = parse_cas_expression("(x + y) / (x - y)")
+        restrictions = extract_domain_restrictions(ast)
+        certainty = assess_domain_certainty(ast, restrictions)
+        assert certainty == "NOT_FULLY_DETERMINED"
+
+    def test_domain_certainty_none_ast_not_fully_determined(self):
+        from mke_product.cas.safety import assess_domain_certainty
+        certainty = assess_domain_certainty(None, [])
+        assert certainty == "NOT_FULLY_DETERMINED"
+

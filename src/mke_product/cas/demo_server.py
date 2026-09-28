@@ -197,7 +197,7 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
 
         operation_str = payload.get("operation") or default_op
         input_text = payload.get("input") or payload.get("expression") or ""
-        options = payload.get("options", {})
+        raw_options = payload.get("options")
         preferred_engine = payload.get("engine") or payload.get("preferred_engine")
 
         if not operation_str or not input_text:
@@ -222,10 +222,35 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             })
             return
 
+        from mke_product.cas.safety import sanitize_client_options
+        try:
+            client_options = sanitize_client_options(raw_options if raw_options is not None else {})
+        except (ValueError, TypeError) as exc:
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Invalid client execution options: {exc}",
+            })
+            return
+
+        # Sanitize preferred_engine: only public known engines or None
+        valid_public_engines = {"mke_native_v1", "sympy_cas_v0"}
+        if preferred_engine and str(preferred_engine) not in valid_public_engines:
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.OUT_OF_SCOPE.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Requested engine '{preferred_engine}' is not a valid public mathematical engine.",
+            })
+            return
+
         request = ExecutionRequest(
             operation=op_type,
             raw_input=str(input_text),
-            options=options if isinstance(options, dict) else {},
+            options=client_options,
             preferred_engine=str(preferred_engine) if preferred_engine else None,
         )
 

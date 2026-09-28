@@ -292,7 +292,52 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["selected_engine"], "sympy_cas_v0")
         self.assertEqual(data["verification_status"], "COMPUTED")
 
+    def test_http_reject_in_process_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x + 1 = 0",
+            "options": {"in_process": True},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_sleep_seconds_option(self):
+        payload = {
+            "operation": "SIMPLIFY",
+            "input": "x + x",
+            "options": {"sleep_seconds": 60},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_engine_override_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x^2 - 4 = 0",
+            "options": {"engine_override": "mke_native_v1"},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_invalid_preferred_engine(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x + 1 = 0",
+            "preferred_engine": "malicious_eval_engine",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "OUT_OF_SCOPE")
+        self.assertIn("not a valid public mathematical engine", data["error_message"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
