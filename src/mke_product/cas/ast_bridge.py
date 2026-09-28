@@ -20,18 +20,33 @@ from mke_product.parser.ast import (
     UnaryOp,
     Variable,
 )
-from .cas_parser import CASPower
+from .cas_parser import CASPower, Inequality, LinearSystem
 from .safety import DomainRestrictionError, inspect_ast_safety
 
 
-def ast_to_sympy(node: ASTNode) -> Union[sympy.Expr, sympy.Eq]:
-    """Convert an arbitrary valid MKE AST node (Expression or Equation) to SymPy."""
+def ast_to_sympy(node: ASTNode) -> Union[sympy.Expr, sympy.Eq, sympy.Rel, List[sympy.Eq]]:
+    """Convert an arbitrary valid MKE AST node (Expression, Equation, Inequality, or LinearSystem) to SymPy."""
     inspect_ast_safety(node)
 
     if isinstance(node, Equation):
         left_sym = ast_to_sympy_expr(node.left)
         right_sym = ast_to_sympy_expr(node.right)
         return sympy.Eq(left_sym, right_sym, evaluate=False)
+    elif isinstance(node, Inequality):
+        left_sym = ast_to_sympy_expr(node.left)
+        right_sym = ast_to_sympy_expr(node.right)
+        if node.op == "<":
+            return sympy.Lt(left_sym, right_sym, evaluate=False)
+        elif node.op in ("<=", "≤"):
+            return sympy.Le(left_sym, right_sym, evaluate=False)
+        elif node.op == ">":
+            return sympy.Gt(left_sym, right_sym, evaluate=False)
+        elif node.op in (">=", "≥"):
+            return sympy.Ge(left_sym, right_sym, evaluate=False)
+        else:
+            raise ValueError(f"Unsupported inequality operator: {node.op!r}")
+    elif isinstance(node, LinearSystem):
+        return [sympy.Eq(ast_to_sympy_expr(eq.left), ast_to_sympy_expr(eq.right), evaluate=False) for eq in node.equations]
     else:
         return ast_to_sympy_expr(node)
 

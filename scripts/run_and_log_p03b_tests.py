@@ -1,0 +1,128 @@
+"""
+MKE PRODUCT-03B: Mathematical Expansion v0 Test Suite & Evidence Generator.
+
+Executes:
+1. Baseline unit tests (solver, parser, rational, protocol, evaluator)
+2. CAS multi-engine tests (test_cas_product03a.py)
+3. Mathematical Expansion v0 tests (test_cas_product03b_expansion.py)
+4. HTTP E2E integration tests (test_cas_http_integration.py)
+5. Automated browser verification suite with Selenium (test_browser_canonical_ui.py)
+6. Windows worker containment tests (test_worker_windows.py)
+
+Captures stdout/stderr, execution timings, exit codes, and generates
+structured JSON evidence in evidence/p03b/.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+EVIDENCE_DIR = REPO_ROOT / "evidence" / "p03b"
+
+
+def run_tests() -> int:
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    raw_log_path = EVIDENCE_DIR / "p03b_test_suite_raw.log"
+    results_json_path = EVIDENCE_DIR / "p03b_test_results.json"
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT / "src")
+
+    # Get Git commit hash and branch
+    try:
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+        git_branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+    except Exception as exc:
+        commit_hash = f"UNKNOWN ({exc})"
+        git_branch = "UNKNOWN"
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-v",
+        "--tb=short",
+        "tests",
+    ]
+
+    print(f"[*] Running MKE PRODUCT-03B full regression suite on commit: {commit_hash} (branch: {git_branch})")
+    start_time = time.monotonic()
+
+    process = subprocess.Popen(
+        cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    full_output = []
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        if line:
+            sys.stdout.write(line)
+            full_output.append(line)
+
+    returncode = process.poll() or 0
+    duration_sec = time.monotonic() - start_time
+    output_text = "".join(full_output)
+
+    # Save raw console log
+    with open(raw_log_path, "w", encoding="utf-8") as f:
+        f.write(f"# MKE PRODUCT-03B MATHEMATICAL EXPANSION V0 TEST SUITE LOG\n")
+        f.write(f"# Commit: {commit_hash}\n")
+        f.write(f"# Branch: {git_branch}\n")
+        f.write(f"# Duration: {duration_sec:.2f}s\n")
+        f.write(f"# Exit Code: {returncode}\n\n")
+        f.write(output_text)
+
+    print(f"\n[*] Raw log saved to: {raw_log_path}")
+
+    # Parse passed/failed counts
+    passed_count = 0
+    failed_count = 0
+    for line in output_text.splitlines():
+        if "passed" in line and "=" in line:
+            m_pass = re.search(r"(\d+)\s+passed", line)
+            m_fail = re.search(r"(\d+)\s+failed", line)
+            if m_pass:
+                passed_count = int(m_pass.group(1))
+            if m_fail:
+                failed_count = int(m_fail.group(1))
+
+    results = {
+        "suite": "MKE_PRODUCT_03B_EXPANSION_V0",
+        "tested_commit": commit_hash,
+        "branch": git_branch,
+        "duration_sec": round(duration_sec, 2),
+        "exit_code": returncode,
+        "passed_tests": passed_count,
+        "failed_tests": failed_count,
+        "total_tests": passed_count + failed_count,
+        "status": "PASSED" if returncode == 0 and failed_count == 0 else "FAILED",
+        "log_file": str(raw_log_path.relative_to(REPO_ROOT)),
+    }
+
+    with open(results_json_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"[*] Structured results saved to: {results_json_path}")
+    print(f"[*] Status: {results['status']} ({passed_count} passed, {failed_count} failed in {duration_sec:.2f}s)")
+    return returncode
+
+
+if __name__ == "__main__":
+    sys.exit(run_tests())

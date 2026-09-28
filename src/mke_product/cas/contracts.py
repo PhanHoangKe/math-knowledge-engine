@@ -20,6 +20,8 @@ class OperationType(str, Enum):
     INTEGRATE = "INTEGRATE"
     PLOT_2D = "PLOT_2D"
     CHECK_CANDIDATE = "CHECK_CANDIDATE"
+    SOLVE_SYSTEM = "SOLVE_SYSTEM"
+    SOLVE_INEQUALITY = "SOLVE_INEQUALITY"
 
 
 class EngineStatus(str, Enum):

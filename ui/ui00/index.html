@@ -186,10 +186,16 @@
             <div class="math-quick-keys" aria-label="Phím chèn ký hiệu nhanh">
               <button type="button" class="math-key-btn" data-sym="*" title="Nhân tường minh">*</button>
               <button type="button" class="math-key-btn" data-sym="x" title="Biến x">x</button>
+              <button type="button" class="math-key-btn" data-sym="y" title="Biến y">y</button>
+              <button type="button" class="math-key-btn" data-sym="," title="Dấu phẩy (hệ PT)">,</button>
               <button type="button" class="math-key-btn" data-sym="^2" title="Bình phương">^2</button>
               <button type="button" class="math-key-btn" data-sym="^0" title="Mũ không">^0</button>
               <button type="button" class="math-key-btn" data-sym="/" title="Phép chia">/</button>
               <button type="button" class="math-key-btn" data-sym="=" title="Dấu bằng">=</button>
+              <button type="button" class="math-key-btn" data-sym=">" title="Lớn hơn">&gt;</button>
+              <button type="button" class="math-key-btn" data-sym="<" title="Nhỏ hơn">&lt;</button>
+              <button type="button" class="math-key-btn" data-sym="<=" title="Nhỏ hơn hoặc bằng">&le;</button>
+              <button type="button" class="math-key-btn" data-sym=">=" title="Lớn hơn hoặc bằng">&ge;</button>
               <button type="button" class="math-key-btn" data-sym="( )" title="Dấu ngoặc">( )</button>
             </div>
           </div>
@@ -199,6 +205,9 @@
         <div class="sample-chips" aria-label="Các ví dụ tiêu biểu" data-i18n-attr="aria-label:chips_aria">
           <span class="chips-label" data-i18n="chips_label">Ví dụ:</span>
           <button type="button" class="chip" data-query="2*x + 3 = 7">2*x + 3 = 7</button>
+          <button type="button" class="chip" data-query="2*x + 3*y = 5, x - y = 1">2*x + 3*y = 5, x - y = 1</button>
+          <button type="button" class="chip" data-query="x^2 - 4 > 0">x^2 - 4 &gt; 0</button>
+          <button type="button" class="chip" data-query="2*x + 3 <= 7">2*x + 3 &le; 7</button>
           <button type="button" class="chip" data-query="x^2 - 5*x + 6 = 0">x^2 - 5*x + 6 = 0</button>
           <button type="button" class="chip" data-query="x^3 + 2*x^2 - 5*x + 7">x^3 + 2*x^2 - 5*x + 7</button>
           <button type="button" class="chip" data-query="x^0 = 1">x^0 = 1</button>
@@ -455,6 +464,8 @@ Equation(
             <h3 class="res-card-title" id="res-solution-card-title" data-i18n="card_solution_title">Nghiệm Chuẩn xác</h3>
             <div class="method-selector" role="tablist" aria-label="Solution Methods" data-i18n-attr="aria-label:methods_aria">
               <button type="button" class="tab-btn active" id="tab-solve" role="tab" aria-selected="true" data-op="SOLVE" data-i18n="tab_solve">Giải phương trình</button>
+              <button type="button" class="tab-btn" id="tab-system" role="tab" aria-selected="false" data-op="SOLVE_SYSTEM" data-i18n="tab_system">Hệ phương trình</button>
+              <button type="button" class="tab-btn" id="tab-inequality" role="tab" aria-selected="false" data-op="SOLVE_INEQUALITY" data-i18n="tab_inequality">Bất phương trình</button>
               <button type="button" class="tab-btn" id="tab-simplify" role="tab" aria-selected="false" data-op="SIMPLIFY" data-i18n="tab_simplify">Rút gọn</button>
               <button type="button" class="tab-btn" id="tab-diff" role="tab" aria-selected="false" data-op="DIFFERENTIATE" data-i18n="tab_diff">Đạo hàm</button>
               <button type="button" class="tab-btn" id="tab-integrate" role="tab" aria-selected="false" data-op="INTEGRATE" data-i18n="tab_integrate">Tích phân</button>

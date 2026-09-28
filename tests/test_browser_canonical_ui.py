@@ -30,7 +30,7 @@ if str(REPO_ROOT / "src") not in sys.path:
 
 from mke_product.cas.demo_server import MKEProductHTTPRequestHandler
 
-SCREENSHOTS_DIR = REPO_ROOT / "evidence" / "ui_r4" / "screenshots"
+SCREENSHOTS_DIR = REPO_ROOT / "evidence" / "p03b" / "screenshots"
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -580,6 +580,55 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         self.assertIn("status-invalid-cert", cert_badge.get_attribute("class"))
 
         self._save_screenshot("21_honest_out_of_scope_presentation")
+
+    # -------------------------------------------------------------------------
+    # Scenario 22: Linear System 2x2 UI Solving and Verification
+    # -------------------------------------------------------------------------
+    def test_22_solve_linear_system_browser_ui(self):
+        self._submit_query("2*x + 3*y = 5, x - y = 1")
+        time.sleep(0.5)
+
+        # 1. Operation tab active
+        tab_system = self.driver.find_element(By.ID, "tab-system")
+        self.assertIn("active", tab_system.get_attribute("class"))
+
+        # 2. Syntax status valid
+        syntax_status = self.driver.find_element(By.ID, "res-syntax-status")
+        self.assertIn("CÚ PHÁP HỢP LỆ", syntax_status.text)
+
+        # 3. Solution value has KaTeX rendering
+        solution_val = self.driver.find_element(By.ID, "res-solution-val")
+        self.assertTrue("katex" in solution_val.get_attribute("innerHTML"))
+        self.assertIn("8", solution_val.text)
+        self.assertIn("3", solution_val.text)
+
+        # 4. Engine badge is sympy_cas_v0
+        engine_badge = self.driver.find_element(By.ID, "res-engine-badge")
+        self.assertEqual(engine_badge.text, "sympy_cas_v0")
+
+        self._save_screenshot("22_solve_linear_system_ui")
+
+    # -------------------------------------------------------------------------
+    # Scenario 23: Single-Variable Inequality UI Solving and Verification
+    # -------------------------------------------------------------------------
+    def test_23_solve_inequality_browser_ui(self):
+        self._submit_query("x^2 - 4 > 0")
+        time.sleep(0.5)
+
+        # 1. Inequality tab active
+        tab_ineq = self.driver.find_element(By.ID, "tab-inequality")
+        self.assertIn("active", tab_ineq.get_attribute("class"))
+
+        # 2. Solution value has KaTeX rendering with interval union
+        solution_val = self.driver.find_element(By.ID, "res-solution-val")
+        self.assertTrue("katex" in solution_val.get_attribute("innerHTML"))
+        self.assertIn("2", solution_val.text)
+
+        # 3. Certification badge computed
+        cert_badge = self.driver.find_element(By.ID, "res-cert-badge")
+        self.assertIn("status-computed-cert", cert_badge.get_attribute("class"))
+
+        self._save_screenshot("23_solve_inequality_ui")
 
 
 if __name__ == "__main__":

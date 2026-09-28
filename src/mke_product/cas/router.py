@@ -15,7 +15,12 @@ from mke_product.parser.errors import (
     MKEParserError,
     ParserError,
 )
-from .cas_parser import parse_cas_equation, parse_cas_expression
+from .cas_parser import (
+    parse_cas_equation,
+    parse_cas_expression,
+    parse_cas_inequality,
+    parse_cas_system,
+)
 from .contracts import (
     DomainCertainty,
     EngineStatus,
@@ -110,7 +115,11 @@ class EngineRouter:
         # 2. Parse AST if needed
         try:
             if request.ast is None:
-                if request.operation in {OperationType.SOLVE, OperationType.CHECK_CANDIDATE} and "=" in input_str:
+                if request.operation == OperationType.SOLVE_SYSTEM:
+                    request.ast = parse_cas_system(input_str)
+                elif request.operation == OperationType.SOLVE_INEQUALITY:
+                    request.ast = parse_cas_inequality(input_str)
+                elif request.operation in {OperationType.SOLVE, OperationType.CHECK_CANDIDATE} and "=" in input_str:
                     request.ast = parse_cas_equation(input_str)
                 else:
                     request.ast = parse_cas_expression(input_str)

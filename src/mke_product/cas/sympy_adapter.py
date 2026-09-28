@@ -9,7 +9,14 @@ import sympy
 
 from mke_product.parser.ast import ASTNode, Equation
 from .ast_bridge import ast_to_sympy, ast_to_sympy_expr
-from .cas_parser import parse_cas_equation, parse_cas_expression
+from .cas_parser import (
+    Inequality,
+    LinearSystem,
+    parse_cas_equation,
+    parse_cas_expression,
+    parse_cas_inequality,
+    parse_cas_system,
+)
 from .contracts import (
     DomainCertainty,
     EngineCapability,
@@ -33,8 +40,12 @@ from .safety import (
 from .serialization import (
     format_integral_latex,
     format_integral_symbolic,
+    format_interval_latex,
+    format_interval_symbolic,
     format_solution_set_latex,
     format_solution_set_symbolic,
+    format_system_latex,
+    format_system_symbolic,
     format_sympy_latex,
     format_sympy_symbolic,
 )
@@ -60,8 +71,22 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
         # 2. Parse AST if not already provided
         ast_node = request.ast
         if ast_node is None:
-            if request.operation in (OperationType.SOLVE, OperationType.CHECK_CANDIDATE) and "=" in input_text:
-                ast_node = parse_cas_equation(input_text)
+            if request.operation == OperationType.SOLVE_SYSTEM:
+                ast_node = parse_cas_system(input_text)
+            elif request.operation == OperationType.SOLVE_INEQUALITY:
+                ast_node = parse_cas_inequality(input_text)
+            elif request.operation in (OperationType.SOLVE, OperationType.CHECK_CANDIDATE):
+                # Auto-detect system (presence of , or ; with =) or inequality
+                if ("," in input_text or ";" in input_text) and "=" in input_text:
+                    ast_node = parse_cas_system(input_text)
+                    request.operation = OperationType.SOLVE_SYSTEM
+                elif any(op in input_text for op in ("<=", ">=", "≤", "≥", "<", ">")):
+                    ast_node = parse_cas_inequality(input_text)
+                    request.operation = OperationType.SOLVE_INEQUALITY
+                elif "=" in input_text:
+                    ast_node = parse_cas_equation(input_text)
+                else:
+                    ast_node = parse_cas_expression(input_text)
             else:
                 ast_node = parse_cas_expression(input_text)
 
@@ -76,6 +101,10 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
         # 5. Dispatch to specific mathematical operation
         if request.operation == OperationType.SOLVE:
             _execute_solve(ast_node, sym_obj, response)
+        elif request.operation == OperationType.SOLVE_SYSTEM:
+            _execute_solve_system(ast_node, sym_obj, response)
+        elif request.operation == OperationType.SOLVE_INEQUALITY:
+            _execute_solve_inequality(ast_node, sym_obj, response)
         elif request.operation == OperationType.SIMPLIFY:
             _execute_simplify(sym_obj, response)
         elif request.operation == OperationType.DIFFERENTIATE:
@@ -222,6 +251,163 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         "roots": [str(r) for r in valid_roots],
         "solution_set": [str(r) for r in valid_roots],
         "domain": "Reals",
+    }
+
+
+def _execute_solve_system(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
+    """Solve a 2x2 linear equation system in the real domain."""
+    if not isinstance(ast_node, LinearSystem) or not isinstance(sym_obj, (list, tuple)):
+        response.mathematical_status = EngineStatus.INVALID_INPUT
+        response.error_message = "Expected a system of linear equations"
+        return
+
+    if len(ast_node.equations) != 2 or len(sym_obj) != 2:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = "Only 2x2 linear systems are supported in v0"
+        return
+
+    # Extract equations and diffs
+    eq1, eq2 = sym_obj[0], sym_obj[1]
+    lhs1 = eq1.lhs if isinstance(eq1, sympy.Eq) else eq1
+    rhs1 = eq1.rhs if isinstance(eq1, sympy.Eq) else 0
+    lhs2 = eq2.lhs if isinstance(eq2, sympy.Eq) else eq2
+    rhs2 = eq2.rhs if isinstance(eq2, sympy.Eq) else 0
+
+    diff1 = sympy.cancel(lhs1 - rhs1)
+    diff2 = sympy.cancel(lhs2 - rhs2)
+
+    free_syms = sorted(list(diff1.free_symbols | diff2.free_symbols), key=lambda s: s.name)
+    if len(free_syms) > 2:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = f"Linear system has {len(free_syms)} variables; maximum 2 variables supported"
+        return
+
+    # Fallback to [x, y] symbols if 0 or 1 variable present
+    if not free_syms:
+        sym_vars = [sympy.Symbol("x", real=True), sympy.Symbol("y", real=True)]
+    elif len(free_syms) == 1:
+        primary = free_syms[0]
+        other_name = "y" if primary.name != "y" else "x"
+        sym_vars = [primary, sympy.Symbol(other_name, real=True)]
+    else:
+        sym_vars = free_syms
+
+    # Verify linear degree <= 1 for all variables
+    try:
+        p1 = sympy.Poly(diff1, *sym_vars)
+        p2 = sympy.Poly(diff2, *sym_vars)
+        if p1.total_degree() > 1 or p2.total_degree() > 1:
+            response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+            response.error_message = "Non-linear equations are out of scope for the linear system solver"
+            return
+    except Exception:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = "Non-polynomial equations in system are out of scope"
+        return
+
+    # Solve via linsolve
+    try:
+        sol_set = sympy.linsolve([diff1, diff2], sym_vars)
+    except Exception as ex:
+        response.mathematical_status = EngineStatus.INTERNAL_ERROR
+        response.error_message = f"Failed to solve linear system: {ex}"
+        return
+
+    if sol_set == sympy.EmptySet or len(sol_set) == 0:
+        response.symbolic_result = "No solution (Inconsistent system)"
+        response.latex_output = "\\emptyset"
+        response.mathematical_status = EngineStatus.SUCCESS
+        response.verification_evidence = {
+            "system_type": "inconsistent",
+            "variables": [str(v) for v in sym_vars],
+            "solution_count": 0,
+            "solution_set": [],
+        }
+        return
+
+    sol_tuple = list(sol_set)[0]
+    has_free_parameters = any(val.free_symbols for val in sol_tuple)
+    sol_dict = {str(v): val for v, val in zip(sym_vars, sol_tuple)}
+
+    if has_free_parameters:
+        response.symbolic_result = f"Infinitely many solutions (Dependent system: {format_system_symbolic(sol_dict)})"
+        response.latex_output = format_system_latex(sol_dict)
+        response.mathematical_status = EngineStatus.SUCCESS
+        response.verification_evidence = {
+            "system_type": "dependent",
+            "variables": [str(v) for v in sym_vars],
+            "parametric_form": {str(k): format_sympy_symbolic(v) for k, v in sol_dict.items()},
+            "solution_set": [format_system_symbolic(sol_dict)],
+        }
+    else:
+        response.symbolic_result = format_system_symbolic(sol_dict)
+        response.latex_output = format_system_latex(sol_dict)
+        response.mathematical_status = EngineStatus.SUCCESS
+        response.verification_evidence = {
+            "system_type": "unique",
+            "variables": [str(v) for v in sym_vars],
+            "solution": {str(k): format_sympy_symbolic(v) for k, v in sol_dict.items()},
+            "solution_set": [format_system_symbolic(sol_dict)],
+        }
+
+
+def _execute_solve_inequality(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
+    """Solve a univariate real polynomial inequality with degree <= 2."""
+    if not isinstance(ast_node, Inequality) or not hasattr(sym_obj, "lhs"):
+        response.mathematical_status = EngineStatus.INVALID_INPUT
+        response.error_message = "Expected an inequality relation"
+        return
+
+    diff_expr = sympy.cancel(sym_obj.lhs - sym_obj.rhs)
+    free_syms = sorted(list(diff_expr.free_symbols), key=lambda s: s.name)
+
+    if len(free_syms) > 1:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = f"Multivariate inequalities with {len(free_syms)} variables are out of scope"
+        return
+
+    if not free_syms:
+        is_true = bool(sympy.simplify(sym_obj))
+        if is_true:
+            response.symbolic_result = "(-oo, oo)"
+            response.latex_output = "\\mathbb{R}"
+            response.verification_evidence = {"solution_set": ["(-oo, oo)"]}
+        else:
+            response.symbolic_result = "No real solution"
+            response.latex_output = "\\emptyset"
+            response.verification_evidence = {"solution_set": []}
+        response.mathematical_status = EngineStatus.SUCCESS
+        return
+
+    var = free_syms[0]
+    try:
+        poly = sympy.Poly(diff_expr, var)
+        deg = poly.degree()
+        if deg > 2:
+            response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+            response.error_message = f"Polynomial inequalities with degree {deg} > 2 are out of scope"
+            return
+    except Exception:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = "Non-polynomial inequalities are out of scope"
+        return
+
+    try:
+        sol_set = sympy.solveset(sym_obj, var, domain=sympy.S.Reals)
+    except Exception as ex:
+        response.mathematical_status = EngineStatus.INTERNAL_ERROR
+        response.error_message = f"Failed to solve inequality: {ex}"
+        return
+
+    response.symbolic_result = format_interval_symbolic(sol_set, var=var.name)
+    response.latex_output = format_interval_latex(sol_set, var=var.name)
+    response.mathematical_status = EngineStatus.SUCCESS
+    response.verification_evidence = {
+        "variable": var.name,
+        "degree": deg,
+        "interval_symbolic": response.symbolic_result,
+        "interval_latex": response.latex_output,
+        "solution_set": [response.symbolic_result] if response.symbolic_result != "No real solution" else [],
     }
 
 
@@ -389,6 +575,8 @@ class SymPyAdapter(MathEngine):
             license="3-clause BSD",
             supported_operations={
                 OperationType.SOLVE,
+                OperationType.SOLVE_SYSTEM,
+                OperationType.SOLVE_INEQUALITY,
                 OperationType.SIMPLIFY,
                 OperationType.DIFFERENTIATE,
                 OperationType.INTEGRATE,

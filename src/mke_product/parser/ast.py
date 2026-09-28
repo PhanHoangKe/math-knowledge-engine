@@ -70,8 +70,8 @@ class Variable(ASTNode):
     span: Span
 
     def __post_init__(self) -> None:
-        if self.name != "x":
-            raise ValueError(f"Only variable 'x' is supported in P02A, got: {self.name!r}")
+        if not self.name.isidentifier():
+            raise ValueError(f"Invalid variable identifier, got: {self.name!r}")
 
     def walk(self) -> Iterator[ASTNode]:
         yield self

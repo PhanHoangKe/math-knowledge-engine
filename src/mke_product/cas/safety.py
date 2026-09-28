@@ -122,6 +122,9 @@ def inspect_ast_safety(node: ASTNode) -> None:
                     raise DivisionByZeroError("Division by zero constant is undefined.")
 
 
+from .cas_parser import CASPower, Inequality, LinearSystem
+
+
 def extract_domain_restrictions(node: ASTNode) -> List[str]:
     """Inspect all division denominators and powers in AST to find domain restrictions (e.g., x != 1, x != 0)."""
     restrictions: List[str] = []
@@ -129,33 +132,33 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
     for n in node.walk():
         if isinstance(n, BinaryOp) and n.op == "/":
             denom = n.right
-            # If denominator contains variable 'x', formulate restriction
-            if "x" in denom.variables():
+            vars_in_denom = denom.variables()
+            if vars_in_denom:
                 from .ast_bridge import ast_to_sympy_expr
                 try:
                     sym_denom = ast_to_sympy_expr(denom)
-                    x_sym = sympy.Symbol("x", real=True)
-                    # Solve sym_denom = 0 for real roots using solveset / solve in Reals
-                    roots = sympy.solve(sym_denom, x_sym)
-                    if not isinstance(roots, (list, tuple, set)):
-                        roots = [roots]
-                    for root in roots:
-                        if hasattr(root, "is_real") and root.is_real is True:
-                            restrictions.append(f"x != {root}")
-                        elif isinstance(root, (int, float, sympy.Integer, sympy.Rational)):
-                            restrictions.append(f"x != {root}")
-                        else:
-                            try:
-                                if sympy.im(root) == 0:
-                                    restrictions.append(f"x != {root}")
-                            except Exception:
-                                restrictions.append(f"{sym_denom} != 0")
+                    for v_name in sorted(vars_in_denom):
+                        v_sym = sympy.Symbol(v_name, real=True)
+                        roots = sympy.solve(sym_denom, v_sym)
+                        if not isinstance(roots, (list, tuple, set)):
+                            roots = [roots]
+                        for root in roots:
+                            if hasattr(root, "is_real") and root.is_real is True:
+                                restrictions.append(f"{v_name} != {root}")
+                            elif isinstance(root, (int, float, sympy.Integer, sympy.Rational)):
+                                restrictions.append(f"{v_name} != {root}")
+                            else:
+                                try:
+                                    if sympy.im(root) == 0:
+                                        restrictions.append(f"{v_name} != {root}")
+                                except Exception:
+                                    restrictions.append(f"{sym_denom} != 0")
                 except Exception:
                     restrictions.append("denominator != 0")
         elif isinstance(n, (Power, CASPower)):
-            # x^0 requires x != 0 to avoid indeterminate 0^0
+            # v^0 requires v != 0 to avoid indeterminate 0^0
             if isinstance(n.base, Variable) and n.exponent.value == 0:
-                restrictions.append("x != 0")
+                restrictions.append(f"{n.base.name} != 0")
 
     # Deduplicate while preserving order
     seen: Set[str] = set()
@@ -246,14 +249,14 @@ def sanitize_execution_options(options: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(v, str) or not re.match(r"^[a-zA-Z]$", v):
                 raise ValueError(f"Invalid variable name: {v!r}. Must be a single letter.")
             sanitized["variable"] = v
-        elif k in ("engine_override", "in_process", "sleep_seconds"):
+        elif k in ("engine_override", "in_process", "sleep_seconds", "timeout_sec"):
             if k == "engine_override":
                 if not isinstance(v, str) or not re.match(r"^[a-zA-Z0-9_-]+$", v):
                     raise ValueError(f"Invalid engine override name: {v!r}")
                 sanitized[k] = v
             elif k == "in_process":
                 sanitized[k] = bool(v)
-            elif k == "sleep_seconds":
+            elif k in ("sleep_seconds", "timeout_sec"):
                 sanitized[k] = float(v)
         else:
             raise ValueError(f"Unknown or unsupported option key: {k!r}")
@@ -283,6 +286,10 @@ def is_polynomial_ast(node: ASTNode) -> bool:
         return False
     if isinstance(node, Equation):
         return is_polynomial_ast(node.left) and is_polynomial_ast(node.right)
+    if isinstance(node, Inequality):
+        return is_polynomial_ast(node.left) and is_polynomial_ast(node.right)
+    if isinstance(node, LinearSystem):
+        return all(is_polynomial_ast(eq) for eq in node.equations)
     return False
 
 

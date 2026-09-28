@@ -268,6 +268,30 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["domain_certainty"], "EXPLICIT_EXCLUSIONS")
         self.assertIn("x != 1", data["domain_restrictions"])
 
+    def test_http_solve_linear_system_e2e(self):
+        payload = {
+            "operation": "SOLVE_SYSTEM",
+            "input": "2*x + 3*y = 5, x - y = 1",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["mathematical_status"], "SUCCESS")
+        self.assertIn("x = 8/5", data["symbolic_result"])
+        self.assertEqual(data["selected_engine"], "sympy_cas_v0")
+        self.assertEqual(data["verification_status"], "COMPUTED")
+
+    def test_http_solve_inequality_e2e(self):
+        payload = {
+            "operation": "SOLVE_INEQUALITY",
+            "input": "x^2 - 4 > 0",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["mathematical_status"], "SUCCESS")
+        self.assertEqual(data["symbolic_result"], "(-oo, -2) U (2, oo)")
+        self.assertEqual(data["selected_engine"], "sympy_cas_v0")
+        self.assertEqual(data["verification_status"], "COMPUTED")
+
 
 if __name__ == "__main__":
     unittest.main()

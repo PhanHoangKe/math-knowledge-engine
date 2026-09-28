@@ -46,8 +46,8 @@
       clear_title: 'Xóa nội dung nhập',
       clear_aria: 'Xóa nội dung nhập',
       compute_aria: 'Tính toán biểu thức',
-      mode_exact_math: 'Ngôn Ngữ Tự Nhiên',
-      mode_symbolic: 'Nhập Toán Học',
+      mode_exact_math: 'Toán Tường Minh',
+      mode_symbolic: 'Toán Ký Hiệu',
       chips_aria: 'Các ví dụ tiêu biểu',
       chips_label: 'Ví dụ:',
       chip_syntax_demo: '1/2x = 1 (Lỗi Cú pháp)',
@@ -113,12 +113,16 @@
       btn_retry: 'Thử lại kết nối',
       methods_aria: 'Phương pháp giải toán',
       tab_solve: 'Giải phương trình',
+      tab_system: 'Hệ phương trình',
+      tab_inequality: 'Bất phương trình',
       tab_simplify: 'Rút gọn',
       tab_diff: 'Đạo hàm',
       tab_integrate: 'Tích phân',
       tab_plot: 'Đồ thị 2D',
       sol_domain_tag: 'Số hữu tỉ chính xác trong \\(\\mathbb{Q}\\)',
       sol_domain_real_tag: 'Nghiệm thực chính xác trong \\(\\mathbb{R}\\)',
+      sol_system_tag: 'Nghiệm hệ phương trình tuyến tính \\(\\mathbb{R}^2\\)',
+      sol_ineq_tag: 'Miền nghiệm bất phương trình trong \\(\\mathbb{R}\\)',
       sol_diff_tag: 'Đạo hàm giải tích ký hiệu',
       sol_int_tag: 'Tích phân giải tích ký hiệu',
       sol_simplify_tag: 'Biểu thức đại số rút gọn',
@@ -272,12 +276,16 @@
       btn_retry: 'Retry Connection',
       methods_aria: 'Solution methods',
       tab_solve: 'Solve Equation',
+      tab_system: 'Linear System',
+      tab_inequality: 'Inequality',
       tab_simplify: 'Simplify',
       tab_diff: 'Differentiate',
       tab_integrate: 'Integrate',
       tab_plot: '2D Plot',
       sol_domain_tag: 'Exact Rational in \\(\\mathbb{Q}\\)',
       sol_domain_real_tag: 'Exact Real Roots in \\(\\mathbb{R}\\)',
+      sol_system_tag: 'Linear system solution in \\(\\mathbb{R}^2\\)',
+      sol_ineq_tag: 'Inequality solution set in \\(\\mathbb{R}\\)',
       sol_diff_tag: 'Exact Symbolic Derivative',
       sol_int_tag: 'Exact Symbolic Integral',
       sol_simplify_tag: 'Simplified Algebraic Form',
@@ -711,6 +719,12 @@
     if (s.startsWith('simplify(')) {
       return 'SIMPLIFY';
     }
+    if (s.includes(',') && s.includes('=')) {
+      return 'SOLVE_SYSTEM';
+    }
+    if (s.includes('<') || s.includes('>') || s.includes('<=') || s.includes('>=') || s.includes('≤') || s.includes('≥')) {
+      return 'SOLVE_INEQUALITY';
+    }
     if (s.includes('=')) {
       return 'SOLVE';
     }
@@ -735,6 +749,8 @@
     currentOperation = op;
     const tabMap = {
       'SOLVE': 'tab-solve',
+      'SOLVE_SYSTEM': 'tab-system',
+      'SOLVE_INEQUALITY': 'tab-inequality',
       'SIMPLIFY': 'tab-simplify',
       'DIFFERENTIATE': 'tab-diff',
       'INTEGRATE': 'tab-integrate',
@@ -1116,6 +1132,30 @@
       }
       if (solutionTag) {
         solutionTag.textContent = (selectedEngine === 'mke_native_v1') ? t('sol_domain_tag') : t('sol_domain_real_tag');
+        typesetAllMath(solutionTag);
+      }
+    } else if (op === 'SOLVE_SYSTEM') {
+      if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Nghiệm Hệ Phương Trình Tuyến Tính' : 'Linear System Solution';
+      if (solutionVar) solutionVar.textContent = '(x, y)';
+      if (solutionEq) solutionEq.textContent = '=';
+      if (solutionVal) {
+        const solLatex = data.latex_output || data.symbolic_result || 'N/A';
+        renderMath(solutionVal, solLatex, false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_system_tag');
+        typesetAllMath(solutionTag);
+      }
+    } else if (op === 'SOLVE_INEQUALITY') {
+      if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Miền Nghiệm Bất Phương Trình' : 'Inequality Solution Set';
+      if (solutionVar) solutionVar.textContent = 'x';
+      if (solutionEq) solutionEq.textContent = '∈';
+      if (solutionVal) {
+        const solLatex = data.latex_output || data.symbolic_result || 'N/A';
+        renderMath(solutionVal, solLatex, false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_ineq_tag');
         typesetAllMath(solutionTag);
       }
     } else if (op === 'DIFFERENTIATE') {
