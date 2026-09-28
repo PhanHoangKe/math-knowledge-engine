@@ -1,0 +1,14 @@
+{
+  "schema_version": "mke.product03a.evidence.v0",
+  "timestamp_utc": "2026-09-28T03:21:13Z",
+  "commit_hash": "12f7ad392a0eb5fc437d10039ba6a3d468c7eb80",
+  "git_branch": "product/p03a-sympy-cas-v0",
+  "platform": "win32",
+  "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "duration_seconds": 38.84,
+  "exit_code": 0,
+  "total_tests": 349,
+  "passed_tests": 349,
+  "failed_tests": 0,
+  "verdict": "PASS"
+}

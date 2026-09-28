@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MKE Multi-Engine CAS Platform (PRODUCT-03A)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --accent: #58a6ff;
+      --accent-hover: #1f6feb;
+      --success: #238636;
+      --warning: #d29922;
+      --danger: #da3633;
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      color: var(--text-bright);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-primary { background: #1f6feb33; color: var(--accent); border: 1px solid var(--accent); }
+    .badge-success { background: #23863633; color: #3fb950; border: 1px solid #238636; }
+    .badge-native { background: #8957e533; color: #d2a8ff; border: 1px solid #8957e5; }
+    .badge-warning { background: #9e6a0333; color: #f2cc60; border: 1px solid #9e6a03; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #8b949e;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--text-bright);
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      background: var(--success);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover { opacity: 0.9; }
+
+    .example-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .chip {
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: #8b949e;
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .result-section {
+      margin-bottom: 16px;
+    }
+
+    .result-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: #8b949e;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .result-val {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      color: var(--text-bright);
+      background: #0d1117;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      word-break: break-all;
+    }
+
+    .latex-rendered {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      background: #0d1117;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #8b949e;
+      padding: 6px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .meta-row:last-child { border-bottom: none; }
+
+    .graph-container {
+      width: 100%;
+      height: 320px;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    svg.plot-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .alert-danger {
+      background: #da363322;
+      border: 1px solid #da3633;
+      color: #f85149;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>MKE Multi-Engine CAS Platform</h1>
+        <p style="font-size: 0.85rem; color: #8b949e;">PRODUCT-03A Multi-Engine Symbolic Architecture & SymPy Integration V0</p>
+      </div>
+      <div class="badge-bar">
+        <span class="badge badge-native" id="nativeBadge">Native MKE Linear</span>
+        <span class="badge badge-primary" id="sympyBadge">SymPy 1.14 CAS</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <div class="card-title">
+          <span>Mathematical Operation</span>
+        </div>
+
+        <div class="alert alert-danger" id="errorBox"></div>
+
+        <div class="form-group">
+          <label for="operationSelect">Select Operation</label>
+          <select id="operationSelect">
+            <option value="SOLVE">SOLVE — Algebraic & Polynomial Equations</option>
+            <option value="SIMPLIFY">SIMPLIFY — Algebraic Expression Reduction</option>
+            <option value="DIFFERENTIATE">DIFFERENTIATE — Symbolic Derivative d/dx</option>
+            <option value="INTEGRATE">INTEGRATE — Indefinite Anti-Derivative ∫ f(x) dx + C</option>
+            <option value="PLOT_2D">PLOT_2D — 2-Dimensional Function Graph</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="mathInput">Mathematical Input</label>
+          <input type="text" id="mathInput" placeholder="e.g. x^2 - 4 = 0" value="x^2 - 4 = 0" spellcheck="false" autocomplete="off">
+        </div>
+
+        <button class="btn" id="executeBtn">Execute Mathematical Operation</button>
+
+        <label style="margin-top: 20px;">Quick Test Cases (Acceptance Matrix):</label>
+        <div class="example-chips">
+          <div class="chip" data-op="SOLVE" data-input="x^2 - 4 = 0">Solve Quadratic (x^2 - 4 = 0)</div>
+          <div class="chip" data-op="DIFFERENTIATE" data-input="x^2 + 3*x">Derivative (x^2 + 3*x)</div>
+          <div class="chip" data-op="INTEGRATE" data-input="x^2">Integral (x^2)</div>
+          <div class="chip" data-op="SIMPLIFY" data-input="(x + 1) * (x - 1)">Simplify ((x+1)*(x-1))</div>
+          <div class="chip" data-op="PLOT_2D" data-input="x^2 - 1">Plot 2D (x^2 - 1)</div>
+          <div class="chip" data-op="SOLVE" data-input="2*x + 4 = 10">Native MKE (2*x + 4 = 10)</div>
+          <div class="chip" data-op="SOLVE" data-input="(x - 1) / (x - 1) = 1">Domain Guard ((x-1)/(x-1)=1)</div>
+          <div class="chip" data-op="PLOT_2D" data-input="1 / (x - 2)">Asymptote (1/(x-2))</div>
+        </div>
+      </div>
+
+      <!-- Result Panel -->
+      <div class="card">
+        <div class="card-title">
+          <span>Mathematical Result</span>
+          <span class="badge badge-success" id="engineBadge">Ready</span>
+        </div>
+
+        <div class="result-section">
+          <div class="result-label">Rendered LaTeX</div>
+          <div class="latex-rendered" id="latexDisplay">$$x = \pm 2$$</div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-label">Exact Symbolic Output</div>
+          <div class="result-val" id="symbolicDisplay">{-2, 2}</div>
+        </div>
+
+        <div class="result-section" id="plotSection" style="display: none;">
+          <div class="result-label">2D Function Plot</div>
+          <div class="graph-container" id="graphContainer">
+            <svg class="plot-svg" id="plotSvg"></svg>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div class="meta-row">
+            <span>Executed Engine</span>
+            <strong id="metaEngine">sympy_cas_v0</strong>
+          </div>
+          <div class="meta-row">
+            <span>Execution Status</span>
+            <strong id="metaStatus">SUCCESS</strong>
+          </div>
+          <div class="meta-row">
+            <span>Domain Restrictions</span>
+            <span id="metaDomain">None (Full Real Domain)</span>
+          </div>
+          <div class="meta-row">
+            <span>Execution Time</span>
+            <span id="metaDuration">0.0012 s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const operationSelect = document.getElementById('operationSelect');
+    const mathInput = document.getElementById('mathInput');
+    const executeBtn = document.getElementById('executeBtn');
+    const errorBox = document.getElementById('errorBox');
+    const engineBadge = document.getElementById('engineBadge');
+    const latexDisplay = document.getElementById('latexDisplay');
+    const symbolicDisplay = document.getElementById('symbolicDisplay');
+    const plotSection = document.getElementById('plotSection');
+    const plotSvg = document.getElementById('plotSvg');
+    const metaEngine = document.getElementById('metaEngine');
+    const metaStatus = document.getElementById('metaStatus');
+    const metaDomain = document.getElementById('metaDomain');
+    const metaDuration = document.getElementById('metaDuration');
+
+    // Quick chip handlers
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        operationSelect.value = chip.dataset.op;
+        mathInput.value = chip.dataset.input;
+        executeOperation();
+      });
+    });
+
+    executeBtn.addEventListener('click', executeOperation);
+    mathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') executeOperation();
+    });
+
+    async function executeOperation() {
+      const op = operationSelect.value;
+      const input = mathInput.value.trim();
+
+      errorBox.style.display = 'none';
+      executeBtn.disabled = true;
+      executeBtn.textContent = 'Computing...';
+
+      try {
+        const response = await fetch('/api/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operation: op,
+            input: input,
+            options: { x_min: -10, x_max: 10, num_points: 200 }
+          })
+        });
+
+        const data = await response.json();
+        renderResult(data);
+      } catch (err) {
+        errorBox.textContent = 'Server communication error: ' + err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = 'Execute Mathematical Operation';
+      }
+    }
+
+    function renderResult(data) {
+      if (data.mathematical_status === 'INTERNAL_ERROR' || data.mathematical_status === 'DOMAIN_ERROR' || data.error_message) {
+        if (data.error_message) {
+          errorBox.textContent = `[${data.mathematical_status}] ${data.error_message}`;
+          errorBox.style.display = 'block';
+        }
+      }
+
+      // Metadata
+      metaEngine.textContent = data.selected_engine || 'N/A';
+      metaStatus.textContent = data.mathematical_status || 'UNKNOWN';
+      metaDuration.textContent = (data.execution_duration_sec * 1000).toFixed(2) + ' ms';
+      
+      if (data.domain_restrictions && data.domain_restrictions.length > 0) {
+        metaDomain.textContent = data.domain_restrictions.join(', ');
+      } else {
+        metaDomain.textContent = 'None (Full Real Domain)';
+      }
+
+      // Engine badge styling
+      engineBadge.textContent = data.selected_engine;
+      if (data.selected_engine === 'mke_native_v1') {
+        engineBadge.className = 'badge badge-native';
+      } else if (data.selected_engine === 'sympy_cas_v0') {
+        engineBadge.className = 'badge badge-primary';
+      } else {
+        engineBadge.className = 'badge badge-warning';
+      }
+
+      // Symbolic display
+      symbolicDisplay.textContent = data.symbolic_result || 'None';
+
+      // Render KaTeX
+      if (data.latex_output && window.katex) {
+        try {
+          katex.render(data.latex_output, latexDisplay, { displayMode: true, throwOnError: false });
+        } catch (e) {
+          latexDisplay.textContent = data.latex_output;
+        }
+      } else {
+        latexDisplay.textContent = data.latex_output || '—';
+      }
+
+      // 2D Plotting
+      if (data.plot_data && data.plot_data.segments) {
+        plotSection.style.display = 'block';
+        renderPlot(data.plot_data);
+      } else {
+        plotSection.style.display = 'none';
+      }
+    }
+
+    function renderPlot(plotData) {
+      const svg = plotSvg;
+      svg.innerHTML = '';
+      const w = svg.clientWidth || 460;
+      const h = svg.clientHeight || 320;
+      const pad = 36;
+
+      const xMin = plotData.x_min;
+      const xMax = plotData.x_max;
+
+      // Find y range
+      let yMin = Infinity, yMax = -Infinity;
+      plotData.segments.forEach(seg => {
+        seg.forEach(p => {
+          if (p.y < yMin) yMin = p.y;
+          if (p.y > yMax) yMax = p.y;
+        });
+      });
+
+      if (!isFinite(yMin) || !isFinite(yMax) || yMin === yMax) {
+        yMin = -10; yMax = 10;
+      }
+
+      // Add 10% margin
+      const ySpan = yMax - yMin;
+      yMin -= ySpan * 0.1;
+      yMax += ySpan * 0.1;
+
+      const scaleX = (x) => pad + ((x - xMin) / (xMax - xMin)) * (w - 2 * pad);
+      const scaleY = (y) => h - pad - ((y - yMin) / (yMax - yMin)) * (h - 2 * pad);
+
+      // Draw Grid & Axes
+      const ns = "http://www.w3.org/2000/svg";
+      
+      // X Axis
+      if (yMin <= 0 && yMax >= 0) {
+        const y0 = scaleY(0);
+        const axisX = document.createElementNS(ns, 'line');
+        axisX.setAttribute('x1', pad); axisX.setAttribute('y1', y0);
+        axisX.setAttribute('x2', w - pad); axisX.setAttribute('y2', y0);
+        axisX.setAttribute('stroke', '#30363d'); axisX.setAttribute('stroke-width', '1.5');
+        svg.appendChild(axisX);
+      }
+
+      // Y Axis
+      if (xMin <= 0 && xMax >= 0) {
+        const x0 = scaleX(0);
+        const axisY = document.createElementNS(ns, 'line');
+        axisY.setAttribute('x1', x0); axisY.setAttribute('y1', pad);
+        axisY.setAttribute('x2', x0); axisY.setAttribute('y2', h - pad);
+        axisY.setAttribute('stroke', '#30363d'); axisY.setAttribute('stroke-width', '1.5');
+        svg.appendChild(axisY);
+      }
+
+      // Draw Curve Segments
+      plotData.segments.forEach(seg => {
+        if (seg.length < 2) return;
+        let d = `M ${scaleX(seg[0].x)} ${scaleY(seg[0].y)}`;
+        for (let i = 1; i < seg.length; i++) {
+          d += ` L ${scaleX(seg[i].x)} ${scaleY(seg[i].y)}`;
+        }
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#58a6ff');
+        path.setAttribute('stroke-width', '2.5');
+        svg.appendChild(path);
+      });
+
+      // Draw Discontinuity Asymptotes
+      if (plotData.discontinuities) {
+        plotData.discontinuities.forEach(disc => {
+          if (disc >= xMin && disc <= xMax) {
+            const xd = scaleX(disc);
+            const line = document.createElementNS(ns, 'line');
+            line.setAttribute('x1', xd); line.setAttribute('y1', pad);
+            line.setAttribute('x2', xd); line.setAttribute('y2', h - pad);
+            line.setAttribute('stroke', '#da3633');
+            line.setAttribute('stroke-width', '1.5');
+            line.setAttribute('stroke-dasharray', '4 4');
+            svg.appendChild(line);
+          }
+        });
+      }
+    }
+
+    // Initial run
+    window.addEventListener('DOMContentLoaded', () => {
+      executeOperation();
+    });
+  </script>
+</body>
+</html>
