@@ -14,6 +14,7 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 from .contracts import (
+    DomainCertainty,
     EngineStatus,
     ExecutionRequest,
     ExecutionResponse,
@@ -123,6 +124,7 @@ def run_in_supervised_process(
             selected_engine="sympy_cas_v0",
             mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
             verification_status=VerificationStatus.ERROR,
+            domain_certainty=DomainCertainty.NOT_APPLICABLE,
             error_message=f"Computation timed out after {deadline:.1f}s. Child worker process was forcefully terminated.",
             execution_duration_sec=time.monotonic() - start_time,
         )
@@ -144,6 +146,12 @@ def run_in_supervised_process(
             except ValueError:
                 verif_enum = None
 
+            certainty_val = res_dict.get("domain_certainty")
+            try:
+                certainty_enum = DomainCertainty(certainty_val) if certainty_val else None
+            except ValueError:
+                certainty_enum = None
+
             return ExecutionResponse(
                 schema_version=res_dict.get("schema_version", SCHEMA_VERSION_P03A),
                 request_id=res_dict.get("request_id", request.request_id),
@@ -152,6 +160,7 @@ def run_in_supervised_process(
                 selected_engine=res_dict.get("selected_engine", "sympy_cas_v0"),
                 mathematical_status=status_enum,
                 verification_status=verif_enum,
+                domain_certainty=certainty_enum,
                 symbolic_result=res_dict.get("symbolic_result"),
                 latex_output=res_dict.get("latex_output"),
                 domain_restrictions=res_dict.get("domain_restrictions", []),
@@ -170,6 +179,7 @@ def run_in_supervised_process(
                 selected_engine="sympy_cas_v0",
                 mathematical_status=EngineStatus.INTERNAL_ERROR,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=f"Worker process exited with code {process.exitcode} without returning results.",
                 execution_duration_sec=elapsed,
             )
@@ -182,6 +192,7 @@ def run_in_supervised_process(
             selected_engine="sympy_cas_v0",
             mathematical_status=EngineStatus.INTERNAL_ERROR,
             verification_status=VerificationStatus.ERROR,
+            domain_certainty=DomainCertainty.NOT_APPLICABLE,
             error_message=f"Failed to read result from worker process: {exc}",
             execution_duration_sec=elapsed,
         )

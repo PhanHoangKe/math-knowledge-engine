@@ -247,7 +247,28 @@ class TestCASHTTPIntegration(unittest.TestCase):
         status, data = self._post_json("/api/execute", payload)
         self.assertEqual(status, 400)
         self.assertEqual(data["verification_status"], "ERROR")
+        self.assertEqual(data.get("domain_certainty"), "NOT_APPLICABLE")
+
+    def test_http_domain_certainty_proven_reals(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "2*x + 4 = 10",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["domain_certainty"], "PROVEN_REALS")
+
+    def test_http_domain_certainty_explicit_exclusions(self):
+        payload = {
+            "operation": "SIMPLIFY",
+            "input": "(x^2 - 1)/(x - 1)",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["domain_certainty"], "EXPLICIT_EXCLUSIONS")
+        self.assertIn("x != 1", data["domain_restrictions"])
 
 
 if __name__ == "__main__":
     unittest.main()
+

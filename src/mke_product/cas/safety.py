@@ -256,6 +256,43 @@ def sanitize_execution_options(options: Dict[str, Any]) -> Dict[str, Any]:
             elif k == "sleep_seconds":
                 sanitized[k] = float(v)
         else:
-            raise ValueError(f"Unrecognized option: '{k}'")
-
+            raise ValueError(f"Unknown or unsupported option key: {k!r}")
     return sanitized
+
+
+def is_polynomial_ast(node: ASTNode) -> bool:
+    """Check if AST represents a polynomial with no variable denominators or non-integer powers."""
+    if isinstance(node, IntegerLiteral):
+        return True
+    if isinstance(node, Variable):
+        return True
+    if isinstance(node, Group):
+        return is_polynomial_ast(node.inner)
+    if isinstance(node, UnaryOp):
+        return is_polynomial_ast(node.operand)
+    if isinstance(node, BinaryOp):
+        if node.op in ("+", "-", "*"):
+            return is_polynomial_ast(node.left) and is_polynomial_ast(node.right)
+        elif node.op == "/":
+            # Division by non-zero constant is polynomial (rational coefficient)
+            return len(node.right.variables()) == 0 and is_polynomial_ast(node.left)
+        return False
+    if isinstance(node, (Power, CASPower)):
+        if isinstance(node.exponent, IntegerLiteral) and node.exponent.value > 0:
+            return is_polynomial_ast(node.base)
+        return False
+    if isinstance(node, Equation):
+        return is_polynomial_ast(node.left) and is_polynomial_ast(node.right)
+    return False
+
+
+def assess_domain_certainty(node: Optional[ASTNode], restrictions: List[str]) -> str:
+    """Classify mathematical domain certainty for expression/equation."""
+    if node is None:
+        return "NOT_FULLY_DETERMINED"
+    if restrictions:
+        return "EXPLICIT_EXCLUSIONS"
+    if is_polynomial_ast(node):
+        return "PROVEN_REALS"
+    return "NOT_FULLY_DETERMINED"
+

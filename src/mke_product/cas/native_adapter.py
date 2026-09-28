@@ -12,6 +12,7 @@ from mke_product.solver.errors import OutOfScopeError, SolverError
 from mke_product.solver.result import SolutionClassification, SolverScopeStatus
 from mke_product.solver.solver import solve_equation
 from .contracts import (
+    DomainCertainty,
     EngineCapability,
     EngineStatus,
     ExecutionRequest,
@@ -120,13 +121,22 @@ class NativeMKEAdapter(MathEngine):
                     response.symbolic_result = "{}"
                     response.latex_output = "\\emptyset"
 
-                if solver_res.evidence and (solver_res.evidence.step_trace or solver_res.evidence.rules_applied):
+                if response.domain_restrictions:
+                    response.domain_certainty = DomainCertainty.EXPLICIT_EXCLUSIONS
+                else:
+                    response.domain_certainty = DomainCertainty.PROVEN_REALS
+
+                if solver_res.evidence and (
+                    solver_res.evidence.candidate_check is not None
+                    or (solver_res.evidence.classification is not None and (solver_res.evidence.normalized_a is not None or solver_res.evidence.step_trace))
+                ):
                     response.verification_status = VerificationStatus.VERIFIED_WITH_EVIDENCE
                 else:
                     response.verification_status = VerificationStatus.COMPUTED
             else:
                 response.mathematical_status = EngineStatus.OUT_OF_SCOPE
                 response.verification_status = VerificationStatus.ERROR
+                response.domain_certainty = DomainCertainty.NOT_APPLICABLE
                 response.error_message = solver_res.error_message or solver_res.error_code
 
             evidence_dict = solver_res.evidence.to_dict() if solver_res.evidence else {}
@@ -139,10 +149,12 @@ class NativeMKEAdapter(MathEngine):
         except OutOfScopeError as ex:
             response.mathematical_status = EngineStatus.OUT_OF_SCOPE
             response.verification_status = VerificationStatus.ERROR
+            response.domain_certainty = DomainCertainty.NOT_APPLICABLE
             response.error_message = f"Out of native linear scope: {str(ex)}"
         except Exception as ex:
             response.mathematical_status = EngineStatus.INTERNAL_ERROR
             response.verification_status = VerificationStatus.ERROR
+            response.domain_certainty = DomainCertainty.NOT_APPLICABLE
             response.error_message = f"{type(ex).__name__}: {str(ex)}"
         finally:
             response.execution_duration_sec = time.monotonic() - start_time

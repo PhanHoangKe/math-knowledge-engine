@@ -94,6 +94,10 @@
       status_security_rejected: 'TỪ CHỐI BẢO MẬT',
       status_timeout: 'HẾT THỜI GIAN (TIMEOUT)',
       status_domain_error: 'LỖI MIỀN XÁC ĐỊNH',
+      status_out_of_scope: 'VƯỢT QUÁ PHẠM VI (OUT_OF_SCOPE)',
+      status_internal_error: 'LỖI NỘI BỘ (INTERNAL_ERROR)',
+      status_unresolved: 'CHƯA GIẢI QUYẾT (UNRESOLVED)',
+      status_partial: 'KẾT QUẢ MỘT PHẦN (PARTIAL)',
       status_connection_error: 'LỖI KẾT NỐI (CONNECTION_ERROR)',
       status_computing: 'ĐANG TÍNH TOÁN...',
       meta_op_label: 'Thao tác:',
@@ -132,6 +136,7 @@
       badge_partial: 'KẾT QUẢ MỘT PHẦN (PARTIAL)',
       badge_unresolved: 'CHƯA GIẢI QUYẾT (UNRESOLVED)',
       badge_unverified: 'CHƯA KIỂM ĐỊNH (NOT_VERIFIED)',
+      badge_not_applicable: 'KHÔNG ÁP DỤNG (NOT_APPLICABLE)',
       badge_error: 'LỖI / TỪ CHỐI (ERROR)',
       tile_eq_domain: 'Miền biểu thức',
       val_eq_domain: 'Số thực \\(\\mathbb{R}\\)',
@@ -248,6 +253,10 @@
       status_security_rejected: 'SECURITY REJECTED',
       status_timeout: 'TIMEOUT (RESOURCE EXHAUSTED)',
       status_domain_error: 'DOMAIN ERROR',
+      status_out_of_scope: 'OUT OF SCOPE',
+      status_internal_error: 'INTERNAL ERROR',
+      status_unresolved: 'UNRESOLVED',
+      status_partial: 'PARTIAL RESULT',
       status_connection_error: 'CONNECTION ERROR',
       status_computing: 'COMPUTING...',
       meta_op_label: 'Operation:',
@@ -286,6 +295,7 @@
       badge_partial: 'PARTIAL RESULT',
       badge_unresolved: 'UNRESOLVED',
       badge_unverified: 'NOT VERIFIED',
+      badge_not_applicable: 'NOT APPLICABLE',
       badge_error: 'ERROR / REJECTED',
       tile_eq_domain: 'Expression Domain',
       val_eq_domain: 'Real Numbers \\(\\mathbb{R}\\)',
@@ -1018,15 +1028,30 @@
       } else if (status === 'SECURITY_REJECTED') {
         syntaxStatus.textContent = t('status_security_rejected');
         syntaxStatus.className = 'syntax-status status-invalid';
-      } else if (status === 'RESOURCE_EXHAUSTED') {
+      } else if (status === 'RESOURCE_EXHAUSTED' || status === 'TIMEOUT') {
         syntaxStatus.textContent = t('status_timeout');
         syntaxStatus.className = 'syntax-status status-invalid';
       } else if (status === 'DOMAIN_ERROR') {
         syntaxStatus.textContent = t('status_domain_error');
         syntaxStatus.className = 'syntax-status status-invalid';
-      } else {
+      } else if (status === 'OUT_OF_SCOPE') {
+        syntaxStatus.textContent = t('status_out_of_scope');
+        syntaxStatus.className = 'syntax-status status-invalid';
+      } else if (status === 'INTERNAL_ERROR' || status === 'ERROR') {
+        syntaxStatus.textContent = t('status_internal_error');
+        syntaxStatus.className = 'syntax-status status-invalid';
+      } else if (status === 'UNRESOLVED') {
+        syntaxStatus.textContent = t('status_unresolved');
+        syntaxStatus.className = 'syntax-status status-invalid';
+      } else if (status === 'PARTIAL') {
+        syntaxStatus.textContent = t('status_partial');
+        syntaxStatus.className = 'syntax-status status-candidate';
+      } else if (isSuccess) {
         syntaxStatus.textContent = t('status_syntax_valid');
         syntaxStatus.className = 'syntax-status status-valid';
+      } else {
+        syntaxStatus.textContent = status;
+        syntaxStatus.className = 'syntax-status status-invalid';
       }
     }
 
@@ -1190,18 +1215,48 @@
 
     // Domain information with KaTeX
     if (eqDomain) {
-      if (data.domain_restrictions && data.domain_restrictions.length > 0) {
-        const excl = data.domain_restrictions.map(r => r.replace(/^x\s*!=\s*/, '')).join(', ');
-        renderMath(eqDomain, `\\mathbb{R} \\setminus \\{ ${excl} \\}`, false);
-      } else {
+      const domainCertainty = data.domain_certainty;
+      if (domainCertainty === 'PROVEN_REALS') {
         renderMath(eqDomain, '\\mathbb{R}', false);
+      } else if (domainCertainty === 'EXPLICIT_EXCLUSIONS' && data.domain_restrictions && data.domain_restrictions.length > 0) {
+        const excl = data.domain_restrictions.map(r => {
+          if (r.startsWith('x !=') || r.startsWith('x ≠')) {
+            return r.replace(/^x\s*(!=|≠)\s*/, '');
+          }
+          return r;
+        }).join(', ');
+        renderMath(eqDomain, `\\mathbb{R} \\setminus \\{ ${excl} \\}`, false);
+      } else if (domainCertainty === 'NOT_FULLY_DETERMINED') {
+        renderMath(eqDomain, '\\text{Chưa xác định đầy đủ / Not fully determined}', false);
+      } else if (domainCertainty === 'NOT_APPLICABLE') {
+        renderMath(eqDomain, '\\text{N/A}', false);
+      } else if (data.domain_restrictions && data.domain_restrictions.length > 0) {
+        const excl = data.domain_restrictions.map(r => r.replace(/^x\s*(!=|≠)\s*/, '')).join(', ');
+        renderMath(eqDomain, `\\mathbb{R} \\setminus \\{ ${excl} \\}`, false);
+      } else if (isSuccess) {
+        renderMath(eqDomain, '\\text{Chưa xác định đầy đủ / Not fully determined}', false);
+      } else {
+        renderMath(eqDomain, '\\text{N/A}', false);
       }
     }
     if (domainConstraints) {
+      const domainCertainty = data.domain_certainty;
       if (data.domain_restrictions && data.domain_restrictions.length > 0) {
-        renderMath(domainConstraints, data.domain_restrictions.map(r => `x \\neq ${r.replace(/^x\s*!=\s*/, '')}`).join(', '), false);
-      } else {
+        const formatted = data.domain_restrictions.map(r => {
+          if (r.startsWith('x !=') || r.startsWith('x ≠')) {
+            return `x \\neq ${r.replace(/^x\s*(!=|≠)\s*/, '')}`;
+          }
+          return r;
+        }).join(', ');
+        renderMath(domainConstraints, formatted, false);
+      } else if (domainCertainty === 'PROVEN_REALS') {
         domainConstraints.textContent = currentLanguage === 'vi' ? 'Không có (Toàn bộ miền số thực)' : 'None (Full Reals)';
+      } else if (domainCertainty === 'NOT_FULLY_DETERMINED') {
+        domainConstraints.textContent = currentLanguage === 'vi' ? 'Chưa xác định đầy đủ' : 'Not fully determined';
+      } else if (domainCertainty === 'NOT_APPLICABLE') {
+        domainConstraints.textContent = currentLanguage === 'vi' ? 'Không áp dụng' : 'Not applicable';
+      } else {
+        domainConstraints.textContent = currentLanguage === 'vi' ? 'Không có' : 'None';
       }
     }
 
@@ -1212,7 +1267,16 @@
     }
 
     // MANDATE 2: Honest First-Class Verification Classification
-    const verifStatus = data.verification_status || (isSuccess ? (selectedEngine === 'mke_native_v1' && data.verification_evidence && (data.verification_evidence.step_trace || data.verification_evidence.steps) ? 'VERIFIED_WITH_EVIDENCE' : 'COMPUTED') : 'ERROR');
+    const validVerifStatuses = ['VERIFIED_WITH_EVIDENCE', 'CANDIDATE_CHECKED', 'COMPUTED', 'PARTIAL', 'UNRESOLVED', 'NOT_VERIFIED', 'NOT_APPLICABLE', 'ERROR'];
+    let verifStatus;
+    if (data.verification_status && validVerifStatuses.includes(data.verification_status)) {
+      verifStatus = data.verification_status;
+    } else if (!isSuccess) {
+      verifStatus = 'ERROR';
+    } else {
+      verifStatus = 'NOT_VERIFIED';
+    }
+
     if (certBadge) {
       if (!isSuccess || verifStatus === 'ERROR') {
         certBadge.textContent = t('badge_error');
@@ -1229,9 +1293,12 @@
       } else if (verifStatus === 'UNRESOLVED') {
         certBadge.textContent = t('badge_unresolved');
         certBadge.className = 'cert-status status-unresolved-cert';
-      } else if (verifStatus === 'COMPUTED' || selectedEngine === 'sympy_cas_v0') {
+      } else if (verifStatus === 'COMPUTED') {
         certBadge.textContent = t('badge_computed_cas');
         certBadge.className = 'cert-status status-computed-cert';
+      } else if (verifStatus === 'NOT_APPLICABLE') {
+        certBadge.textContent = t('badge_not_applicable');
+        certBadge.className = 'cert-status status-unverified-cert';
       } else {
         certBadge.textContent = t('badge_unverified');
         certBadge.className = 'cert-status status-unverified-cert';

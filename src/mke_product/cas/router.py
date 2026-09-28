@@ -17,6 +17,7 @@ from mke_product.parser.errors import (
 )
 from .cas_parser import parse_cas_equation, parse_cas_expression
 from .contracts import (
+    DomainCertainty,
     EngineStatus,
     ExecutionRequest,
     ExecutionResponse,
@@ -84,6 +85,7 @@ class EngineRouter:
                     selected_engine="security_guard",
                     mathematical_status=EngineStatus.SECURITY_REJECTED,
                     verification_status=VerificationStatus.ERROR,
+                    domain_certainty=DomainCertainty.NOT_APPLICABLE,
                     error_message=f"Input rejected by security policy: forbidden pattern '{pattern}' detected.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -100,6 +102,7 @@ class EngineRouter:
                 selected_engine="security_guard",
                 mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=str(ex),
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -123,6 +126,7 @@ class EngineRouter:
                 selected_engine="router",
                 mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=str(ex),
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -135,6 +139,7 @@ class EngineRouter:
                 selected_engine="router",
                 mathematical_status=EngineStatus.INVALID_INPUT,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=str(ex),
                 warnings=[str(ex)],
                 execution_duration_sec=time.monotonic() - start_time,
@@ -148,6 +153,7 @@ class EngineRouter:
                 selected_engine="router",
                 mathematical_status=EngineStatus.INVALID_INPUT,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=f"Syntax Error: {str(ex)}",
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -160,6 +166,7 @@ class EngineRouter:
                 selected_engine="router",
                 mathematical_status=EngineStatus.INTERNAL_ERROR,
                 verification_status=VerificationStatus.ERROR,
+                domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=f"Parser Error: {str(ex)}",
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -183,6 +190,7 @@ class EngineRouter:
                     selected_engine=engine_override,
                     mathematical_status=EngineStatus.OUT_OF_SCOPE,
                     verification_status=VerificationStatus.ERROR,
+                    domain_certainty=DomainCertainty.NOT_APPLICABLE,
                     error_message=f"Engine '{engine_override}' cannot handle operation '{request.operation}'.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -195,6 +203,7 @@ class EngineRouter:
                     selected_engine=engine_override,
                     mathematical_status=EngineStatus.OUT_OF_SCOPE,
                     verification_status=VerificationStatus.ERROR,
+                    domain_certainty=DomainCertainty.NOT_APPLICABLE,
                     error_message=f"Requested engine '{engine_override}' is not available or not installed.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -220,6 +229,7 @@ class EngineRouter:
             selected_engine="none",
             mathematical_status=EngineStatus.OUT_OF_SCOPE,
             verification_status=VerificationStatus.ERROR,
+            domain_certainty=DomainCertainty.NOT_APPLICABLE,
             error_message=f"No available registered engine can handle operation '{request.operation}'.",
             execution_duration_sec=time.monotonic() - start_time,
         )

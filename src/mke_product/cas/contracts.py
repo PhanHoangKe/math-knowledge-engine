@@ -47,6 +47,15 @@ class VerificationStatus(str, Enum):
     ERROR = "ERROR"
 
 
+class DomainCertainty(str, Enum):
+    """Certainty level of the mathematical domain assessment."""
+    PROVEN_REALS = "PROVEN_REALS"
+    EXPLICIT_EXCLUSIONS = "EXPLICIT_EXCLUSIONS"
+    NOT_FULLY_DETERMINED = "NOT_FULLY_DETERMINED"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+
 
 @dataclass(frozen=True)
 class EngineCapability:
@@ -113,6 +122,7 @@ class ExecutionResponse:
     execution_duration_sec: float = 0.0
     error_message: Optional[str] = None
     verification_status: Optional[VerificationStatus] = None
+    domain_certainty: Optional[DomainCertainty] = None
 
     @property
     def status(self) -> EngineStatus:
@@ -166,6 +176,7 @@ class ExecutionResponse:
             "selected_engine": self.selected_engine,
             "mathematical_status": self.mathematical_status.value if isinstance(self.mathematical_status, EngineStatus) else str(self.mathematical_status),
             "verification_status": self.verification_status.value if isinstance(self.verification_status, VerificationStatus) else (str(self.verification_status) if self.verification_status is not None else None),
+            "domain_certainty": self.domain_certainty.value if isinstance(self.domain_certainty, DomainCertainty) else (str(self.domain_certainty) if self.domain_certainty is not None else None),
             "symbolic_result": self.symbolic_result,
             "latex_output": self.latex_output,
             "domain_restrictions": self.domain_restrictions,

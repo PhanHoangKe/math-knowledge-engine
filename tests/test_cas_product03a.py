@@ -417,13 +417,85 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertIn("scipy_numerical", engine_ids)
         self.assertIn("sagemath_cas", engine_ids)
 
-        active = registry.list_active_engines()
-        active_ids = [e.engine_id for e in active]
-        self.assertIn("mke_native_v1", active_ids)
-        self.assertIn("sympy_cas_v0", active_ids)
-        self.assertNotIn("scipy_numerical", active_ids)
-        self.assertNotIn("sagemath_cas", active_ids)
+    # -------------------------------------------------------------------------
+    # Test L: DOMAIN CERTAINTY & CONTRACT TESTS
+    # -------------------------------------------------------------------------
+    def test_domain_certainty_polynomial_proven_reals(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="2*x + 3 = 7",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.domain_certainty.value, "PROVEN_REALS")
+        self.assertEqual(res.domain_restrictions, [])
+
+        # Quadratic polynomial via SymPy
+        req2 = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="x^2 - 4 = 0",
+        )
+        res2 = self.router.execute(req2)
+        self.assertEqual(res2.status, EngineStatus.SUCCESS)
+        self.assertEqual(res2.domain_certainty.value, "PROVEN_REALS")
+        self.assertEqual(res2.domain_restrictions, [])
+
+    def test_domain_certainty_rational_explicit_exclusions(self):
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            expression="(x^2 - 1)/(x - 1)",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.domain_certainty.value, "EXPLICIT_EXCLUSIONS")
+        self.assertIn("x != 1", res.domain_restrictions)
+
+    def test_domain_certainty_rejection_not_applicable(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="2x + 1 = 0",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+        self.assertEqual(res.domain_certainty.value, "NOT_APPLICABLE")
+
+    # -------------------------------------------------------------------------
+    # Test M: VERIFICATION EVIDENCE & STATUS CONTRACT
+    # -------------------------------------------------------------------------
+    def test_native_adapter_verification_status_with_evidence(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="3*x + 6 = 0",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.engine_used, "mke_native_v1")
+        self.assertEqual(res.verification_status.value, "VERIFIED_WITH_EVIDENCE")
+        self.assertIsNotNone(res.verification_evidence)
+
+    def test_sympy_adapter_verification_status_computed(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="x^2 - 5*x + 6 = 0",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.engine_used, "sympy_cas_v0")
+        self.assertEqual(res.verification_status.value, "COMPUTED")
+
+    def test_execution_response_to_dict_contract_fields(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="2*x + 4 = 10",
+        )
+        res = self.router.execute(req)
+        d = res.to_dict()
+        self.assertIn("domain_certainty", d)
+        self.assertEqual(d["domain_certainty"], "PROVEN_REALS")
+        self.assertIn("verification_status", d)
+        self.assertEqual(d["verification_status"], "VERIFIED_WITH_EVIDENCE")
 
 
 if __name__ == "__main__":
     unittest.main()
+

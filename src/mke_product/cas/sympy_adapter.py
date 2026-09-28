@@ -11,6 +11,7 @@ from mke_product.parser.ast import ASTNode, Equation
 from .ast_bridge import ast_to_sympy, ast_to_sympy_expr
 from .cas_parser import parse_cas_equation, parse_cas_expression
 from .contracts import (
+    DomainCertainty,
     EngineCapability,
     EngineStatus,
     ExecutionRequest,
@@ -23,6 +24,7 @@ from .contracts import (
 from .safety import (
     DomainRestrictionError,
     SafetyError,
+    assess_domain_certainty,
     extract_domain_restrictions,
     inspect_ast_safety,
     parse_safe_numeric_bound,
@@ -87,33 +89,42 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             response.error_message = f"Unsupported operation: {request.operation}"
 
         if response.mathematical_status == EngineStatus.SUCCESS:
+            certainty_str = assess_domain_certainty(ast_node, response.domain_restrictions)
+            response.domain_certainty = DomainCertainty(certainty_str)
             if request.operation == OperationType.CHECK_CANDIDATE:
                 response.verification_status = VerificationStatus.CANDIDATE_CHECKED
             else:
                 response.verification_status = VerificationStatus.COMPUTED
         elif response.mathematical_status == EngineStatus.PARTIAL:
             response.verification_status = VerificationStatus.PARTIAL
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
         elif response.mathematical_status == EngineStatus.UNRESOLVED:
             response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
         else:
             response.verification_status = VerificationStatus.ERROR
+            response.domain_certainty = DomainCertainty.NOT_APPLICABLE
 
     except DomainRestrictionError as ex:
         response.mathematical_status = EngineStatus.DOMAIN_ERROR
         response.verification_status = VerificationStatus.ERROR
+        response.domain_certainty = DomainCertainty.NOT_APPLICABLE
         response.error_message = str(ex)
         response.warnings.append(str(ex))
     except SafetyError as ex:
         response.mathematical_status = EngineStatus.RESOURCE_EXHAUSTED
         response.verification_status = VerificationStatus.ERROR
+        response.domain_certainty = DomainCertainty.NOT_APPLICABLE
         response.error_message = str(ex)
     except ValueError as ex:
         response.mathematical_status = EngineStatus.INVALID_INPUT
         response.verification_status = VerificationStatus.ERROR
+        response.domain_certainty = DomainCertainty.NOT_APPLICABLE
         response.error_message = str(ex)
     except Exception as ex:
         response.mathematical_status = EngineStatus.INTERNAL_ERROR
         response.verification_status = VerificationStatus.ERROR
+        response.domain_certainty = DomainCertainty.NOT_APPLICABLE
         response.error_message = f"{type(ex).__name__}: {str(ex)}"
     finally:
         response.execution_duration_sec = time.monotonic() - start_time

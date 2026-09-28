@@ -1042,6 +1042,11 @@ body {
   color: #991b1b;
 }
 
+.syntax-status.status-candidate {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
 .res-card-body {
   padding: 1.25rem;
 }

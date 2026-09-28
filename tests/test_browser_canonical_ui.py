@@ -474,8 +474,106 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         banner = self.driver.find_element(By.ID, "app-connection-banner")
         self.assertIn("banner-disconnected", banner.get_attribute("class"))
 
-        self._save_screenshot("18_immediate_disconnection_banner")
+    # -------------------------------------------------------------------------
+    # Scenario 19: Strict Verification Contract Fallback (Missing/Invalid Status)
+    # -------------------------------------------------------------------------
+    def test_19_strict_verification_contract_fallback(self):
+        self.driver.get(f"{self.base_url}/?lang=vi&theme=light")
+
+        # Mock fetch while still on home screen
+        self.driver.execute_script("""
+            window.fetch = function() {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        mathematical_status: "SUCCESS",
+                        selected_engine: "mke_native_v1",
+                        symbolic_result: "x = 5",
+                        canonical_steps: [{step_num: "Bước 1", description: "Biến đổi", math: "x = 5"}],
+                        execution_duration_sec: 0.001
+                        // verification_status is deliberately omitted!
+                    })
+                });
+            };
+        """)
+
+        math_input = WebDriverWait(self.driver, 5.0).until(
+            EC.element_to_be_clickable((By.ID, "math-input"))
+        )
+        math_input.clear()
+        math_input.send_keys("x = 5")
+        self.driver.find_element(By.CLASS_NAME, "compute-btn").click()
+
+        WebDriverWait(self.driver, 5.0).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#screen-result.active"))
+        )
+        time.sleep(0.5)
+
+        # Must display CHƯA KIỂM ĐỊNH (NOT_VERIFIED), NOT VERIFIED_WITH_EVIDENCE!
+        cert_badge = self.driver.find_element(By.ID, "res-cert-badge")
+        self.assertIn("CHƯA KIỂM ĐỊNH", cert_badge.text)
+        self.assertIn("status-unverified-cert", cert_badge.get_attribute("class"))
+
+        self._save_screenshot("19_strict_verification_fallback")
+
+    # -------------------------------------------------------------------------
+    # Scenario 20: Explicit Domain Certainty Rendering
+    # -------------------------------------------------------------------------
+    def test_20_explicit_domain_certainty_rendering(self):
+        # 1. Proven reals
+        self._submit_query("2*x + 3 = 7")
+        time.sleep(0.5)
+        eq_domain = self.driver.find_element(By.ID, "res-eq-domain")
+        self.assertTrue("katex" in eq_domain.get_attribute("innerHTML"))
+
+        # 2. Explicit exclusions (rational)
+        self._submit_query("simplify((x^2 - 1)/(x - 1))")
+        time.sleep(0.5)
+        eq_domain = self.driver.find_element(By.ID, "res-eq-domain")
+        self.assertIn("1", eq_domain.text)
+
+        self._save_screenshot("20_explicit_domain_certainty")
+
+    # -------------------------------------------------------------------------
+    # Scenario 21: Honest Presentation of Non-Success Status (No Green Badge)
+    # -------------------------------------------------------------------------
+    def test_21_honest_presentation_non_success_statuses(self):
+        self.driver.get(f"{self.base_url}/?lang=vi&theme=light")
+
+        # Test OUT_OF_SCOPE presentation
+        self.driver.execute_script("""
+            window.fetch = function() {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        mathematical_status: "OUT_OF_SCOPE",
+                        verification_status: "ERROR",
+                        selected_engine: "mke_native_v1",
+                        error_message: "Operation out of scope for Native MKE."
+                    })
+                });
+            };
+        """)
+
+        math_input = self.driver.find_element(By.ID, "math-input")
+        math_input.clear()
+        math_input.send_keys("cos(x)")
+        self.driver.find_element(By.CLASS_NAME, "compute-btn").click()
+        time.sleep(0.5)
+
+        syntax_status = self.driver.find_element(By.ID, "res-syntax-status")
+        # Ensure it is NOT green status-valid!
+        self.assertNotIn("status-valid", syntax_status.get_attribute("class"))
+        self.assertIn("status-invalid", syntax_status.get_attribute("class"))
+        self.assertIn("VƯỢT QUÁ PHẠM VI", syntax_status.text)
+
+        # Ensure cert badge is status-invalid-cert
+        cert_badge = self.driver.find_element(By.ID, "res-cert-badge")
+        self.assertIn("status-invalid-cert", cert_badge.get_attribute("class"))
+
+        self._save_screenshot("21_honest_out_of_scope_presentation")
 
 
 if __name__ == "__main__":
     unittest.main()
+
