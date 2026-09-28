@@ -1,0 +1,22 @@
+{
+  "suite": "MKE_PRODUCT_03A_R3_FULL_REGRESSION",
+  "commit": "6106a70af3c0a132c23fee2e39e951b5a936f9db",
+  "branch": "product/p03a-r3-ui-trust-rendering",
+  "duration_sec": 83.44,
+  "returncode": 0,
+  "passed": 382,
+  "failed": 0,
+  "subtests": 18,
+  "verdict": "PASS",
+  "tested_files": [
+    "tests/test_browser_canonical_ui.py",
+    "tests/test_cas_http_integration.py",
+    "tests/test_cas_product03a.py",
+    "tests/test_evaluator.py",
+    "tests/test_parser.py",
+    "tests/test_protocol.py",
+    "tests/test_rational.py",
+    "tests/test_solver.py",
+    "tests/test_worker_windows.py"
+  ]
+}
