@@ -320,6 +320,98 @@ def is_polynomial_ast(node: ASTNode) -> bool:
     return False
 
 
+def is_domain_determination_complete(node: Optional[ASTNode], restrictions: List[str]) -> bool:
+    """Mathematically audit whether the domain restriction set is proven exhaustive and complete.
+    
+    Conditions for verified domain completeness in v0:
+    1. Node must be univariate or constant (len(node.variables()) <= 1).
+    2. Every denominator must be a univariate polynomial with degree <= 2 where all real roots
+       are algebraically determined as exact rational point exclusions.
+    3. Every variable base raised to exponent 0 must have its zero exclusion accounted for.
+    4. No radical, transcendental, piecewise, or unverified functions exist in the AST.
+    5. The set of required real exclusions must exactly match the provided restrictions.
+    """
+    if node is None:
+        return False
+
+    vars_in_expr = node.variables()
+    if len(vars_in_expr) > 1:
+        # Multivariate domains are curves/surfaces and cannot be complete univariate point exclusions
+        return False
+
+    var_name = sorted(list(vars_in_expr))[0] if vars_in_expr else "x"
+    v_sym = sympy.Symbol(var_name, real=True)
+    required_exclusions: Set[str] = set()
+
+    for n in node.walk():
+        # Check function calls / unsupported non-algebraic nodes
+        if hasattr(n, "func_name") or not isinstance(
+            n, (IntegerLiteral, Variable, Group, UnaryOp, BinaryOp, Power, CASPower, Equation, Inequality, LinearSystem)
+        ):
+            return False
+
+        if isinstance(n, BinaryOp) and n.op == "/":
+            denom = n.right
+            if not is_polynomial_ast(denom):
+                return False
+
+            denom_vars = denom.variables()
+            if not denom_vars:
+                # Constant denominator: non-zero check
+                continue
+
+            # Univariate polynomial denominator
+            from .ast_bridge import ast_to_sympy_expr
+            try:
+                sym_denom = ast_to_sympy_expr(denom)
+                poly = sympy.Poly(sym_denom, v_sym)
+                deg = poly.degree()
+                if deg == 1:
+                    coeffs = poly.all_coeffs()
+                    # a*x + b = 0 => x = -b/a
+                    a, b = coeffs[0], coeffs[1]
+                    root = -b / a
+                    required_exclusions.add(f"{var_name} != {root}")
+                elif deg == 2:
+                    coeffs = poly.all_coeffs()
+                    a, b, c = coeffs[0], coeffs[1], coeffs[2]
+                    disc = b**2 - 4*a*c
+                    if disc < 0:
+                        # No real roots (e.g. x^2 + 1)
+                        pass
+                    elif disc == 0:
+                        root = -b / (2*a)
+                        required_exclusions.add(f"{var_name} != {root}")
+                    else:
+                        sqrt_disc = sympy.sqrt(disc)
+                        if isinstance(sqrt_disc, (int, sympy.Integer, sympy.Rational)) or (hasattr(sqrt_disc, "is_rational") and sqrt_disc.is_rational):
+                            r1 = (-b - sqrt_disc) / (2*a)
+                            r2 = (-b + sqrt_disc) / (2*a)
+                            required_exclusions.add(f"{var_name} != {r1}")
+                            required_exclusions.add(f"{var_name} != {r2}")
+                        else:
+                            # Irrational roots cannot be audited as exact rational point exclusions in v0
+                            return False
+                else:
+                    # Degree > 2 polynomial roots cannot be audited as exhaustive rational exclusions in v0
+                    return False
+            except Exception:
+                return False
+
+        elif isinstance(n, (Power, CASPower)):
+            if isinstance(n.exponent, IntegerLiteral):
+                if n.exponent.value == 0 and isinstance(n.base, Variable):
+                    required_exclusions.add(f"{n.base.name} != 0")
+                elif n.exponent.value < 0:
+                    return False
+            else:
+                return False
+
+    # Check if provided restrictions match required exclusions
+    restr_set = set(restrictions)
+    return restr_set == required_exclusions
+
+
 def assess_domain_certainty(node: Optional[ASTNode], restrictions: List[str]) -> str:
     """Classify mathematical domain certainty for expression/equation/system/inequality."""
     if node is None:
@@ -328,17 +420,11 @@ def assess_domain_certainty(node: Optional[ASTNode], restrictions: List[str]) ->
     if is_polynomial_ast(node) and not restrictions:
         return "PROVEN_REALS"
     
-    if restrictions:
-        # Check if all restrictions are strictly verified point exclusions on univariate real expressions
-        is_complete_point_exclusions = True
-        for r in restrictions:
-            # Matches pattern like "x != 1", "x != -3/2", "x != 0"
-            if not re.match(r"^[a-zA-Z]\s*!=\s*[-+]?\d+(\s*/\s*[-+]?\d+)?$", r):
-                is_complete_point_exclusions = False
-                break
-        if is_complete_point_exclusions:
-            return "EXPLICIT_EXCLUSIONS"
-        return "NOT_FULLY_DETERMINED"
+    if is_domain_determination_complete(node, restrictions):
+        if not restrictions:
+            return "PROVEN_REALS"
+        return "EXPLICIT_EXCLUSIONS"
     
     return "NOT_FULLY_DETERMINED"
+
 

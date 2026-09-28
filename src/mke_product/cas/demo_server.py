@@ -162,27 +162,49 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_execute(self, default_op: str | None = None) -> None:
         content_length_header = self.headers.get("Content-Length")
-        if not content_length_header:
+        if content_length_header is None:
             self._send_json(400, {
                 "schema_version": "mke.product03a.v0",
                 "mathematical_status": EngineStatus.INVALID_INPUT.value,
                 "verification_status": "ERROR",
                 "domain_certainty": "NOT_APPLICABLE",
-                "error_message": "Missing Content-Length header",
+                "error_message": "Missing Content-Length header.",
             })
             return
 
         try:
-            content_length = int(content_length_header)
-            if content_length > 65536:
-                self._send_json(413, {
-                    "schema_version": "mke.product03a.v0",
-                    "mathematical_status": EngineStatus.RESOURCE_EXHAUSTED.value,
-                    "verification_status": "ERROR",
-                    "domain_certainty": "NOT_APPLICABLE",
-                    "error_message": "Payload exceeds maximum allowed size of 65536 bytes.",
-                })
-                return
+            content_length = int(content_length_header.strip())
+        except (ValueError, TypeError, AttributeError):
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Malformed Content-Length header: {content_length_header!r}.",
+            })
+            return
+
+        if content_length <= 0:
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Invalid Content-Length: {content_length}. Content-Length must be a strictly positive integer.",
+            })
+            return
+
+        if content_length > 65536:
+            self._send_json(413, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.RESOURCE_EXHAUSTED.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": "Payload exceeds maximum allowed size of 65536 bytes.",
+            })
+            return
+
+        try:
             raw_body = self.rfile.read(content_length)
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as exc:
@@ -192,6 +214,16 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
                 "verification_status": "ERROR",
                 "domain_certainty": "NOT_APPLICABLE",
                 "error_message": f"Invalid JSON payload: {exc}",
+            })
+            return
+
+        if not isinstance(payload, dict):
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Invalid top-level JSON payload: expected an object (JSON dictionary), got {type(payload).__name__}.",
             })
             return
 

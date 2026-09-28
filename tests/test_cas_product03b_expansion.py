@@ -371,3 +371,61 @@ class TestProduct03BR1SoundnessAndCounterexamples:
         certainty = assess_domain_certainty(None, [])
         assert certainty == "NOT_FULLY_DETERMINED"
 
+    def test_solve_system_reject_original_ast_variable_bypass(self, router: EngineRouter):
+        """x + 0*z = 1, y = 2 has 3 variables in original AST; must be OUT_OF_SCOPE."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_SYSTEM,
+            raw_input="x + 0*z = 1, y = 2",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.OUT_OF_SCOPE
+        assert "3 variables in original input" in res.error_message or "out of scope" in res.error_message
+
+    def test_solve_inequality_reject_original_ast_variable_bypass(self, router: EngineRouter):
+        """x - x + y > 0 has 2 variables in original AST; must be OUT_OF_SCOPE."""
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE_INEQUALITY,
+            raw_input="x - x + y > 0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.OUT_OF_SCOPE
+        assert "2 variables in original input" in res.error_message or "out of scope" in res.error_message
+
+    def test_domain_certainty_reducible_quadratic_denominator(self):
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty, extract_domain_restrictions
+        ast = parse_cas_expression("1 / (x^2 - 4)")
+        restrictions = extract_domain_restrictions(ast)
+        certainty = assess_domain_certainty(ast, restrictions)
+        assert certainty == "EXPLICIT_EXCLUSIONS"
+        assert "x != -2" in restrictions
+        assert "x != 2" in restrictions
+
+    def test_domain_certainty_irreducible_quadratic_denominator_proven_reals(self):
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty, extract_domain_restrictions
+        ast = parse_cas_expression("1 / (x^2 + 1)")
+        restrictions = extract_domain_restrictions(ast)
+        certainty = assess_domain_certainty(ast, restrictions)
+        assert certainty == "PROVEN_REALS"
+        assert restrictions == []
+
+    def test_domain_certainty_irrational_quadratic_roots_not_fully_determined(self):
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty, extract_domain_restrictions
+        ast = parse_cas_expression("1 / (x^2 - 2)")
+        restrictions = extract_domain_restrictions(ast)
+        certainty = assess_domain_certainty(ast, restrictions)
+        assert certainty == "NOT_FULLY_DETERMINED"
+
+    def test_domain_certainty_cubic_denominator_not_fully_determined(self):
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import assess_domain_certainty, extract_domain_restrictions
+        ast = parse_cas_expression("1 / (x^3 - 1)")
+        restrictions = extract_domain_restrictions(ast)
+        certainty = assess_domain_certainty(ast, restrictions)
+        assert certainty == "NOT_FULLY_DETERMINED"
+
+

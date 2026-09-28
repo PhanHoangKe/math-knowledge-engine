@@ -268,6 +268,13 @@ def _execute_solve_system(ast_node: ASTNode, sym_obj: Any, response: ExecutionRe
         response.error_message = "Systems with variable denominators or non-polynomial terms are out of scope for linear solver v0"
         return
 
+    # Enforce original AST variable count: maximum 2 variables in original input
+    orig_vars = sorted(list(ast_node.variables()))
+    if len(orig_vars) > 2:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = f"Linear system has {len(orig_vars)} variables in original input; maximum 2 variables supported in v0"
+        return
+
     if len(ast_node.equations) != 2 or len(sym_obj) != 2:
         response.mathematical_status = EngineStatus.OUT_OF_SCOPE
         response.error_message = "Only 2x2 linear systems are supported in v0"
@@ -289,15 +296,21 @@ def _execute_solve_system(ast_node: ASTNode, sym_obj: Any, response: ExecutionRe
         response.error_message = f"Linear system has {len(free_syms)} variables; maximum 2 variables supported"
         return
 
-    # Fallback to [x, y] symbols if 0 or 1 variable present
-    if not free_syms:
-        sym_vars = [sympy.Symbol("x", real=True), sympy.Symbol("y", real=True)]
+    # Select canonical variables based on original AST input variables
+    if len(orig_vars) == 2:
+        sym_vars = [sympy.Symbol(v, real=True) for v in orig_vars]
+    elif len(orig_vars) == 1:
+        primary = orig_vars[0]
+        other_name = "y" if primary != "y" else "x"
+        sym_vars = [sympy.Symbol(primary, real=True), sympy.Symbol(other_name, real=True)]
+    elif len(free_syms) == 2:
+        sym_vars = free_syms
     elif len(free_syms) == 1:
         primary = free_syms[0]
         other_name = "y" if primary.name != "y" else "x"
         sym_vars = [primary, sympy.Symbol(other_name, real=True)]
     else:
-        sym_vars = free_syms
+        sym_vars = [sympy.Symbol("x", real=True), sympy.Symbol("y", real=True)]
 
     # Verify linear degree <= 1 for all variables
     try:
@@ -369,6 +382,13 @@ def _execute_solve_inequality(ast_node: ASTNode, sym_obj: Any, response: Executi
     if not is_polynomial_ast(ast_node):
         response.mathematical_status = EngineStatus.OUT_OF_SCOPE
         response.error_message = "Inequalities with variable denominators or non-polynomial expressions are out of scope for v0 polynomial inequality solver"
+        return
+
+    # Enforce original AST variable count: maximum 1 variable in original input
+    orig_vars = sorted(list(ast_node.variables()))
+    if len(orig_vars) > 1:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.error_message = f"Multivariate inequalities with {len(orig_vars)} variables in original input are out of scope for v0 single-variable inequality solver"
         return
 
     diff_expr = sympy.cancel(sym_obj.lhs - sym_obj.rhs)

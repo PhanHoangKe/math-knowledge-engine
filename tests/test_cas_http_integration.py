@@ -292,6 +292,25 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["selected_engine"], "sympy_cas_v0")
         self.assertEqual(data["verification_status"], "COMPUTED")
 
+    def _raw_socket_request(self, request_bytes: bytes, timeout: float = 3.0) -> bytes:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            s.connect((self.host, self.port))
+            s.sendall(request_bytes)
+            response = b""
+            while True:
+                try:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    response += chunk
+                except (socket.timeout, ConnectionResetError):
+                    break
+            return response
+        finally:
+            s.close()
+
     def test_http_reject_in_process_option(self):
         payload = {
             "operation": "SOLVE",
@@ -325,6 +344,50 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
         self.assertIn("forbidden", data["error_message"].lower())
 
+    def test_http_reject_timeout_sec_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x = 1",
+            "options": {"timeout_sec": 5.0},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_simulate_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x = 1",
+            "options": {"simulate": True},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_direct_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x = 1",
+            "options": {"direct": True},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
+    def test_http_reject_internal_option(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x = 1",
+            "options": {"internal": True},
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("forbidden", data["error_message"].lower())
+
     def test_http_reject_invalid_preferred_engine(self):
         payload = {
             "operation": "SOLVE",
@@ -336,8 +399,112 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["mathematical_status"], "OUT_OF_SCOPE")
         self.assertIn("not a valid public mathematical engine", data["error_message"])
 
+    # -------------------------------------------------------------------------
+    # Content-Length & Malformed Payload Hardening
+    # -------------------------------------------------------------------------
+    def test_http_negative_content_length_raw_socket(self):
+        raw_req = (
+            f"POST /api/execute HTTP/1.1\r\n"
+            f"Host: {self.host}:{self.port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: -25\r\n"
+            f"\r\n"
+            f'{{"operation": "SOLVE", "input": "x = 1"}}'
+        ).encode("utf-8")
+        resp = self._raw_socket_request(raw_req)
+        self.assertTrue(resp.startswith(b"HTTP/1.0 400") or resp.startswith(b"HTTP/1.1 400"))
+        self.assertIn(b"INVALID_INPUT", resp)
+        self.assertIn(b"strictly positive integer", resp)
+
+    def test_http_zero_content_length_raw_socket(self):
+        raw_req = (
+            f"POST /api/execute HTTP/1.1\r\n"
+            f"Host: {self.host}:{self.port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: 0\r\n"
+            f"\r\n"
+        ).encode("utf-8")
+        resp = self._raw_socket_request(raw_req)
+        self.assertTrue(resp.startswith(b"HTTP/1.0 400") or resp.startswith(b"HTTP/1.1 400"))
+        self.assertIn(b"INVALID_INPUT", resp)
+        self.assertIn(b"strictly positive integer", resp)
+
+    def test_http_malformed_content_length_raw_socket(self):
+        raw_req = (
+            f"POST /api/execute HTTP/1.1\r\n"
+            f"Host: {self.host}:{self.port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: not_a_number\r\n"
+            f"\r\n"
+            f'{{"operation": "SOLVE", "input": "x = 1"}}'
+        ).encode("utf-8")
+        resp = self._raw_socket_request(raw_req)
+        self.assertTrue(resp.startswith(b"HTTP/1.0 400") or resp.startswith(b"HTTP/1.1 400"))
+        self.assertIn(b"INVALID_INPUT", resp)
+        self.assertIn(b"Malformed Content-Length header", resp)
+
+    def test_http_oversized_content_length(self):
+        raw_req = (
+            f"POST /api/execute HTTP/1.1\r\n"
+            f"Host: {self.host}:{self.port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: 70000\r\n"
+            f"\r\n"
+            f'{{"operation": "SOLVE", "input": "x = 1"}}'
+        ).encode("utf-8")
+        resp = self._raw_socket_request(raw_req)
+        self.assertTrue(resp.startswith(b"HTTP/1.0 413") or resp.startswith(b"HTTP/1.1 413"))
+        self.assertIn(b"RESOURCE_EXHAUSTED", resp)
+
+    def test_http_reject_array_top_level_payload(self):
+        payload = [{"operation": "SOLVE", "input": "x + 1 = 0"}]
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("expected an object", data["error_message"].lower())
+
+    def test_http_reject_string_top_level_payload(self):
+        payload = "just a raw string"
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("expected an object", data["error_message"].lower())
+
+    def test_http_reject_number_top_level_payload(self):
+        payload = 12345
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("expected an object", data["error_message"].lower())
+
+    def test_http_reject_boolean_top_level_payload(self):
+        payload = True
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("expected an object", data["error_message"].lower())
+
+    def test_http_reject_null_top_level_payload(self):
+        payload = None
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
+        self.assertIn("expected an object", data["error_message"].lower())
+
+    def test_http_liveness_after_adversarial_requests(self):
+        """Verify the HTTP server remains fully functional and responsive after malformed payloads."""
+        payload = {
+            "operation": "SOLVE",
+            "input": "3*x - 9 = 0",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["mathematical_status"], "SUCCESS")
+        self.assertEqual(data["symbolic_result"], "x = 3")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
