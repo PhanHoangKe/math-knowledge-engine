@@ -26,9 +26,16 @@ from mke_product.cas.cas_parser import (
     parse_cas_expression,
     tokenize_cas,
 )
-from mke_product.cas.contracts import EngineStatus, ExecutionRequest, OperationType
-from mke_product.cas.router import CASRouter, execute_cas_operation
+from mke_product.cas.contracts import (
+    DomainCertainty,
+    EngineStatus,
+    ExecutionRequest,
+    OperationType,
+    VerificationStatus,
+)
+from mke_product.cas.router import CASRouter, EngineRouter, execute_cas_operation
 from mke_product.cas.safety import extract_domain_restrictions, inspect_ast_safety
+from mke_product.cas.sympy_adapter import execute_sympy_direct
 from mke_product.parser.ast import (
     ASTNode,
     Equation,
@@ -298,3 +305,182 @@ def test_exponential_equation_solving():
     assert res2.mathematical_status == EngineStatus.SUCCESS
     assert "0" in res2.symbolic_result
     assert "log(2)" in res2.symbolic_result or "ln(2)" in res2.symbolic_result
+
+
+# ==============================================================================
+# 4. P1B-R1 DOMAIN IDENTITIES & PERIODIC TRIGONOMETRIC TESTS
+# ==============================================================================
+
+def test_transcendental_identity_ln_domain():
+    """Verify ln(x) = ln(x) -> (0, oo) with SUCCESS."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\ln(x) = \\ln(x)",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "(0, oo)" in res.symbolic_result
+    assert res.domain_certainty == DomainCertainty.PROVEN_REALS
+
+
+def test_transcendental_identity_log_domain():
+    """Verify log(x-1, 2) = log(x-1, 2) -> (1, oo) with SUCCESS."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\log(x-1, 2) = \\log(x-1, 2)",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "(1, oo)" in res.symbolic_result
+    assert res.domain_certainty == DomainCertainty.PROVEN_REALS
+
+
+def test_transcendental_identity_tan_domain():
+    """Verify tan(x) = tan(x) -> All real numbers except pi/2 + k*pi (k integer)."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\tan(x) = \\tan(x)",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "All real numbers except" in res.symbolic_result
+    assert "pi/2 + k*pi" in res.symbolic_result
+    assert res.domain_certainty == DomainCertainty.EXPLICIT_EXCLUSIONS
+
+
+def test_transcendental_identity_injected_failure():
+    """Verify injected domain calculation failure fails closed with UNRESOLVED / NOT_FULLY_DETERMINED."""
+    from unittest.mock import patch
+    with patch("sympy.solveset", side_effect=RuntimeError("Injected solveset crash")):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="\\ln(x) = \\ln(x)",
+        )
+        res = execute_sympy_direct(req)
+        assert res.mathematical_status == EngineStatus.UNRESOLVED
+        assert res.verification_status == VerificationStatus.UNRESOLVED
+        assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+def test_periodic_trig_sin_half():
+    """Verify sin(x) = 1/2 produces complete two-family general solution with k in Z."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(x) = 1/2",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/6 + 2*k*pi" in res.symbolic_result
+    assert "5*pi/6 + 2*k*pi" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+    assert res.verification_evidence.get("solution_type") == "periodic_family"
+
+
+def test_periodic_trig_cos_zero():
+    """Verify cos(x) = 0 -> x = pi/2 + k*pi (k in Z)."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\cos(x) = 0",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/2 + k*pi" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+
+def test_periodic_trig_tan_one():
+    """Verify tan(x) = 1 -> x = pi/4 + k*pi (k in Z)."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\tan(x) = 1",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/4 + k*pi" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+
+def test_periodic_trig_transformed_arg():
+    """Verify sin(2*x - pi/6) = 1/2 -> x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z)."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(2*x - \\pi/6) = 1/2",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/6 + k*pi" in res.symbolic_result
+    assert "pi/2 + k*pi" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+
+def test_periodic_trig_empty_set():
+    """Verify sin(x) = 2 and cos(x) = -3 produce empty solution set."""
+    res_sin = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(x) = 2",
+    )
+    assert res_sin.mathematical_status == EngineStatus.SUCCESS
+    assert res_sin.symbolic_result == "{}"
+
+    res_cos = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\cos(x) = -3",
+    )
+    assert res_cos.mathematical_status == EngineStatus.SUCCESS
+    assert res_cos.symbolic_result == "{}"
+
+
+def test_periodic_trig_unsupported_nonlinear_fail_closed():
+    """Verify non-elementary periodic equation fails closed with OUT_OF_SCOPE / UNRESOLVED."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(x) + \\cos(x) = x",
+    )
+    assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+    assert res.verification_status == VerificationStatus.UNRESOLVED
+    assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+def test_domain_error_invalid_log_and_tan():
+    """Verify invalid constant log arguments, bases, and tan poles raise DOMAIN_ERROR or INVALID_INPUT."""
+    res_neg_log = execute_cas_operation(
+        OperationType.SIMPLIFY,
+        "\\log(-4, 2)",
+    )
+    assert res_neg_log.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+
+    res_base_1 = execute_cas_operation(
+        OperationType.SIMPLIFY,
+        "\\log(5, 1)",
+    )
+    assert res_base_1.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+
+    res_ln_0 = execute_cas_operation(
+        OperationType.SIMPLIFY,
+        "\\ln(0)",
+    )
+    assert res_ln_0.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+
+    res_tan_pole = execute_cas_operation(
+        OperationType.SIMPLIFY,
+        "\\tan(\\pi/2)",
+    )
+    assert res_tan_pole.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+
+
+def test_supervised_transcendental_identity_and_trig_solver():
+    """Verify execution of transcendental identity and periodic trig through supervised EngineRouter."""
+    router = EngineRouter()
+    
+    # 1. Identity ln(x) = ln(x)
+    req_id = ExecutionRequest(
+        operation=OperationType.SOLVE,
+        expression="\\ln(x) = \\ln(x)",
+    )
+    res_id = router.execute(req_id)
+    assert res_id.mathematical_status == EngineStatus.SUCCESS
+    assert "(0, oo)" in res_id.symbolic_result
+
+    # 2. Periodic sin(x) = 1/2
+    req_trig = ExecutionRequest(
+        operation=OperationType.SOLVE,
+        expression="\\sin(x) = 1/2",
+    )
+    res_trig = router.execute(req_trig)
+    assert res_trig.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/6 + 2*k*pi" in res_trig.symbolic_result
+    assert "k in Z" in res_trig.symbolic_result
+

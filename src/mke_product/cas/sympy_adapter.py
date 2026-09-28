@@ -165,6 +165,52 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
                         response.error_message = f"Undecidable radical definedness: {exc}"
                         return response
 
+            elif isinstance(n, FunctionCall):
+                if n.name in ("log", "ln"):
+                    if len(n.args[0].variables()) == 0:
+                        sym_arg = ast_to_sympy_expr(n.args[0])
+                        try:
+                            simplified_arg = sympy.simplify(sym_arg)
+                            if simplified_arg.is_number and (simplified_arg.is_nonpositive or (hasattr(simplified_arg, "evalf") and float(simplified_arg.evalf()) <= 0)):
+                                raise DomainRestrictionError("Logarithm of non-positive real number is undefined in real domain.")
+                        except DomainRestrictionError:
+                            raise
+                        except Exception as exc:
+                            response.mathematical_status = EngineStatus.UNRESOLVED
+                            response.verification_status = VerificationStatus.UNRESOLVED
+                            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                            response.error_message = f"Undecidable logarithm argument definedness: {exc}"
+                            return response
+                    if n.name == "log" and len(n.args) == 2 and len(n.args[1].variables()) == 0:
+                        sym_base = ast_to_sympy_expr(n.args[1])
+                        try:
+                            simplified_base = sympy.simplify(sym_base)
+                            if simplified_base.is_number and (simplified_base.is_nonpositive or (hasattr(simplified_base, "evalf") and float(simplified_base.evalf()) <= 0) or simplified_base == 1):
+                                raise DomainRestrictionError("Logarithm base must be positive and not equal to 1.")
+                        except DomainRestrictionError:
+                            raise
+                        except Exception as exc:
+                            response.mathematical_status = EngineStatus.UNRESOLVED
+                            response.verification_status = VerificationStatus.UNRESOLVED
+                            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                            response.error_message = f"Undecidable logarithm base definedness: {exc}"
+                            return response
+                elif n.name == "tan":
+                    if len(n.args[0].variables()) == 0:
+                        sym_arg = ast_to_sympy_expr(n.args[0])
+                        try:
+                            cos_val = sympy.simplify(sympy.cos(sym_arg))
+                            if cos_val == 0 or cos_val.is_zero is True:
+                                raise DomainRestrictionError("Tangent is undefined when cosine is zero.")
+                        except DomainRestrictionError:
+                            raise
+                        except Exception as exc:
+                            response.mathematical_status = EngineStatus.UNRESOLVED
+                            response.verification_status = VerificationStatus.UNRESOLVED
+                            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                            response.error_message = f"Undecidable tangent definedness: {exc}"
+                            return response
+
         domain_restrictions = extract_domain_restrictions(ast_node)
 
         response.domain_restrictions = domain_restrictions
@@ -192,8 +238,9 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             response.error_message = f"Unsupported operation: {request.operation}"
 
         if response.mathematical_status == EngineStatus.SUCCESS:
-            certainty_str = assess_domain_certainty(ast_node, response.domain_restrictions)
-            response.domain_certainty = DomainCertainty(certainty_str)
+            if response.domain_certainty is None:
+                certainty_str = assess_domain_certainty(ast_node, response.domain_restrictions)
+                response.domain_certainty = DomainCertainty(certainty_str)
             if request.operation == OperationType.CHECK_CANDIDATE:
                 response.verification_status = VerificationStatus.CANDIDATE_CHECKED
             else:
@@ -202,6 +249,9 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             response.verification_status = VerificationStatus.PARTIAL
             response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
         elif response.mathematical_status == EngineStatus.UNRESOLVED:
+            response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        elif response.mathematical_status == EngineStatus.OUT_OF_SCOPE:
             response.verification_status = VerificationStatus.UNRESOLVED
             response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
         else:
@@ -498,6 +548,221 @@ def _validate_root_in_ast(
         return False, "evaluation_failed"
 
 
+def format_family_symbolic(c0: Any, ck: Any) -> str:
+    """Format a periodic root family C0 + Ck * k * pi in clean mathematical notation."""
+    c0_s = sympy.nsimplify(c0)
+    ck_s = sympy.nsimplify(ck)
+    parts = []
+    if c0_s != 0:
+        parts.append(format_sympy_symbolic(c0_s))
+    if ck_s == 1:
+        parts.append("k*pi")
+    elif ck_s == 2:
+        parts.append("2*k*pi")
+    elif ck_s == -1:
+        parts.append("-k*pi")
+    elif ck_s == -2:
+        parts.append("-2*k*pi")
+    elif isinstance(ck_s, (int, sympy.Integer)):
+        parts.append(f"{ck_s}*k*pi")
+    elif isinstance(ck_s, sympy.Rational):
+        if ck_s.q == 1:
+            parts.append(f"{ck_s.p}*k*pi")
+        elif ck_s.p == 1:
+            parts.append(f"k*pi/{ck_s.q}")
+        else:
+            parts.append(f"{ck_s.p}*k*pi/{ck_s.q}")
+    else:
+        parts.append(f"{format_sympy_symbolic(ck_s)}*k*pi")
+
+    if len(parts) == 1:
+        return parts[0]
+    return " + ".join(parts)
+
+
+def format_family_latex(c0: Any, ck: Any) -> str:
+    """Format a periodic root family C0 + Ck * k * pi in clean LaTeX."""
+    c0_s = sympy.nsimplify(c0)
+    ck_s = sympy.nsimplify(ck)
+    parts = []
+    if c0_s != 0:
+        parts.append(format_sympy_latex(c0_s))
+    if ck_s == 1:
+        parts.append("k\\pi")
+    elif ck_s == 2:
+        parts.append("2k\\pi")
+    elif isinstance(ck_s, (int, sympy.Integer)):
+        parts.append(f"{ck_s}k\\pi")
+    elif isinstance(ck_s, sympy.Rational):
+        if ck_s.q == 1:
+            parts.append(f"{ck_s.p}k\\pi")
+        elif ck_s.p == 1:
+            parts.append(f"\\frac{{k\\pi}}{{{ck_s.q}}}")
+        else:
+            parts.append(f"\\frac{{{ck_s.p}k\\pi}}{{{ck_s.q}}}")
+    else:
+        parts.append(f"{format_sympy_latex(ck_s)}k\\pi")
+
+    if len(parts) == 1:
+        return parts[0]
+    return " + ".join(parts)
+
+
+def _solve_periodic_trigonometric(
+    ast_node: ASTNode,
+    eq: sympy.Eq,
+    var: sympy.Symbol,
+    response: ExecutionResponse,
+) -> None:
+    """Solve elementary periodic trigonometric equations sin(ax+b)=m, cos(ax+b)=m, tan(ax+b)=m."""
+    func_name: Optional[str] = None
+    arg_sym: Optional[sympy.Expr] = None
+    rhs_sym: Optional[sympy.Expr] = None
+
+    if isinstance(ast_node, Equation):
+        left_ast = ast_node.left
+        right_ast = ast_node.right
+        if isinstance(left_ast, FunctionCall) and left_ast.name in ("sin", "cos", "tan") and len(right_ast.variables()) == 0:
+            func_name = left_ast.name
+            arg_sym = ast_to_sympy_expr(left_ast.args[0])
+            rhs_sym = ast_to_sympy_expr(right_ast)
+        elif isinstance(right_ast, FunctionCall) and right_ast.name in ("sin", "cos", "tan") and len(left_ast.variables()) == 0:
+            func_name = right_ast.name
+            arg_sym = ast_to_sympy_expr(right_ast.args[0])
+            rhs_sym = ast_to_sympy_expr(left_ast)
+
+    if func_name is None:
+        diff = sympy.simplify(eq.lhs - eq.rhs)
+        for cand_func in (sympy.sin, sympy.cos, sympy.tan):
+            matches = diff.atoms(cand_func)
+            if len(matches) == 1:
+                term = list(matches)[0]
+                t_arg = term.args[0]
+                if len(t_arg.free_symbols) == 1 and var in t_arg.free_symbols:
+                    term_dummy = sympy.Symbol("__trig_term__")
+                    diff_sub = diff.subs(term, term_dummy)
+                    term_sol = sympy.solve(diff_sub, term_dummy)
+                    if term_sol and len(term_sol) == 1 and len(term_sol[0].free_symbols) == 0:
+                        func_name = cand_func.__name__.lower()
+                        arg_sym = t_arg
+                        rhs_sym = term_sol[0]
+                        break
+
+    if func_name is None or arg_sym is None or rhs_sym is None:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.verification_status = VerificationStatus.UNRESOLVED
+        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        response.error_message = "Nonlinear or unclassified periodic trigonometric equation is out of scope for exact family solver"
+        return
+
+    try:
+        poly = sympy.Poly(arg_sym, var)
+        if poly.degree() != 1:
+            response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+            response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+            response.error_message = "Nonlinear argument in trigonometric equation is out of scope for exact family solver"
+            return
+        coeffs = poly.all_coeffs()
+        a = coeffs[0]
+        b = coeffs[1]
+    except Exception as exc:
+        response.mathematical_status = EngineStatus.UNRESOLVED
+        response.verification_status = VerificationStatus.UNRESOLVED
+        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        response.error_message = f"Failed to analyze trigonometric argument: {exc}"
+        return
+
+    m = sympy.simplify(rhs_sym)
+
+    if func_name in ("sin", "cos"):
+        if (m.is_number and (m > 1 or m < -1)) or (hasattr(m, "evalf") and abs(float(m.evalf())) > 1.0 + 1e-12):
+            response.symbolic_result = "{}"
+            response.latex_output = "\\emptyset"
+            response.mathematical_status = EngineStatus.SUCCESS
+            response.domain_certainty = DomainCertainty.PROVEN_REALS
+            response.verification_evidence = {
+                "solution_type": "empty_set",
+                "solution_set": [],
+            }
+            return
+
+        if func_name == "sin":
+            alpha = sympy.asin(m)
+            if m == 0:
+                c0 = sympy.simplify(-b / a)
+                ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+                families = [(c0, ck)]
+            elif m == 1:
+                c0 = sympy.simplify((sympy.pi/2 - b) / a)
+                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0, ck)]
+            elif m == -1:
+                c0 = sympy.simplify((-sympy.pi/2 - b) / a)
+                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0, ck)]
+            else:
+                c0_1 = sympy.simplify((alpha - b) / a)
+                ck_1 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                c0_2 = sympy.simplify((sympy.pi - alpha - b) / a)
+                ck_2 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0_1, ck_1), (c0_2, ck_2)]
+
+        elif func_name == "cos":
+            alpha = sympy.acos(m)
+            if m == 1:
+                c0 = sympy.simplify(-b / a)
+                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0, ck)]
+            elif m == -1:
+                c0 = sympy.simplify((sympy.pi - b) / a)
+                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0, ck)]
+            elif m == 0:
+                c0 = sympy.simplify((sympy.pi/2 - b) / a)
+                ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+                families = [(c0, ck)]
+            else:
+                c0_1 = sympy.simplify((alpha - b) / a)
+                ck_1 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                c0_2 = sympy.simplify((-alpha - b) / a)
+                ck_2 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                families = [(c0_1, ck_1), (c0_2, ck_2)]
+
+    elif func_name == "tan":
+        alpha = sympy.atan(m)
+        c0 = sympy.simplify((alpha - b) / a)
+        ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+        families = [(c0, ck)]
+    else:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.verification_status = VerificationStatus.UNRESOLVED
+        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        response.error_message = f"Unsupported trigonometric function: {func_name}"
+        return
+
+    sym_family_strs = []
+    latex_family_strs = []
+    evidence_family_strs = []
+    for c0_val, ck_val in families:
+        s_fam = format_family_symbolic(c0_val, ck_val)
+        l_fam = format_family_latex(c0_val, ck_val)
+        sym_family_strs.append(f"x = {s_fam}")
+        latex_family_strs.append(f"x = {l_fam}")
+        evidence_family_strs.append(s_fam)
+
+    response.symbolic_result = ", ".join(sym_family_strs) + " (k in Z)"
+    response.latex_output = " \\quad \\lor \\quad ".join(latex_family_strs) + " \\quad (k \\in \\mathbb{Z})"
+    response.mathematical_status = EngineStatus.SUCCESS
+    response.domain_certainty = DomainCertainty.PROVEN_REALS if func_name != "tan" else DomainCertainty.EXPLICIT_EXCLUSIONS
+    response.verification_evidence = {
+        "solution_type": "periodic_family",
+        "families": evidence_family_strs,
+        "solution_set": evidence_family_strs,
+        "parameter": "k in Z",
+    }
+
+
 def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
     """Solve an equation or expression in the real domain."""
     x = sympy.Symbol("x", real=True)
@@ -506,13 +771,14 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
     else:
         eq = sympy.Eq(sym_obj, 0)
 
-    # Check for identity equation with domain restrictions, e.g. (x-1)/(x-1) = 1, sqrt(x) = sqrt(x)
+    # Check for identity equation with domain restrictions, e.g. (x-1)/(x-1) = 1, sqrt(x) = sqrt(x), ln(x) = ln(x), tan(x) = tan(x)
     diff_expr = sympy.cancel(eq.lhs - eq.rhs)
 
-    if diff_expr == 0:
+    if diff_expr == 0 or sympy.simplify(eq.lhs - eq.rhs) == 0:
         domain_set = sympy.S.Reals
         has_radical_or_interval = False
         excluded_points: List[Any] = []
+        periodic_exclusions: List[Tuple[str, Any, Any]] = []
 
         for n in ast_node.walk():
             # 1. Radicals require radicand >= 0
@@ -579,6 +845,91 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
                     response.error_message = f"Failed to compute zero-exponent base constraint for {n}: {ex}"
                     return
 
+            # 4. Logarithms require argument > 0 and base > 0, base != 1
+            elif isinstance(n, FunctionCall) and n.name in ("log", "ln"):
+                has_radical_or_interval = True
+                try:
+                    arg_sym = ast_to_sympy_expr(n.args[0])
+                    arg_domain = sympy.solveset(arg_sym > 0, x, domain=sympy.S.Reals)
+                    if isinstance(arg_domain, sympy.ConditionSet):
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Logarithm argument condition {arg_sym} > 0 could not be fully determined"
+                        return
+                    domain_set = domain_set.intersect(arg_domain)
+
+                    if n.name == "log" and len(n.args) == 2:
+                        base_sym = ast_to_sympy_expr(n.args[1])
+                        base_pos = sympy.solveset(base_sym > 0, x, domain=sympy.S.Reals)
+                        base_not_one = sympy.solveset(sympy.Ne(base_sym, 1), x, domain=sympy.S.Reals)
+                        if isinstance(base_pos, sympy.ConditionSet) or isinstance(base_not_one, sympy.ConditionSet):
+                            response.mathematical_status = EngineStatus.UNRESOLVED
+                            response.verification_status = VerificationStatus.UNRESOLVED
+                            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                            response.error_message = f"Logarithm base conditions could not be fully determined"
+                            return
+                        domain_set = domain_set.intersect(base_pos).intersect(base_not_one)
+                except Exception as ex:
+                    response.mathematical_status = EngineStatus.UNRESOLVED
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = f"Failed to compute logarithm domain constraint for {n}: {ex}"
+                    return
+
+            # 5. Tangent requires cos(arg) != 0 -> arg != pi/2 + k*pi
+            elif isinstance(n, FunctionCall) and n.name == "tan":
+                try:
+                    arg_sym = ast_to_sympy_expr(n.args[0])
+                    if len(arg_sym.free_symbols) == 1 and x in arg_sym.free_symbols:
+                        poly = sympy.Poly(arg_sym, x)
+                        if poly.degree() == 1:
+                            a_coeff = poly.all_coeffs()[0]
+                            b_coeff = poly.all_coeffs()[1]
+                            periodic_exclusions.append(("tan", a_coeff, b_coeff))
+                        else:
+                            response.mathematical_status = EngineStatus.UNRESOLVED
+                            response.verification_status = VerificationStatus.UNRESOLVED
+                            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                            response.error_message = f"Non-linear tangent periodic domain could not be fully determined"
+                            return
+                except Exception as ex:
+                    response.mathematical_status = EngineStatus.UNRESOLVED
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = f"Failed to compute tangent domain constraint for {n}: {ex}"
+                    return
+
+        # Check periodic exclusions
+        if periodic_exclusions:
+            unique_periodic: List[Tuple[str, Any, Any]] = []
+            for item in periodic_exclusions:
+                if not any(item[0] == u[0] and sympy.simplify(item[1] - u[1]) == 0 and sympy.simplify(item[2] - u[2]) == 0 for u in unique_periodic):
+                    unique_periodic.append(item)
+
+            if domain_set == sympy.S.Reals and len(unique_periodic) == 1:
+                _, a_val, b_val = unique_periodic[0]
+                c0 = sympy.nsimplify((sympy.pi/2 - b_val) / a_val)
+                ck = sympy.nsimplify(sympy.Rational(1, a_val) if hasattr(a_val, "is_integer") and a_val.is_integer else 1 / a_val)
+
+                excl_sym = format_family_symbolic(c0, ck)
+                excl_lat = format_family_latex(c0, ck)
+                response.symbolic_result = f"All real numbers except {excl_sym} (k integer)"
+                response.latex_output = "\\mathbb{R} \\setminus \\left\\{ " + excl_lat + " \\;\\middle|\\; k \\in \\mathbb{Z} \\right\\}"
+                response.mathematical_status = EngineStatus.SUCCESS
+                response.domain_certainty = DomainCertainty.EXPLICIT_EXCLUSIONS
+                response.verification_evidence = {
+                    "solution_type": "identity_periodic_exclusions",
+                    "periodic_exclusions": [f"{excl_sym}, k in Z"],
+                }
+                return
+            else:
+                response.mathematical_status = EngineStatus.UNRESOLVED
+                response.verification_status = VerificationStatus.UNRESOLVED
+                response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                response.error_message = "Composite or intersected periodic domain could not be fully determined"
+                return
+
         # Check if resulting domain_set is unresolved (e.g. ConditionSet)
         if isinstance(domain_set, sympy.ConditionSet):
             response.mathematical_status = EngineStatus.UNRESOLVED
@@ -608,7 +959,7 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             }
             return
 
-        # If only isolated point exclusions and no radicals
+        # If only isolated point exclusions and no radicals / intervals
         if not has_radical_or_interval and excluded_points:
             unique_excl: List[Any] = []
             for p in excluded_points:
@@ -630,7 +981,7 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             }
             return
 
-        # Otherwise format domain interval/set (e.g. [0, oo) or [2, 5) U (5, oo))
+        # Otherwise format domain interval/set (e.g. (0, oo), (1, oo), [0, oo) or [2, 5) U (5, oo))
         response.symbolic_result = format_interval_symbolic(domain_set, var="x")
         response.latex_output = format_interval_latex(domain_set, var="x")
         response.mathematical_status = EngineStatus.SUCCESS
@@ -639,6 +990,18 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             "solution_type": "identity_interval",
             "domain_set": str(domain_set),
         }
+        return
+
+    # Check if the equation involves periodic trigonometric functions with variables
+    has_trig_vars = False
+    for n in ast_node.walk():
+        if isinstance(n, FunctionCall) and n.name in ("sin", "cos", "tan"):
+            if len(n.variables()) > 0:
+                has_trig_vars = True
+                break
+
+    if has_trig_vars:
+        _solve_periodic_trigonometric(ast_node, eq, x, response)
         return
 
     # Collect all candidate roots from SymPy solve and pattern-based algebraic transformations

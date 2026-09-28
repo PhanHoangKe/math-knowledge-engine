@@ -162,15 +162,41 @@ def _eval_constant_bounded(
         elif node.name == "cos":
             return sympy.cos(args_val[0])
         elif node.name == "tan":
+            cos_val = sympy.simplify(sympy.cos(args_val[0]))
+            if cos_val == 0 or cos_val.is_zero is True:
+                raise DomainRestrictionError("Tangent is undefined when cosine is zero.")
             return sympy.tan(args_val[0])
         elif node.name == "exp":
             return sympy.exp(args_val[0])
         elif node.name == "ln":
-            return sympy.log(args_val[0])
+            arg = args_val[0]
+            if hasattr(arg, "is_positive") and arg.is_positive is False:
+                raise DomainRestrictionError("Logarithm argument must be strictly positive.")
+            if hasattr(arg, "is_zero") and arg.is_zero is True:
+                raise DomainRestrictionError("Logarithm of zero is undefined.")
+            if hasattr(arg, "evalf") and float(arg.evalf()) <= 0:
+                raise DomainRestrictionError("Logarithm argument must be strictly positive.")
+            return sympy.log(arg)
         elif node.name == "log":
-            if len(args_val) == 1:
-                return sympy.log(args_val[0])
-            return sympy.log(args_val[0], args_val[1])
+            arg = args_val[0]
+            if hasattr(arg, "is_positive") and arg.is_positive is False:
+                raise DomainRestrictionError("Logarithm argument must be strictly positive.")
+            if hasattr(arg, "is_zero") and arg.is_zero is True:
+                raise DomainRestrictionError("Logarithm of zero is undefined.")
+            if hasattr(arg, "evalf") and float(arg.evalf()) <= 0:
+                raise DomainRestrictionError("Logarithm argument must be strictly positive.")
+            if len(args_val) == 2:
+                base = args_val[1]
+                if hasattr(base, "is_positive") and base.is_positive is False:
+                    raise DomainRestrictionError("Logarithm base must be strictly positive.")
+                if hasattr(base, "is_zero") and base.is_zero is True:
+                    raise DomainRestrictionError("Logarithm base must be strictly positive.")
+                if hasattr(base, "evalf") and float(base.evalf()) <= 0:
+                    raise DomainRestrictionError("Logarithm base must be strictly positive.")
+                if sympy.simplify(base - 1) == 0 or (hasattr(base, "is_one") and base.is_one is True):
+                    raise DomainRestrictionError("Logarithm base cannot be 1.")
+                return sympy.log(arg, base)
+            return sympy.log(arg)
         raise ConstantEvalResourceLimitError(f"Unsupported function {node.name}")
 
     elif isinstance(node, Group):
@@ -423,6 +449,15 @@ def inspect_ast_safety(node: ASTNode) -> None:
             # Check for statically provable square root of negative constant
             if len(n.radicand.variables()) == 0:
                 zero_status = prove_constant_zero_status(n.radicand)
+        elif isinstance(n, FunctionCall):
+            # Check for statically provable domain violations on constant function subtrees
+            if len(n.variables()) == 0:
+                try:
+                    evaluate_constant_ast(n)
+                except (DomainRestrictionError, DivisionByZeroError):
+                    raise
+                except Exception:
+                    pass
 
 
 from .cas_parser import CASPower, Inequality, LinearSystem
