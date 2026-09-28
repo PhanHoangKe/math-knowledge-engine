@@ -15,6 +15,7 @@ import mimetypes
 import os
 import socket
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict
@@ -206,17 +207,33 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             return
 
         BODY_READ_TIMEOUT_SEC = 2.0
+        deadline = time.monotonic() + BODY_READ_TIMEOUT_SEC
         orig_timeout = None
-        try:
-            if hasattr(self.connection, "gettimeout"):
+        if hasattr(self.connection, "gettimeout"):
+            try:
                 orig_timeout = self.connection.gettimeout()
-                self.connection.settimeout(BODY_READ_TIMEOUT_SEC)
+            except Exception:
+                orig_timeout = None
 
+        try:
             bytes_to_read = content_length
             chunks = []
             bytes_read = 0
             while bytes_read < bytes_to_read:
-                chunk = self.rfile.read(min(4096, bytes_to_read - bytes_read))
+                remaining_time = deadline - time.monotonic()
+                if remaining_time <= 0:
+                    raise TimeoutError(f"Request body read exceeded wall-clock deadline of {BODY_READ_TIMEOUT_SEC} seconds.")
+
+                if hasattr(self.connection, "settimeout"):
+                    self.connection.settimeout(max(0.001, remaining_time))
+
+                # Use read1 to read whatever is available in the underlying buffer without
+                # internally looping/blocking indefinitely on slow trickle streams
+                if hasattr(self.rfile, "read1"):
+                    chunk = self.rfile.read1(min(4096, bytes_to_read - bytes_read))
+                else:
+                    chunk = self.rfile.read(min(4096, bytes_to_read - bytes_read))
+
                 if not chunk:
                     # Early EOF: client closed socket before sending full declared Content-Length
                     self._send_json(400, {
@@ -252,7 +269,7 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             })
             return
         finally:
-            if orig_timeout is not None and hasattr(self.connection, "settimeout"):
+            if hasattr(self.connection, "settimeout"):
                 try:
                     self.connection.settimeout(orig_timeout)
                 except Exception:

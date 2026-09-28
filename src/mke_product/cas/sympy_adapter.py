@@ -91,8 +91,24 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             else:
                 ast_node = parse_cas_expression(input_text)
 
-        # 3. Inspect AST safety & extract domain constraints
+        # 3. Inspect AST safety & extract domain constraints (lightweight structural checks)
         inspect_ast_safety(ast_node)
+
+        # Substantive symbolic domain validations executed under the supervised worker
+        from mke_product.parser.ast import BinaryOp, Power
+        from .cas_parser import CASPower
+        for n in ast_node.walk():
+            if isinstance(n, (Power, CASPower)) and n.exponent.value == 0:
+                if len(n.base.variables()) > 0:
+                    sym_base = ast_to_sympy_expr(n.base)
+                    if sympy.simplify(sym_base) == 0:
+                        raise DomainRestrictionError("Indeterminate form (0)^0 is undefined everywhere in real domain.")
+            elif isinstance(n, BinaryOp) and n.op == "/":
+                if len(n.right.variables()) > 0:
+                    sym_denom = ast_to_sympy_expr(n.right)
+                    if sympy.simplify(sym_denom) == 0:
+                        raise DomainRestrictionError("Division by zero expression is undefined everywhere in real domain.")
+
         domain_restrictions = extract_domain_restrictions(ast_node)
         response.domain_restrictions = domain_restrictions
 

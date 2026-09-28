@@ -20,6 +20,7 @@ Covers:
 4. Domain certainty & honest verification status contracts
 """
 
+import time
 import pytest
 import sympy
 
@@ -490,6 +491,93 @@ class TestProduct03BR1SoundnessAndCounterexamples:
         assert res.mathematical_status in {EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT}
         assert res.verification_status == VerificationStatus.ERROR
         assert "zero" in res.error_message.lower()
+
+    # -------------------------------------------------------------------------
+    # Supervised Child-Process & Pre-Dispatch Resource Isolation Tests
+    # -------------------------------------------------------------------------
+    def test_supervised_zero_power_composite_linear_base_explicit_exclusions(self, router: EngineRouter):
+        """Supervised child worker execution of (x-1)^0 yields EXPLICIT_EXCLUSIONS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x - 1)^0",
+            timeout_sec=5.0,
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "1"
+        assert res.domain_certainty == DomainCertainty.EXPLICIT_EXCLUSIONS
+        assert "x != 1" in res.domain_restrictions
+
+    def test_supervised_zero_power_identically_zero_base_domain_error(self, router: EngineRouter):
+        """Supervised child worker execution of (x-x)^0 yields DOMAIN_ERROR."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x - x)^0",
+            timeout_sec=5.0,
+        )
+        res = router.execute(req)
+        assert res.mathematical_status in {EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT}
+        assert res.verification_status == VerificationStatus.ERROR
+
+    def test_supervised_division_by_identically_zero_domain_error(self, router: EngineRouter):
+        """Supervised child worker execution of 1/(x-x) yields DOMAIN_ERROR."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="1 / (x - x)",
+            timeout_sec=5.0,
+        )
+        res = router.execute(req)
+        assert res.mathematical_status in {EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT}
+        assert res.verification_status == VerificationStatus.ERROR
+
+    def test_supervised_zero_power_irreducible_quadratic_base_proven_reals(self, router: EngineRouter):
+        """Supervised child worker execution of (x^2+1)^0 yields PROVEN_REALS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x^2 + 1)^0",
+            timeout_sec=5.0,
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "1"
+        assert res.domain_certainty == DomainCertainty.PROVEN_REALS
+
+    def test_pre_dispatch_inspect_ast_safety_zero_symbolic_evaluations(self):
+        """Verify pre-dispatch inspect_ast_safety never calls sympy.simplify or sympy.solve on variable subtrees."""
+        from unittest.mock import patch
+        import sympy
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import inspect_ast_safety
+
+        def forbidden_simplify(*args, **kwargs):
+            raise AssertionError("sympy.simplify called in pre-dispatch inspect_ast_safety!")
+
+        def forbidden_solve(*args, **kwargs):
+            raise AssertionError("sympy.solve called in pre-dispatch inspect_ast_safety!")
+
+        with patch.object(sympy, "simplify", side_effect=forbidden_simplify), \
+             patch.object(sympy, "solve", side_effect=forbidden_solve):
+            # None of these should invoke sympy.simplify or sympy.solve during pre-dispatch AST safety inspection
+            inspect_ast_safety(parse_cas_expression("(x - 1)^0"))
+            inspect_ast_safety(parse_cas_expression("(x - x)^0"))
+            inspect_ast_safety(parse_cas_expression("1 / (x - x)"))
+            inspect_ast_safety(parse_cas_expression("(x^2 + 1)^0"))
+            inspect_ast_safety(parse_cas_expression("x^0"))
+
+    def test_supervisor_hard_timeout_evasion_prevention(self, router: EngineRouter):
+        """Verify slow symbolic computations running in child worker are strictly terminated by supervisor."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="x^2 + x",
+            options={"sleep_seconds": 1.5},
+            timeout_sec=0.3,
+        )
+        start_t = time.monotonic()
+        res = router.execute(req)
+        elapsed = time.monotonic() - start_t
+        assert elapsed < 1.2, f"Supervisor hung for {elapsed:.2f}s, expected termination around 0.3s"
+        assert res.mathematical_status == EngineStatus.RESOURCE_EXHAUSTED
+        assert "timed out" in res.error_message.lower()
 
 
 

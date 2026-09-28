@@ -101,7 +101,15 @@ def evaluate_constant_ast(node: ASTNode) -> sympy.Rational:
 
 
 def inspect_ast_safety(node: ASTNode) -> None:
-    """Recursively validate safety constraints on the AST node."""
+    """Recursively validate structural and constant safety constraints on the AST node.
+
+    CRITICAL RESOURCE-ISOLATION INVARIANT:
+    This function runs in the unsupervised pre-dispatch path (router and entrypoints).
+    It executes only lightweight O(AST size) structural checks and constant subtree arithmetic
+    via evaluate_constant_ast(). It NEVER invokes unconstrained symbolic operations
+    (such as sympy.simplify, sympy.solve, or sympy.Poly) on variable subtrees in the parent process.
+    All untrusted-input-dependent symbolic checks are strictly deferred to the supervised child worker.
+    """
     for n in node.walk():
         if isinstance(n, IntegerLiteral):
             if len(str(n.value)) > MAX_INTEGER_DIGITS:
@@ -109,38 +117,18 @@ def inspect_ast_safety(node: ASTNode) -> None:
                     f"Integer literal exceeds maximum allowed size of {MAX_INTEGER_DIGITS} digits."
                 )
         elif isinstance(n, (Power, CASPower)):
-            # Check for 0^0 (direct literal, constant subtree, or symbolically identical zero)
+            # Check for statically provable 0^0 on constant subtrees
             if n.exponent.value == 0:
                 if len(n.base.variables()) == 0:
                     b_val = evaluate_constant_ast(n.base)
                     if b_val == 0:
                         raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
-                else:
-                    from .ast_bridge import ast_to_sympy_expr
-                    try:
-                        sym_base = ast_to_sympy_expr(n.base)
-                        if sympy.simplify(sym_base) == 0:
-                            raise DomainRestrictionError("Indeterminate form (0)^0 is undefined everywhere in real domain.")
-                    except DomainRestrictionError:
-                        raise
-                    except Exception:
-                        pass
         elif isinstance(n, BinaryOp) and n.op == "/":
-            # Check for zero denominator: e.g. expr / 0, expr / (2 - 2), or expr / (x - x)
+            # Check for statically provable division by zero on constant subtrees
             if len(n.right.variables()) == 0:
                 denom_val = evaluate_constant_ast(n.right)
                 if denom_val == 0:
                     raise DivisionByZeroError("Division by zero constant is undefined.")
-            else:
-                from .ast_bridge import ast_to_sympy_expr
-                try:
-                    sym_denom = ast_to_sympy_expr(n.right)
-                    if sympy.simplify(sym_denom) == 0:
-                        raise DivisionByZeroError("Division by zero expression is undefined everywhere in real domain.")
-                except DivisionByZeroError:
-                    raise
-                except Exception:
-                    pass
 
 
 from .cas_parser import CASPower, Inequality, LinearSystem

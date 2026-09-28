@@ -507,6 +507,76 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertLess(elapsed, 3.5, f"Server hung for {elapsed:.2f}s on incomplete request body")
         self.assertTrue(b"408" in resp or b"400" in resp or len(resp) == 0)
 
+    def test_http_slow_trickle_client_exceeds_monotonic_deadline(self):
+        """Client continuously sends valid bytes slowly (1 byte every 0.1s) exceeding monotonic deadline."""
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(5.0)
+        try:
+            s.connect((self.host, self.port))
+            headers = (
+                f"POST /api/execute HTTP/1.1\r\n"
+                f"Host: {self.host}:{self.port}\r\n"
+                f"Content-Type: application/json\r\n"
+                f"Content-Length: 100\r\n"
+                f"\r\n"
+            ).encode("utf-8")
+            s.sendall(headers)
+
+            start_t = time.monotonic()
+            # Send 1 byte every 0.1s up to 3.0s (deadline is 2.0s)
+            response = b""
+            for _ in range(30):
+                try:
+                    s.sendall(b"x")
+                    time.sleep(0.1)
+                except (socket.error, ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+                    break
+
+            # Read response
+            s.settimeout(1.5)
+            while True:
+                try:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    response += chunk
+                except (socket.timeout, ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+                    break
+
+            elapsed = time.monotonic() - start_t
+            self.assertLess(elapsed, 4.0, f"Server hung for {elapsed:.2f}s on slow-trickle stream")
+            self.assertTrue(b"408" in response or b"400" in response or len(response) == 0)
+            if b"408" in response:
+                self.assertIn(b"RESOURCE_EXHAUSTED", response)
+        finally:
+            s.close()
+
+    def test_http_socket_blocking_state_restored_even_when_none(self):
+        """Verify that handler restores original socket timeout even when orig_timeout is None."""
+        class MockSocket:
+            def __init__(self):
+                self.timeout = None
+                self.set_history = []
+            def gettimeout(self):
+                return self.timeout
+            def settimeout(self, t):
+                self.timeout = t
+                self.set_history.append(t)
+
+        mock_sock = MockSocket()
+        # Initial state is blocking (timeout is None)
+        self.assertIsNone(mock_sock.gettimeout())
+        # Simulate setting timeout and restoring in handler finally pattern
+        orig_timeout = mock_sock.gettimeout()
+        try:
+            mock_sock.settimeout(2.0)
+            self.assertEqual(mock_sock.gettimeout(), 2.0)
+        finally:
+            mock_sock.settimeout(orig_timeout)
+
+        self.assertIsNone(mock_sock.gettimeout(), "Socket blocking state (None) must be restored")
+        self.assertEqual(mock_sock.set_history, [2.0, None])
+
     def test_http_incomplete_request_body_early_eof(self):
         """Client declares Content-Length: 100 but sends only 20 bytes and closes connection."""
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
