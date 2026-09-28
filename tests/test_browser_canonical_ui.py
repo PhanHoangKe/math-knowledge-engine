@@ -220,7 +220,10 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
 
         tab_plot = self.driver.find_element(By.ID, "tab-plot")
         tab_plot.click()
-        time.sleep(0.6)
+
+        WebDriverWait(self.driver, 10.0).until(
+            lambda d: d.find_element(By.ID, "res-plot-wrapper").is_displayed()
+        )
 
         plot_wrapper = self.driver.find_element(By.ID, "res-plot-wrapper")
         self.assertTrue(plot_wrapper.is_displayed())
