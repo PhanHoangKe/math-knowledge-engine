@@ -3,455 +3,836 @@
   "benchmark_id": "P03C_P1B_TRANSCENDENTAL_BENCHMARK",
   "title": "P03C-P1B Transcendental Functions, Calculus & Equations Benchmark",
   "description": "32 authentic GDPT 2018 Grade 11-12 mathematical problems testing trigonometry, logarithms, exponentials, differentiation, and domain-guarded equation solving with extraneous root elimination.",
-  "problem_count": 32,
+  "problem_count": 47,
   "problems": [
     {
       "problem_id": "P1B-TRIG-001",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Rút gọn biểu thức lượng giác: sin(x + pi/4) - cos(x - pi/4)",
       "problem_latex": "\\sin(x + \\pi/4) - \\cos(x - \\pi/4)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "0",
         "latex_canonical": "0",
-        "alternate_forms": ["0"]
-      }
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-TRIG-002",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Rút gọn biểu thức: sin^2(x) + cos^2(x)",
       "problem_latex": "\\sin^2(x) + \\cos^2(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1",
         "latex_canonical": "1",
-        "alternate_forms": ["1"]
-      }
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-TRIG-003",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Tính giá trị lượng giác: sin(pi/6) + cos(pi/3)",
       "problem_latex": "\\sin(\\pi/6) + \\cos(\\pi/3)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1",
         "latex_canonical": "1",
-        "alternate_forms": ["1"]
-      }
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-TRIG-004",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Tính giá trị lượng giác: cos(0) + sin(pi/2)",
       "problem_latex": "\\cos(0) + \\sin(\\pi/2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "2",
         "latex_canonical": "2",
-        "alternate_forms": ["2"]
-      }
+        "alternate_forms": [
+          "2"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-TRIG-005",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Rút gọn biểu thức: cos(x + pi/2) + sin(x)",
       "problem_latex": "\\cos(x + \\pi/2) + \\sin(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "0",
         "latex_canonical": "0",
-        "alternate_forms": ["0"]
-      }
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-TRIG-006",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "archetype_id": "ARCH-11.1.1",
       "problem_text_vi": "Rút gọn biểu thức: sin(pi - x) - sin(x)",
       "problem_latex": "\\sin(\\pi - x) - \\sin(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "0",
         "latex_canonical": "0",
-        "alternate_forms": ["0"]
-      }
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "benchmark_category": "TRIG_SIMPLIFICATION"
     },
     {
       "problem_id": "P1B-LOG-001",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_2(12) - log_2(3)",
       "problem_latex": "\\log(12, 2) - \\log(3, 2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "2",
         "latex_canonical": "2",
-        "alternate_forms": ["2"]
-      }
+        "alternate_forms": [
+          "2"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-002",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_5(25) + log_2(4)",
       "problem_latex": "\\log(25, 5) + \\log(4, 2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "4",
         "latex_canonical": "4",
-        "alternate_forms": ["4"]
-      }
+        "alternate_forms": [
+          "4"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-003",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: ln(e^5) - ln(e^2)",
       "problem_latex": "\\ln(e^5) - \\ln(e^2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "3",
         "latex_canonical": "3",
-        "alternate_forms": ["3"]
-      }
+        "alternate_forms": [
+          "3"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-004",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_10(1000)",
       "problem_latex": "\\log(1000, 10)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "3",
         "latex_canonical": "3",
-        "alternate_forms": ["3"]
-      }
+        "alternate_forms": [
+          "3"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-005",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_2(8) * log_3(9)",
       "problem_latex": "\\log(8, 2) * \\log(9, 3)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "6",
         "latex_canonical": "6",
-        "alternate_forms": ["6"]
-      }
+        "alternate_forms": [
+          "6"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-006",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_2(1/16)",
       "problem_latex": "\\log(1/16, 2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "-4",
         "latex_canonical": "-4",
-        "alternate_forms": ["-4"]
-      }
+        "alternate_forms": [
+          "-4"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-007",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: log_3(81) - log_3(27)",
       "problem_latex": "\\log(81, 3) - \\log(27, 3)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1",
         "latex_canonical": "1",
-        "alternate_forms": ["1"]
-      }
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-LOG-008",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "archetype_id": "ARCH-11.4.1",
       "problem_text_vi": "Tính giá trị của biểu thức: ln(e)",
       "problem_latex": "\\ln(e)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1",
         "latex_canonical": "1",
-        "alternate_forms": ["1"]
-      }
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "benchmark_category": "LOG_EVALUATION"
     },
     {
       "problem_id": "P1B-DIFF-001",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = sin(2*x) + exp(3*x)",
       "problem_latex": "\\sin(2*x) + \\exp(3*x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "2*cos(2*x) + 3*exp(3*x)",
         "latex_canonical": "2\\cos(2x) + 3e^{3x}",
-        "alternate_forms": ["3*exp(3*x) + 2*cos(2*x)"]
-      }
+        "alternate_forms": [
+          "3*exp(3*x) + 2*cos(2*x)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-002",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = cos(5*x)",
       "problem_latex": "\\cos(5*x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "-5*sin(5*x)",
         "latex_canonical": "-5\\sin(5x)",
-        "alternate_forms": ["-5*sin(5*x)"]
-      }
+        "alternate_forms": [
+          "-5*sin(5*x)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-003",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = exp(-2*x)",
       "problem_latex": "\\exp(-2*x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "-2*exp(-2*x)",
         "latex_canonical": "-2e^{-2x}",
-        "alternate_forms": ["-2*exp(-2*x)"]
-      }
+        "alternate_forms": [
+          "-2*exp(-2*x)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-004",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = ln(x)",
       "problem_latex": "\\ln(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1/x",
         "latex_canonical": "\\frac{1}{x}",
-        "alternate_forms": ["x**(-1)"]
-      }
+        "alternate_forms": [
+          "x**(-1)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-005",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = log_2(x)",
       "problem_latex": "\\log(x, 2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "1/(x*log(2))",
         "latex_canonical": "\\frac{1}{x\\ln(2)}",
-        "alternate_forms": ["1/(x*ln(2))", "(x*log(2))**(-1)"]
-      }
+        "alternate_forms": [
+          "1/(x*ln(2))",
+          "(x*log(2))**(-1)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-006",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = sin(x) + cos(x)",
       "problem_latex": "\\sin(x) + \\cos(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "cos(x) - sin(x)",
         "latex_canonical": "\\cos(x) - \\sin(x)",
-        "alternate_forms": ["-sin(x) + cos(x)"]
-      }
+        "alternate_forms": [
+          "-sin(x) + cos(x)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-007",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = tan(x)",
       "problem_latex": "\\tan(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "tan(x)**2 + 1",
         "latex_canonical": "\\tan^2(x) + 1",
-        "alternate_forms": ["1/cos(x)**2", "1 + tan(x)**2", "sec(x)**2"]
-      }
+        "alternate_forms": [
+          "1/cos(x)**2",
+          "1 + tan(x)**2",
+          "sec(x)**2"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-DIFF-008",
       "grade": 11,
       "strand": "FUNCTIONS_AND_CALCULUS",
-      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "archetype_id": "ARCH-11.5.1",
       "problem_text_vi": "Tính đạo hàm của hàm số: y = x*exp(x)",
       "problem_latex": "x*\\exp(x)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "x*exp(x) + exp(x)",
         "latex_canonical": "xe^x + e^x",
-        "alternate_forms": ["exp(x)*(x + 1)", "(x + 1)*exp(x)"]
-      }
+        "alternate_forms": [
+          "exp(x)*(x + 1)",
+          "(x + 1)*exp(x)"
+        ]
+      },
+      "benchmark_category": "TRANSCENDENTAL_DIFF"
     },
     {
       "problem_id": "P1B-EQ-001",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: log_2(x-1) + log_2(x+1) = 3",
       "problem_latex": "\\log(x-1, 2) + \\log(x+1, 2) = 3",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{3}",
         "latex_canonical": "\\left\\{ 3 \\right\\}",
-        "alternate_forms": ["{3}"]
-      }
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-002",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: log_2(x^2 - 3) = log_2(2*x)",
       "problem_latex": "\\log(x^2 - 3, 2) = \\log(2*x, 2)",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{3}",
         "latex_canonical": "\\left\\{ 3 \\right\\}",
-        "alternate_forms": ["{3}"]
-      }
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-003",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: log_3(x-2) = 2",
       "problem_latex": "\\log(x-2, 3) = 2",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{11}",
         "latex_canonical": "\\left\\{ 11 \\right\\}",
-        "alternate_forms": ["{11}"]
-      }
+        "alternate_forms": [
+          "{11}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-004",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: 2^(x+1) = 8",
       "problem_latex": "2^(x+1) = 8",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{2}",
         "latex_canonical": "\\left\\{ 2 \\right\\}",
-        "alternate_forms": ["{2}"]
-      }
+        "alternate_forms": [
+          "{2}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-005",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: 3^(2*x - 1) = 27",
       "problem_latex": "3^(2*x - 1) = 27",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{2}",
         "latex_canonical": "\\left\\{ 2 \\right\\}",
-        "alternate_forms": ["{2}"]
-      }
+        "alternate_forms": [
+          "{2}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-006",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: exp(2*x) - 3*exp(x) + 2 = 0",
       "problem_latex": "\\exp(2*x) - 3*\\exp(x) + 2 = 0",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{0, log(2)}",
         "latex_canonical": "\\left\\{ 0, \\ln(2) \\right\\}",
-        "alternate_forms": ["{0, ln(2)}", "{log(2), 0}"]
-      }
+        "alternate_forms": [
+          "{0, ln(2)}",
+          "{log(2), 0}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-007",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: log_5(x+2) + log_5(x-2) = 1",
       "problem_latex": "\\log(x+2, 5) + \\log(x-2, 5) = 1",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{3}",
         "latex_canonical": "\\left\\{ 3 \\right\\}",
-        "alternate_forms": ["{3}"]
-      }
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-008",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: 4^x - 5*2^x + 4 = 0",
       "problem_latex": "4^x - 5*2^x + 4 = 0",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{0, 2}",
         "latex_canonical": "\\left\\{ 0, 2 \\right\\}",
-        "alternate_forms": ["{0, 2}", "{2, 0}"]
-      }
+        "alternate_forms": [
+          "{0, 2}",
+          "{2, 0}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-009",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: ln(2*x - 1) = 0",
       "problem_latex": "\\ln(2*x - 1) = 0",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{1}",
         "latex_canonical": "\\left\\{ 1 \\right\\}",
-        "alternate_forms": ["{1}"]
-      }
+        "alternate_forms": [
+          "{1}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
     },
     {
       "problem_id": "P1B-EQ-010",
       "grade": 11,
       "strand": "NUMBERS_AND_ALGEBRA",
-      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "archetype_id": "ARCH-11.4.3",
       "problem_text_vi": "Giải phương trình: log_2(x) = 5",
       "problem_latex": "\\log(x, 2) = 5",
       "question_type": "SHORT_ANSWER",
       "ground_truth": {
         "symbolic_canonical": "{32}",
         "latex_canonical": "\\left\\{ 32 \\right\\}",
-        "alternate_forms": ["{32}"]
+        "alternate_forms": [
+          "{32}"
+        ]
+      },
+      "benchmark_category": "EXP_LOG_EQUATION"
+    },
+    {
+      "problem_id": "P1B-ADV-001",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.4.3",
+      "benchmark_category": "DOMAIN_IDENTITY",
+      "problem_text_vi": "Giải phương trình đồng nhất: ln(x) = ln(x)",
+      "problem_latex": "\\ln(x) = \\ln(x)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "(0, oo)",
+        "latex_canonical": "\\left(0, \\infty\\right)",
+        "alternate_forms": [
+          "(0, oo)",
+          "x > 0",
+          "(0, inf)"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-002",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.4.3",
+      "benchmark_category": "DOMAIN_IDENTITY",
+      "problem_text_vi": "Giải phương trình đồng nhất: log_2(x-1) = log_2(x-1)",
+      "problem_latex": "\\log(x-1, 2) = \\log(x-1, 2)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "(1, oo)",
+        "latex_canonical": "\\left(1, \\infty\\right)",
+        "alternate_forms": [
+          "(1, oo)",
+          "x > 1",
+          "(1, inf)"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-003",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "DOMAIN_IDENTITY",
+      "problem_text_vi": "Giải phương trình đồng nhất: tan(x) = tan(x)",
+      "problem_latex": "\\tan(x) = \\tan(x)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "All real numbers except pi/2 + k*pi (k integer)",
+        "latex_canonical": "\\mathbb{R} \\setminus \\left\\{ \\frac{\\pi}{2} + k\\pi \\;\\middle|\\; k \\in \\mathbb{Z} \\right\\}",
+        "alternate_forms": [
+          "All real numbers except pi/2 + k*pi (k integer)",
+          "All real numbers except pi/2 + k*pi, k in Z"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-004",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.4.3",
+      "benchmark_category": "DOMAIN_IDENTITY",
+      "problem_text_vi": "Giải phương trình: log_2(x) / log_2(x) = 1",
+      "problem_latex": "\\log(x, 2) / \\log(x, 2) = 1",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "(0, 1) U (1, oo)",
+        "latex_canonical": "\\left(0, 1\\right) \\cup \\left(1, \\infty\\right)",
+        "alternate_forms": [
+          "(0, 1) U (1, oo)",
+          "(0, 1) U (1, inf)"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-005",
+      "grade": 11,
+      "strand": "NUMBERS_AND_ALGEBRA",
+      "archetype_id": "ARCH-11.4.1",
+      "benchmark_category": "INVALID_DOMAIN_ARGUMENT",
+      "problem_text_vi": "Tính giá trị của log_2(-4) (biểu thức vi phạm tập xác định)",
+      "problem_latex": "\\log(-4, 2)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "DOMAIN_ERROR",
+        "symbolic_canonical": "DOMAIN_ERROR",
+        "alternate_forms": [
+          "DOMAIN_ERROR"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-006",
+      "grade": 11,
+      "strand": "NUMBERS_AND_ALGEBRA",
+      "archetype_id": "ARCH-11.4.1",
+      "benchmark_category": "INVALID_DOMAIN_BASE",
+      "problem_text_vi": "Tính giá trị của log_1(5) (cơ số bằng 1 không hợp lệ)",
+      "problem_latex": "\\log(5, 1)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "DOMAIN_ERROR",
+        "symbolic_canonical": "DOMAIN_ERROR",
+        "alternate_forms": [
+          "DOMAIN_ERROR"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-007",
+      "grade": 11,
+      "strand": "NUMBERS_AND_ALGEBRA",
+      "archetype_id": "ARCH-11.4.1",
+      "benchmark_category": "INVALID_DOMAIN_BASE",
+      "problem_text_vi": "Tính giá trị của log_{-2}(8) (cơ số âm không hợp lệ)",
+      "problem_latex": "\\log(8, -2)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "DOMAIN_ERROR",
+        "symbolic_canonical": "DOMAIN_ERROR",
+        "alternate_forms": [
+          "DOMAIN_ERROR"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-008",
+      "grade": 11,
+      "strand": "NUMBERS_AND_ALGEBRA",
+      "archetype_id": "ARCH-11.4.1",
+      "benchmark_category": "INVALID_DOMAIN_ARGUMENT",
+      "problem_text_vi": "Tính giá trị của ln(0) (logarit của 0 không xác định)",
+      "problem_latex": "\\ln(0)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "DOMAIN_ERROR",
+        "symbolic_canonical": "DOMAIN_ERROR",
+        "alternate_forms": [
+          "DOMAIN_ERROR"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-009",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.1",
+      "benchmark_category": "INVALID_DOMAIN_POLE",
+      "problem_text_vi": "Tính giá trị của tan(pi/2) (cực điểm không xác định)",
+      "problem_latex": "\\tan(\\pi/2)",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "DOMAIN_ERROR",
+        "symbolic_canonical": "DOMAIN_ERROR",
+        "alternate_forms": [
+          "DOMAIN_ERROR"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-010",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "PERIODIC_TRIG_EQUATION",
+      "problem_text_vi": "Giải phương trình lượng giác: sin(x) = 1/2",
+      "problem_latex": "\\sin(x) = 1/2",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "x = pi/6 + 2*k*pi, x = 5*pi/6 + 2*k*pi (k in Z)",
+        "latex_canonical": "x = \\frac{\\pi}{6} + 2k\\pi \\quad \\lor \\quad x = \\frac{5\\pi}{6} + 2k\\pi \\quad (k \\in \\mathbb{Z})",
+        "alternate_forms": [
+          "pi/6 + 2*k*pi, 5*pi/6 + 2*k*pi",
+          "x = pi/6 + 2*k*pi, x = 5*pi/6 + 2*k*pi (k in Z)",
+          "{pi/6 + 2*k*pi, 5*pi/6 + 2*k*pi}"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-011",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "PERIODIC_TRIG_EQUATION",
+      "problem_text_vi": "Giải phương trình lượng giác: cos(x) = 0",
+      "problem_latex": "\\cos(x) = 0",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "x = pi/2 + k*pi (k in Z)",
+        "latex_canonical": "x = \\frac{\\pi}{2} + k\\pi \\quad (k \\in \\mathbb{Z})",
+        "alternate_forms": [
+          "pi/2 + k*pi",
+          "x = pi/2 + k*pi (k in Z)",
+          "{pi/2 + k*pi}"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-012",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "PERIODIC_TRIG_EQUATION",
+      "problem_text_vi": "Giải phương trình lượng giác: tan(x) = 1",
+      "problem_latex": "\\tan(x) = 1",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "x = pi/4 + k*pi (k in Z)",
+        "latex_canonical": "x = \\frac{\\pi}{4} + k\\pi \\quad (k \\in \\mathbb{Z})",
+        "alternate_forms": [
+          "pi/4 + k*pi",
+          "x = pi/4 + k*pi (k in Z)",
+          "{pi/4 + k*pi}"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-013",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "PERIODIC_TRIG_EQUATION",
+      "problem_text_vi": "Giải phương trình lượng giác: sin(2*x - pi/6) = 1/2",
+      "problem_latex": "\\sin(2*x - \\pi/6) = 1/2",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z)",
+        "latex_canonical": "x = \\frac{\\pi}{6} + k\\pi \\quad \\lor \\quad x = \\frac{\\pi}{2} + k\\pi \\quad (k \\in \\mathbb{Z})",
+        "alternate_forms": [
+          "pi/6 + k*pi, pi/2 + k*pi",
+          "x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z)",
+          "{pi/6 + k*pi, pi/2 + k*pi}"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-014",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "PERIODIC_TRIG_EQUATION",
+      "problem_text_vi": "Giải phương trình lượng giác vô nghiệm: sin(x) = 2",
+      "problem_latex": "\\sin(x) = 2",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "symbolic_canonical": "{}",
+        "latex_canonical": "\\emptyset",
+        "alternate_forms": [
+          "{}",
+          "No real solution",
+          "None"
+        ]
+      }
+    },
+    {
+      "problem_id": "P1B-ADV-015",
+      "grade": 11,
+      "strand": "FUNCTIONS_AND_CALCULUS",
+      "archetype_id": "ARCH-11.1.3",
+      "benchmark_category": "UNSUPPORTED_NONLINEAR",
+      "problem_text_vi": "Giải phương trình siêu việt phi tuyến: sin(x) + cos(x) = x",
+      "problem_latex": "\\sin(x) + \\cos(x) = x",
+      "question_type": "SHORT_ANSWER",
+      "ground_truth": {
+        "expected_status": "OUT_OF_SCOPE",
+        "symbolic_canonical": "OUT_OF_SCOPE",
+        "alternate_forms": [
+          "OUT_OF_SCOPE",
+          "UNRESOLVED"
+        ]
       }
     }
-  ]
+  ],
+  "archetype_crosswalk": {
+    "ARCH-11.1.1": "Biến đổi lượng giác cơ bản và công thức lượng giác (Trig Simplification)",
+    "ARCH-11.1.3": "Phương trình lượng giác cơ bản (Periodic Trigonometric Equations)",
+    "ARCH-11.4.1": "Khái niệm và tính chất logarit, biến đổi logarit (Log Evaluation)",
+    "ARCH-11.4.3": "Phương trình, bất phương trình mũ và logarit cơ bản (Exp/Log Equations & Identities)",
+    "ARCH-11.5.1": "Đạo hàm của hàm số lượng giác, mũ và logarit (Transcendental Differentiation)"
+  }
 }

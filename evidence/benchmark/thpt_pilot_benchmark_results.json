@@ -28,22 +28,22 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-28T16:19:06Z",
+    "timestamp": "2026-09-28T22:38:16Z",
     "engine_version": "v0.3.0-p03b-accepted",
-    "duration_seconds": 20.219,
+    "duration_seconds": 21.5,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
       "unsupported_modality": 6,
-      "success": 16,
-      "genuine_wrong_answer": 6,
+      "success": 17,
+      "genuine_wrong_answer": 5,
       "extraneous_root_leak": 0,
       "unsupported_grammar": 12,
       "domain_rejected": 0,
       "timeout": 0,
       "internal_error": 0,
-      "full_pilot_accuracy_pct": 40.0,
-      "symbolic_attempted_accuracy_pct": 47.06
+      "full_pilot_accuracy_pct": 42.5,
+      "symbolic_attempted_accuracy_pct": 50.0
     },
     "extraneous_roots_telemetry": {
       "problems_with_extraneous_roots": 3,
@@ -60,7 +60,7 @@
         "11": {
           "total": 14,
           "attempted": 11,
-          "success": 5
+          "success": 6
         },
         "12": {
           "total": 11,
@@ -71,7 +71,7 @@
       "by_format": {
         "FORMAT_I_MCQ": {
           "total": 11,
-          "success": 4
+          "success": 5
         },
         "FORMAT_II_TRUE_FALSE": {
           "total": 3,
@@ -90,7 +90,7 @@
         "SYMBOLIC_TYPED": {
           "total": 34,
           "attempted": 34,
-          "success": 16
+          "success": 17
         },
         "VIETNAMESE_WORD_PROBLEM": {
           "total": 4,
@@ -176,7 +176,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'-2', '2'}",
+      "scoring_details": "Exact solution set matched: {'2', '-2'}",
       "engine_result": "{-2, 2}",
       "engine_solution_set": [
         "-2",
@@ -463,16 +463,16 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sin(x) = 1/2",
-      "outcome": "GENUINE_WRONG_ANSWER",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
+      "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "MCQ failed: expected choice A / {'pi/6+2*k*pi', '5*pi/6+2*k*pi'}, got key 'None' / {'5*pi/6', 'pi/6'}",
-      "engine_result": "{5*pi/6, pi/6}",
+      "scoring_details": "MCQ matched (choice_matched=False, math_matched=True)",
+      "engine_result": "x = pi/6 + 2*k*pi, x = 5*pi/6 + 2*k*pi (k in Z)",
       "engine_solution_set": [
-        "pi/6",
-        "5*pi/6"
+        "pi/6 + 2*k*pi",
+        "5*pi/6 + 2*k*pi"
       ]
     },
     {

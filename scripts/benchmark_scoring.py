@@ -198,8 +198,22 @@ def evaluate_benchmark_response(
             "details": f"Input modality '{modality}' requires external NLP / multimodal pipeline."
         }
 
+    expected_status = gt.get("expected_status")
+    if expected_status:
+        if (
+            engine_status == expected_status
+            or (expected_status in ["OUT_OF_SCOPE", "UNRESOLVED"] and engine_status in ["OUT_OF_SCOPE", "UNRESOLVED"])
+            or (expected_status == "DOMAIN_ERROR" and engine_status in ["DOMAIN_ERROR", "INVALID_INPUT"])
+        ):
+            return {
+                "outcome": BenchmarkOutcome.SUCCESS,
+                "matched_ground_truth": True,
+                "telemetry": base_telemetry,
+                "details": f"Correctly produced expected status: {engine_status}."
+            }
+
     # 2. Engine non-success statuses: separate syntax rejection from mathematical domain error
-    if engine_status in ["OUT_OF_SCOPE", "UNSUPPORTED_EXPRESSION", "INVALID_INPUT"]:
+    if engine_status in ["OUT_OF_SCOPE", "UNRESOLVED", "UNSUPPORTED_EXPRESSION", "INVALID_INPUT"]:
         return {
             "outcome": BenchmarkOutcome.UNSUPPORTED_GRAMMAR,
             "matched_ground_truth": False,
