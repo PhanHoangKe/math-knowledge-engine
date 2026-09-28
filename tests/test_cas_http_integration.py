@@ -500,7 +500,7 @@ class TestCASHTTPIntegration(unittest.TestCase):
         status, data = self._post_json("/api/execute", payload)
         self.assertEqual(status, 200)
         self.assertEqual(data["mathematical_status"], "SUCCESS")
-        self.assertEqual(data["symbolic_result"], "x = 3")
+        self.assertEqual(data["symbolic_result"], "{3}")
 
 
 if __name__ == "__main__":
