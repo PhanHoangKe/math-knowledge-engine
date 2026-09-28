@@ -73,7 +73,7 @@
           "genuinely_verified_excluded_roots_count": 1
         }
       },
-      "duration_sec": 0.047
+      "duration_sec": 0.078
     },
     {
       "item_id": "P1A-ALG-003",
@@ -107,7 +107,7 @@
           "genuinely_verified_excluded_roots_count": 1
         }
       },
-      "duration_sec": 0.093
+      "duration_sec": 0.109
     },
     {
       "item_id": "P1A-ALG-004",
@@ -141,7 +141,7 @@
           "genuinely_verified_excluded_roots_count": 1
         }
       },
-      "duration_sec": 0.172
+      "duration_sec": 0.188
     },
     {
       "item_id": "P1A-ALG-005",
@@ -171,7 +171,7 @@
           "genuinely_verified_excluded_roots_count": 1
         }
       },
-      "duration_sec": 0.063
+      "duration_sec": 0.046
     },
     {
       "item_id": "P1A-ALG-006",
@@ -205,7 +205,7 @@
     },
     {
       "item_id": "P1A-ALG-007",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "input_text": "(x^2 - 4) / (x - 2) = 4",
       "engine_status": "SUCCESS",
       "symbolic_result": "{}",
@@ -231,11 +231,11 @@
           "genuinely_verified_excluded_roots_count": 1
         }
       },
-      "duration_sec": 0.015
+      "duration_sec": 0.016
     },
     {
       "item_id": "P1A-ALG-008",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "input_text": "(x^2 - 3*x) / (x - 3) = 2",
       "engine_status": "SUCCESS",
       "symbolic_result": "{2}",
@@ -261,11 +261,11 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.016
+      "duration_sec": 0.047
     },
     {
       "item_id": "P1A-ALG-009",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "input_text": "(2*x + 1) / (x - 1) = 3",
       "engine_status": "SUCCESS",
       "symbolic_result": "{4}",
@@ -291,7 +291,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.016
+      "duration_sec": 0.015
     },
     {
       "item_id": "P1A-ALG-010",
@@ -314,7 +314,7 @@
       "eval_result": {
         "outcome": "SUCCESS",
         "matched_ground_truth": true,
-        "details": "Exact solution set matched: {'2/3', '4'}",
+        "details": "Exact solution set matched: {'4', '2/3'}",
         "telemetry": {
           "declared_candidates_count": 0,
           "actually_processed_candidates_count": 0,
@@ -323,7 +323,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.031
+      "duration_sec": 0.032
     },
     {
       "item_id": "P1A-ALG-011",
@@ -380,7 +380,7 @@
       "eval_result": {
         "outcome": "SUCCESS",
         "matched_ground_truth": true,
-        "details": "Exact solution set matched: {'3', '-1/2'}",
+        "details": "Exact solution set matched: {'-1/2', '3'}",
         "telemetry": {
           "declared_candidates_count": 0,
           "actually_processed_candidates_count": 0,
@@ -389,7 +389,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.032
+      "duration_sec": 0.016
     },
     {
       "item_id": "P1A-ALG-013",
@@ -418,7 +418,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.0
+      "duration_sec": 0.016
     },
     {
       "item_id": "P1A-ALG-014",
@@ -441,7 +441,7 @@
       "eval_result": {
         "outcome": "SUCCESS",
         "matched_ground_truth": true,
-        "details": "Exact solution set matched: {'-2/3', '-4'}",
+        "details": "Exact solution set matched: {'-4', '-2/3'}",
         "telemetry": {
           "declared_candidates_count": 0,
           "actually_processed_candidates_count": 0,
@@ -450,7 +450,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.031
+      "duration_sec": 0.015
     },
     {
       "item_id": "P1A-ALG-015",
@@ -480,7 +480,7 @@
           "genuinely_verified_excluded_roots_count": 0
         }
       },
-      "duration_sec": 0.062
+      "duration_sec": 0.063
     }
   ]
 }

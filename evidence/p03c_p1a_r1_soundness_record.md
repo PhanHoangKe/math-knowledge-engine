@@ -1,44 +1,44 @@
-# MKE PRODUCT-03C-P1A-R1: Mathematical Soundness and Benchmark Closure Record
+# MKE PRODUCT-03C-P1A-R1: Mathematical Soundness & Final Acceptance Hotfix Record
 
 ## 1. Overview & Mandate
-- **Mandate:** `MKE PRODUCT-03C-P1A-R1 — MATHEMATICAL SOUNDNESS AND BENCHMARK CLOSURE`
+- **Mandate:** `MKE PRODUCT-03C-P1A — FINAL ACCEPTANCE HOTFIX`
 - **Branch:** `product/p03c-p1a-r1-soundness`
-- **Baseline Source Commit:** `7cf0246a26ec825466a4415bd94dcf04d4df6830`
-- **Baseline Evidence Commit:** `7baec0059992c29104022e6d1e8b1b24e1480fc8`
+- **Initial Baseline Source Commit:** `7cf0246a26ec825466a4415bd94dcf04d4df6830`
+- **R1 Source Commit:** `5501f91320698ec2ec6e2cee3c89d40046c4bded`
+- **R1 Evidence Commit:** `8c57538ba683780a0abb03db6b829ef56a523c42`
 - **Role:** Antigravity — Implementation Engineer
 - **Project Owner:** Kế Phan Hoàng
 - **Independent Auditor:** ChatGPT
 
 ---
 
-## 2. Remediation Summary & Mathematical Soundness
+## 2. Final Acceptance Hotfix Remediations
 
-### Task 1: Exact Symbolic Root Validation
-- **Problem:** `_validate_root_in_ast()` previously used floating-point epsilon comparison `abs(float(diff.evalf())) > 1e-9`. When presented with counterexample `sqrt(x^2) = x - 1/1000000000000`, algebraic squaring produced candidate root $x = 1/2000000000000$. The difference evaluated to $10^{-12} < 10^{-9}$, allowing this false candidate to leak into the solution set as a valid root.
-- **Fix:** Removed all floating-point epsilon checks in `_validate_root_in_ast()`. Implemented exact symbolic equality verification using `diff = sympy.simplify(lhs_val - rhs_val)`. If `diff == 0` or `diff.is_zero is True`, the candidate is accepted. If `diff.is_zero is False` or `diff.is_number and diff != 0`, it is rejected as an extraneous candidate. If equality/inequality is undecidable, it fails closed with `False, "undecidable_equality"`.
-- **Validation:** Tested counterexample `sqrt(x^2) = x - 1/1000000000000` -> Result: `{}` ($\emptyset$), candidate $x = 1/2000000000000$ recorded in `extraneous_roots`. Positive controls confirmed for valid roots.
+### Task 1: Fail-Closed Domain Identities
+- **Defect Addressed:** In `_execute_solve()`'s identity branch ($LHS - RHS \equiv 0$), domain resolution previously caught exceptions and did `pass`, which could allow incomplete or unresolvable domains to fall through to `SUCCESS`.
+- **Correction Applied:**
+  - Removed silent `pass` in radical, denominator, and zero-power domain solving loops.
+  - Added explicit checks for `sympy.ConditionSet` (unresolvable conditions).
+  - When any domain constraint calculation fails or returns `ConditionSet`, the engine immediately fails closed:
+    - `mathematical_status = EngineStatus.UNRESOLVED`
+    - `verification_status = VerificationStatus.UNRESOLVED`
+    - `domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED`
+  - Added dedicated regression unit tests in `tests/test_p03c_p1a_algebra_solver.py`:
+    - `test_injected_identity_domain_calculation_failure_fails_closed`
+    - `test_injected_conditionset_identity_domain_fails_closed`
+    - `test_domain_preserving_identity_radical` (`sqrt(x) = sqrt(x)` -> `[0, oo)`)
+    - `test_domain_preserving_identity_radical_and_rational` (`sqrt(x-2)/(x-5) = sqrt(x-2)/(x-5)` -> `[2, 5) U (5, oo)`)
 
-### Task 2: Domain-Preserving Identities
-- **Problem:** When solving identity equations ($LHS - RHS \equiv 0$), `_execute_solve()` previously assumed all domain restrictions were isolated point exclusions ($x \neq a$), outputting incorrect text such as `"All real numbers except x >= 0"` for `sqrt(x) = sqrt(x)`.
-- **Fix:** Restructured identity equation handling to compute the exact real domain:
-  - Radicands $R(x)$ intersect domain with `sympy.solveset(R >= 0, x, domain=sympy.S.Reals)`.
-  - Rational denominators $D(x)$ exclude zeros `domain - sympy.solveset(Eq(D, 0), x, domain=sympy.S.Reals)`.
-  - Zero-exponent bases $B(x)^0$ exclude zeros `domain - sympy.solveset(Eq(B, 0), x, domain=sympy.S.Reals)`.
-  - Non-trivial interval domains are formatted using `format_interval_symbolic()` and `format_interval_latex()`.
-- **Validation:** `sqrt(x) = sqrt(x)` -> `[0, oo)` / $\left[0, \infty\right)$. `sqrt(x - 2)/(x - 5) = sqrt(x - 2)/(x - 5)` -> `[2, 5) U (5, oo)`.
-
-### Task 3: Benchmark Metadata & Telemetry Reconciliation
-- **Problem:** `tests/benchmarks/p03c_p1a_algebra_benchmark.json` contained invalid archetype ID `ARCH-10.3.4` not present in `docs/curriculum/GDPT2018_THPT_MATH_TAXONOMY.md`. Item `P1A-ALG-015` (`sqrt(x^2 - 3*x + 2) = x - 1`) declared $x = 2$ as an extraneous root, whereas algebraic squaring produces only candidate $x = 1$.
-- **Fix:**
-  - Reconciled all archetype IDs with official Topic 10.5 taxonomy: `ARCH-10.5.1` (Dual radical), `ARCH-10.5.2` (Single radical), `ARCH-10.5.3` (Absolute value).
-  - Corrected `P1A-ALG-015` ground truth: `solution_set: ["1"]`, `extraneous_roots: []`.
-
-### Task 4: Scoring Engine Hardening
-- **Fix:** Enhanced `scripts/benchmark_scoring.py`:
-  - Added exact symbolic mathematical equivalence `is_mathematically_equivalent()` supporting radical simplifications ($2\sqrt{3} \equiv \sqrt{12}$) and algebraic identities.
-  - Added robust multi-variable linear system parsing and equivalence `are_systems_equivalent()`.
-  - Added empty-set MCQ evaluation and separate tracking of `choice_matched` vs `math_matched`.
-  - Added mutation unit test suite in `tests/test_benchmark_scoring.py` with deliberately corrupted responses (wrong signs, partial subsets, supersets with bogus roots, inequivalent radicals, empty vs zero) verifying zero false positives.
+### Task 2: Scorer and Data Corrections
+- **System Solution String Parsing (`PILOT-10-0010`):**
+  - Updated `parse_system_solution()` in `scripts/benchmark_scoring.py` to split on commas and semicolons across lists and single strings.
+  - Real pilot item `PILOT-10-0010` ($2x - 3y = 7, 3x + 2y = 4$) returning `"x = 2, y = -1"` is now correctly parsed and evaluated as `SUCCESS`.
+- **Status Classification Separation:**
+  - Separated `INVALID_INPUT` / `OUT_OF_SCOPE` syntax rejections (`BenchmarkOutcome.UNSUPPORTED_GRAMMAR`) from true mathematical `DOMAIN_ERROR` (`BenchmarkOutcome.DOMAIN_REJECTED`).
+- **Rational Equation Taxonomy Mapping:**
+  - In `tests/benchmarks/p03c_p1a_algebra_benchmark.json`, rational equation items (`P1A-ALG-007`, `P1A-ALG-008`, `P1A-ALG-009`) are explicitly categorized under extension category `ARCH-10.EXT-RATIONAL.1` ("Phương trình phân thức hữu tỉ một ẩn quy về phương trình bậc nhất hoặc bậc hai") rather than overloaded onto radical archetypes.
+- **Root Telemetry Honesty:**
+  - `genuinely_verified_excluded_roots_count` is incremented only when supported by worker `verification_evidence["extraneous_roots"]`.
 
 ---
 
@@ -53,18 +53,21 @@
 ### B. THPT 40-Problem Pilot Diagnostic Benchmark
 - **Total Items:** 40
 - **Attempted Symbolic Subset:** 34 / 40 (85.0%)
-- **Unsupported Modality:** 6 / 40 (15.0%)
-- **Mathematical Successes:** 12
-- **Genuine Wrong Answers:** 5
-- **Domain Rejected / Safety Blocked:** 17
+- **Unsupported Modality (NLP/Word Problems):** 6 / 40 (15.0%)
+- **Mathematical Successes:** 13 (includes `PILOT-10-0010`)
+- **Genuine Wrong Answers:** 4
+- **Unsupported Grammar / Out of Scope:** 17
+- **Domain Rejected / Mathematical Domain Errors:** 0
+- **Engine Timeouts:** 0
+- **Overall Pilot Accuracy:** 32.50% (13/40) (up from 30.00%)
+- **Attempted Symbolic Subset Accuracy:** 38.24% (13/34) (up from 35.29%)
 - **Extraneous Root Leaks:** 0
-- **Overall Accuracy:** 30.00% (12/40)
-- **Attempted Subset Accuracy:** 35.29% (12/34)
+- **Grade 10 Solved:** 10 / 15 (66.7%)
 - **Evidence File:** `evidence/benchmark/thpt_pilot_benchmark_results.json`
 
 ---
 
-## 4. Test Suite Summary
-- **Targeted Unit & Mutation Tests:** 33 passed in 1.88s (`tests/test_p03c_p1a_algebra_solver.py`, `tests/test_benchmark_scoring.py`).
-- **Windows Worker Isolation Suite:** 80 passed in 39.83s (`tests/test_worker_windows.py`).
-- **Full Pytest Suite:** 526 passed.
+## 4. Test Suite Execution
+- **Targeted Unit & Mutation Tests:** 38 passed in 1.66s (`tests/test_p03c_p1a_algebra_solver.py`, `tests/test_benchmark_scoring.py`).
+- **Windows Kernel Isolation & Handle Ownership:** 80 passed (`tests/test_worker_windows.py`).
+- **Full Pytest Regression Suite:** 532 passed in 146.11s.
