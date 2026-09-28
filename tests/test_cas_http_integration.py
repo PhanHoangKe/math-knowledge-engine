@@ -79,8 +79,24 @@ class TestCASHTTPIntegration(unittest.TestCase):
         status, body, headers = self._get("/")
         self.assertEqual(status, 200)
         self.assertIn(b"<!DOCTYPE html>", body)
+        self.assertIn(b"Math Knowledge Engine", body)
+        self.assertIn("text/html", headers.get("Content-Type", ""))
+
+    def test_get_dev_demo_serves_html(self):
+        status, body, headers = self._get("/dev/demo")
+        self.assertEqual(status, 200)
+        self.assertIn(b"<!DOCTYPE html>", body)
         self.assertIn(b"MKE Multi-Engine CAS Platform", body)
         self.assertIn("text/html", headers.get("Content-Type", ""))
+
+    def test_get_static_assets(self):
+        status_css, body_css, _ = self._get("/styles.css")
+        self.assertEqual(status_css, 200)
+        self.assertGreater(len(body_css), 100)
+
+        status_js, body_js, _ = self._get("/app.js")
+        self.assertEqual(status_js, 200)
+        self.assertGreater(len(body_js), 100)
 
     def test_get_health_endpoint(self):
         status, body, headers = self._get("/api/health")

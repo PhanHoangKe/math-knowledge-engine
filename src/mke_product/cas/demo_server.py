@@ -1,8 +1,9 @@
 """
-MKE Multi-Engine CAS Web Demo Server (v0/R1).
+MKE Product Unified Server (v0/R2).
 
-Lightweight HTTP server serving the interactive web UI and dispatching
-CAS operations via the multi-engine router using the canonical ExecutionResponse schema.
+Serves the canonical MKE product web interface (inspired by WolframAlpha)
+and dispatches mathematical operations via the multi-engine CAS router
+(Native MKE linear solver + SymPy CAS symbolic engine).
 """
 
 from __future__ import annotations
@@ -17,28 +18,50 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Dict
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "src"))
+
 from mke_product.cas.contracts import EngineStatus, ExecutionRequest, OperationType
 from mke_product.cas.router import execute_cas_operation
 
-logger = logging.getLogger("mke_cas_demo_server")
+logger = logging.getLogger("mke_product_server")
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+UI_DIR = REPO_ROOT / "ui" / "ui00"
+DEV_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
-class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
-    server_version = "MKECASDemo/0.1"
+class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
+    server_version = "MKEProductServer/0.2"
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.info("%s - - [%s] %s", self.address_string(), self.log_date_time_string(), format % args)
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path == "/" or path == "/index.html":
-            self._serve_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
-        elif path.startswith("/static/"):
-            relative_name = path[len("/static/"):]
-            file_path = (STATIC_DIR / relative_name).resolve()
-            if not str(file_path).startswith(str(STATIC_DIR)):
+        
+        # Primary Canonical Product Interface (ui/ui00)
+        if path in ("/", "/index.html"):
+            self._serve_file(UI_DIR / "index.html", "text/html; charset=utf-8")
+        elif path in ("/styles.css", "/app.js", "/DESIGN_TOKENS.md", "/README.md"):
+            rel_name = path.lstrip("/")
+            mime_type, _ = mimetypes.guess_type(rel_name)
+            self._serve_file(UI_DIR / rel_name, mime_type or "text/plain; charset=utf-8")
+        elif path.startswith("/screenshots/"):
+            rel_name = path[len("/screenshots/"):]
+            file_path = (UI_DIR / "screenshots" / rel_name).resolve()
+            if not str(file_path).startswith(str(UI_DIR)):
+                self.send_error(403, "Forbidden")
+                return
+            if not file_path.is_file():
+                self.send_error(404, "File not found")
+                return
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            self._serve_file(file_path, mime_type or "image/png")
+        elif path.startswith("/ui/"):
+            rel_name = path[len("/ui/"):]
+            file_path = (UI_DIR / rel_name).resolve()
+            if not str(file_path).startswith(str(UI_DIR)):
                 self.send_error(403, "Forbidden")
                 return
             if not file_path.is_file():
@@ -46,18 +69,36 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
                 return
             mime_type, _ = mimetypes.guess_type(str(file_path))
             self._serve_file(file_path, mime_type or "application/octet-stream")
+        
+        # Internal Development Tool (Preserved)
+        elif path == "/dev/demo" or path == "/dev/demo/":
+            self._serve_file(DEV_STATIC_DIR / "index.html", "text/html; charset=utf-8")
+        elif path.startswith("/static/"):
+            rel_name = path[len("/static/"):]
+            file_path = (DEV_STATIC_DIR / rel_name).resolve()
+            if not str(file_path).startswith(str(DEV_STATIC_DIR)):
+                self.send_error(403, "Forbidden")
+                return
+            if not file_path.is_file():
+                self.send_error(404, "File not found")
+                return
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            self._serve_file(file_path, mime_type or "application/octet-stream")
+        
+        # API Health Endpoint
         elif path == "/api/health":
             self._send_json(200, {
                 "status": "HEALTHY",
-                "version": "0.1.0-r1",
+                "version": "0.2.0-r2",
+                "canonical_ui": "ui/ui00 (WolframAlpha atmosphere)",
                 "engines": ["mke_native_v1", "sympy_cas_v0"],
             })
         else:
             self.send_error(404, "Not Found")
 
     def do_POST(self) -> None:
-        if self.path == "/api/execute":
-            self._handle_execute()
+        if self.path in ("/api/execute", "/api/plot"):
+            self._handle_execute(default_op="PLOT_2D" if self.path == "/api/plot" else None)
         else:
             self.send_error(404, "Endpoint not found")
 
@@ -93,7 +134,7 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
 
-    def _handle_execute(self) -> None:
+    def _handle_execute(self, default_op: str | None = None) -> None:
         content_length_header = self.headers.get("Content-Length")
         if not content_length_header:
             self._send_json(400, {
@@ -119,7 +160,7 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
             })
             return
 
-        operation_str = payload.get("operation")
+        operation_str = payload.get("operation") or default_op
         input_text = payload.get("input") or payload.get("expression") or ""
         options = payload.get("options", {})
         preferred_engine = payload.get("engine") or payload.get("preferred_engine")
@@ -167,21 +208,25 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
         self._send_json(http_status, response.to_dict())
 
 
+# Backwards compatibility alias for CAS test suite
+CASDemoHTTPRequestHandler = MKEProductHTTPRequestHandler
+
+
 def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     server_address = (host, port)
-    httpd = HTTPServer(server_address, CASDemoHTTPRequestHandler)
-    logger.info("Starting MKE CAS Demo Server at http://%s:%d/", host, port)
+    httpd = HTTPServer(server_address, MKEProductHTTPRequestHandler)
+    logger.info("Starting Canonical MKE Product Server at http://%s:%d/", host, port)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        logger.info("Shutting down CAS Demo Server...")
+        logger.info("Shutting down MKE Product Server...")
     finally:
         httpd.server_close()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MKE Multi-Engine CAS Web Demo Server")
+    parser = argparse.ArgumentParser(description="MKE Product Multi-Engine Unified Web Server")
     parser.add_argument("--host", default="127.0.0.1", help="Host address to bind to (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
     args = parser.parse_args()

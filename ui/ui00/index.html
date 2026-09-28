@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Knowledge Engine (MKE) — Unified Product Interface</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header & Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand" id="brand-logo" role="button" tabindex="0" aria-label="MKE Home" data-i18n-attr="aria-label:brand_home_aria">
+        <div class="brand-icon-wrapper">
+          <svg class="brand-icon" viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="16" cy="16" r="13" />
+            <path d="M10 16h12M16 10v12" />
+            <path d="M12 12l8 8M20 12l-8 8" stroke-width="1.4" opacity="0.6" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">MKE<span class="brand-title-accent">Alpha</span></span>
+          <span class="brand-sub" data-i18n="brand_subtitle">Math Knowledge Engine</span>
+        </div>
+        <span class="prototype-badge" data-i18n="product_version_badge" data-i18n-attr="title:product_version_badge_title" title="Phiên bản Sản phẩm MKE v0 (Native MKE + SymPy CAS)">MKE V0</span>
+      </div>
+
+      <nav class="nav-links" aria-label="Main Navigation" data-i18n-attr="aria-label:nav_main_aria">
+        <button type="button" class="nav-btn active" id="nav-home" data-i18n="nav_home">Trang chủ</button>
+        <button type="button" class="nav-btn" id="nav-demo-result" data-i18n="nav_sample">Kết quả tính</button>
+        <button type="button" class="nav-btn" id="nav-syntax" data-i18n="nav_syntax">Cú pháp</button>
+      </nav>
+
+      <!-- Header Right: Wolfram-style Settings Popover Button -->
+      <div class="header-actions">
+        <button type="button" class="settings-btn" id="btn-settings" aria-label="Cài đặt giao diện & ngôn ngữ" title="Settings / Cài đặt" aria-expanded="false" aria-haspopup="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+
+        <!-- Popover Dropdown Menu -->
+        <div class="settings-popover" id="settings-popover" role="dialog" aria-label="Tùy chọn hiển thị">
+          <!-- Section 1: Theme -->
+          <div class="popover-section">
+            <div class="popover-title">
+              <span data-i18n="theme_popover_title">Giao diện</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="popover-options">
+              <button type="button" class="popover-item" data-theme-val="auto" id="opt-theme-auto">
+                <span data-i18n="theme_auto">Tự động (Hệ thống)</span>
+                <span class="popover-check">&#10003;</span>
+              </button>
+              <button type="button" class="popover-item active" data-theme-val="light" id="opt-theme-light">
+                <span data-i18n="theme_light">Sáng</span>
+                <span class="popover-check">&#10003;</span>
+              </button>
+              <button type="button" class="popover-item" data-theme-val="dark" id="opt-theme-dark">
+                <span data-i18n="theme_dark">Tối</span>
+                <span class="popover-check">&#10003;</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Language -->
+          <div class="popover-section">
+            <div class="popover-title">
+              <span data-i18n="lang_popover_title">Ngôn ngữ</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="popover-options">
+              <button type="button" class="popover-item active" data-lang-val="vi" id="opt-lang-vi">
+                <span>Tiếng Việt</span>
+                <span class="popover-check">&#10003;</span>
+              </button>
+              <button type="button" class="popover-item" data-lang-val="en" id="opt-lang-en">
+                <span>English</span>
+                <span class="popover-check">&#10003;</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Product Architecture Live Banner -->
+  <div class="disclaimer-banner" role="status">
+    <div class="banner-inner">
+      <span class="banner-tag" data-i18n="banner_tag">MKE PRODUCT V0</span>
+      <span class="banner-msg" data-i18n="banner_msg">Đã kết nối động cơ toán học đa lõi (Native MKE v1 + SymPy CAS v0). Toàn bộ nghiệm, đạo hàm, tích phân và đồ thị được xử lý trực tiếp bởi kiến trúc tính toán toán học chuẩn xác.</span>
+    </div>
+  </div>
+
+  <main class="main-content" id="app-main">
+    <!-- Screen 1: Home View -->
+    <section class="screen-view active" id="screen-home" aria-label="Equation Input and Topics">
+      <div class="hero-section">
+        <div class="hero-super" data-i18n="hero_super">TỪ HỆ THỐNG SUY LUẬN KÝ HIỆU HÌNH THỨC &amp; TOÁN HỌC CHÍNH XÁC</div>
+        <div class="hero-brand-logo">
+          <!-- Geometric Multi-point Star Icon (Wolfram inspired MKE insignia) -->
+          <svg class="hero-logo-star" width="42" height="42" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="24,2 29,15 43,10 34,22 47,29 33,33 36,47 24,37 12,47 15,33 1,29 14,22 5,10 19,15" fill="#ea580c" stroke="#c2410c"/>
+          </svg>
+          <div class="hero-brand-name">Math<span>Knowledge</span></div>
+        </div>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">"Suy luận ký hiệu tất định trên miền số thực \(\mathbb{R}\) với số học hữu tỉ chuẩn xác trên \(\mathbb{Q}\)."</p>
+      </div>
+
+      <!-- Prominent Capsule Search Field with Wolfram Violet Border -->
+      <div class="search-wrapper">
+        <form class="search-form" id="search-form" action="#" onsubmit="return false;">
+          <div class="input-container">
+            <input 
+              type="text" 
+              id="math-input" 
+              class="math-input" 
+              placeholder="Nhập biểu thức hoặc phương trình cần giải..." 
+              value="2*x + 3 = 7"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Nhập biểu thức toán học"
+              data-i18n-attr="placeholder:input_placeholder,aria-label:input_aria"
+            >
+            <button type="button" class="clear-btn" id="btn-clear" aria-label="Xóa nội dung nhập" title="Xóa" data-i18n-attr="title:clear_title,aria-label:clear_aria">
+              &times;
+            </button>
+            <button type="submit" class="compute-btn" id="btn-compute" aria-label="Tính toán biểu thức" data-i18n-attr="aria-label:compute_aria">
+              <span class="compute-equals-icon">&#61;</span>
+            </button>
+          </div>
+
+          <!-- Sub-Search Toolbar (Left Mode Badges, Right Quick Math Symbols) -->
+          <div class="sub-search-toolbar">
+            <div class="search-mode-toggles">
+              <span class="mode-badge" title="Chế độ toán học chuẩn xác">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <span data-i18n="mode_exact_math">Toán Chuẩn xác</span>
+              </span>
+              <span class="mode-badge" title="Đầu vào giải tích ký hiệu">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19h16M7 14l5-9 5 9"></path></svg>
+                <span data-i18n="mode_symbolic">Ký hiệu Tất định</span>
+              </span>
+            </div>
+
+            <div class="math-quick-keys" aria-label="Phím chèn ký hiệu nhanh">
+              <button type="button" class="math-key-btn" data-sym="*" title="Nhân tường minh">*</button>
+              <button type="button" class="math-key-btn" data-sym="x" title="Biến x">x</button>
+              <button type="button" class="math-key-btn" data-sym="^2" title="Bình phương">^2</button>
+              <button type="button" class="math-key-btn" data-sym="^0" title="Mũ không">^0</button>
+              <button type="button" class="math-key-btn" data-sym="/" title="Phép chia">/</button>
+              <button type="button" class="math-key-btn" data-sym="=" title="Dấu bằng">=</button>
+              <button type="button" class="math-key-btn" data-sym="( )" title="Dấu ngoặc">( )</button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Suggested Prompt Chips -->
+        <div class="sample-chips" aria-label="Các ví dụ tiêu biểu" data-i18n-attr="aria-label:chips_aria">
+          <span class="chips-label" data-i18n="chips_label">Ví dụ:</span>
+          <button type="button" class="chip" data-query="2*x + 3 = 7">2*x + 3 = 7</button>
+          <button type="button" class="chip" data-query="x^2 - 5*x + 6 = 0">x^2 - 5*x + 6 = 0</button>
+          <button type="button" class="chip" data-query="x^3 + 2*x^2 - 5*x + 7">x^3 + 2*x^2 - 5*x + 7</button>
+          <button type="button" class="chip" data-query="x^0 = 1">x^0 = 1</button>
+          <button type="button" class="chip" data-query="(x^2 - 4)/(x - 2) = 4">(x^2 - 4)/(x - 2) = 4</button>
+          <button type="button" class="chip" data-query="1/(2-2) = 1" title="Minh họa lỗi chia cho 0">1/(2-2) = 1 (Lỗi Chia 0)</button>
+          <button type="button" class="chip chip-syntax" data-query="1/2x = 1" title="Minh họa lỗi cú pháp" data-i18n="chip_syntax_demo" data-i18n-attr="title:chip_syntax_title">1/2x = 1 (Lỗi Cú pháp)</button>
+        </div>
+      </div>
+
+      <!-- 4-Column Mathematical Topic Grid (WolframAlpha Layout with Authentic Iconography) -->
+      <section class="topics-section" aria-label="Chuyên đề toán học" data-i18n-attr="aria-label:topics_section_aria">
+        <div class="topic-4col-grid">
+          <!-- COLUMN 1: Mathematics & Linear Algebra (Purple / Violet) -->
+          <div class="topic-col">
+            <div class="col-header col-header-math">
+              <span data-i18n="col_math_title">Toán học &amp; Đại số</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+            
+            <button type="button" class="topic-tile" data-query="2*x + 3 = 7">
+              <div class="tile-icon-box tile-icon-math">
+                <!-- Checklist / Step-by-step icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_step_solutions">Lời giải Từng bước Tuyến tính</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="3*x - 5 = 10">
+              <div class="tile-icon-box tile-icon-math">
+                <!-- Linear Formula ax + b icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="20" x2="21" y2="4"></line><circle cx="7" cy="16" r="2"></circle><circle cx="17" cy="8" r="2"></circle></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_linear_eq">Phương trình Tuyến tính Tuyệt đối</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="0*x = 0">
+              <div class="tile-icon-box tile-icon-math">
+                <!-- Identity 0=0 symbol icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="5"></circle><line x1="16" y1="10" x2="22" y2="10"></line><line x1="16" y1="14" x2="22" y2="14"></line></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_identity_eq">Đồng nhất thức &amp; Vô nghiệm</span>
+            </button>
+
+            <!-- Bottom More Topics Tile -->
+            <button type="button" class="topic-tile more-topics-tile math-more" id="btn-more-math">
+              <div class="tile-icon-box tile-icon-math">
+                <!-- 3x3 Dot Matrix Icon -->
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_more_algebra">Xem thêm Chuyên đề Đại số &raquo;</span>
+            </button>
+          </div>
+
+          <!-- COLUMN 2: Rational Field Arithmetic (Emerald Green) -->
+          <div class="topic-col">
+            <div class="col-header col-header-science">
+              <span data-i18n="col_rational_title">Trường Số Hữu tỉ</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+
+            <button type="button" class="topic-tile" data-query="1/3 + 1/6 = 1/2">
+              <div class="tile-icon-box tile-icon-science">
+                <!-- Fraction icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><text x="4" y="10" font-size="10" font-family="serif" fill="currentColor">1</text><line x1="3" y1="13" x2="15" y2="13"></line><text x="7" y="21" font-size="10" font-family="serif" fill="currentColor">2</text></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_rational_arithmetic">Số học Hữu tỉ Chính xác \(\mathbb{Q}\)</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="10^100 / 10^99 = 10">
+              <div class="tile-icon-box tile-icon-science">
+                <!-- Canonical Euclidean GCD icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M7 14l5-9 5 9"></path></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_euclidean_gcd">Rút gọn GCD Euclid Chuẩn tắc</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="(x-1)/(x-1) = 1">
+              <div class="tile-icon-box tile-icon-science">
+                <!-- Domain exclusion icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_domain_exclusions">Điều kiện Xác định Mẫu số</span>
+            </button>
+
+            <!-- Bottom More Topics Tile -->
+            <button type="button" class="topic-tile more-topics-tile science-more" id="btn-more-science">
+              <div class="tile-icon-box tile-icon-science">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_more_rational">Xem thêm Số học Hữu tỉ &raquo;</span>
+            </button>
+          </div>
+
+          <!-- COLUMN 3: Quadratics & Factoring (Terracotta Coral) -->
+          <div class="topic-col">
+            <div class="col-header col-header-society">
+              <span data-i18n="col_quad_title">Đa thức &amp; Bậc hai</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+
+            <button type="button" class="topic-tile" data-query="x^2 - 5*x + 6 = 0">
+              <div class="tile-icon-box tile-icon-society">
+                <!-- Parabola curve / x^2 icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18c4-12 12-12 16 0"></path></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_quad_eq">Phương trình Bậc hai \(ax^2 + bx + c\)</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="x^2 - 4 = 0">
+              <div class="tile-icon-box tile-icon-society">
+                <!-- Discriminant Delta triangle icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 4 21 20 3 20"></polygon></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_discriminant">Phân tích Biệt thức Biệt số \(\Delta\)</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="(-x)^2 = 1">
+              <div class="tile-icon-box tile-icon-society">
+                <!-- Candidate check validation icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M9 12l2 2 4-4"></path></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_candidate_check">Kiểm tra Nghiệm Ứng viên Độc lập</span>
+            </button>
+
+            <!-- Bottom More Topics Tile -->
+            <button type="button" class="topic-tile more-topics-tile society-more" id="btn-more-society">
+              <div class="tile-icon-box tile-icon-society">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_more_quad">Xem thêm Chuyên đề Bậc hai &raquo;</span>
+            </button>
+          </div>
+
+          <!-- COLUMN 4: Classroom & Document Ingestion (Sky Blue) -->
+          <div class="topic-col">
+            <div class="col-header col-header-life">
+              <span data-i18n="col_classroom_title">Sư phạm &amp; Giải tích</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+
+            <button type="button" class="topic-tile" data-query="x^3 + 2*x^2 - 5*x + 7">
+              <div class="tile-icon-box tile-icon-life">
+                <!-- Step Guidance Tree icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2"></circle><circle cx="6" cy="19" r="2"></circle><circle cx="18" cy="19" r="2"></circle><line x1="12" y1="7" x2="6" y2="17"></line><line x1="12" y1="7" x2="18" y2="17"></line></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_guidance_tree">Đạo hàm &amp; Giải tích Ký hiệu</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="4*x + 2 = 2*x + 8">
+              <div class="tile-icon-box tile-icon-life">
+                <!-- Diagnostic alert icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_error_categorization">Phân loại Sai lầm Học sinh</span>
+            </button>
+
+            <button type="button" class="topic-tile" data-query="x^2 - 4">
+              <div class="tile-icon-box tile-icon-life">
+                <!-- Document Ingestion PDF icon -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_doc_ingestion">Đồ thị Hàm số 2D Tương tác</span>
+            </button>
+
+            <!-- Bottom More Topics Tile -->
+            <button type="button" class="topic-tile more-topics-tile life-more" id="btn-more-life">
+              <div class="tile-icon-box tile-icon-life">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+              </div>
+              <span class="tile-title" data-i18n="tile_more_classroom">Xem thêm Chuyên đề Sư phạm &raquo;</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Wolfram Inspired Architecture Formula Flow Banner -->
+      <section class="architecture-flow-banner" aria-label="Kiến trúc tính toán MKE">
+        <div class="flow-tagline" data-i18n="flow_tagline">Được phát triển trên nền tảng suy luận ký hiệu hình thức và số học chính xác &raquo;</div>
+        <div class="flow-diagram">
+          <div class="flow-node">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M8 12h8M12 8v8"></path></svg>
+            <strong>MKE</strong>
+          </div>
+          <span class="flow-symbol">&#61;</span>
+          <div class="flow-node">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            <span data-i18n="flow_parser">Cú pháp AST Tường minh</span>
+          </div>
+          <span class="flow-symbol">&#43;</span>
+          <div class="flow-node">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M7 14l5-9 5 9"></path></svg>
+            <span data-i18n="flow_rational">Số học Hữu tỉ Chuẩn xác \(\mathbb{Q}\)</span>
+          </div>
+          <span class="flow-symbol">&#43;</span>
+          <div class="flow-node">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span data-i18n="flow_symbolic">Suy luận Ký hiệu \(\mathbb{R}\)</span>
+          </div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-node" style="border-color: #ea580c;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <span data-i18n="flow_verifiable">Nghiệm &amp; Minh chứng Tất định</span>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Screen 2: Result View -->
+    <section class="screen-view" id="screen-result" aria-label="Equation Solution and Verification">
+      <div class="result-header">
+        <button type="button" class="back-link" id="btn-back-home" data-i18n="btn_back_home">&larr; Quay lại Trang chủ</button>
+        <div class="result-query-badge">
+          <span class="query-label" data-i18n="active_query_label">Biểu thức đang chọn:</span>
+          <code class="query-code" id="result-query-text">2*x + 3 = 7</code>
+        </div>
+      </div>
+
+      <!-- Result Card Stack -->
+      <div class="result-stack">
+        <!-- 1. Input Interpretation Card -->
+        <article class="result-card" id="card-input-interp">
+          <div class="res-card-header">
+            <h3 class="res-card-title" data-i18n="card_input_title">Phân tích Biểu thức Đầu vào</h3>
+            <div class="header-badges">
+              <span class="engine-badge" id="res-engine-badge">mke_native_v1</span>
+              <span class="syntax-status status-valid" id="res-syntax-status" data-i18n="status_syntax_valid">CÚ PHÁP HỢP LỆ</span>
+            </div>
+          </div>
+          <div class="res-card-body">
+            <div class="math-display-large" id="res-math-display">
+              \(2x + 3 = 7\)
+            </div>
+            <div class="ast-meta">
+              <span class="meta-item"><strong data-i18n="meta_op_label">Thao tác:</strong> <span id="res-meta-op">SOLVE</span></span>
+              <span class="meta-item"><strong data-i18n="meta_mult_label">Phép nhân:</strong> <span id="res-meta-mult" data-i18n="meta_mult_val">Tường minh (đã xác nhận *)</span></span>
+              <span class="meta-item"><strong data-i18n="meta_ast_nodes_label">Trạng thái:</strong> <span id="res-meta-status">EXACT_SOLUTION</span></span>
+            </div>
+            <details class="ast-details">
+              <summary class="ast-summary" data-i18n="ast_summary">Xem Cấu trúc Cây Cú pháp (AST)</summary>
+              <pre class="ast-code" id="res-ast-json">
+Equation(
+  left=BinaryOp("+",
+    left=BinaryOp("*", left=IntegerLiteral(2), right=Variable("x")),
+    right=IntegerLiteral(3)),
+  right=IntegerLiteral(7)
+)</pre>
+            </details>
+          </div>
+        </article>
+
+        <!-- 2. Exact Solution & Method Card -->
+        <article class="result-card card-primary-solution" id="card-main-solution">
+          <div class="res-card-header">
+            <h3 class="res-card-title" id="res-solution-card-title" data-i18n="card_solution_title">Nghiệm Chuẩn xác</h3>
+            <div class="method-selector" role="tablist" aria-label="Solution Methods" data-i18n-attr="aria-label:methods_aria">
+              <button type="button" class="tab-btn active" id="tab-solve" role="tab" aria-selected="true" data-op="SOLVE" data-i18n="tab_solve">Giải phương trình</button>
+              <button type="button" class="tab-btn" id="tab-simplify" role="tab" aria-selected="false" data-op="SIMPLIFY" data-i18n="tab_simplify">Rút gọn</button>
+              <button type="button" class="tab-btn" id="tab-diff" role="tab" aria-selected="false" data-op="DIFFERENTIATE" data-i18n="tab_diff">Đạo hàm</button>
+              <button type="button" class="tab-btn" id="tab-integrate" role="tab" aria-selected="false" data-op="INTEGRATE" data-i18n="tab_integrate">Tích phân</button>
+              <button type="button" class="tab-btn" id="tab-plot" role="tab" aria-selected="false" data-op="PLOT_2D" data-i18n="tab_plot">Đồ thị 2D</button>
+            </div>
+          </div>
+          <div class="res-card-body">
+            <!-- Main Solution Box -->
+            <div class="solution-box" id="res-solution-box">
+              <div class="solution-equation" id="res-solution-equation">
+                <span class="sol-var" id="res-solution-var">x</span>
+                <span class="sol-eq" id="res-solution-eq">=</span>
+                <span class="sol-val" id="res-solution-val">2</span>
+              </div>
+              <span class="sol-domain-tag" id="res-solution-tag" data-i18n="sol_domain_tag">Số hữu tỉ chính xác trong \(\mathbb{Q}\)</span>
+            </div>
+
+            <!-- Plot Visualization Box (Shown when PLOT_2D tab active or requested) -->
+            <div class="plot-box-wrapper" id="res-plot-wrapper" style="display: none;">
+              <div class="plot-meta-header">
+                <span class="plot-meta-title" data-i18n="plot_title">Biểu diễn Hình học Trục Tọa độ Descartes</span>
+                <span class="plot-meta-badge" id="res-plot-badge">[-10, 10] &times; [-10, 10]</span>
+              </div>
+              <div class="plot-svg-container" id="res-plot-svg-container">
+                <!-- Dynamic SVG will be injected here -->
+              </div>
+            </div>
+
+            <!-- Step by Step Presentation -->
+            <div class="step-trace" id="res-step-trace">
+              <h4 class="trace-title" id="res-trace-title" data-i18n="trace_title">Các bước Biến đổi Tất định</h4>
+              <ol class="steps-list" id="res-steps-list">
+                <li class="step-item">
+                  <div class="step-num">Bước 1</div>
+                  <div class="step-desc">Chuyển vế hằng số bằng cách trừ 3 ở cả hai vế:</div>
+                  <div class="step-math">\(2x + 3 - 3 = 7 - 3 \implies 2x = 4\)</div>
+                </li>
+                <li class="step-item">
+                  <div class="step-num">Bước 2</div>
+                  <div class="step-desc">Nhân với nghịch đảo của hệ số a=2 trong trường \(\mathbb{Q}\):</div>
+                  <div class="step-math">\(x = \frac{4}{2} = 2\)</div>
+                </li>
+              </ol>
+              <div class="engine-note" id="res-engine-note" style="display: none;">
+                <p data-i18n="engine_steps_cas_note">Nghiệm được tính toán bởi bộ giải ký hiệu SymPy 1.14.0. Minh chứng từng bước hình thức áp dụng cho hệ giải tuyến tính Native MKE.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 3. Domain & Candidate Verification Card -->
+        <article class="result-card" id="card-domain-verif">
+          <div class="res-card-header">
+            <h3 class="res-card-title" data-i18n="card_domain_title">Miền Xác định &amp; Minh chứng Kiểm định</h3>
+            <span class="cert-status status-valid-cert" id="res-cert-badge" data-i18n="badge_verified_math">CHỨNG THỰC TẤT ĐỊNH</span>
+          </div>
+          <div class="res-card-body">
+            <div class="domain-info-grid">
+              <div class="domain-tile">
+                <span class="tile-label" data-i18n="tile_eq_domain">Miền nghiệm phương trình</span>
+                <span class="tile-val" id="res-eq-domain">Số thực \(\mathbb{R}\)</span>
+              </div>
+              <div class="domain-tile">
+                <span class="tile-label" data-i18n="tile_domain_constraints">Ràng buộc miền ban đầu</span>
+                <span class="tile-val" id="res-domain-constraints">Không có (Không có biến ở mẫu số)</span>
+              </div>
+              <div class="domain-tile">
+                <span class="tile-label" data-i18n="tile_candidate_check">Động cơ &amp; Thời gian</span>
+                <span class="tile-val status-valid-text" id="res-candidate-check">mke_native_v1 (0.85 ms)</span>
+              </div>
+            </div>
+
+            <div class="crypto-meta">
+              <span class="crypto-tag" data-i18n="tag_specimen_notice">CHỨNG NHẬN ĐỘNG CƠ TẤT ĐỊNH</span>
+              <p class="crypto-note" id="res-crypto-note" data-i18n="msg_verification_notice">Kết quả được tính toán và kiểm định trực tiếp bởi lõi toán học MKE. Không phụ thuộc vào mô hình ngôn ngữ hay tính toán xấp xỉ không chứng minh.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Screen 3: Syntax Guide View -->
+    <section class="screen-view" id="screen-syntax" aria-label="Syntax Rules and Grammar">
+      <div class="syntax-guide-container">
+        <h2 class="guide-title" data-i18n="syntax_guide_title">Quy chuẩn Cú pháp MKE Giai đoạn P02A</h2>
+        <p class="guide-lead" data-i18n="syntax_guide_lead">MKE áp dụng cú pháp toán học tường minh nghiêm ngặt nhằm loại trừ hoàn toàn các diễn giải mơ hồ hoặc ngầm định sai lệch.</p>
+
+        <div class="syntax-grid">
+          <div class="syntax-rule-card">
+            <h3 class="rule-title rule-accepted" data-i18n="syntax_accepted_title">&#10003; Cú pháp Được Chấp nhận</h3>
+            <ul class="rule-list">
+              <li><code>2*x + 3 = 7</code> <span data-i18n="syntax_acc_1">(Phép nhân tường minh với ký tự <code>*</code>)</span></li>
+              <li><code>-x^2 = 1</code> <span data-i18n="syntax_acc_2">(Được phân tích thành <code>-(x^2)</code>)</span></li>
+              <li><code>(-x)^2 = 1</code> <span data-i18n="syntax_acc_3">(Cơ số âm có dấu ngoặc nhóm)</span></li>
+              <li><code>x^0 = 1</code> <span data-i18n="syntax_acc_4">(Bảo toàn nút lũy thừa; đánh giá trên miền ban đầu)</span></li>
+              <li><code>0*x = 0</code> <span data-i18n="syntax_acc_5">(Phương trình đồng nhất; miền nghiệm \(\mathbb{R}\))</span></li>
+              <li><code>(x-1)/(x-1) = 1</code> <span data-i18n="syntax_acc_6">(Phương trình hữu tỉ được giữ nguyên để kiểm tra ứng viên)</span></li>
+            </ul>
+          </div>
+
+          <div class="syntax-rule-card">
+            <h3 class="rule-title rule-rejected" data-i18n="syntax_rejected_title">&#10007; Nghiêm ngặt Từ chối (Lỗi Cú pháp)</h3>
+            <ul class="rule-list">
+              <li><code>2x = 4</code> <span data-i18n="syntax_rej_1">(Phép nhân ngầm mơ hồ; yêu cầu viết <code>2*x</code>)</span></li>
+              <li><code>1/2x = 1</code> <span data-i18n="syntax_rej_2">(Nhân ngầm mẫu số; yêu cầu viết <code>1/(2*x)</code> hoặc <code>(1/2)*x</code>)</span></li>
+              <li><code>x(x+1) = 0</code> <span data-i18n="syntax_rej_3">(Nhân ngầm ngoặc; yêu cầu viết <code>x*(x+1)</code>)</span></li>
+              <li><code>x^3 = 1</code> <span data-i18n="syntax_rej_4">(Số mũ &gt; 2 được chuyển tuyến sang động cơ SymPy CAS)</span></li>
+              <li><code>2*y = 4</code> <span data-i18n="syntax_rej_5">(Không hỗ trợ đa biến; chỉ chấp nhận đơn biến <code>x</code>)</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-col">
+        <span class="footer-brand" data-i18n="footer_brand">Kiến trúc Sản phẩm MKE</span>
+        <p class="footer-desc" data-i18n="footer_desc">Hệ tri thức Toán học Chuẩn xác Đa động cơ. Kết hợp lõi tuyến tính tất định MKE v1 và động cơ giải tích ký hiệu SymPy 1.14.0.</p>
+      </div>
+      <div class="footer-col">
+        <span class="footer-heading" data-i18n="footer_specs_heading">Quy chuẩn &amp; Động cơ</span>
+        <ul class="footer-links">
+          <li><span>Động cơ Tuyến tính:</span> <code>mke_native_v1</code></li>
+          <li><span>Động cơ Ký hiệu:</span> <code>sympy_cas_v0 (1.14.0)</code></li>
+          <li><span>Giao diện:</span> <code>ui/ui00 (Wolfram Atmosphere)</code></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <span class="footer-heading" data-i18n="footer_disclaimer_heading">Bản quyền &amp; Thiết kế</span>
+        <p class="footer-disclaimer" data-i18n="footer_disclaimer_desc">Lấy cảm hứng từ phong cách WolframAlpha; toàn bộ mã nguồn, biểu tượng SVG, token thiết kế và bố cục đều thuộc bản quyền nguyên bản của MKE.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
