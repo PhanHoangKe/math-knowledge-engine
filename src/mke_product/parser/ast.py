@@ -282,3 +282,70 @@ class AbsoluteValue(ASTNode):
     def __repr__(self) -> str:
         return f"AbsoluteValue({self.inner!r})"
 
+
+@dataclass(frozen=True, slots=True)
+class FunctionCall(ASTNode):
+    """Mathematical function call: sin, cos, tan, exp, log, ln."""
+    name: str
+    args: Tuple[ASTNode, ...]
+    span: Span
+
+    def __post_init__(self) -> None:
+        if self.name not in {"sin", "cos", "tan", "exp", "log", "ln"}:
+            raise ValueError(f"Unsupported function call: {self.name!r}")
+        if self.name in {"sin", "cos", "tan", "exp", "ln"} and len(self.args) != 1:
+            raise ValueError(f"Function {self.name!r} requires exactly 1 argument, got {len(self.args)}")
+        if self.name == "log" and len(self.args) not in {1, 2}:
+            raise ValueError(f"Function 'log' requires 1 or 2 arguments, got {len(self.args)}")
+
+    def walk(self) -> Iterator[ASTNode]:
+        yield self
+        for arg in self.args:
+            yield from arg.walk()
+
+    def variables(self) -> Set[str]:
+        v: Set[str] = set()
+        for arg in self.args:
+            v.update(arg.variables())
+        return v
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "FunctionCall",
+            "name": self.name,
+            "args": [arg.to_dict() for arg in self.args],
+            "span": self.span.to_tuple(),
+        }
+
+    def __repr__(self) -> str:
+        args_str = ", ".join(repr(a) for a in self.args)
+        return f"FunctionCall({self.name!r}, ({args_str}))"
+
+
+@dataclass(frozen=True, slots=True)
+class NamedConstant(ASTNode):
+    """Named mathematical constant (pi, e)."""
+    name: str
+    span: Span
+
+    def __post_init__(self) -> None:
+        if self.name not in {"pi", "e"}:
+            raise ValueError(f"Unsupported named constant: {self.name!r}")
+
+    def walk(self) -> Iterator[ASTNode]:
+        yield self
+
+    def variables(self) -> Set[str]:
+        return set()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "NamedConstant",
+            "name": self.name,
+            "span": self.span.to_tuple(),
+        }
+
+    def __repr__(self) -> str:
+        return f"NamedConstant({self.name!r})"
+
+

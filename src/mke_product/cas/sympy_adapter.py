@@ -12,6 +12,9 @@ from mke_product.parser.ast import (
     ASTNode,
     BinaryOp,
     Equation,
+    FunctionCall,
+    IntegerLiteral,
+    NamedConstant,
     Power,
     Radical,
 )
@@ -20,6 +23,7 @@ from .ast_bridge import ast_to_sympy, ast_to_sympy_expr
 from .cas_parser import (
     Inequality,
     LinearSystem,
+    is_top_level_system,
     parse_cas_equation,
     parse_cas_expression,
     parse_cas_inequality,
@@ -85,8 +89,8 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             elif request.operation == OperationType.SOLVE_INEQUALITY:
                 ast_node = parse_cas_inequality(input_text)
             elif request.operation in (OperationType.SOLVE, OperationType.CHECK_CANDIDATE):
-                # Auto-detect system (presence of , or ; with =) or inequality
-                if ("," in input_text or ";" in input_text) and "=" in input_text:
+                # Auto-detect system (presence of top-level , or ; with =) or inequality
+                if is_top_level_system(input_text) and "=" in input_text:
                     ast_node = parse_cas_system(input_text)
                     request.operation = OperationType.SOLVE_SYSTEM
                 elif any(op in input_text for op in ("<=", ">=", "≤", "≥", "<", ">")):
@@ -107,7 +111,7 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
         from .cas_parser import CASPower
         from .safety import prove_constant_zero_status, DivisionByZeroError
         for n in ast_node.walk():
-            if isinstance(n, (Power, CASPower)) and n.exponent.value == 0:
+            if isinstance(n, (Power, CASPower)) and isinstance(n.exponent, IntegerLiteral) and n.exponent.value == 0:
                 zero_status = prove_constant_zero_status(n.base) if len(n.base.variables()) == 0 else "UNDECIDABLE"
                 if zero_status == "ZERO":
                     raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
@@ -327,6 +331,40 @@ def _collect_algebraic_candidates(ast_node: ASTNode, sym_eq: sympy.Eq, var: symp
         except Exception:
             pass
 
+        # Logarithmic sum/diff transformation: e.g. log(f, b) + log(g, b) = c -> f * g = b^c
+        if isinstance(left_ast, BinaryOp) and left_ast.op in ("+", "-"):
+            if (
+                isinstance(left_ast.left, FunctionCall)
+                and left_ast.left.name in ("log", "ln")
+                and isinstance(left_ast.right, FunctionCall)
+                and left_ast.right.name in ("log", "ln")
+            ):
+                f_sym = ast_to_sympy_expr(left_ast.left.args[0])
+                g_sym = ast_to_sympy_expr(left_ast.right.args[0])
+                base_ast = left_ast.left.args[1] if len(left_ast.left.args) == 2 else None
+                base_sym = ast_to_sympy_expr(base_ast) if base_ast is not None else (sympy.E if left_ast.left.name == "ln" else 10)
+                if left_ast.op == "+":
+                    alg_eq = sympy.Eq(f_sym * g_sym, base_sym ** rhs_sym)
+                else:
+                    alg_eq = sympy.Eq(f_sym, g_sym * (base_sym ** rhs_sym))
+                try:
+                    roots = sympy.solve(alg_eq, var)
+                    if not isinstance(roots, (list, tuple, set)):
+                        roots = [roots]
+                    candidates.extend(roots)
+                except Exception:
+                    pass
+
+        # Logarithmic equations: logcombine
+        try:
+            log_comb = sympy.logcombine(lhs_sym - rhs_sym, force=True)
+            roots = sympy.solve(log_comb, var)
+            if not isinstance(roots, (list, tuple, set)):
+                roots = [roots]
+            candidates.extend(roots)
+        except Exception:
+            pass
+
     return candidates
 
 
@@ -403,7 +441,46 @@ def _validate_root_in_ast(
             except Exception:
                 return False, "evaluation_failed"
 
-    # 5. Check LHS vs RHS substitution exact identity without float epsilon
+    # 5. Check all logarithmic and trigonometric domain conditions
+    for n in ast_node.walk():
+        if isinstance(n, FunctionCall):
+            if n.name in ("log", "ln"):
+                arg_sym = ast_to_sympy_expr(n.args[0])
+                val = arg_sym.subs(var, r)
+                try:
+                    simplified_val = sympy.simplify(val)
+                    if simplified_val.is_negative is True or simplified_val == 0 or simplified_val.is_zero is True:
+                        return False, "non_positive_log_argument"
+                    if simplified_val.is_number and simplified_val <= 0:
+                        return False, "non_positive_log_argument"
+                    if simplified_val.is_positive is False:
+                        return False, "non_positive_log_argument"
+                except Exception:
+                    return False, "evaluation_failed"
+
+                if n.name == "log" and len(n.args) == 2:
+                    base_sym = ast_to_sympy_expr(n.args[1])
+                    b_val = base_sym.subs(var, r)
+                    try:
+                        simplified_b = sympy.simplify(b_val)
+                        if simplified_b.is_negative is True or simplified_b == 0 or simplified_b.is_zero is True or simplified_b == 1:
+                            return False, "invalid_log_base"
+                        if simplified_b.is_number and (simplified_b <= 0 or simplified_b == 1):
+                            return False, "invalid_log_base"
+                    except Exception:
+                        return False, "evaluation_failed"
+
+            elif n.name == "tan":
+                arg_sym = ast_to_sympy_expr(n.args[0])
+                val = arg_sym.subs(var, r)
+                try:
+                    cos_val = sympy.simplify(sympy.cos(val))
+                    if cos_val == 0 or cos_val.is_zero is True:
+                        return False, "tan_undefined_pole"
+                except Exception:
+                    return False, "evaluation_failed"
+
+    # 6. Check LHS vs RHS substitution exact identity without float epsilon
     try:
         lhs_val = lhs_sym.subs(var, r)
         rhs_val = rhs_sym.subs(var, r)

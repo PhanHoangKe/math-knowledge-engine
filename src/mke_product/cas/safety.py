@@ -12,8 +12,10 @@ from mke_product.parser.ast import (
     ASTNode,
     BinaryOp,
     Equation,
+    FunctionCall,
     Group,
     IntegerLiteral,
+    NamedConstant,
     Power,
     Radical,
     UnaryOp,
@@ -85,7 +87,7 @@ def ast_nodes_structurally_equal(a: ASTNode, b: ASTNode) -> bool:
             return ast_nodes_structurally_equal(a, b.inner)
         if isinstance(a, (Power, CASPower)) and isinstance(b, (Power, CASPower)):
             return (
-                a.exponent.value == b.exponent.value
+                ast_nodes_structurally_equal(a.exponent, b.exponent)
                 and ast_nodes_structurally_equal(a.base, b.base)
             )
         return False
@@ -94,6 +96,14 @@ def ast_nodes_structurally_equal(a: ASTNode, b: ASTNode) -> bool:
         return a.value == b.value
     elif isinstance(a, Variable):
         return a.name == b.name
+    elif isinstance(a, NamedConstant):
+        return a.name == b.name
+    elif isinstance(a, FunctionCall):
+        return (
+            a.name == b.name
+            and len(a.args) == len(b.args)
+            and all(ast_nodes_structurally_equal(x, y) for x, y in zip(a.args, b.args))
+        )
     elif isinstance(a, Group):
         return ast_nodes_structurally_equal(a.inner, b.inner)
     elif isinstance(a, UnaryOp):
@@ -106,7 +116,7 @@ def ast_nodes_structurally_equal(a: ASTNode, b: ASTNode) -> bool:
         )
     elif isinstance(a, (Power, CASPower)):
         return (
-            a.exponent.value == b.exponent.value
+            ast_nodes_structurally_equal(a.exponent, b.exponent)
             and ast_nodes_structurally_equal(a.base, b.base)
         )
     elif isinstance(a, Radical):
@@ -137,6 +147,31 @@ def _eval_constant_bounded(
                 f"Integer literal bit length ({node.value.bit_length()}) exceeds budget of {max_bits} bits."
             )
         return sympy.Integer(node.value)
+
+    elif isinstance(node, NamedConstant):
+        if node.name == "pi":
+            return sympy.pi
+        elif node.name == "e":
+            return sympy.E
+        raise ConstantEvalResourceLimitError(f"Unknown constant {node.name}")
+
+    elif isinstance(node, FunctionCall):
+        args_val = [_eval_constant_bounded(arg, steps, max_steps, max_exp, max_bits) for arg in node.args]
+        if node.name == "sin":
+            return sympy.sin(args_val[0])
+        elif node.name == "cos":
+            return sympy.cos(args_val[0])
+        elif node.name == "tan":
+            return sympy.tan(args_val[0])
+        elif node.name == "exp":
+            return sympy.exp(args_val[0])
+        elif node.name == "ln":
+            return sympy.log(args_val[0])
+        elif node.name == "log":
+            if len(args_val) == 1:
+                return sympy.log(args_val[0])
+            return sympy.log(args_val[0], args_val[1])
+        raise ConstantEvalResourceLimitError(f"Unsupported function {node.name}")
 
     elif isinstance(node, Group):
         return _eval_constant_bounded(node.inner, steps, max_steps, max_exp, max_bits)
@@ -170,7 +205,17 @@ def _eval_constant_bounded(
         return res
 
     elif isinstance(node, (Power, CASPower)):
-        exp_val = int(node.exponent.value)
+        exp_node = node.exponent
+        if isinstance(exp_node, IntegerLiteral):
+            exp_val = int(exp_node.value)
+        else:
+            evaluated_exp = _eval_constant_bounded(exp_node, steps, max_steps, max_exp, max_bits)
+            if hasattr(evaluated_exp, "is_integer") and evaluated_exp.is_integer:
+                exp_val = int(evaluated_exp)
+            else:
+                base_val = _eval_constant_bounded(node.base, steps, max_steps, max_exp, max_bits)
+                return base_val ** evaluated_exp
+
         if exp_val < 0:
             raise ConstantEvalResourceLimitError("Negative exponents not evaluated in pre-dispatch constant check.")
 
@@ -278,23 +323,41 @@ def prove_constant_zero_status(node: ASTNode) -> str:
                 return "UNDECIDABLE"
         return "UNDECIDABLE"
 
-    elif isinstance(node, (Power, CASPower)):
-        exp_val = int(node.exponent.value)
-        if exp_val == 0:
-            b_status = prove_constant_zero_status(node.base)
-            if b_status == "ZERO":
-                raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
-            elif b_status == "NONZERO":
-                return "NONZERO"
-            return "UNDECIDABLE"
-        elif exp_val > 0:
-            b_status = prove_constant_zero_status(node.base)
-            if b_status == "ZERO":
+    elif isinstance(node, NamedConstant):
+        return "NONZERO"
+
+    elif isinstance(node, FunctionCall):
+        if node.name == "exp":
+            return "NONZERO"
+        elif node.name in ("sin", "tan"):
+            status = prove_constant_zero_status(node.args[0])
+            if status == "ZERO":
                 return "ZERO"
-            elif b_status == "NONZERO":
-                # For any real b != 0 and integer e > 0, b^e != 0
+        elif node.name == "cos":
+            status = prove_constant_zero_status(node.args[0])
+            if status == "ZERO":
                 return "NONZERO"
-            return "UNDECIDABLE"
+
+    elif isinstance(node, (Power, CASPower)):
+        exp_node = node.exponent
+        if isinstance(exp_node, IntegerLiteral):
+            exp_val = int(exp_node.value)
+            if exp_val == 0:
+                b_status = prove_constant_zero_status(node.base)
+                if b_status == "ZERO":
+                    raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+                elif b_status == "NONZERO":
+                    return "NONZERO"
+                return "UNDECIDABLE"
+            elif exp_val > 0:
+                b_status = prove_constant_zero_status(node.base)
+                if b_status == "ZERO":
+                    return "ZERO"
+                elif b_status == "NONZERO":
+                    # For any real b != 0 and integer e > 0, b^e != 0
+                    return "NONZERO"
+                return "UNDECIDABLE"
+        return "UNDECIDABLE"
 
     elif isinstance(node, BinaryOp):
         if node.op == "-":
@@ -346,7 +409,7 @@ def inspect_ast_safety(node: ASTNode) -> None:
                 )
         elif isinstance(n, (Power, CASPower)):
             # Check for statically provable 0^0 on constant subtrees
-            if n.exponent.value == 0 and len(n.base.variables()) == 0:
+            if isinstance(n.exponent, IntegerLiteral) and n.exponent.value == 0 and len(n.base.variables()) == 0:
                 zero_status = prove_constant_zero_status(n.base)
                 if zero_status == "ZERO":
                     raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
@@ -366,7 +429,7 @@ from .cas_parser import CASPower, Inequality, LinearSystem
 
 
 def extract_domain_restrictions(node: ASTNode) -> List[str]:
-    """Inspect all division denominators, powers, and radicals in AST to find domain restrictions."""
+    """Inspect all division denominators, powers, radicals, logarithms, and trig functions in AST to find domain restrictions."""
     restrictions: List[str] = []
 
     for n in node.walk():
@@ -397,7 +460,7 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
                     restrictions.append("denominator != 0")
         elif isinstance(n, (Power, CASPower)):
             # B(x)^0 requires B(x) != 0 to avoid indeterminate 0^0
-            if n.exponent.value == 0:
+            if isinstance(n.exponent, IntegerLiteral) and n.exponent.value == 0:
                 vars_in_base = n.base.variables()
                 if vars_in_base:
                     from .ast_bridge import ast_to_sympy_expr
@@ -431,6 +494,38 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
                     restrictions.append(f"{sym_rad} >= 0")
                 except Exception:
                     restrictions.append("radicand >= 0")
+        elif isinstance(n, FunctionCall):
+            if n.name in ("log", "ln"):
+                arg = n.args[0]
+                vars_in_arg = arg.variables()
+                if vars_in_arg:
+                    from .ast_bridge import ast_to_sympy_expr
+                    try:
+                        sym_arg = sympy.simplify(ast_to_sympy_expr(arg))
+                        restrictions.append(f"{sym_arg} > 0")
+                    except Exception:
+                        restrictions.append("log_arg > 0")
+                if n.name == "log" and len(n.args) == 2:
+                    base = n.args[1]
+                    vars_in_base = base.variables()
+                    if vars_in_base:
+                        from .ast_bridge import ast_to_sympy_expr
+                        try:
+                            sym_base = sympy.simplify(ast_to_sympy_expr(base))
+                            restrictions.append(f"{sym_base} > 0")
+                            restrictions.append(f"{sym_base} != 1")
+                        except Exception:
+                            restrictions.append("log_base > 0")
+            elif n.name == "tan":
+                arg = n.args[0]
+                vars_in_arg = arg.variables()
+                if vars_in_arg:
+                    from .ast_bridge import ast_to_sympy_expr
+                    try:
+                        sym_arg = sympy.simplify(ast_to_sympy_expr(arg))
+                        restrictions.append(f"cos({sym_arg}) != 0")
+                    except Exception:
+                        restrictions.append("cos(arg) != 0")
 
     # Deduplicate while preserving order
     seen: Set[str] = set()
