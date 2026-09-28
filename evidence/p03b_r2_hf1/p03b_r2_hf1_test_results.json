@@ -1,0 +1,21 @@
+{
+  "milestone": "PRODUCT-03B-R2-HF1",
+  "timestamp": "2026-09-28 10:02:04Z",
+  "commit_hash": "17a2c774668e9f4c74a354777bf289705ea137d7",
+  "git_branch": "product/p03b-r2-hf1",
+  "environment": {
+    "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "system": "Windows",
+    "release": "10",
+    "machine": "AMD64",
+    "sympy_version": "1.14.0",
+    "pytest_version": "9.1.1"
+  },
+  "source_cleanliness": "Clean working tree",
+  "exit_code": 0,
+  "duration_seconds": 122.3,
+  "total_passed": 463,
+  "total_failed": 0,
+  "success": true
+}
