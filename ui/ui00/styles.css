@@ -212,13 +212,15 @@ body {
   margin-left: 0.4rem;
 }
 
-.header-left-group {
+/* Header Right Group: Nav Links + Sign In + Theme/Language Popover Trigger */
+.header-right-group {
   display: flex;
   align-items: center;
-  gap: 2.2rem;
+  gap: 1.25rem;
+  position: relative;
 }
 
-/* Navigation Links (Left-Aligned next to Brand, NO button box containers, pure text hover) */
+/* Navigation Links (Pushed Right next to Sign in, NO button box containers, pure text hover) */
 .nav-links {
   display: flex;
   align-items: center;
@@ -247,14 +249,6 @@ body {
   background: transparent !important;
   color: var(--wolfram-orange) !important;
   font-weight: 600;
-}
-
-/* Header Right: Wolfram-style Sign In & Theme/Language Popover */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  position: relative;
 }
 
 /* Authentic Wolfram-style Sign In Button */
