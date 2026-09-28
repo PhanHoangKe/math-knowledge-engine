@@ -1,0 +1,38 @@
+
+test_filesystem_negative_worker_cannot_access_host_repository (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Negative Test: AppContainer worker cannot access the host source repository. ... ok
+test_filesystem_negative_worker_cannot_modify_protected_canary (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Negative Test: AppContainer worker cannot modify or overwrite a protected canary. ... ok
+test_filesystem_negative_worker_cannot_read_protected_canary (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Negative Test: AppContainer worker cannot read a protected canary in user/temp directory. ... ok
+test_filesystem_negative_worker_cannot_write_into_staged_runtime (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Negative Test: Staged runtime directory is read-only (write operations fail). ... ok
+test_filesystem_positive_control_host_reads_and_modifies_canary (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Positive Control: Unsandboxed host process has full access to the canary file. ... ok
+test_filesystem_positive_worker_reads_staged_modules_and_solves_equations (tests.test_worker_security_p2.TestAppContainerFilesystemSecurity)
+Positive Test: Worker cleanly reads staged modules and solves mathematical equations. ... ok
+test_network_capability_allowlist_is_strictly_empty (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Security Invariant: AppContainer security capabilities have zero network capabilities. ... ok
+test_network_ipv6_loopback_tcp_denied_if_supported (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Negative Test: AppContainer worker is blocked from connecting to IPv6 loopback if supported. ... ok
+test_network_negative_worker_loopback_tcp_denied (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Negative Test: AppContainer worker is blocked from connecting to loopback TCP server. ... ok
+test_network_negative_worker_loopback_udp_denied (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Negative Test: AppContainer worker is blocked from sending UDP packets on loopback. ... ok
+test_network_negative_worker_non_loopback_tcp_denied (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Negative Test: AppContainer worker is blocked from connecting to non-loopback TCP destinations. ... ok
+test_network_positive_control_host_loopback_tcp (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Positive Control: Host process can connect to and communicate with loopback TCP server. ... ok
+test_network_positive_control_host_loopback_udp (tests.test_worker_security_p2.TestAppContainerNetworkSecurity)
+Positive Control: Host process can send/recv UDP packets on loopback. ... ok
+test_appcontainer_token_and_sid_verification_pre_resume (tests.test_worker_security_p2.TestAppContainerSecurityInvariants)
+Worker process token is verified as authentic AppContainer with exact SID before primary thread resume. ... ok
+test_security_violation_injected_appcontainer_attribute_failure_fails_closed (tests.test_worker_security_p2.TestAppContainerSecurityInvariants)
+Inability to apply AppContainer attribute fails closed without starting unrestricted worker. ... ok
+test_security_violation_injected_sid_mismatch_fails_closed_immediately (tests.test_worker_security_p2.TestAppContainerSecurityInvariants)
+Token SID mismatch aborts immediately, terminates child before resume, and never falls back. ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 7.734s
+
+OK

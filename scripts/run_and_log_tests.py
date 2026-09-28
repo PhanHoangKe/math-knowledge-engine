@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 repo_root = Path(__file__).resolve().parents[1]
-output_log = repo_root / "evidence" / "s4b2_p1_r2" / "test_suite_raw.log"
+output_log = repo_root / "evidence" / "s4b2_p2" / "test_suite_raw.log"
 output_log.parent.mkdir(parents=True, exist_ok=True)
 
 cmd = [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"]

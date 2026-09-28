@@ -37,10 +37,10 @@ kernel32.GetProcessId.argtypes = [wintypes.HANDLE]
 kernel32.GetProcessId.restype = wintypes.DWORD
 
 
-def run_real_lifecycle_experiment() -> dict:
+def run_real_lifecycle_experiment(*, inject_cleanup_failure: bool = False) -> dict:
     host_pid = os.getpid()
     evidence = {
-        "milestone": "S4-B2/P1-R2",
+        "milestone": "S4-B2/P2",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "host_pid": host_pid,
         "python_executable": sys.executable,
@@ -157,7 +157,7 @@ def run_real_lifecycle_experiment() -> dict:
         }
 
         # Step 7: Final Profile & Staging Directory Deletion
-        final_cleanup = manager.cleanup()
+        final_cleanup = manager.cleanup(_inject_stage_deletion_failure=inject_cleanup_failure)
         evidence["steps"]["step_6_final_profile_cleanup"] = {
             "cleanup_result": final_cleanup,
             "cleaned_as_expected": final_cleanup.get("state") == "CLEANED",
@@ -201,7 +201,11 @@ def run_real_lifecycle_experiment() -> dict:
             # Check if manager still has active children or unresolved handles
             if manager.active_children == 0:
                 # All leases released through legitimate reconciliation; safe to cleanup
-                manager.cleanup()
+                rec_cleanup = manager.cleanup()
+                if rec_cleanup.get("state") == "CLEANUP_FAILED":
+                    evidence["emergency_recovery_state"] = "CLEANUP_FAILED"
+                    evidence["emergency_cleanup_failure_details"] = rec_cleanup
+                    evidence["experiment_verdict"] = False
             else:
                 # Active leases remain because child termination could not be confirmed.
                 # In accordance with strict audit requirements:
@@ -220,9 +224,10 @@ def run_real_lifecycle_experiment() -> dict:
 
 
 if __name__ == "__main__":
-    result = run_real_lifecycle_experiment()
-    output_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p1_r2" / "real_process_lifecycle_evidence.json"
-    output_raw_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p1_r2" / "real_process_lifecycle_raw.log"
+    inject_fail = "--inject-cleanup-failure" in sys.argv
+    result = run_real_lifecycle_experiment(inject_cleanup_failure=inject_fail)
+    output_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p2" / "real_process_lifecycle_evidence.json"
+    output_raw_path = Path(__file__).resolve().parents[1] / "evidence" / "s4b2_p2" / "real_process_lifecycle_raw.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     json_str = json.dumps(result, indent=2)
     output_path.write_text(json_str, encoding="utf-8")
@@ -230,7 +235,16 @@ if __name__ == "__main__":
 
     has_cleanup_error = bool(result.get("emergency_cleanup_error"))
     has_unconfirmed_leases = (result.get("emergency_recovery_state") == "ACTIVE_LEASES_RETAINED_TERMINATION_UNCONFIRMED")
-    verdict = result.get("experiment_verdict") is True and not has_cleanup_error and not has_unconfirmed_leases
+    has_cleanup_failed = (
+        result.get("emergency_recovery_state") == "CLEANUP_FAILED"
+        or result.get("steps", {}).get("step_6_final_profile_cleanup", {}).get("cleanup_result", {}).get("state") == "CLEANUP_FAILED"
+    )
+    verdict = (
+        result.get("experiment_verdict") is True
+        and not has_cleanup_error
+        and not has_unconfirmed_leases
+        and not has_cleanup_failed
+    )
 
     summary_text = json_str + "\n"
     if verdict:
@@ -252,8 +266,13 @@ if __name__ == "__main__":
             leases_msg = f"       Unresolved active leases: {result.get('unresolved_active_children')}"
             print(leases_msg)
             summary_text += leases_msg + "\n"
+        if has_cleanup_failed:
+            fail_msg = "       Cleanup state returned CLEANUP_FAILED (profile/stage not removed)"
+            print(fail_msg)
+            summary_text += fail_msg + "\n"
         output_raw_path.write_text(summary_text, encoding="utf-8")
         sys.exit(1)
+
 
 
 
