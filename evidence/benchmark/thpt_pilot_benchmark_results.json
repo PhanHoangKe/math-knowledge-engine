@@ -28,22 +28,22 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-28T14:34:05Z",
+    "timestamp": "2026-09-28T14:51:20Z",
     "engine_version": "v0.3.0-p03b-accepted",
-    "duration_seconds": 10.156,
+    "duration_seconds": 16.437,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
       "unsupported_modality": 6,
-      "success": 5,
-      "genuine_wrong_answer": 6,
+      "success": 9,
+      "genuine_wrong_answer": 8,
       "extraneous_root_leak": 0,
       "unsupported_grammar": 0,
-      "domain_rejected": 23,
+      "domain_rejected": 17,
       "timeout": 0,
       "internal_error": 0,
-      "full_pilot_accuracy_pct": 12.5,
-      "symbolic_attempted_accuracy_pct": 14.71
+      "full_pilot_accuracy_pct": 22.5,
+      "symbolic_attempted_accuracy_pct": 26.47
     },
     "extraneous_roots_telemetry": {
       "problems_with_extraneous_roots": 3,
@@ -55,7 +55,7 @@
         "10": {
           "total": 15,
           "attempted": 13,
-          "success": 3
+          "success": 7
         },
         "11": {
           "total": 14,
@@ -71,7 +71,7 @@
       "by_format": {
         "FORMAT_I_MCQ": {
           "total": 11,
-          "success": 1
+          "success": 2
         },
         "FORMAT_II_TRUE_FALSE": {
           "total": 3,
@@ -79,18 +79,18 @@
         },
         "FORMAT_III_SHORT_ANSWER": {
           "total": 25,
-          "success": 4
+          "success": 6
         },
         "FORMAT_IV_STRUCTURED": {
           "total": 1,
-          "success": 0
+          "success": 1
         }
       },
       "by_modality": {
         "SYMBOLIC_TYPED": {
           "total": 34,
           "attempted": 34,
-          "success": 5
+          "success": 9
         },
         "VIETNAMESE_WORD_PROBLEM": {
           "total": 4,
@@ -171,14 +171,17 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(2*x^2 - 3) = sqrt(x^2 + 1)",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Exact solution set matched: {'2', '-2'}",
+      "engine_result": "{-2, 2}",
+      "engine_solution_set": [
+        "-2",
+        "2"
+      ]
     },
     {
       "problem_id": "PILOT-10-0005",
@@ -188,14 +191,17 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(x^2 - 4*x + 3) = sqrt(x - 1)",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Mathematical solution matched MCQ target: {'1', '4'}",
+      "engine_result": "{1, 4}",
+      "engine_solution_set": [
+        "1",
+        "4"
+      ]
     },
     {
       "problem_id": "PILOT-10-0006",
@@ -205,14 +211,16 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(3*x^2 - 9*x + 1) = sqrt(x^2 - 2*x - 2)",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Exact solution set matched: {'3'}",
+      "engine_result": "{3}",
+      "engine_solution_set": [
+        "3"
+      ]
     },
     {
       "problem_id": "PILOT-10-0007",
@@ -222,13 +230,13 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(3*x^2 - 4*x + 1) = 2*x - 1",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "GENUINE_WRONG_ANSWER",
       "attempted": true,
       "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "MCQ failed: expected choice C / set(), got key 'None' / set()",
+      "engine_result": "{}",
       "engine_solution_set": []
     },
     {
@@ -239,14 +247,17 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(2*x^2 + 5) = x + 2",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "GENUINE_WRONG_ANSWER",
       "attempted": true,
       "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Produced {'2-sqrt(3)', 'sqrt(3)+2'} did not match expected {'2+sqrt(3)', '2-sqrt(3)'}.",
+      "engine_result": "{2 - sqrt(3), sqrt(3) + 2}",
+      "engine_solution_set": [
+        "2 - sqrt(3)",
+        "sqrt(3) + 2"
+      ]
     },
     {
       "problem_id": "PILOT-10-0009",
@@ -256,14 +267,16 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sqrt(x^2 - 3*x + 2) = x - 1",
-      "outcome": "DOMAIN_REJECTED",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'q'. Use explicit '*' (e.g. 's*q').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Exact solution set matched: {'1'}",
+      "engine_result": "{1}",
+      "engine_solution_set": [
+        "1"
+      ]
     },
     {
       "problem_id": "PILOT-10-0010",
@@ -278,7 +291,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'x=2,y=-1'} did not match expected {'y=-1', 'x=2'}.",
+      "scoring_details": "Produced {'x=2,y=-1'} did not match expected {'x=2', 'y=-1'}.",
       "engine_result": "x = 2, y = -1",
       "engine_solution_set": [
         "x = 2, y = -1"
