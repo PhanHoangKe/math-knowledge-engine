@@ -2,15 +2,15 @@
   "benchmark_name": "GDPT 2018 THPT P03C-P1A Elementary Algebra Benchmark",
   "version": "1.0.0",
   "archetype_scope": [
-    "ARCH-10.3.2",
-    "ARCH-10.3.3",
-    "ARCH-10.3.4"
+    "ARCH-10.5.1",
+    "ARCH-10.5.2",
+    "ARCH-10.5.3"
   ],
   "total_items": 15,
   "items": [
     {
       "id": "P1A-ALG-001",
-      "archetype_id": "ARCH-10.3.3",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -23,7 +23,7 @@
     },
     {
       "id": "P1A-ALG-002",
-      "archetype_id": "ARCH-10.3.3",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -36,7 +36,7 @@
     },
     {
       "id": "P1A-ALG-003",
-      "archetype_id": "ARCH-10.3.3",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -49,7 +49,7 @@
     },
     {
       "id": "P1A-ALG-004",
-      "archetype_id": "ARCH-10.3.4",
+      "archetype_id": "ARCH-10.5.1",
       "grade": 10,
       "topic": "Dual Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -62,7 +62,7 @@
     },
     {
       "id": "P1A-ALG-005",
-      "archetype_id": "ARCH-10.3.4",
+      "archetype_id": "ARCH-10.5.1",
       "grade": 10,
       "topic": "Dual Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -75,7 +75,7 @@
     },
     {
       "id": "P1A-ALG-006",
-      "archetype_id": "ARCH-10.3.4",
+      "archetype_id": "ARCH-10.5.1",
       "grade": 10,
       "topic": "Dual Radical Equations",
       "question_type": "SHORT_ANSWER",
@@ -88,7 +88,7 @@
     },
     {
       "id": "P1A-ALG-007",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",
@@ -101,7 +101,7 @@
     },
     {
       "id": "P1A-ALG-008",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",
@@ -114,7 +114,7 @@
     },
     {
       "id": "P1A-ALG-009",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",
@@ -127,7 +127,7 @@
     },
     {
       "id": "P1A-ALG-010",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.3",
       "grade": 10,
       "topic": "Absolute Value Equations",
       "question_type": "SHORT_ANSWER",
@@ -140,7 +140,7 @@
     },
     {
       "id": "P1A-ALG-011",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.3",
       "grade": 10,
       "topic": "Absolute Value Equations",
       "question_type": "SHORT_ANSWER",
@@ -153,7 +153,7 @@
     },
     {
       "id": "P1A-ALG-012",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.3",
       "grade": 10,
       "topic": "Absolute Value Equations",
       "question_type": "SHORT_ANSWER",
@@ -166,7 +166,7 @@
     },
     {
       "id": "P1A-ALG-013",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.3",
       "grade": 10,
       "topic": "Absolute Value Equations",
       "question_type": "SHORT_ANSWER",
@@ -179,7 +179,7 @@
     },
     {
       "id": "P1A-ALG-014",
-      "archetype_id": "ARCH-10.3.2",
+      "archetype_id": "ARCH-10.5.3",
       "grade": 10,
       "topic": "Absolute Value Equations",
       "question_type": "SHORT_ANSWER",
@@ -192,17 +192,16 @@
     },
     {
       "id": "P1A-ALG-015",
-      "archetype_id": "ARCH-10.3.3",
+      "archetype_id": "ARCH-10.5.2",
       "grade": 10,
       "topic": "Radical Equations",
       "question_type": "SHORT_ANSWER",
       "input_text": "sqrt(x^2 - 3*x + 2) = x - 1",
       "ground_truth": {
         "solution_set": ["1"],
-        "extraneous_roots": ["2"]
+        "extraneous_roots": []
       },
-      "description": "Radical equation sqrt(x^2-3x+2) = x-1 with valid root x = 1 and extraneous root x = 2 (LHS = 0 != RHS = 1)."
+      "description": "Radical equation sqrt(x^2-3x+2) = x-1 with valid root x = 1 (squaring yields only candidate x = 1)."
     }
-
   ]
 }

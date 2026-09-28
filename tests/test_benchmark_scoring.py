@@ -1,7 +1,7 @@
 """
-Comprehensive Unit Tests for MKE THPT Benchmark Scoring & Telemetry Engine (P03C-P1A).
+Comprehensive Unit Tests for MKE THPT Benchmark Scoring & Telemetry Engine (P03C-P1A-R1).
 Tests domain-aware normalization, multi-format evaluations, false-success attacks,
-and extraneous root telemetry invariants.
+mutation tests with intentionally wrong responses, and extraneous root telemetry invariants.
 """
 
 import pytest
@@ -16,12 +16,16 @@ if str(REPO_ROOT / "scripts") not in sys.path:
 
 from scripts.benchmark_scoring import (
     BenchmarkOutcome,
+    are_solution_sets_equivalent,
+    are_systems_equivalent,
     check_extraneous_root_leak,
     evaluate_benchmark_response,
+    is_mathematically_equivalent,
     normalize_math_string,
     parse_interval_tokens,
     parse_system_solution,
 )
+
 
 class TestBenchmarkScoringSuite:
     """Rigorous verification suite for benchmark scoring engine."""
@@ -31,6 +35,7 @@ class TestBenchmarkScoringSuite:
         assert normalize_math_string("\\frac{2}{3}") == "(2/3)"
         assert normalize_math_string("\\sqrt{3}") == "sqrt(3)"
         assert normalize_math_string("(-\\infty, 2) \\cup (3, +\\infty)") == "(-oo,2)u(3,oo)"
+        assert normalize_math_string("\\emptyset") == ""
 
     def test_interval_token_parsing(self):
         intervals = parse_interval_tokens("(-oo, 2) U (3, +oo)")
@@ -40,6 +45,20 @@ class TestBenchmarkScoringSuite:
         sol_list = ["x = 2", "y = -1"]
         sys_dict = parse_system_solution(sol_list)
         assert sys_dict == {"x": "2", "y": "-1"}
+
+    def test_mathematical_equivalence_radicals_and_algebra(self):
+        assert is_mathematically_equivalent("2*sqrt(3)", "sqrt(12)") is True
+        assert is_mathematically_equivalent("sqrt(2)/2", "1/sqrt(2)") is True
+        assert is_mathematically_equivalent("3*x^2 + 2*x", "x*(3*x + 2)") is True
+        assert is_mathematically_equivalent("-sin(x)", "-1*sin(x)") is True
+        assert is_mathematically_equivalent("2*sqrt(2)", "sqrt(6)") is False
+
+    def test_system_equivalence(self):
+        sys1 = {"x": "8/5", "y": "3/5"}
+        sys2 = {"x": "1.6", "y": "0.6"}
+        assert are_systems_equivalent(sys1, sys2) is True
+        sys_wrong = {"x": "8/5", "y": "-3/5"}
+        assert are_systems_equivalent(sys1, sys_wrong) is False
 
     def test_extraneous_root_leak_detection(self):
         leaked, roots = check_extraneous_root_leak({"0", "4"}, ["0", "-3"])
@@ -96,7 +115,6 @@ class TestBenchmarkScoringSuite:
                 "boolean_values": {"a": True, "b": False, "c": True, "d": False}
             }
         }
-        # Engine outputs empty set or text
         mock_resp = {"symbolic_result": "{}", "solution_set": []}
         res = evaluate_benchmark_response(problem, "SUCCESS", mock_resp)
         assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
@@ -140,18 +158,45 @@ class TestBenchmarkScoringSuite:
         res_key = evaluate_benchmark_response(problem, "SUCCESS", mock_key)
         assert res_key["outcome"] == BenchmarkOutcome.SUCCESS
         assert res_key["matched_ground_truth"] is True
+        assert res_key["choice_matched"] is True
 
         # Mathematical fallback
         mock_math = {"symbolic_result": "(-oo, 2) U (3, +oo)"}
         res_math = evaluate_benchmark_response(problem, "SUCCESS", mock_math)
         assert res_math["outcome"] == BenchmarkOutcome.SUCCESS
         assert res_math["matched_ground_truth"] is True
+        assert res_math["math_matched"] is True
 
         # Wrong choice key
         mock_wrong = {"selected_choice": "A"}
         res_wrong = evaluate_benchmark_response(problem, "SUCCESS", mock_wrong)
         assert res_wrong["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
         assert res_wrong["matched_ground_truth"] is False
+
+    def test_mcq_empty_set_scoring(self):
+        problem = {
+            "format_type": "FORMAT_I_MCQ",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {
+                "solution_type": "CHOICE_KEY",
+                "correct_choice": "C",
+                "exact_solution_set": []
+            }
+        }
+        # Correct choice key
+        res_key = evaluate_benchmark_response(problem, "SUCCESS", {"selected_choice": "C"})
+        assert res_key["outcome"] == BenchmarkOutcome.SUCCESS
+        assert res_key["matched_ground_truth"] is True
+
+        # Math fallback empty set
+        res_math = evaluate_benchmark_response(problem, "SUCCESS", {"symbolic_result": "{}"})
+        assert res_math["outcome"] == BenchmarkOutcome.SUCCESS
+        assert res_math["matched_ground_truth"] is True
+
+        # Non-empty set when empty is expected -> WRONG
+        res_nonempty = evaluate_benchmark_response(problem, "SUCCESS", {"symbolic_result": "{0}"})
+        assert res_nonempty["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
+        assert res_nonempty["matched_ground_truth"] is False
 
     def test_system_of_equations_scoring(self):
         problem = {
@@ -180,4 +225,55 @@ class TestBenchmarkScoringSuite:
         mock_resp = {"error_message": "Division by zero"}
         res = evaluate_benchmark_response(problem, "DOMAIN_ERROR", mock_resp)
         assert res["outcome"] == BenchmarkOutcome.DOMAIN_REJECTED
+        assert res["matched_ground_truth"] is False
+
+    # ================= MUTATION TESTS =================
+    def test_mutation_wrong_sign(self):
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"solution_type": "EXACT_SET", "exact_solution_set": ["1"]}
+        }
+        res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": ["-1"]})
+        assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
+        assert res["matched_ground_truth"] is False
+
+    def test_mutation_partial_subset(self):
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"solution_type": "EXACT_SET", "exact_solution_set": ["1", "4"]}
+        }
+        res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": ["1"]})
+        assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
+        assert res["matched_ground_truth"] is False
+
+    def test_mutation_superset_extra_root(self):
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"solution_type": "EXACT_SET", "exact_solution_set": ["1"]}
+        }
+        res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": ["1", "99"]})
+        assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
+        assert res["matched_ground_truth"] is False
+
+    def test_mutation_inequivalent_radical(self):
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"solution_type": "EXACT_SET", "exact_solution_set": ["sqrt(6)"]}
+        }
+        res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": ["2*sqrt(2)"]})
+        assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
+        assert res["matched_ground_truth"] is False
+
+    def test_mutation_empty_when_zero_expected(self):
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"solution_type": "EXACT_SET", "exact_solution_set": ["0"]}
+        }
+        res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": []})
+        assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
         assert res["matched_ground_truth"] is False

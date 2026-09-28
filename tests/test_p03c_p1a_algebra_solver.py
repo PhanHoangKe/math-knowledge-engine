@@ -158,6 +158,47 @@ class TestP03CP1AAlgebraSolver(unittest.TestCase):
         self.assertEqual(res.status, EngineStatus.SUCCESS)
         self.assertEqual(res.symbolic_result, "16/3")
 
+    def test_exact_root_validation_tiny_epsilon_counterexample(self):
+        # sqrt(x^2) = x - 1/1000000000000 => squaring gives x = 1/2000000000000.
+        # But for x > 0: sqrt(x^2) = x != x - 10^-12.
+        # With exact symbolic evaluation, this must yield EMPTY solution set.
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="sqrt(x^2) = x - 1/1000000000000",
+            options={"in_process": True},
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.symbolic_result, "{}")
+        self.assertEqual(res.solution_set, [])
+        self.assertIn("extraneous_roots", res.verification_evidence)
+        self.assertEqual(res.verification_evidence["extraneous_roots"], ["1/2000000000000"])
+
+    def test_domain_preserving_identity_radical(self):
+        # sqrt(x) = sqrt(x) => domain is [0, oo), NOT "All real numbers except x >= 0"
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="sqrt(x) = sqrt(x)",
+            options={"in_process": True},
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.symbolic_result, "[0, oo)")
+        self.assertNotIn("All real numbers except", res.symbolic_result)
+
+    def test_domain_preserving_identity_radical_and_rational(self):
+        # sqrt(x - 2)/(x - 5) = sqrt(x - 2)/(x - 5) => domain is [2, 5) U (5, oo)
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="sqrt(x - 2) / (x - 5) = sqrt(x - 2) / (x - 5)",
+            options={"in_process": True},
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertIn("[2, 5)", res.symbolic_result)
+        self.assertIn("(5, oo)", res.symbolic_result)
+
 
 if __name__ == "__main__":
     unittest.main()
+

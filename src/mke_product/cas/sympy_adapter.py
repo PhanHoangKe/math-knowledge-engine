@@ -342,7 +342,9 @@ def _validate_root_in_ast(
     is_real = False
     if hasattr(r, "is_real") and r.is_real is True:
         is_real = True
-    elif isinstance(r, (int, float, sympy.Integer, sympy.Rational)):
+    elif isinstance(r, (int, sympy.Integer, sympy.Rational)):
+        is_real = True
+    elif isinstance(r, float):
         is_real = True
     else:
         try:
@@ -360,38 +362,63 @@ def _validate_root_in_ast(
             denom_sym = ast_to_sympy_expr(n.right)
             val = denom_sym.subs(var, r)
             try:
-                if sympy.simplify(val) == 0:
+                simplified_val = sympy.simplify(val)
+                if simplified_val == 0 or simplified_val.is_zero is True:
                     return False, "division_by_zero"
+                if simplified_val.is_zero is None and not (simplified_val.is_number and simplified_val != 0):
+                    return False, "undecidable_denominator"
             except Exception:
-                pass
+                return False, "undecidable_denominator"
 
-    # 3. Check all radicals in original AST
+    # 3. Check all zero exponents: base != 0
+    for n in ast_node.walk():
+        if isinstance(n, Power) and getattr(n, "exponent", None) is not None and getattr(n.exponent, "value", None) == 0:
+            base_sym = ast_to_sympy_expr(n.base)
+            val = base_sym.subs(var, r)
+            try:
+                simplified_val = sympy.simplify(val)
+                if simplified_val == 0 or simplified_val.is_zero is True:
+                    return False, "zero_power_zero_base"
+                if simplified_val.is_zero is None and not (simplified_val.is_number and simplified_val != 0):
+                    return False, "undecidable_base"
+            except Exception:
+                return False, "undecidable_base"
+
+    # 4. Check all radicals in original AST (radicand >= 0)
     for n in ast_node.walk():
         if isinstance(n, Radical):
             rad_sym = ast_to_sympy_expr(n.radicand)
             val = rad_sym.subs(var, r)
             try:
                 simplified_val = sympy.simplify(val)
-                if simplified_val.is_number:
-                    if simplified_val.is_negative or (hasattr(simplified_val, "evalf") and float(simplified_val.evalf()) < -1e-9):
+                if simplified_val.is_negative is True:
+                    return False, "negative_radicand"
+                if simplified_val.is_number and simplified_val < 0:
+                    return False, "negative_radicand"
+                if simplified_val.is_nonnegative is False:
+                    return False, "negative_radicand"
+                if simplified_val.is_nonnegative is None and not simplified_val.is_number:
+                    if sympy.simplify(simplified_val < 0) is sympy.S.true:
                         return False, "negative_radicand"
             except Exception:
-                pass
+                return False, "evaluation_failed"
 
-    # 4. Check LHS vs RHS substitution identity
+    # 5. Check LHS vs RHS substitution exact identity without float epsilon
     try:
         lhs_val = lhs_sym.subs(var, r)
         rhs_val = rhs_sym.subs(var, r)
         diff = sympy.simplify(lhs_val - rhs_val)
-        if diff != 0:
-            if hasattr(diff, "evalf") and abs(float(diff.evalf())) > 1e-9:
-                return False, "lhs_rhs_mismatch"
-            elif not hasattr(diff, "evalf"):
-                return False, "lhs_rhs_mismatch"
+        if diff == 0 or diff.is_zero is True:
+            return True, "valid"
+        elif diff.is_zero is False:
+            return False, "lhs_rhs_mismatch"
+        elif diff.is_number and diff != 0:
+            return False, "lhs_rhs_mismatch"
+        else:
+            # Soundness requirement: undecidable equality must not be accepted
+            return False, "undecidable_equality"
     except Exception:
         return False, "evaluation_failed"
-
-    return True, "valid"
 
 
 def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
@@ -402,21 +429,99 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
     else:
         eq = sympy.Eq(sym_obj, 0)
 
-    # Check for identity equation with domain restrictions, e.g. (x-1)/(x-1) = 1
+    # Check for identity equation with domain restrictions, e.g. (x-1)/(x-1) = 1, sqrt(x) = sqrt(x)
     diff_expr = sympy.cancel(eq.lhs - eq.rhs)
 
     if diff_expr == 0:
-        if response.domain_restrictions:
-            excluded_str = ", ".join(response.domain_restrictions)
-            response.symbolic_result = f"All real numbers except {excluded_str}"
-            response.latex_output = "\\mathbb{R} \\setminus \\{ " + ", ".join([r.replace("x != ", "") for r in response.domain_restrictions]) + " \\}"
-            response.mathematical_status = EngineStatus.SUCCESS
-            return
-        else:
+        domain_set = sympy.S.Reals
+        has_radical_or_interval = False
+        excluded_points: List[Any] = []
+
+        for n in ast_node.walk():
+            # 1. Radicals require radicand >= 0
+            if isinstance(n, Radical):
+                has_radical_or_interval = True
+                rad_sym = ast_to_sympy_expr(n.radicand)
+                try:
+                    rad_domain = sympy.solveset(rad_sym >= 0, x, domain=sympy.S.Reals)
+                    domain_set = domain_set.intersect(rad_domain)
+                except Exception:
+                    pass
+
+            # 2. Denominators require denom != 0
+            elif isinstance(n, BinaryOp) and n.op == "/":
+                denom_sym = ast_to_sympy_expr(n.right)
+                try:
+                    denom_zeros = sympy.solveset(sympy.Eq(denom_sym, 0), x, domain=sympy.S.Reals)
+                    domain_set = domain_set - denom_zeros
+                    if isinstance(denom_zeros, sympy.FiniteSet):
+                        excluded_points.extend(list(denom_zeros))
+                    elif hasattr(denom_zeros, "__iter__"):
+                        excluded_points.extend(list(denom_zeros))
+                except Exception:
+                    pass
+
+            # 3. Base != 0 for 0-exponent
+            elif isinstance(n, Power) and getattr(n, "exponent", None) is not None and getattr(n.exponent, "value", None) == 0:
+                base_sym = ast_to_sympy_expr(n.base)
+                try:
+                    base_zeros = sympy.solveset(sympy.Eq(base_sym, 0), x, domain=sympy.S.Reals)
+                    domain_set = domain_set - base_zeros
+                    if isinstance(base_zeros, sympy.FiniteSet):
+                        excluded_points.extend(list(base_zeros))
+                except Exception:
+                    pass
+
+        if domain_set == sympy.S.Reals:
             response.symbolic_result = "All real numbers"
             response.latex_output = "\\mathbb{R}"
             response.mathematical_status = EngineStatus.SUCCESS
+            response.verification_evidence = {
+                "solution_type": "identity",
+                "domain": "Reals",
+            }
             return
+
+        if domain_set == sympy.EmptySet or domain_set == sympy.S.EmptySet:
+            response.symbolic_result = "{}"
+            response.latex_output = "\\emptyset"
+            response.mathematical_status = EngineStatus.SUCCESS
+            response.verification_evidence = {
+                "solution_type": "empty_set",
+                "solution_set": [],
+            }
+            return
+
+        # If only isolated point exclusions and no radicals
+        if not has_radical_or_interval and excluded_points:
+            unique_excl: List[Any] = []
+            for p in excluded_points:
+                if not any(sympy.simplify(p - u) == 0 for u in unique_excl):
+                    unique_excl.append(p)
+            try:
+                unique_excl.sort(key=lambda item: float(item.evalf()) if hasattr(item, "evalf") else float(item))
+            except Exception:
+                pass
+            excl_str = ", ".join([f"x != {format_sympy_symbolic(p)}" for p in unique_excl])
+            latex_excl = ", ".join([format_sympy_latex(p) for p in unique_excl])
+            response.symbolic_result = f"All real numbers except {excl_str}"
+            response.latex_output = f"\\mathbb{{R}} \\setminus \\{{ {latex_excl} \\}}"
+            response.mathematical_status = EngineStatus.SUCCESS
+            response.verification_evidence = {
+                "solution_type": "identity_with_exclusions",
+                "excluded_points": [str(p) for p in unique_excl],
+            }
+            return
+
+        # Otherwise format domain interval/set (e.g. [0, oo) or [2, 5) U (5, oo))
+        response.symbolic_result = format_interval_symbolic(domain_set, var="x")
+        response.latex_output = format_interval_latex(domain_set, var="x")
+        response.mathematical_status = EngineStatus.SUCCESS
+        response.verification_evidence = {
+            "solution_type": "identity_interval",
+            "domain_set": str(domain_set),
+        }
+        return
 
     # Collect all candidate roots from SymPy solve and pattern-based algebraic transformations
     raw_candidates = _collect_algebraic_candidates(ast_node, eq, x)
