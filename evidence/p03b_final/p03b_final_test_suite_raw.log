@@ -1,10 +1,10 @@
 # MKE PRODUCT-03B FINAL RESOURCE ISOLATION REGRESSION TEST SUITE LOG
-# Commit: 911f3b14009bfba4e68400f39e1b4263eee337c7
+# Commit: 0e3036322923e9d79a6262fd0be161d5c82f4b52
 # Branch: product/p03b-final-isolation
 # Environment: Python 3.10.11 on Windows 10
 # SymPy: 1.14.0, Pytest: 9.1.1
-# Duration: 142.59s
-# Exit Code: 1
+# Duration: 134.77s
+# Exit Code: 0
 
 ============================= test session starts =============================
 platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
@@ -478,7 +478,7 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_er
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_failed_termination_request_retains_job_containment PASSED [ 95%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_failed_termination_wait_is_not_confirmation PASSED [ 96%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_genuine_native_close_failure_is_not_blindly_retried PASSED [ 96%]
-tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_independent_repeated_requests_reset_telemetry FAILED [ 96%]
+tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_independent_repeated_requests_reset_telemetry PASSED [ 96%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_injected_close_handle_failure_preserves_quarantine_diagnostics PASSED [ 96%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_invalid_stale_handle_is_recorded_not_closed_or_retried PASSED [ 96%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_job_object_close_failure_fails_closed_and_preserves_diagnostics PASSED [ 97%]
@@ -497,11 +497,4 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 99%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-================================== FAILURES ===================================
-_ TestWindowsCancellationAndHandleOwnership.test_independent_repeated_requests_reset_telemetry _
-tests\test_worker_windows.py:1433: in test_independent_repeated_requests_reset_telemetry
-    self.assertEqual(handles_end - handles_start, 0, f"Handle leak: start={handles_start}, end={handles_end}")
-E   AssertionError: -2 != 0 : Handle leak: start=260, end=258
-=========================== short test summary info ===========================
-FAILED tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_independent_repeated_requests_reset_telemetry
-======== 1 failed, 478 passed, 18 subtests passed in 141.13s (0:02:21) ========
+============= 479 passed, 18 subtests passed in 133.44s (0:02:13) =============
