@@ -663,6 +663,42 @@ class TestProduct03BR1SoundnessAndCounterexamples:
         certainty = assess_domain_certainty(ast, [])
         assert certainty == "NOT_FULLY_DETERMINED"
 
+    def test_constant_domain_soundness_counterexamples(self):
+        """Verify that undecidable constant zero-power bases and denominators are validated in worker."""
+        from mke_product.cas.router import execute_cas_operation
+        from mke_product.cas.contracts import ExecutionRequest, OperationType, EngineStatus
+        from mke_product.cas.cas_parser import parse_cas_expression
+        from mke_product.cas.safety import is_polynomial_ast
+
+        # 1. SIMPLIFY: 1/(2^500 - 4^250) -> DOMAIN_ERROR
+        req1 = ExecutionRequest(expression="1/(2^500 - 4^250)", operation=OperationType.SIMPLIFY)
+        res1 = execute_cas_operation(req1)
+        assert res1.mathematical_status == EngineStatus.DOMAIN_ERROR
+        assert "Division by zero" in res1.error_message
+
+        # is_polynomial_ast must return False since denominator is not proven non-zero
+        ast1 = parse_cas_expression("1/(2^500 - 4^250)")
+        assert is_polynomial_ast(ast1) is False
+
+        # 2. SIMPLIFY: (2^500 - 4^250)^0 -> DOMAIN_ERROR
+        req2 = ExecutionRequest(expression="(2^500 - 4^250)^0", operation=OperationType.SIMPLIFY)
+        res2 = execute_cas_operation(req2)
+        assert res2.mathematical_status == EngineStatus.DOMAIN_ERROR
+        assert "0^0 is undefined" in res2.error_message
+
+        # 3. SIMPLIFY: 1/(2^500 - 3^300) -> SUCCESS
+        req3 = ExecutionRequest(expression="1/(2^500 - 3^300)", operation=OperationType.SIMPLIFY)
+        res3 = execute_cas_operation(req3)
+        assert res3.mathematical_status == EngineStatus.SUCCESS
+        assert res3.symbolic_result is not None
+
+        # 4. SIMPLIFY: (2^500 - 3^300)^0 -> SUCCESS
+        req4 = ExecutionRequest(expression="(2^500 - 3^300)^0", operation=OperationType.SIMPLIFY)
+        res4 = execute_cas_operation(req4)
+        assert res4.mathematical_status == EngineStatus.SUCCESS
+        assert res4.symbolic_result == "1"
+
+
 
 
 

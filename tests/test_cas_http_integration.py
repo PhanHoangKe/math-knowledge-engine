@@ -615,6 +615,45 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["mathematical_status"], "SUCCESS")
         self.assertEqual(data["symbolic_result"], "{3}")
 
+    def test_http_constant_domain_soundness_counterexamples(self):
+        """Verify HTTP API correctly returns DOMAIN_ERROR for undecidable constant 0-power and div-by-0."""
+        # 1. 1/(2^500 - 4^250)
+        status, data = self._post_json("/api/execute", {
+            "operation": "SIMPLIFY",
+            "input": "1/(2^500 - 4^250)",
+        })
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "DOMAIN_ERROR")
+        self.assertIn("Division by zero", data.get("error_message", ""))
+
+        # 2. (2^500 - 4^250)^0
+        status, data = self._post_json("/api/execute", {
+            "operation": "SIMPLIFY",
+            "input": "(2^500 - 4^250)^0",
+        })
+        self.assertEqual(status, 400)
+        self.assertEqual(data["mathematical_status"], "DOMAIN_ERROR")
+        self.assertIn("0^0 is undefined", data.get("error_message", ""))
+
+        # 3. 1/(2^500 - 3^300)
+        status, data = self._post_json("/api/execute", {
+            "operation": "SIMPLIFY",
+            "input": "1/(2^500 - 3^300)",
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(data["mathematical_status"], "SUCCESS")
+
+        # 4. (2^500 - 3^300)^0
+        status, data = self._post_json("/api/execute", {
+            "operation": "SIMPLIFY",
+            "input": "(2^500 - 3^300)^0",
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(data["mathematical_status"], "SUCCESS")
+        self.assertEqual(data["symbolic_result"], "1")
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

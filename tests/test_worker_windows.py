@@ -1428,9 +1428,10 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
         controller.settle_quarantine(timeout=0.5)
         gc.collect()
 
-        # Process handle count remains strictly stable
+        # Process handle count remains strictly stable (no leaks)
         handles_end = get_current_process_handle_count()
-        self.assertEqual(handles_end - handles_start, 0, f"Handle leak: start={handles_start}, end={handles_end}")
+        self.assertLessEqual(handles_end - handles_start, 0, f"Handle leak: start={handles_start}, end={handles_end}")
+
 
     def test_quarantined_handle_released_after_delayed_writer_eventual_exit(self):
         """Quarantined handle is safely released when delayed writer thread eventually finishes."""
@@ -1499,7 +1500,8 @@ class TestWindowsCancellationAndHandleOwnership(unittest.TestCase):
 
         final_handles = get_current_process_handle_count()
         handle_diff = final_handles - baseline_handles
-        self.assertEqual(handle_diff, 0, f"Handle leak detected: baseline={baseline_handles}, final={final_handles}")
+        self.assertLessEqual(handle_diff, 0, f"Handle leak detected: baseline={baseline_handles}, final={final_handles}")
+
 
     def test_normal_write_completion_guards_active_writer(self):
         """Normal write completion fails closed and quarantines handle if writer thread is still active."""

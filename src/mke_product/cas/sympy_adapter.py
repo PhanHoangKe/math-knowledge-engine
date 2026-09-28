@@ -97,17 +97,45 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
         # Substantive symbolic domain validations executed under the supervised worker
         from mke_product.parser.ast import BinaryOp, Power
         from .cas_parser import CASPower
+        from .safety import prove_constant_zero_status, DivisionByZeroError
         for n in ast_node.walk():
             if isinstance(n, (Power, CASPower)) and n.exponent.value == 0:
-                if len(n.base.variables()) > 0:
+                zero_status = prove_constant_zero_status(n.base) if len(n.base.variables()) == 0 else "UNDECIDABLE"
+                if zero_status == "ZERO":
+                    raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+                elif zero_status == "UNDECIDABLE":
                     sym_base = ast_to_sympy_expr(n.base)
-                    if sympy.simplify(sym_base) == 0:
-                        raise DomainRestrictionError("Indeterminate form (0)^0 is undefined everywhere in real domain.")
+                    try:
+                        simplified_base = sympy.simplify(sym_base)
+                        if simplified_base == 0:
+                            raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+                    except DomainRestrictionError:
+                        raise
+                    except Exception as exc:
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Undecidable zero-power base definedness: {exc}"
+                        return response
+
             elif isinstance(n, BinaryOp) and n.op == "/":
-                if len(n.right.variables()) > 0:
+                zero_status = prove_constant_zero_status(n.right) if len(n.right.variables()) == 0 else "UNDECIDABLE"
+                if zero_status == "ZERO":
+                    raise DivisionByZeroError("Division by zero expression is undefined in real domain.")
+                elif zero_status == "UNDECIDABLE":
                     sym_denom = ast_to_sympy_expr(n.right)
-                    if sympy.simplify(sym_denom) == 0:
-                        raise DomainRestrictionError("Division by zero expression is undefined everywhere in real domain.")
+                    try:
+                        simplified_denom = sympy.simplify(sym_denom)
+                        if simplified_denom == 0:
+                            raise DivisionByZeroError("Division by zero expression is undefined in real domain.")
+                    except DivisionByZeroError:
+                        raise
+                    except Exception as exc:
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Undecidable denominator definedness: {exc}"
+                        return response
 
         domain_restrictions = extract_domain_restrictions(ast_node)
         response.domain_restrictions = domain_restrictions

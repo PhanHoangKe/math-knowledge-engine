@@ -520,7 +520,11 @@ def is_polynomial_ast(node: ASTNode) -> bool:
             return is_polynomial_ast(node.left) and is_polynomial_ast(node.right)
         elif node.op == "/":
             # Division by non-zero constant is polynomial (rational coefficient)
-            return len(node.right.variables()) == 0 and is_polynomial_ast(node.left)
+            return (
+                len(node.right.variables()) == 0
+                and prove_constant_zero_status(node.right) == "NONZERO"
+                and is_polynomial_ast(node.left)
+            )
         return False
     if isinstance(node, (Power, CASPower)):
         if isinstance(node.exponent, IntegerLiteral) and node.exponent.value > 0:
