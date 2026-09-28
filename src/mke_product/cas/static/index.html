@@ -466,7 +466,8 @@
       // Find y range
       let yMin = Infinity, yMax = -Infinity;
       plotData.segments.forEach(seg => {
-        seg.forEach(p => {
+        const pts = Array.isArray(seg) ? seg : (seg.x ? seg.x.map((x, i) => ({x: x, y: seg.y[i]})) : []);
+        pts.forEach(p => {
           if (p.y < yMin) yMin = p.y;
           if (p.y > yMax) yMax = p.y;
         });
@@ -509,10 +510,11 @@
 
       // Draw Curve Segments
       plotData.segments.forEach(seg => {
-        if (seg.length < 2) return;
-        let d = `M ${scaleX(seg[0].x)} ${scaleY(seg[0].y)}`;
-        for (let i = 1; i < seg.length; i++) {
-          d += ` L ${scaleX(seg[i].x)} ${scaleY(seg[i].y)}`;
+        const pts = Array.isArray(seg) ? seg : (seg.x ? seg.x.map((x, i) => ({x: x, y: seg.y[i]})) : []);
+        if (pts.length < 2) return;
+        let d = `M ${scaleX(pts[0].x)} ${scaleY(pts[0].y)}`;
+        for (let i = 1; i < pts.length; i++) {
+          d += ` L ${scaleX(pts[i].x)} ${scaleY(pts[i].y)}`;
         }
         const path = document.createElementNS(ns, 'path');
         path.setAttribute('d', d);

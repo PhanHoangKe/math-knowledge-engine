@@ -194,7 +194,9 @@ class EngineRouter:
         # Prefer native formal MKE engine for linear equation solving
         native_engine = self.registry.get_engine("mke_native_v1")
         if native_engine and native_engine.can_handle(request):
-            return native_engine.execute(request)
+            native_res = native_engine.execute(request)
+            if native_res.status == EngineStatus.SUCCESS:
+                return native_res
 
         # Fallback to SymPy for symbolic algebra, nonlinear, calculus, and plotting
         sympy_engine = self.registry.get_engine("sympy_cas_v0")

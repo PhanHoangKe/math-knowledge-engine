@@ -1,20 +1,22 @@
 """
-Acceptance Test Suite for MKE Multi-Engine CAS (Product-03A v0).
+Acceptance Test Suite for MKE Multi-Engine CAS (Product-03A v0/R1).
 
 Covers:
 - Test A: SOLVE quadratic (x^2 - 4 = 0 -> {-2, 2})
 - Test B: DIFFERENTIATE (x^2 + 3*x -> 2*x + 3)
-- Test C: INTEGRATE (x^2 -> x^3/3 + C)
-- Test D: SIMPLIFY ((x+1)*(x-1) -> x^2 - 1)
+- Test C: INTEGRATE (x^2 -> x^3/3 + C; definite integration with safe bounds)
+- Test D: SIMPLIFY ((x+1)*(x-1) -> x^2 - 1; rational functions with domain preservation)
 - Test E: PLOT_2D (smooth curves, asymptote split on 1/(x-2))
 - Test F: NATIVE ROUTING (2*x + 4 = 10 -> mke_native_v1)
-- Test G: DOMAIN PRESERVATION ((x-1)/(x-1) = 1 -> x != 1)
-- Test H: MALICIOUS INPUT REJECTION (__import__, eval, code injection)
-- Test I: RESOURCE SAFETY (deep nesting > 16, huge digits > 256, 1/0, 0^0)
+- Test G: DOMAIN PRESERVATION (removable singularities, composite zeros, multiple excluded points)
+- Test H: MALICIOUS INPUT REJECTION (__import__, eval, code injection, options injection)
+- Test I: RESOURCE SAFETY (deep nesting > 16, huge digits > 256, 1/0, 0^0, composite zeros)
+- Test J: SUPERVISED TIMEOUT (killable child worker process on hard deadline)
 - Test K: REGISTRY & CAPABILITIES (Engine registry, status, metadata)
 """
 
 import math
+import time
 import unittest
 
 from mke_product.cas.contracts import EngineStatus, ExecutionRequest, OperationType
@@ -28,6 +30,8 @@ from mke_product.cas.safety import (
     check_input_bounds,
     extract_domain_restrictions,
     inspect_ast_safety,
+    parse_safe_numeric_bound,
+    sanitize_execution_options,
 )
 from mke_product.cas.sympy_adapter import SymPyAdapter
 
@@ -70,6 +74,16 @@ class TestCASProduct03A(unittest.TestCase):
         res = self.router.execute(req)
         self.assertEqual(res.status, EngineStatus.SUCCESS)
         self.assertIn("2", res.solution_set)
+
+    def test_exact_realness_no_complex_roots(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="x^2 + 1 = 0",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.solution_set, [])
+        self.assertEqual(res.result_str, "{}")
 
     # -------------------------------------------------------------------------
     # Test B: DIFFERENTIATE
@@ -123,6 +137,16 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertEqual(res.status, EngineStatus.SUCCESS)
         self.assertEqual(res.result_str, "9")
 
+    def test_integrate_definite_fractional_bounds(self):
+        req = ExecutionRequest(
+            operation=OperationType.INTEGRATE,
+            expression="x",
+            options={"variable": "x", "lower": "1/2", "upper": "3/2"},
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertEqual(res.result_str, "1")
+
     # -------------------------------------------------------------------------
     # Test D: SIMPLIFY
     # -------------------------------------------------------------------------
@@ -161,8 +185,9 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertIsNotNone(res.plot_data)
         self.assertEqual(len(res.plot_data["segments"]), 1)
         segment = res.plot_data["segments"][0]
-        self.assertGreaterEqual(len(segment["x"]), 50)
-        self.assertEqual(len(segment["x"]), len(segment["y"]))
+        self.assertGreaterEqual(len(segment), 50)
+        self.assertIn("x", segment[0])
+        self.assertIn("y", segment[0])
 
     def test_plot_2d_asymptote_detection(self):
         req = ExecutionRequest(
@@ -173,9 +198,7 @@ class TestCASProduct03A(unittest.TestCase):
         res = self.router.execute(req)
         self.assertEqual(res.status, EngineStatus.SUCCESS)
         self.assertIsNotNone(res.plot_data)
-        # Should split across the singularity at x = 2
         self.assertGreaterEqual(len(res.plot_data["segments"]), 2)
-        # Discontinuities tracked
         self.assertIn(2.0, [round(d, 1) for d in res.plot_data["discontinuities"]])
 
     # -------------------------------------------------------------------------
@@ -208,7 +231,7 @@ class TestCASProduct03A(unittest.TestCase):
         req = ExecutionRequest(
             operation=OperationType.SOLVE,
             expression="x^2 - 16 = 0",
-            preferred_engine="mke_native_v1",  # Native cannot solve quadratic, router handles fallback/dispatch
+            preferred_engine="mke_native_v1",
         )
         res = self.router.execute(req)
         self.assertEqual(res.status, EngineStatus.SUCCESS)
@@ -216,7 +239,7 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertEqual(res.solution_set, ["-4", "4"])
 
     # -------------------------------------------------------------------------
-    # Test G: DOMAIN PRESERVATION
+    # Test G: DOMAIN PRESERVATION & SINGULARITIES
     # -------------------------------------------------------------------------
     def test_domain_preservation_removable_singularity(self):
         req = ExecutionRequest(
@@ -227,8 +250,28 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertEqual(res.status, EngineStatus.SUCCESS)
         self.assertTrue(any("x != 1" in note for note in res.domain_notes))
 
+    def test_multiple_excluded_points(self):
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            expression="((x - 2) * (x - 3)) / ((x - 2) * (x - 4))",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        notes = res.domain_notes
+        self.assertTrue(any("x != 2" in n for n in notes))
+        self.assertTrue(any("x != 4" in n for n in notes))
+
+    def test_variable_exponent_zero_domain_restriction(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="x^0 = 1",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.SUCCESS)
+        self.assertTrue(any("x != 0" in n for n in res.domain_notes))
+
     # -------------------------------------------------------------------------
-    # Test H: MALICIOUS INPUT REJECTION
+    # Test H: MALICIOUS INPUT & OPTION REJECTION
     # -------------------------------------------------------------------------
     def test_reject_python_dunder_and_builtins(self):
         malicious_inputs = [
@@ -260,6 +303,24 @@ class TestCASProduct03A(unittest.TestCase):
         )
         res = self.router.execute(req)
         self.assertIn(res.status, [EngineStatus.INVALID_INPUT, EngineStatus.SECURITY_REJECTED])
+
+    def test_reject_malicious_options(self):
+        bad_options = [
+            {"lower": "__import__('os').system('calc')"},
+            {"upper": "eval('1+1')"},
+            {"order": "system('whoami')"},
+            {"num_points": "100; os.system('dir')"},
+            {"unknown_key": "injected_payload"},
+        ]
+        for opt in bad_options:
+            with self.subTest(opt=opt):
+                req = ExecutionRequest(
+                    operation=OperationType.INTEGRATE,
+                    expression="x^2",
+                    options=opt,
+                )
+                res = self.router.execute(req)
+                self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
 
     # -------------------------------------------------------------------------
     # Test I: RESOURCE SAFETY & MATHEMATICAL BOUNDS
@@ -300,6 +361,18 @@ class TestCASProduct03A(unittest.TestCase):
         self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
         self.assertIn("Division by zero", res.error_message or "")
 
+    def test_composite_constant_zero_denominator_rejected(self):
+        cases = ["1 / (2 - 2)", "x / (10 - 10)", "5 / (3 * 0)"]
+        for expr in cases:
+            with self.subTest(expr=expr):
+                req = ExecutionRequest(
+                    operation=OperationType.SIMPLIFY,
+                    expression=expr,
+                )
+                res = self.router.execute(req)
+                self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+                self.assertIn("Division by zero", res.error_message or "")
+
     def test_zero_power_zero_detection(self):
         req = ExecutionRequest(
             operation=OperationType.SIMPLIFY,
@@ -308,6 +381,29 @@ class TestCASProduct03A(unittest.TestCase):
         res = self.router.execute(req)
         self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
         self.assertIn("Indeterminate form 0^0", res.error_message or "")
+
+    def test_composite_zero_power_zero_detection(self):
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            expression="(5 - 5)^0",
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+        self.assertIn("Indeterminate form 0^0", res.error_message or "")
+
+    # -------------------------------------------------------------------------
+    # Test J: SUPERVISED TIMEOUT & CHILD WORKER REAPING
+    # -------------------------------------------------------------------------
+    def test_supervised_process_terminates_on_timeout(self):
+        req = ExecutionRequest(
+            operation=OperationType.SOLVE,
+            expression="x^2 - 4 = 0",
+            options={"sleep_seconds": 1.0},
+            timeout_sec=0.1,  # Short deadline triggers timeout termination
+        )
+        res = self.router.execute(req)
+        self.assertEqual(res.status, EngineStatus.RESOURCE_EXHAUSTED)
+        self.assertIn("Computation timed out", res.error_message or "")
 
     # -------------------------------------------------------------------------
     # Test K: REGISTRY & CAPABILITIES

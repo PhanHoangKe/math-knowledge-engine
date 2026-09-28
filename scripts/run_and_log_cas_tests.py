@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EVIDENCE_DIR = REPO_ROOT / "evidence" / "p03a_v0"
+EVIDENCE_DIR = REPO_ROOT / "evidence" / "p03a_r1"
 
 
 def run_tests() -> int:
@@ -97,7 +97,7 @@ def run_tests() -> int:
                 failed_count = int(m_fail.group(1))
 
     results_data = {
-        "schema_version": "mke.product03a.evidence.v0",
+        "schema_version": "mke.product03a.evidence.r1",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "commit_hash": commit_hash,
         "git_branch": git_branch,

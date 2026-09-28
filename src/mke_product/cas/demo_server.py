@@ -1,8 +1,8 @@
 """
-MKE Multi-Engine CAS Web Demo Server (v0).
+MKE Multi-Engine CAS Web Demo Server (v0/R1).
 
 Lightweight HTTP server serving the interactive web UI and dispatching
-CAS operations via the multi-engine router.
+CAS operations via the multi-engine router using the canonical ExecutionResponse schema.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Dict
 
-from mke_product.cas.contracts import ExecutionRequest, OperationType
+from mke_product.cas.contracts import EngineStatus, ExecutionRequest, OperationType
 from mke_product.cas.router import execute_cas_operation
 
 logger = logging.getLogger("mke_cas_demo_server")
@@ -47,7 +47,11 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
             mime_type, _ = mimetypes.guess_type(str(file_path))
             self._serve_file(file_path, mime_type or "application/octet-stream")
         elif path == "/api/health":
-            self._send_json(200, {"status": "HEALTHY", "version": "0.1.0", "engines": ["mke_native_v1", "sympy_cas_v0"]})
+            self._send_json(200, {
+                "status": "HEALTHY",
+                "version": "0.1.0-r1",
+                "engines": ["mke_native_v1", "sympy_cas_v0"],
+            })
         else:
             self.send_error(404, "Not Found")
 
@@ -77,65 +81,90 @@ class CASDemoHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
 
     def _handle_execute(self) -> None:
         content_length_header = self.headers.get("Content-Length")
         if not content_length_header:
-            self._send_json(400, {"error": "Missing Content-Length header", "status": "ERROR"})
+            self._send_json(400, {
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "error_message": "Missing Content-Length header",
+            })
             return
 
         try:
             content_length = int(content_length_header)
             if content_length > 65536:
-                self._send_json(413, {"error": "Payload too large", "status": "SECURITY_REJECTED"})
+                self._send_json(413, {
+                    "mathematical_status": EngineStatus.RESOURCE_EXHAUSTED.value,
+                    "error_message": "Payload exceeds maximum allowed size of 65536 bytes.",
+                })
                 return
             raw_body = self.rfile.read(content_length)
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as exc:
-            self._send_json(400, {"error": f"Invalid JSON payload: {exc}", "status": "ERROR"})
+            self._send_json(400, {
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "error_message": f"Invalid JSON payload: {exc}",
+            })
             return
 
         operation_str = payload.get("operation")
-        expression = payload.get("expression", "")
+        input_text = payload.get("input") or payload.get("expression") or ""
         options = payload.get("options", {})
-        preferred_engine = payload.get("engine")
+        preferred_engine = payload.get("engine") or payload.get("preferred_engine")
 
-        if not operation_str or not expression:
-            self._send_json(400, {"error": "Both 'operation' and 'expression' fields are required", "status": "ERROR"})
+        if not operation_str or not input_text:
+            self._send_json(400, {
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "error_message": "Both 'operation' and 'input' (or 'expression') fields are required.",
+            })
             return
 
         try:
-            op_type = OperationType(operation_str.upper())
+            op_type = OperationType(str(operation_str).upper())
         except ValueError:
-            self._send_json(400, {"error": f"Unsupported operation: '{operation_str}'", "status": "UNSUPPORTED_OPERATION"})
+            self._send_json(400, {
+                "mathematical_status": EngineStatus.OUT_OF_SCOPE.value,
+                "error_message": f"Unsupported operation: '{operation_str}'.",
+            })
             return
 
         request = ExecutionRequest(
             operation=op_type,
-            expression=str(expression),
+            raw_input=str(input_text),
             options=options if isinstance(options, dict) else {},
             preferred_engine=str(preferred_engine) if preferred_engine else None,
         )
 
         response = execute_cas_operation(request)
 
-        result_dict = {
-            "status": response.status.value,
-            "engine_used": response.engine_used,
-            "timing_ms": round(response.timing_ms, 3),
-            "result_str": response.result_str,
-            "latex_str": response.latex_str,
-            "solution_set": response.solution_set,
-            "plot_data": response.plot_data,
-            "domain_notes": response.domain_notes,
-            "error_message": response.error_message,
-            "details": response.details,
-        }
+        # Map mathematical status to appropriate HTTP status code
+        if response.status == EngineStatus.SUCCESS:
+            http_status = 200
+        elif response.status == EngineStatus.SECURITY_REJECTED:
+            http_status = 403
+        elif response.status == EngineStatus.RESOURCE_EXHAUSTED:
+            http_status = 408
+        elif response.status in (EngineStatus.INVALID_INPUT, EngineStatus.DOMAIN_ERROR):
+            http_status = 400
+        elif response.status == EngineStatus.OUT_OF_SCOPE:
+            http_status = 422
+        else:
+            http_status = 500
 
-        status_code = 200 if response.status.value == "SUCCESS" else 400
-        self._send_json(status_code, result_dict)
+        # Return canonical response dictionary directly
+        self._send_json(http_status, response.to_dict())
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
