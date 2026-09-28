@@ -19,6 +19,7 @@ if str(REPO_ROOT / "src") not in sys.path:
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+from mke_product.cas.cas_parser import is_top_level_system
 from mke_product.cas.contracts import (
     EngineStatus,
     ExecutionRequest,
@@ -63,7 +64,7 @@ def determine_pilot_operation(problem: dict) -> tuple[OperationType, str]:
         return OperationType.SOLVE_INEQUALITY, raw_expr
 
     # 4. Systems of Equations
-    if "," in raw_expr or ";" in raw_expr:
+    if is_top_level_system(raw_expr):
         return OperationType.SOLVE_SYSTEM, raw_expr
 
     # 5. Equations

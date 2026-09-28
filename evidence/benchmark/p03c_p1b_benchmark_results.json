@@ -1,0 +1,757 @@
+{
+  "benchmark_id": "P03C_P1B_TRANSCENDENTAL_BENCHMARK",
+  "timestamp_utc": "2026-09-28T16:18:58Z",
+  "total_problems": 32,
+  "passed": 32,
+  "failed": 0,
+  "accuracy_pct": 100.0,
+  "duration_sec": 28.20299999997951,
+  "by_archetype": {
+    "ARCH-11.1-TRIG-SIMP": {
+      "total": 6,
+      "passed": 6
+    },
+    "ARCH-11.2-LOG-EVAL": {
+      "total": 8,
+      "passed": 8
+    },
+    "ARCH-11.5-DIFF-TRANSCENDENTAL": {
+      "total": 8,
+      "passed": 8
+    },
+    "ARCH-11.3-LOG-EQ": {
+      "total": 6,
+      "passed": 6
+    },
+    "ARCH-11.3-EXP-EQ": {
+      "total": 4,
+      "passed": 4
+    }
+  },
+  "results": [
+    {
+      "problem_id": "P1B-TRIG-001",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\sin(x + \\pi/4) - \\cos(x - \\pi/4)",
+      "ground_truth": {
+        "symbolic_canonical": "0",
+        "latex_canonical": "0",
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "0",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'0'}",
+      "duration_sec": 0.8279999999795109,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-TRIG-002",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\sin^2(x) + \\cos^2(x)",
+      "ground_truth": {
+        "symbolic_canonical": "1",
+        "latex_canonical": "1",
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'1'}",
+      "duration_sec": 0.8280000000377186,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-TRIG-003",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\sin(\\pi/6) + \\cos(\\pi/3)",
+      "ground_truth": {
+        "symbolic_canonical": "1",
+        "latex_canonical": "1",
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'1'}",
+      "duration_sec": 0.8119999999762513,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-TRIG-004",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\cos(0) + \\sin(\\pi/2)",
+      "ground_truth": {
+        "symbolic_canonical": "2",
+        "latex_canonical": "2",
+        "alternate_forms": [
+          "2"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "2",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'2'}",
+      "duration_sec": 0.7820000000065193,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-TRIG-005",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\cos(x + \\pi/2) + \\sin(x)",
+      "ground_truth": {
+        "symbolic_canonical": "0",
+        "latex_canonical": "0",
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "0",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'0'}",
+      "duration_sec": 0.7810000000172295,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-TRIG-006",
+      "archetype_id": "ARCH-11.1-TRIG-SIMP",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\sin(\\pi - x) - \\sin(x)",
+      "ground_truth": {
+        "symbolic_canonical": "0",
+        "latex_canonical": "0",
+        "alternate_forms": [
+          "0"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "0",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'0'}",
+      "duration_sec": 0.6559999999590218,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-001",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(12, 2) - \\log(3, 2)",
+      "ground_truth": {
+        "symbolic_canonical": "2",
+        "latex_canonical": "2",
+        "alternate_forms": [
+          "2"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "2",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'2'}",
+      "duration_sec": 0.8130000000237487,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-002",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(25, 5) + \\log(4, 2)",
+      "ground_truth": {
+        "symbolic_canonical": "4",
+        "latex_canonical": "4",
+        "alternate_forms": [
+          "4"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "4",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'4'}",
+      "duration_sec": 0.8119999999762513,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-003",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\ln(e^5) - \\ln(e^2)",
+      "ground_truth": {
+        "symbolic_canonical": "3",
+        "latex_canonical": "3",
+        "alternate_forms": [
+          "3"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "3",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'3'}",
+      "duration_sec": 0.7810000000172295,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-004",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(1000, 10)",
+      "ground_truth": {
+        "symbolic_canonical": "3",
+        "latex_canonical": "3",
+        "alternate_forms": [
+          "3"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "3",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'3'}",
+      "duration_sec": 0.8279999999795109,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-005",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(8, 2) * \\log(9, 3)",
+      "ground_truth": {
+        "symbolic_canonical": "6",
+        "latex_canonical": "6",
+        "alternate_forms": [
+          "6"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "6",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'6'}",
+      "duration_sec": 0.8290000000270084,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-006",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(1/16, 2)",
+      "ground_truth": {
+        "symbolic_canonical": "-4",
+        "latex_canonical": "-4",
+        "alternate_forms": [
+          "-4"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "-4",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'-4'}",
+      "duration_sec": 0.9679999999934807,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-007",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\log(81, 3) - \\log(27, 3)",
+      "ground_truth": {
+        "symbolic_canonical": "1",
+        "latex_canonical": "1",
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'1'}",
+      "duration_sec": 0.9070000000065193,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-LOG-008",
+      "archetype_id": "ARCH-11.2-LOG-EVAL",
+      "operation": "SIMPLIFY",
+      "input_latex": "\\ln(e)",
+      "ground_truth": {
+        "symbolic_canonical": "1",
+        "latex_canonical": "1",
+        "alternate_forms": [
+          "1"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'1'}",
+      "duration_sec": 0.7810000000172295,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-001",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\sin(2*x) + \\exp(3*x)",
+      "ground_truth": {
+        "symbolic_canonical": "2*cos(2*x) + 3*exp(3*x)",
+        "latex_canonical": "2\\cos(2x) + 3e^{3x}",
+        "alternate_forms": [
+          "3*exp(3*x) + 2*cos(2*x)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "3*exp(3*x) + 2*cos(2*x)",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: 3*exp(3*x)+2*cos(2*x)",
+      "duration_sec": 0.75,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-002",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\cos(5*x)",
+      "ground_truth": {
+        "symbolic_canonical": "-5*sin(5*x)",
+        "latex_canonical": "-5\\sin(5x)",
+        "alternate_forms": [
+          "-5*sin(5*x)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "-5*sin(5*x)",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'-5*sin(5*x)'}",
+      "duration_sec": 0.7189999999827705,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-003",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\exp(-2*x)",
+      "ground_truth": {
+        "symbolic_canonical": "-2*exp(-2*x)",
+        "latex_canonical": "-2e^{-2x}",
+        "alternate_forms": [
+          "-2*exp(-2*x)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "-2*exp(-2*x)",
+      "outcome": "SUCCESS",
+      "detail": "Exact solution set matched: {'-2*exp(-2*x)'}",
+      "duration_sec": 0.7810000000172295,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-004",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\ln(x)",
+      "ground_truth": {
+        "symbolic_canonical": "1/x",
+        "latex_canonical": "\\frac{1}{x}",
+        "alternate_forms": [
+          "x**(-1)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1/x",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: 1/x",
+      "duration_sec": 0.7339999999967404,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-005",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\log(x, 2)",
+      "ground_truth": {
+        "symbolic_canonical": "1/(x*log(2))",
+        "latex_canonical": "\\frac{1}{x\\ln(2)}",
+        "alternate_forms": [
+          "1/(x*ln(2))",
+          "(x*log(2))**(-1)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "1/(x*log(2))",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: 1/(x*log(2))",
+      "duration_sec": 0.7349999999860302,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-006",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\sin(x) + \\cos(x)",
+      "ground_truth": {
+        "symbolic_canonical": "cos(x) - sin(x)",
+        "latex_canonical": "\\cos(x) - \\sin(x)",
+        "alternate_forms": [
+          "-sin(x) + cos(x)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "-sin(x) + cos(x)",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: -sin(x)+cos(x)",
+      "duration_sec": 0.7959999999729916,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-007",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "\\tan(x)",
+      "ground_truth": {
+        "symbolic_canonical": "tan(x)**2 + 1",
+        "latex_canonical": "\\tan^2(x) + 1",
+        "alternate_forms": [
+          "1/cos(x)**2",
+          "1 + tan(x)**2",
+          "sec(x)**2"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "tan(x)^2 + 1",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: tan(x)^2+1",
+      "duration_sec": 0.7029999999795109,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-DIFF-008",
+      "archetype_id": "ARCH-11.5-DIFF-TRANSCENDENTAL",
+      "operation": "DIFFERENTIATE",
+      "input_latex": "x*\\exp(x)",
+      "ground_truth": {
+        "symbolic_canonical": "x*exp(x) + exp(x)",
+        "latex_canonical": "xe^x + e^x",
+        "alternate_forms": [
+          "exp(x)*(x + 1)",
+          "(x + 1)*exp(x)"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "x*exp(x) + exp(x)",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: x*exp(x)+exp(x)",
+      "duration_sec": 0.6870000000344589,
+      "verification_evidence": null
+    },
+    {
+      "problem_id": "P1B-EQ-001",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\log(x-1, 2) + \\log(x+1, 2) = 3",
+      "ground_truth": {
+        "symbolic_canonical": "{3}",
+        "latex_canonical": "\\left\\{ 3 \\right\\}",
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{3}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {3)",
+      "duration_sec": 1.375,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "3"
+        ],
+        "solution_set": [
+          "3"
+        ],
+        "extraneous_roots": [
+          "-3"
+        ],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-002",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\log(x^2 - 3, 2) = \\log(2*x, 2)",
+      "ground_truth": {
+        "symbolic_canonical": "{3}",
+        "latex_canonical": "\\left\\{ 3 \\right\\}",
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{3}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {3)",
+      "duration_sec": 1.3290000000270084,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "3"
+        ],
+        "solution_set": [
+          "3"
+        ],
+        "extraneous_roots": [
+          "-1"
+        ],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-003",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\log(x-2, 3) = 2",
+      "ground_truth": {
+        "symbolic_canonical": "{11}",
+        "latex_canonical": "\\left\\{ 11 \\right\\}",
+        "alternate_forms": [
+          "{11}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{11}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {11)",
+      "duration_sec": 0.9059999999590218,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "11"
+        ],
+        "solution_set": [
+          "11"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-004",
+      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "operation": "SOLVE",
+      "input_latex": "2^(x+1) = 8",
+      "ground_truth": {
+        "symbolic_canonical": "{2}",
+        "latex_canonical": "\\left\\{ 2 \\right\\}",
+        "alternate_forms": [
+          "{2}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{2}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {2)",
+      "duration_sec": 0.9220000000204891,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "2"
+        ],
+        "solution_set": [
+          "2"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-005",
+      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "operation": "SOLVE",
+      "input_latex": "3^(2*x - 1) = 27",
+      "ground_truth": {
+        "symbolic_canonical": "{2}",
+        "latex_canonical": "\\left\\{ 2 \\right\\}",
+        "alternate_forms": [
+          "{2}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{2}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {2)",
+      "duration_sec": 0.9849999999860302,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "2"
+        ],
+        "solution_set": [
+          "2"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-006",
+      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\exp(2*x) - 3*\\exp(x) + 2 = 0",
+      "ground_truth": {
+        "symbolic_canonical": "{0, log(2)}",
+        "latex_canonical": "\\left\\{ 0, \\ln(2) \\right\\}",
+        "alternate_forms": [
+          "{0, ln(2)}",
+          "{log(2), 0}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{0, log(2)}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {0,log(2))",
+      "duration_sec": 0.8120000000344589,
+      "verification_evidence": {
+        "root_count": 2,
+        "roots": [
+          "0",
+          "log(2)"
+        ],
+        "solution_set": [
+          "0",
+          "log(2)"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-007",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\log(x+2, 5) + \\log(x-2, 5) = 1",
+      "ground_truth": {
+        "symbolic_canonical": "{3}",
+        "latex_canonical": "\\left\\{ 3 \\right\\}",
+        "alternate_forms": [
+          "{3}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{3}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {3)",
+      "duration_sec": 1.3439999999827705,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "3"
+        ],
+        "solution_set": [
+          "3"
+        ],
+        "extraneous_roots": [
+          "-3"
+        ],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-008",
+      "archetype_id": "ARCH-11.3-EXP-EQ",
+      "operation": "SOLVE",
+      "input_latex": "4^x - 5*2^x + 4 = 0",
+      "ground_truth": {
+        "symbolic_canonical": "{0, 2}",
+        "latex_canonical": "\\left\\{ 0, 2 \\right\\}",
+        "alternate_forms": [
+          "{0, 2}",
+          "{2, 0}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{0, 2}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {0,2)",
+      "duration_sec": 1.125,
+      "verification_evidence": {
+        "root_count": 2,
+        "roots": [
+          "0",
+          "2"
+        ],
+        "solution_set": [
+          "0",
+          "2"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-009",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\ln(2*x - 1) = 0",
+      "ground_truth": {
+        "symbolic_canonical": "{1}",
+        "latex_canonical": "\\left\\{ 1 \\right\\}",
+        "alternate_forms": [
+          "{1}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{1}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {1)",
+      "duration_sec": 0.8899999999557622,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "1"
+        ],
+        "solution_set": [
+          "1"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    },
+    {
+      "problem_id": "P1B-EQ-010",
+      "archetype_id": "ARCH-11.3-LOG-EQ",
+      "operation": "SOLVE",
+      "input_latex": "\\log(x, 2) = 5",
+      "ground_truth": {
+        "symbolic_canonical": "{32}",
+        "latex_canonical": "\\left\\{ 32 \\right\\}",
+        "alternate_forms": [
+          "{32}"
+        ]
+      },
+      "engine_status": "SUCCESS",
+      "symbolic_result": "{32}",
+      "outcome": "SUCCESS",
+      "detail": "Expression matched expected form: {32)",
+      "duration_sec": 0.8910000000032596,
+      "verification_evidence": {
+        "root_count": 1,
+        "roots": [
+          "32"
+        ],
+        "solution_set": [
+          "32"
+        ],
+        "extraneous_roots": [],
+        "domain": "Reals"
+      }
+    }
+  ]
+}

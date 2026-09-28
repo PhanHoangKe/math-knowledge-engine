@@ -28,22 +28,22 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-28T15:48:45Z",
+    "timestamp": "2026-09-28T16:19:06Z",
     "engine_version": "v0.3.0-p03b-accepted",
-    "duration_seconds": 22.328,
+    "duration_seconds": 20.219,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
       "unsupported_modality": 6,
-      "success": 13,
-      "genuine_wrong_answer": 4,
+      "success": 16,
+      "genuine_wrong_answer": 6,
       "extraneous_root_leak": 0,
-      "unsupported_grammar": 17,
+      "unsupported_grammar": 12,
       "domain_rejected": 0,
       "timeout": 0,
       "internal_error": 0,
-      "full_pilot_accuracy_pct": 32.5,
-      "symbolic_attempted_accuracy_pct": 38.24
+      "full_pilot_accuracy_pct": 40.0,
+      "symbolic_attempted_accuracy_pct": 47.06
     },
     "extraneous_roots_telemetry": {
       "problems_with_extraneous_roots": 3,
@@ -60,7 +60,7 @@
         "11": {
           "total": 14,
           "attempted": 11,
-          "success": 2
+          "success": 5
         },
         "12": {
           "total": 11,
@@ -79,7 +79,7 @@
         },
         "FORMAT_III_SHORT_ANSWER": {
           "total": 25,
-          "success": 8
+          "success": 11
         },
         "FORMAT_IV_STRUCTURED": {
           "total": 1,
@@ -90,7 +90,7 @@
         "SYMBOLIC_TYPED": {
           "total": 34,
           "attempted": 34,
-          "success": 13
+          "success": 16
         },
         "VIETNAMESE_WORD_PROBLEM": {
           "total": 4,
@@ -252,7 +252,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'2-sqrt(3)', 'sqrt(3)+2'}",
+      "scoring_details": "Exact solution set matched: {'sqrt(3)+2', '2-sqrt(3)'}",
       "engine_result": "{2 - sqrt(3), sqrt(3) + 2}",
       "engine_solution_set": [
         "2 - sqrt(3)",
@@ -320,14 +320,14 @@
       "archetype_id": "ARCH-10.8.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "dot((2, -3), (4, 1))",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:20] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 'd' and 'o'. Use explicit '*' (e.g. 'd*o').",
       "engine_result": null,
       "engine_solution_set": []
     },
@@ -412,13 +412,13 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "DIFFERENTIATE",
       "expression_dispatched": "sin(2*x) + exp(3*x)",
-      "outcome": "UNSUPPORTED_GRAMMAR",
+      "outcome": "GENUINE_WRONG_ANSWER",
       "attempted": true,
       "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'i'. Use explicit '*' (e.g. 's*i').",
-      "engine_result": null,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Produced set() did not match expected {'2*cos(2*x)+3*e^(3*x)'}.",
+      "engine_result": "3*exp(3*x) + 2*cos(2*x)",
       "engine_solution_set": []
     },
     {
@@ -446,13 +446,13 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "sin(x + pi/4) - cos(x - pi/4)",
-      "outcome": "UNSUPPORTED_GRAMMAR",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'i'. Use explicit '*' (e.g. 's*i').",
-      "engine_result": null,
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Expression matched expected form: 0",
+      "engine_result": "0",
       "engine_solution_set": []
     },
     {
@@ -463,14 +463,17 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "sin(x) = 1/2",
-      "outcome": "UNSUPPORTED_GRAMMAR",
+      "outcome": "GENUINE_WRONG_ANSWER",
       "attempted": true,
       "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'i'. Use explicit '*' (e.g. 's*i').",
-      "engine_result": null,
-      "engine_solution_set": []
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "MCQ failed: expected choice A / {'pi/6+2*k*pi', '5*pi/6+2*k*pi'}, got key 'None' / {'5*pi/6', 'pi/6'}",
+      "engine_result": "{5*pi/6, pi/6}",
+      "engine_solution_set": [
+        "pi/6",
+        "5*pi/6"
+      ]
     },
     {
       "problem_id": "PILOT-11-0007",
@@ -478,15 +481,15 @@
       "archetype_id": "ARCH-11.4.1",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "log(12, 2) - log(3, 2)",
-      "outcome": "UNSUPPORTED_GRAMMAR",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:22] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
-      "engine_result": null,
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Numeric float matched: 2.0 ~= 2.0 (tol=0.001)",
+      "engine_result": "2",
       "engine_solution_set": []
     },
     {
@@ -495,16 +498,18 @@
       "archetype_id": "ARCH-11.4.3",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SOLVE",
       "expression_dispatched": "log(x - 1, 2) + log(x + 1, 2) = 3",
-      "outcome": "UNSUPPORTED_GRAMMAR",
+      "outcome": "SUCCESS",
       "attempted": true,
-      "matched_ground_truth": false,
-      "selected_engine": "router",
-      "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:33] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
-      "engine_result": null,
-      "engine_solution_set": []
+      "matched_ground_truth": true,
+      "selected_engine": "sympy_cas_v0",
+      "engine_status": "SUCCESS",
+      "scoring_details": "Exact solution set matched: {'3'}",
+      "engine_result": "{3}",
+      "engine_solution_set": [
+        "3"
+      ]
     },
     {
       "problem_id": "PILOT-11-0009",
@@ -512,14 +517,14 @@
       "archetype_id": "ARCH-11.3.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "limit((x^2 - 4)/(x - 2), x, 2)",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:30] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 'l' and 'i'. Use explicit '*' (e.g. 'l*i').",
       "engine_result": null,
       "engine_solution_set": []
     },
@@ -529,14 +534,14 @@
       "archetype_id": "ARCH-11.2.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "sum(3 + 4*(n-1), n, 1, 10)",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:26] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 's' and 'u'. Use explicit '*' (e.g. 's*u').",
       "engine_result": null,
       "engine_solution_set": []
     },
@@ -613,14 +618,14 @@
       "archetype_id": "ARCH-12.1.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "max_min(x^4 - 2*x^2 + 3, x, 0, 2)",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:33] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 'm' and 'a'. Use explicit '*' (e.g. 'm*a').",
       "engine_result": null,
       "engine_solution_set": []
     },
@@ -715,14 +720,14 @@
       "archetype_id": "ARCH-12.3.1",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "cross((1, 2, -1), (2, 0, 3))",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:28] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 'c' and 'r'. Use explicit '*' (e.g. 'c*r').",
       "engine_result": null,
       "engine_solution_set": []
     },
@@ -732,14 +737,14 @@
       "archetype_id": "ARCH-12.3.3",
       "format_type": "FORMAT_I_MCQ",
       "input_modality": "SYMBOLIC_TYPED",
-      "operation_dispatched": "SOLVE_SYSTEM",
+      "operation_dispatched": "SIMPLIFY",
       "expression_dispatched": "plane_through_point_normal((1, -2, 3), (2, 1, -4))",
       "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "router",
       "engine_status": "INVALID_INPUT",
-      "scoring_details": "Syntax Error: [0:50] 2x2 linear equation system requires exactly 2 equations separated by comma or semicolon, got 1.",
+      "scoring_details": "Syntax Error: [0:2] Implicit multiplication detected between 'p' and 'l'. Use explicit '*' (e.g. 'p*l').",
       "engine_result": null,
       "engine_solution_set": []
     },

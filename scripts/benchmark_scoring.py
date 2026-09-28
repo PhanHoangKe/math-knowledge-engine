@@ -356,6 +356,10 @@ def evaluate_benchmark_response(
 
     # Standard Exact Set Matching
     expected_set = {normalize_math_string(s) for s in gt.get("exact_solution_set", []) if normalize_math_string(s)}
+    if not expected_set and gt.get("symbolic_canonical"):
+        expected_set.add(normalize_math_string(gt["symbolic_canonical"]))
+        for alt in gt.get("alternate_forms", []):
+            expected_set.add(normalize_math_string(alt))
 
     # Check if empty solution set expected
     if not expected_set and not produced_sol_set:
