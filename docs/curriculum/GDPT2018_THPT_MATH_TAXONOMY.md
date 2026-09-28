@@ -370,7 +370,8 @@ $$\text{Grade} \longrightarrow \text{Strand} \longrightarrow \text{Topic} \longr
 
 | Grade | Total Core Topics | Core Archetypes | Elective Archetypes | Total Mapped Problem Archetypes |
 | :--- | :---: | :---: | :---: | :---: |
-| **Grade 10** | 11 | 35 | 4 | **39** |
+| **Grade 10** | 11 | 34 | 4 | **38** |
 | **Grade 11** | 9 | 33 | 3 | **36** |
-| **Grade 12** | 5 | 24 | 3 | **27** |
-| **Total THPT (10–12)** | **25 Topics** | **92 Core Archetypes** | **10 Elective Archetypes** | **102 Archetypes** |
+| **Grade 12** | 5 | 23 | 3 | **26** |
+| **Total THPT (10–12)** | **25 Topics** | **90 Core Archetypes** | **10 Elective Archetypes** | **100 Archetypes** |
+
