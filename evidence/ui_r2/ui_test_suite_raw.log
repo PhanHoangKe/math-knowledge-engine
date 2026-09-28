@@ -1,7 +1,7 @@
 # MKE CANONICAL UI INTEGRATION TEST SUITE LOG
-# Commit: 06ee722037876119f785fab2ac903cb4040dd976
+# Commit: 8b7e06fe0db4ca2a398bce4ebc606c4187e40eeb
 # Branch: product/p03a-r2-original-ui-integration
-# Duration: 67.67s
+# Duration: 71.86s
 # Exit Code: 0
 
 ============================= test session starts =============================
@@ -385,4 +385,4 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 99%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============= 369 passed, 18 subtests passed in 66.52s (0:01:06) ==============
+============= 369 passed, 18 subtests passed in 70.88s (0:01:10) ==============

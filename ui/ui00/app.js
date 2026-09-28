@@ -22,7 +22,7 @@
       nav_home: 'Trang chủ',
       nav_sample: 'Kết quả tính',
       nav_syntax: 'Cú pháp',
-      header_signin: 'Sign in',
+      header_signin: 'Đăng nhập',
       theme_popover_title: 'Giao diện',
       lang_popover_title: 'Ngôn ngữ',
       theme_auto: 'Tự động (Hệ thống)',
