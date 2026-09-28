@@ -1,8 +1,9 @@
 /**
- * MKE PRODUCT-UI-00 — Canonical Multi-Engine Web Application Logic
+ * MKE PRODUCT-UI-00 — Canonical Multi-Engine Web Application Logic (v0/R3)
  * Inspired by WolframAlpha's iconic visual atmosphere and interaction model.
  * Unified architecture connecting to Native MKE v1 and SymPy CAS v0 backend engines.
  * Bilingual localization (Vietnamese default, English supported), light/charcoal dark themes.
+ * Rigorous mathematical trust: offline KaTeX rendering, live backend health, NO fake simulated results.
  */
 
 (function () {
@@ -26,12 +27,16 @@
       theme_popover_title: 'Chủ đề',
       lang_popover_title: 'Ngôn ngữ',
       theme_auto: 'Tự động',
-      theme_light: 'Ánh sáng',
-      theme_dark: 'Tối tăm',
+      theme_light: 'Sáng',
+      theme_dark: 'Tối',
 
       // Advisory & Connection Banner
-      banner_tag: 'MKE PRODUCT V0',
+      banner_tag: 'MKE PRODUCT V0 (ONLINE)',
       banner_msg: 'Đã kết nối động cơ toán học đa lõi (Native MKE v1 + SymPy CAS v0). Toàn bộ nghiệm, đạo hàm, tích phân và đồ thị được xử lý trực tiếp bởi kiến trúc tính toán toán học chuẩn xác.',
+      banner_tag_disconnected: 'MẤT KẾT NỐI (DISCONNECTED)',
+      banner_msg_disconnected: 'Không thể kết nối máy chủ backend (/api/health). Các truy vấn tính toán sẽ dừng xử lý và tuyệt đối không tạo kết quả giả lập.',
+      banner_tag_checking: 'ĐANG KIỂM TRA (CHECKING)',
+      banner_msg_checking: 'Đang kiểm tra trạng thái máy chủ toán học...',
 
       // Home Screen — Hero & Search
       hero_super: 'TỪ HỆ THỐNG SUY LUẬN KÝ HIỆU HÌNH THỨC & TOÁN HỌC CHÍNH XÁC',
@@ -89,6 +94,7 @@
       status_security_rejected: 'TỪ CHỐI BẢO MẬT',
       status_timeout: 'HẾT THỜI GIAN (TIMEOUT)',
       status_domain_error: 'LỖI MIỀN XÁC ĐỊNH',
+      status_connection_error: 'LỖI KẾT NỐI (CONNECTION_ERROR)',
       status_computing: 'ĐANG TÍNH TOÁN...',
       meta_op_label: 'Thao tác:',
       meta_mult_label: 'Phép nhân:',
@@ -98,6 +104,9 @@
       ast_summary: 'Xem Cấu trúc Cây Cú pháp (AST)',
 
       card_solution_title: 'Nghiệm Chuẩn xác',
+      conn_error_title: 'Lỗi Kết Nối Máy Chủ Toán Học (CONNECTION_ERROR)',
+      conn_error_desc: 'Không thể kết nối tới máy chủ tính toán toán học. Không có phép tính toán nào được thực hiện hoặc giả lập.',
+      btn_retry: 'Thử lại kết nối',
       methods_aria: 'Phương pháp giải toán',
       tab_solve: 'Giải phương trình',
       tab_simplify: 'Rút gọn',
@@ -112,16 +121,26 @@
       sol_plot_tag: 'Biểu diễn tọa độ Descartes 2D',
       trace_title: 'Các bước Biến đổi Tất định',
       plot_title: 'Biểu diễn Hình học Trục Tọa độ Descartes',
+      engine_steps_native: 'Minh chứng từng bước tất định được suy luận và chứng thực bởi Native MKE v1.',
       engine_steps_cas_note: 'Nghiệm được tính toán bởi bộ giải ký hiệu SymPy 1.14.0. Minh chứng từng bước hình thức áp dụng cho hệ giải tuyến tính Native MKE.',
 
       card_domain_title: 'Miền Xác định & Minh chứng Kiểm định',
-      badge_verified_math: 'CHỨNG THỰC TẤT ĐỊNH',
+      badge_verified_math: 'CHỨNG THỰC TẤT ĐỊNH (VERIFIED)',
+      badge_verified_evidence: 'CHỨNG THỰC TẤT ĐỊNH (VERIFIED)',
+      badge_candidate_checked: 'ĐÃ KIỂM TRA ỨNG VIÊN (CANDIDATE_CHECKED)',
+      badge_computed_cas: 'KẾT QUẢ TÍNH TOÁN KÝ HIỆU (COMPUTED - SYM_PY)',
+      badge_partial: 'KẾT QUẢ MỘT PHẦN (PARTIAL)',
+      badge_unresolved: 'CHƯA GIẢI QUYẾT (UNRESOLVED)',
+      badge_unverified: 'CHƯA KIỂM ĐỊNH (NOT_VERIFIED)',
+      badge_error: 'LỖI / TỪ CHỐI (ERROR)',
       tile_eq_domain: 'Miền biểu thức',
       val_eq_domain: 'Số thực \\(\\mathbb{R}\\)',
       tile_domain_constraints: 'Ràng buộc miền ban đầu',
       tile_candidate_check: 'Động cơ & Thời gian',
       tag_specimen_notice: 'CHỨNG NHẬN ĐỘNG CƠ TẤT ĐỊNH',
-      msg_verification_notice: 'Kết quả được tính toán và kiểm định trực tiếp bởi lõi toán học MKE. Không phụ thuộc vào mô hình ngôn ngữ hay tính toán xấp xỉ không chứng minh.',
+      msg_verification_native: 'Kết quả được tính toán và kiểm định trực tiếp bởi lõi toán học Native MKE. Không phụ thuộc vào mô hình ngôn ngữ hay tính toán xấp xỉ không chứng minh.',
+      msg_verification_cas: 'Kết quả được tính toán trực tiếp bởi SymPy CAS 1.14.0. Không có suy luận xấp xỉ; kiểm định độc lập phụ thuộc vào quy tắc miền Native MKE.',
+      msg_verification_error: 'Yêu cầu bị từ chối hoặc máy chủ gặp lỗi. Không có kết quả toán học nào được xác nhận.',
 
       // Syntax Guide Screen
       syntax_guide_title: 'Quy chuẩn Cú pháp MKE Giai đoạn P02A',
@@ -166,8 +185,12 @@
       theme_dark: 'Dark',
 
       // Advisory & Connection Banner
-      banner_tag: 'MKE PRODUCT V0',
+      banner_tag: 'MKE PRODUCT V0 (ONLINE)',
       banner_msg: 'Connected to multi-engine mathematical backend (Native MKE v1 + SymPy CAS v0). All equation solving, derivatives, integrals, and plots are executed directly by the exact computing architecture.',
+      banner_tag_disconnected: 'DISCONNECTED (BACKEND OFFLINE)',
+      banner_msg_disconnected: 'Unable to reach backend mathematical server (/api/health). Computation queries will fail-closed with zero simulation.',
+      banner_tag_checking: 'CHECKING (STATUS PENDING)',
+      banner_msg_checking: 'Checking backend mathematical server connectivity...',
 
       // Home Screen — Hero & Search
       hero_super: 'FROM FORMAL SYMBOLIC REASONING & EXACT MATHEMATICS',
@@ -225,6 +248,7 @@
       status_security_rejected: 'SECURITY REJECTED',
       status_timeout: 'TIMEOUT (RESOURCE EXHAUSTED)',
       status_domain_error: 'DOMAIN ERROR',
+      status_connection_error: 'CONNECTION ERROR',
       status_computing: 'COMPUTING...',
       meta_op_label: 'Operation:',
       meta_mult_label: 'Multiplication:',
@@ -234,6 +258,9 @@
       ast_summary: 'View Parsed AST Structure',
 
       card_solution_title: 'Exact Solution',
+      conn_error_title: 'Backend Connection Error (CONNECTION_ERROR)',
+      conn_error_desc: 'Unable to reach mathematical backend server. No computation was performed or simulated.',
+      btn_retry: 'Retry Connection',
       methods_aria: 'Solution methods',
       tab_solve: 'Solve Equation',
       tab_simplify: 'Simplify',
@@ -248,16 +275,26 @@
       sol_plot_tag: '2D Cartesian Geometry Plot',
       trace_title: 'Deterministic Step-by-Step Derivation',
       plot_title: 'Cartesian Coordinate Geometry Plot',
+      engine_steps_native: 'Deterministic step derivation verified by Native MKE v1 kernel.',
       engine_steps_cas_note: 'Result computed by SymPy 1.14.0 CAS symbolic engine. Step-by-step formal derivation applies to Native MKE linear solver.',
 
       card_domain_title: 'Domain & Verification Evidence',
-      badge_verified_math: 'DETERMINISTIC VERIFICATION',
+      badge_verified_math: 'DETERMINISTIC VERIFICATION (VERIFIED)',
+      badge_verified_evidence: 'DETERMINISTIC VERIFICATION (VERIFIED)',
+      badge_candidate_checked: 'CANDIDATE CHECKED',
+      badge_computed_cas: 'SYMBOLIC COMPUTED (SYM_PY)',
+      badge_partial: 'PARTIAL RESULT',
+      badge_unresolved: 'UNRESOLVED',
+      badge_unverified: 'NOT VERIFIED',
+      badge_error: 'ERROR / REJECTED',
       tile_eq_domain: 'Expression Domain',
       val_eq_domain: 'Real Numbers \\(\\mathbb{R}\\)',
       tile_domain_constraints: 'Original Domain Constraints',
       tile_candidate_check: 'Engine & Duration',
       tag_specimen_notice: 'DETERMINISTIC ENGINE ATTESTATION',
-      msg_verification_notice: 'Result computed and verified directly by the MKE mathematical kernel. Free of LLM approximations or unproven conjectures.',
+      msg_verification_native: 'Result computed and verified directly by Native MKE kernel. Free of LLM approximations or unproven conjectures.',
+      msg_verification_cas: 'Result computed directly by SymPy CAS 1.14.0. No probabilistic approximations; independent verification bounded by MKE domain rules.',
+      msg_verification_error: 'Request halted due to syntax, domain, security, or connectivity errors. No mathematical result confirmed.',
 
       // Syntax Guide Screen
       syntax_guide_title: 'MKE Phase P02A Syntax Specification',
@@ -297,6 +334,52 @@
       return I18N.en[key];
     }
     return key;
+  }
+
+  // ==========================================================================
+  // KaTeX Safe Typesetting Utility
+  // ==========================================================================
+  function renderMath(el, latex, displayMode = false) {
+    if (!el) return;
+    const str = (latex || '').trim();
+    if (!str) {
+      el.textContent = '';
+      return;
+    }
+    if (window.katex) {
+      try {
+        window.katex.render(str, el, {
+          displayMode: displayMode,
+          throwOnError: false,
+          strict: false
+        });
+        return;
+      } catch (e) {
+        console.warn('KaTeX render warning:', e);
+      }
+    }
+    // Safe text fallback if KaTeX is absent
+    el.textContent = str;
+  }
+
+  function typesetAllMath(container) {
+    const target = container || document.body;
+    if (window.renderMathInElement && target) {
+      try {
+        window.renderMathInElement(target, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '\\[', right: '\\]', display: true },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false,
+          strict: false
+        });
+      } catch (e) {
+        console.warn('auto-render warning:', e);
+      }
+    }
   }
 
   // ==========================================================================
@@ -340,12 +423,15 @@
       });
     });
 
+    // Typeset any inline formulas in UI text
+    typesetAllMath(document.body);
+
     // Re-render active result screen if open
     if (screens.result && screens.result.classList.contains('active')) {
       if (lastExecutionResponse) {
         renderExecutionResponse(lastExecutionResponse, currentOperation, activeQueryString);
-      } else {
-        renderActiveResult();
+      } else if (lastConnectionError) {
+        renderConnectionError(activeQueryString, currentOperation, lastConnectionError);
       }
     }
 
@@ -500,6 +586,42 @@
   }
 
   // ==========================================================================
+  // Real Backend Health Check & Live Banner
+  // ==========================================================================
+  let isBackendHealthy = false;
+
+  async function checkBackendHealth() {
+    const banner = document.getElementById('app-connection-banner');
+    const tag = document.getElementById('app-banner-tag');
+    const msg = document.getElementById('app-banner-msg');
+
+    try {
+      const res = await fetch('/api/health', { method: 'GET', cache: 'no-cache' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'HEALTHY') {
+          isBackendHealthy = true;
+          if (banner) {
+            banner.className = 'disclaimer-banner banner-connected';
+          }
+          if (tag) tag.textContent = t('banner_tag');
+          if (msg) msg.textContent = t('banner_msg');
+          return true;
+        }
+      }
+      throw new Error('Health check returned non-healthy status');
+    } catch (e) {
+      isBackendHealthy = false;
+      if (banner) {
+        banner.className = 'disclaimer-banner banner-disconnected';
+      }
+      if (tag) tag.textContent = t('banner_tag_disconnected');
+      if (msg) msg.textContent = t('banner_msg_disconnected');
+      return false;
+    }
+  }
+
+  // ==========================================================================
   // Screen Navigation
   // ==========================================================================
   const screens = {
@@ -528,6 +650,7 @@
     });
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    typesetAllMath(screens[screenKey]);
   }
 
   // ==========================================================================
@@ -559,6 +682,7 @@
   let activeQueryString = '2*x + 3 = 7';
   let currentOperation = 'SOLVE';
   let lastExecutionResponse = null;
+  let lastConnectionError = null;
 
   function inferDefaultOperation(query) {
     const s = query.trim().toLowerCase();
@@ -731,11 +855,118 @@
   }
 
   // ==========================================================================
-  // Render Structured Execution Response
+  // Connection Error Presentation (MANDATE 1: ZERO SIMULATED RESULTS)
+  // ==========================================================================
+  function renderConnectionError(queryString, op, errorDetail) {
+    lastExecutionResponse = null;
+    lastConnectionError = errorDetail;
+    const trimmed = (queryString || activeQueryString).trim();
+
+    const resultQueryText = document.getElementById('result-query-text');
+    const mathDisplay = document.getElementById('res-math-display');
+    const astJson = document.getElementById('res-ast-json');
+    const engineBadge = document.getElementById('res-engine-badge');
+    const syntaxStatus = document.getElementById('res-syntax-status');
+    const metaOp = document.getElementById('res-meta-op');
+    const metaStatus = document.getElementById('res-meta-status');
+    const metaMult = document.getElementById('res-meta-mult');
+    const solutionCardTitle = document.getElementById('res-solution-card-title');
+    const solutionVar = document.getElementById('res-solution-var');
+    const solutionEq = document.getElementById('res-solution-eq');
+    const solutionVal = document.getElementById('res-solution-val');
+    const solutionTag = document.getElementById('res-solution-tag');
+    const plotWrapper = document.getElementById('res-plot-wrapper');
+    const stepTrace = document.getElementById('res-step-trace');
+    const domainConstraints = document.getElementById('res-domain-constraints');
+    const candidateCheck = document.getElementById('res-candidate-check');
+    const eqDomain = document.getElementById('res-eq-domain');
+    const certBadge = document.getElementById('res-cert-badge');
+    const cryptoNote = document.getElementById('res-crypto-note');
+
+    if (resultQueryText) resultQueryText.textContent = trimmed;
+    if (metaOp) metaOp.textContent = op;
+    if (metaStatus) metaStatus.textContent = 'CONNECTION_ERROR';
+    if (metaMult) metaMult.textContent = 'N/A';
+
+    if (engineBadge) {
+      engineBadge.textContent = 'DISCONNECTED';
+    }
+
+    if (syntaxStatus) {
+      syntaxStatus.textContent = t('status_connection_error');
+      syntaxStatus.className = 'syntax-status status-invalid';
+    }
+
+    // Display original raw input safely
+    if (mathDisplay) {
+      renderMath(mathDisplay, trimmed, false);
+    }
+
+    if (astJson) {
+      astJson.textContent = `[CONNECTION_ERROR]\nCould not reach mathematical backend server at /api/execute.\nDetail: ${errorDetail || 'Network offline'}\n\nPreserved Query: "${trimmed}"\nComputation status: NOT_EXECUTED (0.00 ms)`;
+    }
+
+    if (solutionCardTitle) {
+      solutionCardTitle.textContent = t('conn_error_title');
+    }
+
+    if (solutionVar) solutionVar.textContent = 'Status';
+    if (solutionEq) solutionEq.textContent = ':';
+    if (solutionVal) {
+      solutionVal.innerHTML = `
+        <div style="font-size: 0.95rem; font-weight: normal; color: #ef4444; font-family: var(--font-sans);">
+          <p>${t('conn_error_desc')}</p>
+          <button type="button" class="btn-retry-connection" id="btn-retry-exec">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            ${t('btn_retry')}
+          </button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('btn-retry-exec');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+          executeBackendQuery(trimmed, op);
+        });
+      }
+    }
+
+    if (solutionTag) {
+      solutionTag.textContent = 'NOT_COMPUTED';
+    }
+
+    // Hide steps and plot completely (Zero simulation!)
+    if (stepTrace) stepTrace.style.display = 'none';
+    if (plotWrapper) plotWrapper.style.display = 'none';
+
+    if (eqDomain) {
+      renderMath(eqDomain, '\\text{N/A (Chưa tính toán / Not computed)}', false);
+    }
+    if (domainConstraints) {
+      domainConstraints.textContent = currentLanguage === 'vi' ? 'Không khả dụng khi máy chủ ngắt kết nối' : 'Unavailable while disconnected';
+    }
+    if (candidateCheck) {
+      candidateCheck.textContent = 'None (0.00 ms)';
+      candidateCheck.className = 'tile-val';
+    }
+
+    if (certBadge) {
+      certBadge.textContent = t('badge_error');
+      certBadge.className = 'cert-status status-invalid-cert';
+    }
+
+    if (cryptoNote) {
+      cryptoNote.textContent = t('msg_verification_error');
+    }
+  }
+
+  // ==========================================================================
+  // Render Structured Execution Response with KaTeX & Honest Verification
   // ==========================================================================
   function renderExecutionResponse(data, op, queryString) {
     lastExecutionResponse = data;
+    lastConnectionError = null;
     const trimmed = (queryString || activeQueryString).trim();
+
     const resultQueryText = document.getElementById('result-query-text');
     const mathDisplay = document.getElementById('res-math-display');
     const astJson = document.getElementById('res-ast-json');
@@ -758,20 +989,23 @@
     const candidateCheck = document.getElementById('res-candidate-check');
     const eqDomain = document.getElementById('res-eq-domain');
     const certBadge = document.getElementById('res-cert-badge');
+    const cryptoNote = document.getElementById('res-crypto-note');
 
     if (resultQueryText) resultQueryText.textContent = trimmed;
     if (metaOp) metaOp.textContent = op;
 
     // Check for Status / Errors
-    const status = data.mathematical_status || data.status;
+    const status = data.mathematical_status || data.status || 'UNKNOWN';
     const isSuccess = (status === 'SUCCESS' || status === 'EXACT_SOLUTION' || status === 'NO_REAL_SOLUTION' || status === 'INFINITE_SOLUTIONS' || status === 'SIMPLIFIED' || status === 'DERIVATIVE_COMPUTED' || status === 'INTEGRAL_COMPUTED' || status === 'PLOT_GENERATED');
 
+    // Engine Badge: Honest display of backend-provided engine
+    const selectedEngine = data.selected_engine || (data.engine_metadata && data.engine_metadata.engine_name) || 'unknown_engine';
     if (engineBadge) {
-      engineBadge.textContent = data.selected_engine || (op === 'SOLVE' && trimmed.includes('=') && !trimmed.includes('^2') && !trimmed.includes('^3') ? 'mke_native_v1' : 'sympy_cas_v0');
+      engineBadge.textContent = selectedEngine;
     }
 
     if (metaStatus) {
-      metaStatus.textContent = status || 'SUCCESS';
+      metaStatus.textContent = status;
     }
 
     if (syntaxStatus) {
@@ -799,23 +1033,24 @@
         : t('meta_mult_val');
     }
 
-    // Display Math
+    // Input math rendering via KaTeX
     if (mathDisplay) {
-      mathDisplay.textContent = data.latex_output || trimmed;
+      const latexInput = data.latex_output && isSuccess ? data.latex_output : trimmed;
+      renderMath(mathDisplay, latexInput, false);
     }
 
-    // AST view
+    // AST / Metadata view
     if (astJson) {
       if (data.error_message) {
         astJson.textContent = `[ERROR: ${status}]\n${data.error_message}`;
       } else if (data.verification_evidence && data.verification_evidence.ast_representation) {
         astJson.textContent = data.verification_evidence.ast_representation;
       } else {
-        astJson.textContent = `ExecutionRequest(\n  operation="${op}",\n  input="${trimmed}",\n  engine="${data.selected_engine || 'auto'}"\n)`;
+        astJson.textContent = `ExecutionResponse(\n  operation="${op}",\n  engine="${selectedEngine}",\n  status="${status}",\n  duration_ms=${((data.execution_duration_sec || 0) * 1000).toFixed(2)}\n)`;
       }
     }
 
-    // Solution Box Rendering
+    // Handle Error / Rejection Notice
     if (!isSuccess && data.error_message) {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Thông báo Lỗi / Từ chối' : 'Error / Rejection Notice';
       if (solutionVar) solutionVar.textContent = 'Error';
@@ -825,45 +1060,83 @@
       if (plotWrapper) plotWrapper.style.display = 'none';
       if (stepTrace) stepTrace.style.display = 'none';
       if (domainConstraints) domainConstraints.textContent = currentLanguage === 'vi' ? 'Dừng xử lý trước giải thuật' : 'Halted before execution';
-      if (candidateCheck) candidateCheck.textContent = `${data.selected_engine || 'cas'} (${((data.execution_duration_sec || 0) * 1000).toFixed(2)} ms)`;
+      if (candidateCheck) candidateCheck.textContent = `${selectedEngine} (${((data.execution_duration_sec || 0) * 1000).toFixed(2)} ms)`;
+      if (certBadge) {
+        certBadge.textContent = t('badge_error');
+        certBadge.className = 'cert-status status-invalid-cert';
+      }
+      if (cryptoNote) {
+        cryptoNote.textContent = t('msg_verification_error');
+      }
       return;
     }
 
+    // Success: Populate Solution Box with KaTeX
     if (stepTrace) stepTrace.style.display = 'block';
 
     if (op === 'SOLVE') {
       if (solutionCardTitle) solutionCardTitle.textContent = t('card_solution_title');
       if (solutionVar) solutionVar.textContent = 'x';
       if (solutionEq) solutionEq.textContent = (data.symbolic_result && data.symbolic_result.includes('in')) ? '∈' : '=';
-      if (solutionVal) solutionVal.textContent = data.symbolic_result || data.latex_output || 'N/A';
-      if (solutionTag) solutionTag.textContent = (data.selected_engine === 'mke_native_v1') ? t('sol_domain_tag') : t('sol_domain_real_tag');
+      if (solutionVal) {
+        let solLatex = data.symbolic_result || data.latex_output || 'N/A';
+        // Format root notation nicely for KaTeX
+        if (solLatex.startsWith('x = ') || solLatex.startsWith('x in ')) {
+          solLatex = solLatex.replace(/^x\s*(=|in)\s*/, '');
+        }
+        renderMath(solutionVal, solLatex, false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = (selectedEngine === 'mke_native_v1') ? t('sol_domain_tag') : t('sol_domain_real_tag');
+        typesetAllMath(solutionTag);
+      }
     } else if (op === 'DIFFERENTIATE') {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Đạo hàm Ký hiệu' : 'Symbolic Derivative';
       if (solutionVar) solutionVar.textContent = 'd/dx';
       if (solutionEq) solutionEq.textContent = '=';
-      if (solutionVal) solutionVal.textContent = data.symbolic_result || data.latex_output || 'N/A';
-      if (solutionTag) solutionTag.textContent = t('sol_diff_tag');
+      if (solutionVal) {
+        renderMath(solutionVal, data.symbolic_result || data.latex_output || 'N/A', false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_diff_tag');
+        typesetAllMath(solutionTag);
+      }
     } else if (op === 'INTEGRATE') {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Tích phân Ký hiệu' : 'Symbolic Integral';
       if (solutionVar) solutionVar.textContent = '∫ f(x) dx';
       if (solutionEq) solutionEq.textContent = '=';
-      if (solutionVal) solutionVal.textContent = data.symbolic_result || data.latex_output || 'N/A';
-      if (solutionTag) solutionTag.textContent = t('sol_int_tag');
+      if (solutionVal) {
+        renderMath(solutionVal, data.symbolic_result || data.latex_output || 'N/A', false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_int_tag');
+        typesetAllMath(solutionTag);
+      }
     } else if (op === 'SIMPLIFY') {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Biểu thức Rút gọn' : 'Simplified Expression';
       if (solutionVar) solutionVar.textContent = 'Simplified';
       if (solutionEq) solutionEq.textContent = '=';
-      if (solutionVal) solutionVal.textContent = data.symbolic_result || data.latex_output || 'N/A';
-      if (solutionTag) solutionTag.textContent = t('sol_simplify_tag');
+      if (solutionVal) {
+        renderMath(solutionVal, data.symbolic_result || data.latex_output || 'N/A', false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_simplify_tag');
+        typesetAllMath(solutionTag);
+      }
     } else if (op === 'PLOT_2D') {
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Đồ thị Hàm số 2D' : '2D Function Plot';
       if (solutionVar) solutionVar.textContent = 'y';
       if (solutionEq) solutionEq.textContent = '=';
-      if (solutionVal) solutionVal.textContent = data.symbolic_result || trimmed;
-      if (solutionTag) solutionTag.textContent = t('sol_plot_tag');
+      if (solutionVal) {
+        renderMath(solutionVal, data.symbolic_result || trimmed, false);
+      }
+      if (solutionTag) {
+        solutionTag.textContent = t('sol_plot_tag');
+        typesetAllMath(solutionTag);
+      }
     }
 
-    // Step by step presentation
+    // Step by step derivation with KaTeX
     const canonicalSteps = data.canonical_steps || (data.verification_evidence && data.verification_evidence.steps);
     if (canonicalSteps && canonicalSteps.length > 0) {
       if (stepsList) {
@@ -883,7 +1156,7 @@
 
           const stepMath = document.createElement('div');
           stepMath.className = 'step-math';
-          stepMath.textContent = s.math || s.transformation || s.latex || '';
+          renderMath(stepMath, s.math || s.transformation || s.latex || '', false);
 
           item.appendChild(stepNum);
           item.appendChild(stepDesc);
@@ -896,13 +1169,13 @@
       if (stepsList) stepsList.style.display = 'none';
       if (engineNote) {
         engineNote.style.display = 'block';
-        engineNote.querySelector('p').textContent = (data.selected_engine === 'mke_native_v1')
-          ? (currentLanguage === 'vi' ? 'Minh chứng từng bước tất định được xác thực bởi Native MKE v1.' : 'Deterministic step derivation verified by Native MKE v1.')
+        engineNote.querySelector('p').textContent = (selectedEngine === 'mke_native_v1')
+          ? t('engine_steps_native')
           : t('engine_steps_cas_note');
       }
     }
 
-    // Plot Display
+    // 2D Plot Rendering
     if (op === 'PLOT_2D' || data.plot_data) {
       if (plotWrapper) plotWrapper.style.display = 'block';
       if (plotSvgContainer && data.plot_data) {
@@ -912,29 +1185,58 @@
       if (plotWrapper) plotWrapper.style.display = 'none';
     }
 
-    // Domain & Verification
-    if (eqDomain) eqDomain.textContent = currentLanguage === 'vi' ? 'Số thực \\(\\mathbb{R}\\)' : 'Real Numbers \\(\\mathbb{R}\\)';
+    // Domain information with KaTeX
+    if (eqDomain) {
+      renderMath(eqDomain, '\\mathbb{R}', false);
+    }
     if (domainConstraints) {
       if (data.domain_restrictions && data.domain_restrictions.length > 0) {
-        domainConstraints.textContent = data.domain_restrictions.join(', ');
+        renderMath(domainConstraints, data.domain_restrictions.map(r => `x \\neq ${r.replace(/^x\s*!=\s*/, '')}`).join(', '), false);
       } else {
-        domainConstraints.textContent = currentLanguage === 'vi' ? 'Không có (Toàn bộ miền \\(\\mathbb{R}\\))' : 'None (Full Reals \\(\\mathbb{R}\\))';
+        domainConstraints.textContent = currentLanguage === 'vi' ? 'Không có (Toàn bộ miền số thực)' : 'None (Full Reals)';
       }
     }
 
     if (candidateCheck) {
       const ms = ((data.execution_duration_sec || 0) * 1000).toFixed(2);
-      candidateCheck.textContent = `${data.selected_engine || 'mke_native_v1'} (${ms} ms)`;
+      candidateCheck.textContent = `${selectedEngine} (${ms} ms)`;
+      candidateCheck.className = 'tile-val status-valid-text';
     }
 
+    // MANDATE 2: Honest Verification Classification
+    const verifStatus = data.verification_status || (selectedEngine === 'mke_native_v1' ? 'VERIFIED_WITH_EVIDENCE' : 'COMPUTED');
     if (certBadge) {
-      certBadge.textContent = t('badge_verified_math');
-      certBadge.className = 'cert-status status-valid-cert';
+      if (verifStatus === 'VERIFIED_WITH_EVIDENCE') {
+        certBadge.textContent = t('badge_verified_evidence');
+        certBadge.className = 'cert-status status-valid-cert';
+      } else if (verifStatus === 'CANDIDATE_CHECKED') {
+        certBadge.textContent = t('badge_candidate_checked');
+        certBadge.className = 'cert-status status-candidate-cert';
+      } else if (verifStatus === 'PARTIAL') {
+        certBadge.textContent = t('badge_partial');
+        certBadge.className = 'cert-status status-partial-cert';
+      } else if (verifStatus === 'UNRESOLVED') {
+        certBadge.textContent = t('badge_unresolved');
+        certBadge.className = 'cert-status status-unresolved-cert';
+      } else if (selectedEngine === 'sympy_cas_v0' || verifStatus === 'COMPUTED') {
+        certBadge.textContent = t('badge_computed_cas');
+        certBadge.className = 'cert-status status-computed-cert';
+      } else {
+        certBadge.textContent = t('badge_unverified');
+        certBadge.className = 'cert-status status-unverified-cert';
+      }
+    }
+
+    if (cryptoNote) {
+      cryptoNote.textContent = (selectedEngine === 'mke_native_v1')
+        ? t('msg_verification_native')
+        : t('msg_verification_cas');
     }
   }
 
   // ==========================================================================
   // Execute via Backend API (/api/execute and /api/plot)
+  // MANDATE 1: STRICT FAIL-CLOSED DISCONNECTION (NO SILENT SIMULATION)
   // ==========================================================================
   async function executeBackendQuery(queryString, op) {
     const trimmed = (queryString || '').trim();
@@ -951,7 +1253,7 @@
     const metaOp = document.getElementById('res-meta-op');
 
     if (resultQueryText) resultQueryText.textContent = trimmed;
-    if (mathDisplay) mathDisplay.textContent = trimmed;
+    if (mathDisplay) renderMath(mathDisplay, trimmed, false);
     if (metaOp) metaOp.textContent = currentOperation;
     if (syntaxStatus) {
       syntaxStatus.textContent = t('status_computing');
@@ -977,36 +1279,18 @@
         body: JSON.stringify(payload)
       });
 
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        renderConnectionError(trimmed, currentOperation, `HTTP ${res.status}: ${errBody.error_message || res.statusText}`);
+        return;
+      }
+
       const data = await res.json();
       renderExecutionResponse(data, currentOperation, trimmed);
     } catch (err) {
-      // Offline fallback simulation
-      renderActiveResult();
+      // Backend disconnected: fail-closed with honest error, ZERO fake results!
+      renderConnectionError(trimmed, currentOperation, err.message || 'Failed to connect to backend server');
     }
-  }
-
-  // ==========================================================================
-  // Fallback Mock Fixtures (Only for Standalone File Viewing without Server)
-  // ==========================================================================
-  function renderActiveResult() {
-    const trimmed = activeQueryString.trim();
-    const fallbackData = {
-      selected_engine: (trimmed.includes('=') && !trimmed.includes('^2')) ? 'mke_native_v1' : 'sympy_cas_v0',
-      mathematical_status: 'EXACT_SOLUTION',
-      original_input: trimmed,
-      symbolic_result: trimmed.includes('=') ? 'x = 2' : trimmed,
-      latex_output: trimmed,
-      canonical_steps: [
-        {
-          step_num: currentLanguage === 'vi' ? 'Bước 1' : 'Step 1',
-          description: currentLanguage === 'vi' ? 'Biến đổi biểu thức tường minh' : 'Canonical expression transformation',
-          math: trimmed
-        }
-      ],
-      domain_restrictions: trimmed.includes('/(x-1)') ? ['x != 1'] : (trimmed.includes('x^0') ? ['x != 0'] : []),
-      execution_duration_sec: 0.00085
-    };
-    renderExecutionResponse(fallbackData, currentOperation, trimmed);
   }
 
   function displayResult(query, op) {
@@ -1098,6 +1382,10 @@
     initLanguage();
     initSettingsPopover();
     initEvents();
+
+    // Check live backend health
+    checkBackendHealth();
+    setInterval(checkBackendHealth, 10000);
 
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');

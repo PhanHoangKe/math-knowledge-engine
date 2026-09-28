@@ -98,6 +98,17 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(status_js, 200)
         self.assertGreater(len(body_js), 100)
 
+    def test_get_katex_vendor_assets(self):
+        status_css, body_css, h_css = self._get("/vendor/katex/katex.min.css")
+        self.assertEqual(status_css, 200)
+        self.assertIn("text/css", h_css.get("Content-Type", ""))
+        self.assertGreater(len(body_css), 1000)
+
+        status_js, body_js, h_js = self._get("/vendor/katex/katex.min.js")
+        self.assertEqual(status_js, 200)
+        self.assertIn("application/javascript", h_js.get("Content-Type", ""))
+        self.assertGreater(len(body_js), 1000)
+
     def test_get_health_endpoint(self):
         status, body, headers = self._get("/api/health")
         self.assertEqual(status, 200)

@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Math Knowledge Engine (MKE) — Unified Product Interface</title>
+  <!-- Locally vendored, offline-capable, pinned KaTeX mathematical typesetting engine (MIT License) -->
+  <link rel="stylesheet" href="/vendor/katex/katex.min.css">
   <link rel="stylesheet" href="styles.css">
+  <script defer src="/vendor/katex/katex.min.js"></script>
+  <script defer src="/vendor/katex/auto-render.min.js"></script>
 </head>
 <body>
   <!-- Header & Navigation -->
@@ -37,10 +41,18 @@
         <div class="header-v-divider" aria-hidden="true"></div>
         <button type="button" class="settings-trigger-btn" id="btn-settings" aria-label="Tùy chọn chủ đề & ngôn ngữ" title="Theme & Language / Cài đặt" aria-expanded="false" aria-haspopup="true">
           <span class="trigger-icon-wrapper">
-            <!-- Authentic WolframAlpha Earth + Crescent Moon Icon (Trái đất ghép Mặt trăng ôm cung) -->
+            <!-- Authentic WolframAlpha Large Crescent Moon + Smaller Earth on the convex outer bulge -->
             <svg class="trigger-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M9 7a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 9 7zm-1.8 1.8c.4-.3 1-.1 1.2.3.2.4 0 .8-.4 1-.4.2-.9 0-1.1-.4-.2-.4 0-.7.3-.9zm3.8 2.6c.5.2.7.7.5 1.2-.2.5-.7.7-1.2.5-.5-.2-.7-.7-.5-1.2.2-.5.7-.7 1.2-.5zm-4 3c.7-.2 1.3.2 1.5.9.2.7-.2 1.3-.9 1.5-.7.2-1.3-.2-1.5-.9-.2-.7.2-1.3.9-1.5zm2.8.8c.6 0 1 .4 1 1s-.4 1-1 1-1-.4-1-1 .4-1 1-1z"/>
-              <path d="M10.5 3.8c2.8.5 5.2 2.2 6.3 4.8 1.3 3.1.7 6.7-1.4 9.5-1.3 1.8-3.4 3-5.7 3.5 4.3-.4 8-3.4 9-7.8 1.1-4.8-1.7-9.5-6.3-10.8-.7-.2-1.3-.2-1.9.8z"/>
+              <!-- Small Earth situated on the outer convex belly (left/upper-left) -->
+              <g transform="translate(1.5, 4.5)">
+                <circle cx="4.5" cy="4.5" r="4" fill="currentColor" fill-opacity="0.95" />
+                <circle cx="4.5" cy="4.5" r="4" fill="none" stroke="var(--bg-canvas)" stroke-width="0.8" />
+                <!-- Subtle Earth latitude & longitude arcs -->
+                <path d="M 0.8 4.5 Q 4.5 6.2 8.2 4.5" fill="none" stroke="var(--bg-canvas)" stroke-width="0.75" />
+                <path d="M 4.5 0.8 Q 6.2 4.5 4.5 8.2" fill="none" stroke="var(--bg-canvas)" stroke-width="0.75" />
+              </g>
+              <!-- Large Crescent Moon with convex outer belly on left, inner hollow opening to right -->
+              <path d="M 15 2.5 C 8.2 4 4.5 9.8 5.2 16.2 C 5.8 20 9.2 22.3 14.2 22.5 C 10.2 20.8 8.6 16.4 9.2 12 C 9.8 7.8 12.8 4.2 15 2.5 Z" />
             </svg>
           </span>
           <svg class="trigger-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -71,11 +83,11 @@
               </button>
               <button type="button" class="popover-item active" data-theme-val="light" id="opt-theme-light">
                 <span class="popover-check">&#10003;</span>
-                <span class="opt-label" data-i18n="theme_light">Ánh sáng</span>
+                <span class="opt-label" data-i18n="theme_light">Sáng</span>
               </button>
               <button type="button" class="popover-item" data-theme-val="dark" id="opt-theme-dark">
                 <span class="popover-check">&#10003;</span>
-                <span class="opt-label" data-i18n="theme_dark">Tối tăm</span>
+                <span class="opt-label" data-i18n="theme_dark">Tối</span>
               </button>
             </div>
           </div>
@@ -112,11 +124,11 @@
     </div>
   </header>
 
-  <!-- Product Architecture Live Banner -->
-  <div class="disclaimer-banner" role="status">
+  <!-- Product Architecture Live Connection Banner -->
+  <div class="disclaimer-banner banner-connected" id="app-connection-banner" role="status">
     <div class="banner-inner">
-      <span class="banner-tag" data-i18n="banner_tag">MKE PRODUCT V0</span>
-      <span class="banner-msg" data-i18n="banner_msg">Đã kết nối động cơ toán học đa lõi (Native MKE v1 + SymPy CAS v0). Toàn bộ nghiệm, đạo hàm, tích phân và đồ thị được xử lý trực tiếp bởi kiến trúc tính toán toán học chuẩn xác.</span>
+      <span class="banner-tag" id="app-banner-tag" data-i18n="banner_tag">MKE PRODUCT V0</span>
+      <span class="banner-msg" id="app-banner-msg" data-i18n="banner_msg">Đã kết nối động cơ toán học đa lõi (Native MKE v1 + SymPy CAS v0). Toàn bộ nghiệm, đạo hàm, tích phân và đồ thị được xử lý trực tiếp bởi kiến trúc tính toán toán học chuẩn xác.</span>
     </div>
   </div>
 
@@ -457,7 +469,7 @@ Equation(
                 <span class="sol-eq" id="res-solution-eq">=</span>
                 <span class="sol-val" id="res-solution-val">2</span>
               </div>
-              <span class="sol-domain-tag" id="res-solution-tag" data-i18n="sol_domain_tag">Số hữu tỉ chính xác trong \(\mathbb{Q}\)</span>
+              <span class="sol-domain-tag" id="res-solution-tag">Số hữu tỉ chính xác trong \(\mathbb{Q}\)</span>
             </div>
 
             <!-- Plot Visualization Box (Shown when PLOT_2D tab active or requested) -->
@@ -497,7 +509,7 @@ Equation(
         <article class="result-card" id="card-domain-verif">
           <div class="res-card-header">
             <h3 class="res-card-title" data-i18n="card_domain_title">Miền Xác định &amp; Minh chứng Kiểm định</h3>
-            <span class="cert-status status-valid-cert" id="res-cert-badge" data-i18n="badge_verified_math">CHỨNG THỰC TẤT ĐỊNH</span>
+            <span class="cert-status status-valid-cert" id="res-cert-badge">CHỨNG THỰC TẤT ĐỊNH</span>
           </div>
           <div class="res-card-body">
             <div class="domain-info-grid">

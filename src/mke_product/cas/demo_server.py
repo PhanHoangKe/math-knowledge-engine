@@ -14,7 +14,7 @@ import logging
 import mimetypes
 import os
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict
 
@@ -32,7 +32,7 @@ DEV_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
-    server_version = "MKEProductServer/0.2"
+    server_version = "MKEProductServer/0.3"
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.info("%s - - [%s] %s", self.address_string(), self.log_date_time_string(), format % args)
@@ -40,6 +40,12 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         
+        # Favicon
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
+
         # Primary Canonical Product Interface (ui/ui00)
         if path in ("/", "/index.html"):
             self._serve_file(UI_DIR / "index.html", "text/html; charset=utf-8")
@@ -68,6 +74,26 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(404, "File not found")
                 return
             mime_type, _ = mimetypes.guess_type(str(file_path))
+        elif path.startswith("/vendor/"):
+            rel_name = path[len("/vendor/"):]
+            file_path = (UI_DIR / "vendor" / rel_name).resolve()
+            if not str(file_path).startswith(str((UI_DIR / "vendor").resolve())):
+                self.send_error(403, "Forbidden")
+                return
+            if not file_path.is_file():
+                self.send_error(404, "File not found")
+                return
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            if str(file_path).endswith(".woff2"):
+                mime_type = "font/woff2"
+            elif str(file_path).endswith(".woff"):
+                mime_type = "font/woff"
+            elif str(file_path).endswith(".ttf"):
+                mime_type = "font/ttf"
+            elif str(file_path).endswith(".css"):
+                mime_type = "text/css; charset=utf-8"
+            elif str(file_path).endswith(".js"):
+                mime_type = "application/javascript; charset=utf-8"
             self._serve_file(file_path, mime_type or "application/octet-stream")
         
         # Internal Development Tool (Preserved)
@@ -215,7 +241,7 @@ CASDemoHTTPRequestHandler = MKEProductHTTPRequestHandler
 def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     server_address = (host, port)
-    httpd = HTTPServer(server_address, MKEProductHTTPRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, MKEProductHTTPRequestHandler)
     logger.info("Starting Canonical MKE Product Server at http://%s:%d/", host, port)
     try:
         httpd.serve_forever()

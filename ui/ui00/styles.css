@@ -141,7 +141,7 @@ body {
 .app-header {
   background-color: var(--bg-canvas);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 0.65rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -149,7 +149,8 @@ body {
 }
 
 .header-container {
-  max-width: 1240px;
+  max-width: 1360px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -1200,9 +1201,157 @@ body {
   border: 1px solid var(--border-accent);
 }
 
+.cert-status {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 2px;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+}
+
 .cert-status.status-valid-cert {
   background-color: var(--badge-active-bg);
   color: var(--badge-active-text);
+  border: 1px solid rgba(22, 101, 52, 0.25);
+}
+
+.cert-status.status-candidate-cert {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+[data-theme="dark"] .cert-status.status-candidate-cert {
+  background-color: #082f49;
+  color: #7dd3fc;
+  border: 1px solid #0369a1;
+}
+
+.cert-status.status-computed-cert {
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+[data-theme="dark"] .cert-status.status-computed-cert {
+  background-color: #2e1065;
+  color: #c4b5fd;
+  border: 1px solid #5b21b6;
+}
+
+.cert-status.status-partial-cert {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+[data-theme="dark"] .cert-status.status-partial-cert {
+  background-color: #451a03;
+  color: #fcd34d;
+  border: 1px solid #78350f;
+}
+
+.cert-status.status-unresolved-cert {
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+[data-theme="dark"] .cert-status.status-unresolved-cert {
+  background-color: #431407;
+  color: #fdba74;
+  border: 1px solid #9a3412;
+}
+
+.cert-status.status-unverified-cert {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+[data-theme="dark"] .cert-status.status-unverified-cert {
+  background-color: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+}
+
+.cert-status.status-invalid-cert {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+[data-theme="dark"] .cert-status.status-invalid-cert {
+  background-color: #450a0a;
+  color: #fca5a5;
+  border: 1px solid #991b1b;
+}
+
+/* Retry Button */
+.btn-retry-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 2px;
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition-speed);
+}
+.btn-retry-connection:hover {
+  opacity: 0.9;
+}
+
+/* Connection Banner Dynamic Statuses */
+.disclaimer-banner.banner-connected {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.disclaimer-banner.banner-disconnected {
+  background-color: #fee2e2;
+  border-bottom: 1px solid #f87171;
+  color: #991c1c;
+}
+[data-theme="dark"] .disclaimer-banner.banner-disconnected {
+  background-color: #450a0a;
+  border-bottom: 1px solid #b91c1c;
+  color: #fecaca;
+}
+.disclaimer-banner.banner-disconnected .banner-tag {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.disclaimer-banner.banner-checking {
+  background-color: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  color: #92400e;
+}
+[data-theme="dark"] .disclaimer-banner.banner-checking {
+  background-color: #451a03;
+  border-bottom: 1px solid #78350f;
+  color: #fde68a;
+}
+.disclaimer-banner.banner-checking .banner-tag {
+  background-color: #d97706;
+  color: #ffffff;
+}
+
+/* KaTeX Integration Typography */
+.katex {
+  font-size: 1.05em;
+  text-rendering: auto;
+}
+.math-display-large .katex {
+  font-size: 1.35em;
+}
+.solution-equation .katex {
+  font-size: 1.3em;
+}
+.step-math .katex {
+  font-size: 1.1em;
 }
 
 /* Plotting Container Styles */
