@@ -1,0 +1,191 @@
+{
+  "milestone": "PRODUCT-03B-FINAL-RECONCILIATION",
+  "timestamp": "2026-09-28 13:07:44Z",
+  "iterations": 20,
+  "initial_handles": 182,
+  "final_handles": 181,
+  "net_delta": -1,
+  "all_passed": true,
+  "telemetry": [
+    {
+      "iteration": 1,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 2,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 3,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 4,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 5,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 6,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 7,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 8,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 9,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 10,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 11,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 12,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 13,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 14,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 15,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 16,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 17,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 18,
+      "handles_start": 182,
+      "handles_end": 182,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 19,
+      "handles_start": 182,
+      "handles_end": 181,
+      "delta": -1,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    },
+    {
+      "iteration": 20,
+      "handles_start": 181,
+      "handles_end": 181,
+      "delta": 0,
+      "active_quarantine": 0,
+      "unresolved_count": 0,
+      "passed": true
+    }
+  ]
+}
