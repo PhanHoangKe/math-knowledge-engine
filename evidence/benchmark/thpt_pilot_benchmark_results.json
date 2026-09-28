@@ -28,22 +28,22 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-28T14:21:17Z",
+    "timestamp": "2026-09-28T14:34:05Z",
     "engine_version": "v0.3.0-p03b-accepted",
-    "duration_seconds": 10.328,
+    "duration_seconds": 10.156,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
       "unsupported_modality": 6,
-      "success": 6,
-      "genuine_wrong_answer": 5,
+      "success": 5,
+      "genuine_wrong_answer": 6,
       "extraneous_root_leak": 0,
       "unsupported_grammar": 0,
       "domain_rejected": 23,
       "timeout": 0,
       "internal_error": 0,
-      "full_pilot_accuracy_pct": 15.0,
-      "symbolic_attempted_accuracy_pct": 17.65
+      "full_pilot_accuracy_pct": 12.5,
+      "symbolic_attempted_accuracy_pct": 14.71
     },
     "extraneous_roots_telemetry": {
       "problems_with_extraneous_roots": 3,
@@ -55,7 +55,7 @@
         "10": {
           "total": 15,
           "attempted": 13,
-          "success": 4
+          "success": 3
         },
         "11": {
           "total": 14,
@@ -75,7 +75,7 @@
         },
         "FORMAT_II_TRUE_FALSE": {
           "total": 3,
-          "success": 1
+          "success": 0
         },
         "FORMAT_III_SHORT_ANSWER": {
           "total": 25,
@@ -90,7 +90,7 @@
         "SYMBOLIC_TYPED": {
           "total": 34,
           "attempted": 34,
-          "success": 6
+          "success": 5
         },
         "VIETNAMESE_WORD_PROBLEM": {
           "total": 4,
@@ -119,7 +119,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'(-oo,2)U(3,oo)'}",
+      "scoring_details": "Mathematical solution matched MCQ target: {'(-oo,2)u(3,oo)'}",
       "engine_result": "(-oo, 2) U (3, oo)",
       "engine_solution_set": [
         "(-oo, 2) U (3, oo)"
@@ -138,7 +138,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'(-oo,-1]U[5/2,oo)'}",
+      "scoring_details": "Exact solution set matched: {'(-oo,-1]u[5/2,oo)'}",
       "engine_result": "(-oo, -1] U [5/2, oo)",
       "engine_solution_set": [
         "(-oo, -1] U [5/2, oo)"
@@ -278,7 +278,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'2,y=-1'} does not match expected {'2', 'y=-1'}.",
+      "scoring_details": "Produced {'x=2,y=-1'} did not match expected {'y=-1', 'x=2'}.",
       "engine_result": "x = 2, y = -1",
       "engine_solution_set": [
         "x = 2, y = -1"
@@ -287,7 +287,7 @@
     {
       "problem_id": "PILOT-10-0011",
       "grade": 10,
-      "archetype_id": "ARCH-10.1.1",
+      "archetype_id": "ARCH-10.1.2",
       "format_type": "FORMAT_I_MCQ",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -304,7 +304,7 @@
     {
       "problem_id": "PILOT-10-0012",
       "grade": 10,
-      "archetype_id": "ARCH-10.8.1",
+      "archetype_id": "ARCH-10.8.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -321,24 +321,24 @@
     {
       "problem_id": "PILOT-10-0013",
       "grade": 10,
-      "archetype_id": "ARCH-10.9.1",
+      "archetype_id": "ARCH-10.9.3",
       "format_type": "FORMAT_II_TRUE_FALSE",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "x^2 + y^2 - 4*x + 6*y - 12 = 0",
-      "outcome": "SUCCESS",
+      "outcome": "GENUINE_WRONG_ANSWER",
       "attempted": true,
-      "matched_ground_truth": true,
+      "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Correctly matched empty solution set.",
+      "scoring_details": "Engine did not produce boolean sub-statement judgements for Format II.",
       "engine_result": "{}",
       "engine_solution_set": []
     },
     {
       "problem_id": "PILOT-10-0014",
       "grade": 10,
-      "archetype_id": "ARCH-10.2.1",
+      "archetype_id": "ARCH-10.2.3",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "VIETNAMESE_WORD_PROBLEM",
       "outcome": "UNSUPPORTED_MODALITY",
@@ -387,7 +387,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'2/(x+3)-(2*x-1*1)/(x+3)^2'} does not match expected {'7/(x+3)^2'}.",
+      "scoring_details": "MCQ failed: expected choice A / {'7/(x+3)^2'}, got key 'None' / {'2/(x+3)-(2*x-1*1)/(x+3)^2'}",
       "engine_result": "2/(x + 3) - (2*x - 1*1)/(x + 3)^2",
       "engine_solution_set": []
     },
@@ -411,7 +411,7 @@
     {
       "problem_id": "PILOT-11-0004",
       "grade": 11,
-      "archetype_id": "ARCH-11.5.2",
+      "archetype_id": "ARCH-11.5.4",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "DIFFERENTIATE",
@@ -445,7 +445,7 @@
     {
       "problem_id": "PILOT-11-0006",
       "grade": 11,
-      "archetype_id": "ARCH-11.1.2",
+      "archetype_id": "ARCH-11.1.3",
       "format_type": "FORMAT_I_MCQ",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
@@ -479,7 +479,7 @@
     {
       "problem_id": "PILOT-11-0008",
       "grade": 11,
-      "archetype_id": "ARCH-11.4.2",
+      "archetype_id": "ARCH-11.4.3",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -496,7 +496,7 @@
     {
       "problem_id": "PILOT-11-0009",
       "grade": 11,
-      "archetype_id": "ARCH-11.3.1",
+      "archetype_id": "ARCH-11.3.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -513,7 +513,7 @@
     {
       "problem_id": "PILOT-11-0010",
       "grade": 11,
-      "archetype_id": "ARCH-11.2.1",
+      "archetype_id": "ARCH-11.2.2",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -530,7 +530,7 @@
     {
       "problem_id": "PILOT-11-0011",
       "grade": 11,
-      "archetype_id": "ARCH-11.6.1",
+      "archetype_id": "ARCH-11.7.2",
       "format_type": "FORMAT_I_MCQ",
       "input_modality": "VIETNAMESE_WORD_PROBLEM",
       "outcome": "UNSUPPORTED_MODALITY",
@@ -563,7 +563,7 @@
     {
       "problem_id": "PILOT-11-0014",
       "grade": 11,
-      "archetype_id": "ARCH-11.5.1",
+      "archetype_id": "ARCH-11.5.2",
       "format_type": "FORMAT_II_TRUE_FALSE",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "DIFFERENTIATE",
@@ -573,7 +573,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'3*x^2-3'} does not match expected set().",
+      "scoring_details": "Engine did not produce boolean sub-statement judgements for Format II.",
       "engine_result": "3*x^2 - 3",
       "engine_solution_set": []
     },
@@ -590,7 +590,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'x^3-3*x^2+1'} does not match expected {'(-oo,0)U(2,oo)'}.",
+      "scoring_details": "MCQ failed: expected choice B / {'(-oo,0)u(2,oo)'}, got key 'None' / {'x^3-3*x^2+1'}",
       "engine_result": "x^3 - 3*x^2 + 1",
       "engine_solution_set": []
     },
@@ -641,7 +641,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'x^3-2*x^2+x+C'}",
+      "scoring_details": "Exact solution set matched: {'x^3-2*x^2+x+c'}",
       "engine_result": "x^3 - 2*x^2 + x + C",
       "engine_solution_set": []
     },
@@ -716,7 +716,7 @@
     {
       "problem_id": "PILOT-12-0009",
       "grade": 12,
-      "archetype_id": "ARCH-12.3.2",
+      "archetype_id": "ARCH-12.3.3",
       "format_type": "FORMAT_I_MCQ",
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE_SYSTEM",
@@ -733,7 +733,7 @@
     {
       "problem_id": "PILOT-12-0010",
       "grade": 12,
-      "archetype_id": "ARCH-12.4.1",
+      "archetype_id": "ARCH-12.4.4",
       "format_type": "FORMAT_III_SHORT_ANSWER",
       "input_modality": "VIETNAMESE_WORD_PROBLEM",
       "outcome": "UNSUPPORTED_MODALITY",
@@ -754,7 +754,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Produced {'-x^3+3*x-1'} does not match expected set().",
+      "scoring_details": "Engine did not produce boolean sub-statement judgements for Format II.",
       "engine_result": "-x^3 + 3*x - 1",
       "engine_solution_set": []
     }
