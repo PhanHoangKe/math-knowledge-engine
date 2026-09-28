@@ -1,0 +1,22 @@
+{
+  "suite": "MKE_PRODUCT_03A_R4_FULL_REGRESSION",
+  "commit": "9c771a192fa51e1d6f51caa3fe9d89720722ae6e",
+  "branch": "product/p03a-r4-ui-semantic-correction",
+  "duration_sec": 88.81,
+  "returncode": 0,
+  "passed": 389,
+  "failed": 0,
+  "subtests": 18,
+  "verdict": "PASS",
+  "tested_files": [
+    "tests/test_browser_canonical_ui.py",
+    "tests/test_cas_http_integration.py",
+    "tests/test_cas_product03a.py",
+    "tests/test_evaluator.py",
+    "tests/test_parser.py",
+    "tests/test_protocol.py",
+    "tests/test_rational.py",
+    "tests/test_solver.py",
+    "tests/test_worker_windows.py"
+  ]
+}
