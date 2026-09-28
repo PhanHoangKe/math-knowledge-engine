@@ -212,6 +212,77 @@ class TestBenchmarkScoringSuite:
         assert res["outcome"] == BenchmarkOutcome.SUCCESS
         assert res["matched_ground_truth"] is True
 
+    def test_pilot_10_0010_single_string_system_scoring(self):
+        """Verify PILOT-10-0010 matches when engine outputs single-string system solution."""
+        problem = {
+            "problem_id": "PILOT-10-0010",
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {
+                "solution_type": "EXACT_SET",
+                "exact_solution_set": ["x = 2", "y = -1"]
+            }
+        }
+        # Case A: in solution_set as single string
+        mock_resp_a = {"symbolic_result": "x = 2, y = -1", "solution_set": ["x = 2, y = -1"]}
+        res_a = evaluate_benchmark_response(problem, "SUCCESS", mock_resp_a)
+        assert res_a["outcome"] == BenchmarkOutcome.SUCCESS
+        assert res_a["matched_ground_truth"] is True
+
+        # Case B: only in symbolic_result
+        mock_resp_b = {"symbolic_result": "x = 2, y = -1"}
+        res_b = evaluate_benchmark_response(problem, "SUCCESS", mock_resp_b)
+        assert res_b["outcome"] == BenchmarkOutcome.SUCCESS
+        assert res_b["matched_ground_truth"] is True
+
+    def test_invalid_input_separated_from_domain_error(self):
+        """Ensure INVALID_INPUT is categorized as UNSUPPORTED_GRAMMAR while DOMAIN_ERROR is DOMAIN_REJECTED."""
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {
+                "solution_type": "EXACT_SET",
+                "exact_solution_set": ["1"]
+            }
+        }
+        # INVALID_INPUT -> UNSUPPORTED_GRAMMAR
+        res_inv = evaluate_benchmark_response(problem, "INVALID_INPUT", {"error_message": "Invalid syntax"})
+        assert res_inv["outcome"] == BenchmarkOutcome.UNSUPPORTED_GRAMMAR
+        assert res_inv["matched_ground_truth"] is False
+
+        # DOMAIN_ERROR -> DOMAIN_REJECTED
+        res_dom = evaluate_benchmark_response(problem, "DOMAIN_ERROR", {"error_message": "Division by zero"})
+        assert res_dom["outcome"] == BenchmarkOutcome.DOMAIN_REJECTED
+        assert res_dom["matched_ground_truth"] is False
+
+    def test_extraneous_root_telemetry_honesty(self):
+        """Ensure extraneous candidate telemetry reflects verified worker evidence."""
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {
+                "solution_type": "EXACT_SET",
+                "exact_solution_set": ["1"],
+                "extraneous_roots": ["-2"]
+            }
+        }
+        # With worker evidence:
+        resp_with_ev = {
+            "symbolic_result": "{1}",
+            "solution_set": ["1"],
+            "verification_evidence": {"extraneous_roots": ["-2"]}
+        }
+        res_ev = evaluate_benchmark_response(problem, "SUCCESS", resp_with_ev)
+        assert res_ev["telemetry"]["genuinely_verified_excluded_roots_count"] == 1
+
+        # Without worker evidence:
+        resp_no_ev = {
+            "symbolic_result": "{1}",
+            "solution_set": ["1"],
+        }
+        res_no_ev = evaluate_benchmark_response(problem, "SUCCESS", resp_no_ev)
+        assert res_no_ev["telemetry"]["genuinely_verified_excluded_roots_count"] == 0
+
     def test_domain_error_never_classified_as_success_for_empty_set(self):
         """Ensure DOMAIN_ERROR or INVALID_INPUT is NEVER scored as SUCCESS."""
         problem = {
@@ -277,3 +348,4 @@ class TestBenchmarkScoringSuite:
         res = evaluate_benchmark_response(problem, "SUCCESS", {"solution_set": []})
         assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
         assert res["matched_ground_truth"] is False
+

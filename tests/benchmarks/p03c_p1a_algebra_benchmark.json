@@ -4,7 +4,8 @@
   "archetype_scope": [
     "ARCH-10.5.1",
     "ARCH-10.5.2",
-    "ARCH-10.5.3"
+    "ARCH-10.5.3",
+    "ARCH-10.EXT-RATIONAL.1"
   ],
   "total_items": 15,
   "items": [
@@ -88,7 +89,7 @@
     },
     {
       "id": "P1A-ALG-007",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",
@@ -101,7 +102,7 @@
     },
     {
       "id": "P1A-ALG-008",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",
@@ -114,7 +115,7 @@
     },
     {
       "id": "P1A-ALG-009",
-      "archetype_id": "ARCH-10.5.2",
+      "archetype_id": "ARCH-10.EXT-RATIONAL.1",
       "grade": 10,
       "topic": "Rational Equations",
       "question_type": "SHORT_ANSWER",

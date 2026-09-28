@@ -105,20 +105,26 @@ def parse_system_solution(sol_input: Any) -> Dict[str, str]:
             out[str(k).strip().lower()] = normalize_math_string(str(v))
         return out
 
-    items: List[str] = []
+    raw_items: List[str] = []
     if isinstance(sol_input, (list, tuple, set)):
-        items = [str(x) for x in sol_input]
+        raw_items = [str(x) for x in sol_input]
     elif isinstance(sol_input, str):
-        s = sol_input.strip()
-        items = [p.strip() for p in s.split(",") if p.strip()]
+        raw_items = [sol_input]
 
-    for item in items:
-        s = str(item).strip()
-        if "=" in s:
-            var, val = s.split("=", 1)
+    subparts: List[str] = []
+    for raw in raw_items:
+        s = raw.strip()
+        parts = re.split(r"[,;]", s)
+        for p in parts:
+            if p.strip():
+                subparts.append(p.strip())
+
+    for item in subparts:
+        if "=" in item:
+            var, val = item.split("=", 1)
             out[var.strip().lower()] = normalize_math_string(val)
-        elif ":" in s:
-            var, val = s.split(":", 1)
+        elif ":" in item:
+            var, val = item.split(":", 1)
             out[var.strip().lower()] = normalize_math_string(val)
     return out
 
@@ -192,13 +198,22 @@ def evaluate_benchmark_response(
             "details": f"Input modality '{modality}' requires external NLP / multimodal pipeline."
         }
 
-    # 2. Engine non-success statuses
-    if engine_status in ["OUT_OF_SCOPE", "UNSUPPORTED_EXPRESSION"]:
+    # 2. Engine non-success statuses: separate syntax rejection from mathematical domain error
+    if engine_status in ["OUT_OF_SCOPE", "UNSUPPORTED_EXPRESSION", "INVALID_INPUT"]:
         return {
             "outcome": BenchmarkOutcome.UNSUPPORTED_GRAMMAR,
             "matched_ground_truth": False,
             "telemetry": base_telemetry,
-            "details": raw_response.get("error_message") or "Engine reported OUT_OF_SCOPE / UNSUPPORTED_EXPRESSION."
+            "details": raw_response.get("error_message") or f"Engine syntax/grammar rejection: {engine_status}."
+        }
+
+    if engine_status == "DOMAIN_ERROR":
+        base_telemetry["rejected_at_domain_gate_count"] = len(extraneous_declared)
+        return {
+            "outcome": BenchmarkOutcome.DOMAIN_REJECTED,
+            "matched_ground_truth": False,
+            "telemetry": base_telemetry,
+            "details": raw_response.get("error_message") or "Mathematical domain error."
         }
 
     if engine_status in ["TIMEOUT", "RESOURCE_EXHAUSTED"]:
@@ -207,16 +222,6 @@ def evaluate_benchmark_response(
             "matched_ground_truth": False,
             "telemetry": base_telemetry,
             "details": raw_response.get("error_message") or "Execution timed out / resource exhausted."
-        }
-
-    if engine_status in ["DOMAIN_ERROR", "INVALID_INPUT"]:
-        base_telemetry["rejected_at_domain_gate_count"] = len(extraneous_declared)
-        # NEVER classify DOMAIN_ERROR or INVALID_INPUT as SUCCESS
-        return {
-            "outcome": BenchmarkOutcome.DOMAIN_REJECTED,
-            "matched_ground_truth": False,
-            "telemetry": base_telemetry,
-            "details": raw_response.get("error_message") or f"Input rejected with engine status {engine_status}."
         }
 
     if engine_status != "SUCCESS":
@@ -260,7 +265,12 @@ def evaluate_benchmark_response(
             "details": f"Engine admitted extraneous root(s): {leak_list}"
         }
     elif extraneous_declared:
-        base_telemetry["genuinely_verified_excluded_roots_count"] = len(extraneous_declared)
+        evidence = raw_response.get("verification_evidence") or {}
+        worker_eliminated = evidence.get("extraneous_roots", [])
+        if worker_eliminated:
+            base_telemetry["genuinely_verified_excluded_roots_count"] = len(worker_eliminated)
+        else:
+            base_telemetry["genuinely_verified_excluded_roots_count"] = 0
 
     # 5. Format-Specific Scoring
     # FORMAT II: True / False (4 Sub-statements)

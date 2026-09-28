@@ -441,41 +441,80 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             # 1. Radicals require radicand >= 0
             if isinstance(n, Radical):
                 has_radical_or_interval = True
-                rad_sym = ast_to_sympy_expr(n.radicand)
                 try:
+                    rad_sym = ast_to_sympy_expr(n.radicand)
                     rad_domain = sympy.solveset(rad_sym >= 0, x, domain=sympy.S.Reals)
+                    if isinstance(rad_domain, sympy.ConditionSet):
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Radical domain condition {rad_sym} >= 0 could not be fully determined"
+                        return
                     domain_set = domain_set.intersect(rad_domain)
-                except Exception:
-                    pass
+                except Exception as ex:
+                    response.mathematical_status = EngineStatus.UNRESOLVED
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = f"Failed to compute radical domain constraint for {n}: {ex}"
+                    return
 
             # 2. Denominators require denom != 0
             elif isinstance(n, BinaryOp) and n.op == "/":
-                denom_sym = ast_to_sympy_expr(n.right)
                 try:
+                    denom_sym = ast_to_sympy_expr(n.right)
                     denom_zeros = sympy.solveset(sympy.Eq(denom_sym, 0), x, domain=sympy.S.Reals)
+                    if isinstance(denom_zeros, sympy.ConditionSet):
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Denominator singularity condition {denom_sym} = 0 could not be fully determined"
+                        return
                     domain_set = domain_set - denom_zeros
                     if isinstance(denom_zeros, sympy.FiniteSet):
                         excluded_points.extend(list(denom_zeros))
                     elif hasattr(denom_zeros, "__iter__"):
                         excluded_points.extend(list(denom_zeros))
-                except Exception:
-                    pass
+                except Exception as ex:
+                    response.mathematical_status = EngineStatus.UNRESOLVED
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = f"Failed to compute denominator singularity constraint for {n}: {ex}"
+                    return
 
             # 3. Base != 0 for 0-exponent
             elif isinstance(n, Power) and getattr(n, "exponent", None) is not None and getattr(n.exponent, "value", None) == 0:
-                base_sym = ast_to_sympy_expr(n.base)
                 try:
+                    base_sym = ast_to_sympy_expr(n.base)
                     base_zeros = sympy.solveset(sympy.Eq(base_sym, 0), x, domain=sympy.S.Reals)
+                    if isinstance(base_zeros, sympy.ConditionSet):
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Base singularity condition {base_sym} = 0 could not be fully determined"
+                        return
                     domain_set = domain_set - base_zeros
                     if isinstance(base_zeros, sympy.FiniteSet):
                         excluded_points.extend(list(base_zeros))
-                except Exception:
-                    pass
+                except Exception as ex:
+                    response.mathematical_status = EngineStatus.UNRESOLVED
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = f"Failed to compute zero-exponent base constraint for {n}: {ex}"
+                    return
+
+        # Check if resulting domain_set is unresolved (e.g. ConditionSet)
+        if isinstance(domain_set, sympy.ConditionSet):
+            response.mathematical_status = EngineStatus.UNRESOLVED
+            response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+            response.error_message = "Identity equation domain completeness could not be established"
+            return
 
         if domain_set == sympy.S.Reals:
             response.symbolic_result = "All real numbers"
             response.latex_output = "\\mathbb{R}"
             response.mathematical_status = EngineStatus.SUCCESS
+            response.domain_certainty = DomainCertainty.PROVEN_REALS
             response.verification_evidence = {
                 "solution_type": "identity",
                 "domain": "Reals",
@@ -507,6 +546,7 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             response.symbolic_result = f"All real numbers except {excl_str}"
             response.latex_output = f"\\mathbb{{R}} \\setminus \\{{ {latex_excl} \\}}"
             response.mathematical_status = EngineStatus.SUCCESS
+            response.domain_certainty = DomainCertainty.EXPLICIT_EXCLUSIONS
             response.verification_evidence = {
                 "solution_type": "identity_with_exclusions",
                 "excluded_points": [str(p) for p in unique_excl],
@@ -517,6 +557,7 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         response.symbolic_result = format_interval_symbolic(domain_set, var="x")
         response.latex_output = format_interval_latex(domain_set, var="x")
         response.mathematical_status = EngineStatus.SUCCESS
+        response.domain_certainty = DomainCertainty.PROVEN_REALS
         response.verification_evidence = {
             "solution_type": "identity_interval",
             "domain_set": str(domain_set),

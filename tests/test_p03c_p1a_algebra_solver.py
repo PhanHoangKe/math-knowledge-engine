@@ -198,7 +198,39 @@ class TestP03CP1AAlgebraSolver(unittest.TestCase):
         self.assertIn("[2, 5)", res.symbolic_result)
         self.assertIn("(5, oo)", res.symbolic_result)
 
+    def test_injected_identity_domain_calculation_failure_fails_closed(self):
+        from unittest.mock import patch
+        from mke_product.cas.contracts import DomainCertainty
+        with patch("sympy.solveset", side_effect=RuntimeError("Injected CAS failure")):
+            req = ExecutionRequest(
+                operation=OperationType.SOLVE,
+                expression="sqrt(x) = sqrt(x)",
+                options={"in_process": True},
+            )
+            res = self.router.execute(req)
+            self.assertEqual(res.status, EngineStatus.UNRESOLVED)
+            self.assertEqual(res.verification_status, VerificationStatus.UNRESOLVED)
+            self.assertEqual(res.domain_certainty, DomainCertainty.NOT_FULLY_DETERMINED)
+
+    def test_injected_conditionset_identity_domain_fails_closed(self):
+        from unittest.mock import patch
+        import sympy
+        from mke_product.cas.contracts import DomainCertainty
+        x = sympy.Symbol("x", real=True)
+        unresolved_set = sympy.ConditionSet(x, sympy.Eq(x, 1), sympy.S.Reals)
+        with patch("sympy.solveset", return_value=unresolved_set):
+            req = ExecutionRequest(
+                operation=OperationType.SOLVE,
+                expression="sqrt(x) = sqrt(x)",
+                options={"in_process": True},
+            )
+            res = self.router.execute(req)
+            self.assertEqual(res.status, EngineStatus.UNRESOLVED)
+            self.assertEqual(res.verification_status, VerificationStatus.UNRESOLVED)
+            self.assertEqual(res.domain_certainty, DomainCertainty.NOT_FULLY_DETERMINED)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
