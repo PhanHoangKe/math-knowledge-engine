@@ -31,53 +31,79 @@
         <button type="button" class="nav-btn" id="nav-syntax" data-i18n="nav_syntax">Cú pháp</button>
       </nav>
 
-      <!-- Header Right: Wolfram-style Settings Popover Button -->
+      <!-- Header Right: Wolfram-style Sign In & Theme/Language Popover Trigger -->
       <div class="header-actions">
-        <button type="button" class="settings-btn" id="btn-settings" aria-label="Cài đặt giao diện & ngôn ngữ" title="Settings / Cài đặt" aria-expanded="false" aria-haspopup="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        <button type="button" class="signin-btn" id="btn-signin" title="Sign in" data-i18n="header_signin">Sign in</button>
+        <button type="button" class="settings-trigger-btn" id="btn-settings" aria-label="Tùy chọn giao diện & ngôn ngữ" title="Theme & Language / Cài đặt" aria-expanded="false" aria-haspopup="true">
+          <span class="trigger-icon-wrapper">
+            <svg class="trigger-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <!-- Celestial hybrid sun / globe icon -->
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+          </span>
+          <svg class="trigger-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
 
         <!-- Popover Dropdown Menu -->
         <div class="settings-popover" id="settings-popover" role="dialog" aria-label="Tùy chọn hiển thị">
-          <!-- Section 1: Theme -->
-          <div class="popover-section">
-            <div class="popover-title">
-              <span data-i18n="theme_popover_title">Giao diện</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
-            <div class="popover-options">
+          <!-- Section 1: Theme Accordion -->
+          <div class="popover-accordion-section open" id="section-theme">
+            <button type="button" class="popover-section-header" id="header-theme-toggle" aria-expanded="true">
+              <div class="header-left">
+                <!-- 8-point sun icon -->
+                <svg class="section-icon theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2l2.4 3.4 4.1-.9.7 4.1 3.8 1.7-1.7 3.7 2.4 3.4-3.4 2.4.9 4.1-4.1.7-1.7 3.8-3.7-1.7-3.4 2.4-2.4-3.4-4.1.9-.7-4.1-3.8-1.7 1.7-3.7-2.4-3.4 3.4-2.4-.9-4.1 4.1-.7 1.7-3.8 3.7 1.7L12 2zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/>
+                </svg>
+                <span class="section-title" data-i18n="theme_popover_title">Theme</span>
+              </div>
+              <svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="popover-options" id="options-theme">
               <button type="button" class="popover-item" data-theme-val="auto" id="opt-theme-auto">
-                <span data-i18n="theme_auto">Tự động (Hệ thống)</span>
                 <span class="popover-check">&#10003;</span>
+                <span class="opt-label" data-i18n="theme_auto">Automatic</span>
               </button>
               <button type="button" class="popover-item active" data-theme-val="light" id="opt-theme-light">
-                <span data-i18n="theme_light">Sáng</span>
                 <span class="popover-check">&#10003;</span>
+                <span class="opt-label" data-i18n="theme_light">Light</span>
               </button>
               <button type="button" class="popover-item" data-theme-val="dark" id="opt-theme-dark">
-                <span data-i18n="theme_dark">Tối</span>
                 <span class="popover-check">&#10003;</span>
+                <span class="opt-label" data-i18n="theme_dark">Dark</span>
               </button>
             </div>
           </div>
 
-          <!-- Section 2: Language -->
-          <div class="popover-section">
-            <div class="popover-title">
-              <span data-i18n="lang_popover_title">Ngôn ngữ</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
-            <div class="popover-options">
+          <div class="popover-divider"></div>
+
+          <!-- Section 2: Language Accordion -->
+          <div class="popover-accordion-section" id="section-language">
+            <button type="button" class="popover-section-header" id="header-language-toggle" aria-expanded="false">
+              <div class="header-left">
+                <!-- Globe icon -->
+                <svg class="section-icon lang-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <span class="section-title" data-i18n="lang_popover_title">Language</span>
+              </div>
+              <svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="popover-options" id="options-language" style="display: none;">
               <button type="button" class="popover-item active" data-lang-val="vi" id="opt-lang-vi">
-                <span>Tiếng Việt</span>
                 <span class="popover-check">&#10003;</span>
+                <span class="opt-label">Tiếng Việt</span>
               </button>
               <button type="button" class="popover-item" data-lang-val="en" id="opt-lang-en">
-                <span>English</span>
                 <span class="popover-check">&#10003;</span>
+                <span class="opt-label">English</span>
               </button>
             </div>
           </div>

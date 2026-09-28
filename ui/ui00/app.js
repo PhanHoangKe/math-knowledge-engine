@@ -22,6 +22,7 @@
       nav_home: 'Trang chủ',
       nav_sample: 'Kết quả tính',
       nav_syntax: 'Cú pháp',
+      header_signin: 'Sign in',
       theme_popover_title: 'Giao diện',
       lang_popover_title: 'Ngôn ngữ',
       theme_auto: 'Tự động (Hệ thống)',
@@ -157,6 +158,7 @@
       nav_home: 'Home',
       nav_sample: 'Compute Result',
       nav_syntax: 'Syntax Guide',
+      header_signin: 'Sign in',
       theme_popover_title: 'Theme',
       lang_popover_title: 'Language',
       theme_auto: 'Auto (System)',
@@ -447,7 +449,7 @@
   }
 
   // ==========================================================================
-  // Settings Popover Menu Toggle (Wolfram Style)
+  // Settings Popover Menu Toggle & Accordions (Wolfram Alpha Style)
   // ==========================================================================
   function initSettingsPopover() {
     const btnSettings = document.getElementById('btn-settings');
@@ -460,6 +462,33 @@
       btnSettings.classList.toggle('active', isOpen);
       btnSettings.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     });
+
+    // Accordion Sections (Theme & Language)
+    const secTheme = document.getElementById('section-theme');
+    const toggleTheme = document.getElementById('header-theme-toggle');
+    const optsTheme = document.getElementById('options-theme');
+
+    const secLang = document.getElementById('section-language');
+    const toggleLang = document.getElementById('header-language-toggle');
+    const optsLang = document.getElementById('options-language');
+
+    if (toggleTheme && secTheme && optsTheme) {
+      toggleTheme.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = secTheme.classList.toggle('open');
+        optsTheme.style.display = isOpen ? 'flex' : 'none';
+        toggleTheme.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+    }
+
+    if (toggleLang && secLang && optsLang) {
+      toggleLang.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = secLang.classList.toggle('open');
+        optsLang.style.display = isOpen ? 'flex' : 'none';
+        toggleLang.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+    }
 
     document.addEventListener('click', (e) => {
       if (!popover.contains(e.target) && !btnSettings.contains(e.target)) {
