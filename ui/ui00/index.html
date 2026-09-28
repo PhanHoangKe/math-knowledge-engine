@@ -36,9 +36,11 @@
         <button type="button" class="signin-btn" id="btn-signin" title="Sign in" data-i18n="header_signin">Sign in</button>
         <button type="button" class="settings-trigger-btn" id="btn-settings" aria-label="Tùy chọn giao diện & ngôn ngữ" title="Theme & Language / Cài đặt" aria-expanded="false" aria-haspopup="true">
           <span class="trigger-icon-wrapper">
-            <svg class="trigger-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-              <!-- Celestial hybrid sun / globe icon -->
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            <!-- Authentic WolframAlpha Globe + Celestial Crescent Icon -->
+            <svg class="trigger-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c2.6 0 4.98-.99 6.77-2.61l-1.42-1.42C15.86 19.23 14.02 20 12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c2.02 0 3.86.77 5.35 2.03l1.42-1.42C16.98 2.99 14.6 2 12 2z"/>
+              <path d="M12 5.5A6.5 6.5 0 1 0 18.5 12 6.51 6.51 0 0 0 12 5.5zm-1 11.23c-2.48-.38-4.42-2.32-4.8-4.8L9 12v1a1.5 1.5 0 0 0 1.5 1.5v2.23zm4.73-1.8c-.2-.55-.7-.93-1.23-.93h-.5v-2a1 1 0 0 0-1-1h-2v-1h1a1 1 0 0 0 1-1V7.5a4.7 4.7 0 0 1 2.73 6.93z"/>
+              <path d="M21.25 7.75a8.9 8.9 0 0 0-2.45-3.2l-.9.9a7.6 7.6 0 0 1 2.1 2.75l1.25-.45zm.75 4.25c0 1.25-.25 2.45-.7 3.55l1.15.5a9.8 9.8 0 0 0 .8-4.05h-1.25z"/>
             </svg>
           </span>
           <svg class="trigger-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -52,9 +54,9 @@
           <div class="popover-accordion-section open" id="section-theme">
             <button type="button" class="popover-section-header" id="header-theme-toggle" aria-expanded="true">
               <div class="header-left">
-                <!-- 8-point sun icon -->
-                <svg class="section-icon theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2l2.4 3.4 4.1-.9.7 4.1 3.8 1.7-1.7 3.7 2.4 3.4-3.4 2.4.9 4.1-4.1.7-1.7 3.8-3.7-1.7-3.4 2.4-2.4-3.4-4.1.9-.7-4.1-3.8-1.7 1.7-3.7-2.4-3.4 3.4-2.4-.9-4.1 4.1-.7 1.7-3.8 3.7 1.7L12 2zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/>
+                <!-- Spiky 8-point sun icon with center circle hole -->
+                <svg class="section-icon theme-icon" width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12 2.25l2.6 3.2 4.1-.4 1.2 3.9 3.7 1.8-1.5 3.8 2.4 3.3-3.4 2.3.6 4.1-4.1.8-1.6 3.8-3.8-1.6-3.4 2.4-2.4-3.4-4.1.7-.8-4.1-3.8-1.6 1.6-3.8-2.4-3.4 3.4-2.4-.7-4.1 4.1-.7 1.7-3.8 3.8 1.6L12 2.25zm0 6a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5z" clip-rule="evenodd"/>
                 </svg>
                 <span class="section-title" data-i18n="theme_popover_title">Theme</span>
               </div>
@@ -84,11 +86,9 @@
           <div class="popover-accordion-section" id="section-language">
             <button type="button" class="popover-section-header" id="header-language-toggle" aria-expanded="false">
               <div class="header-left">
-                <!-- Globe icon -->
-                <svg class="section-icon lang-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="2" y1="12" x2="22" y2="12"></line>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                <!-- Globe icon with solid continents and grid -->
+                <svg class="section-icon lang-icon" width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" clip-rule="evenodd"/>
                 </svg>
                 <span class="section-title" data-i18n="lang_popover_title">Language</span>
               </div>
@@ -200,7 +200,7 @@
       <section class="topics-section" aria-label="Chuyên đề toán học" data-i18n-attr="aria-label:topics_section_aria">
         <div class="topic-4col-grid">
           <!-- COLUMN 1: Mathematics & Linear Algebra (Purple / Violet) -->
-          <div class="topic-col">
+          <div class="topic-col topic-col-math">
             <div class="col-header col-header-math">
               <span data-i18n="col_math_title">Toán học &amp; Đại số</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -241,7 +241,7 @@
           </div>
 
           <!-- COLUMN 2: Rational Field Arithmetic (Emerald Green) -->
-          <div class="topic-col">
+          <div class="topic-col topic-col-science">
             <div class="col-header col-header-science">
               <span data-i18n="col_rational_title">Trường Số Hữu tỉ</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -281,7 +281,7 @@
           </div>
 
           <!-- COLUMN 3: Quadratics & Factoring (Terracotta Coral) -->
-          <div class="topic-col">
+          <div class="topic-col topic-col-society">
             <div class="col-header col-header-society">
               <span data-i18n="col_quad_title">Đa thức &amp; Bậc hai</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -321,7 +321,7 @@
           </div>
 
           <!-- COLUMN 4: Classroom & Document Ingestion (Sky Blue) -->
-          <div class="topic-col">
+          <div class="topic-col topic-col-life">
             <div class="col-header col-header-life">
               <span data-i18n="col_classroom_title">Sư phạm &amp; Giải tích</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
