@@ -8,7 +8,9 @@ CORS headers, static asset serving, and adversarial request rejection.
 from __future__ import annotations
 
 import json
+import pathlib
 import socket
+import sys
 import threading
 import time
 import unittest
@@ -16,6 +18,10 @@ import urllib.error
 import urllib.request
 from http.server import HTTPServer
 from typing import Any, Dict, Tuple
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+if str(REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from mke_product.cas.contracts import EngineStatus
 from mke_product.cas.demo_server import CASDemoHTTPRequestHandler
@@ -211,6 +217,36 @@ class TestCASHTTPIntegration(unittest.TestCase):
         status, data = self._post_json("/api/execute", payload)
         self.assertEqual(status, 400)
         self.assertIn(data["mathematical_status"], ["INVALID_INPUT", "DOMAIN_ERROR"])
+        self.assertEqual(data["verification_status"], "ERROR")
+
+    def test_http_verification_status_native_evidence(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "2*x + 4 = 10",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["selected_engine"], "mke_native_v1")
+        self.assertEqual(data["verification_status"], "VERIFIED_WITH_EVIDENCE")
+
+    def test_http_verification_status_sympy_computed(self):
+        payload = {
+            "operation": "SOLVE",
+            "input": "x^2 - 9 = 0",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["selected_engine"], "sympy_cas_v0")
+        self.assertEqual(data["verification_status"], "COMPUTED")
+
+    def test_http_reject_out_of_scope_operation(self):
+        payload = {
+            "operation": "UNKNOWN_OP",
+            "input": "x + 1",
+        }
+        status, data = self._post_json("/api/execute", payload)
+        self.assertEqual(status, 400)
+        self.assertEqual(data["verification_status"], "ERROR")
 
 
 if __name__ == "__main__":

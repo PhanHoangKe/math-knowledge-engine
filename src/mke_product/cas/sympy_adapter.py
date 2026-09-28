@@ -18,6 +18,7 @@ from .contracts import (
     MathEngine,
     OperationType,
     SCHEMA_VERSION_P03A,
+    VerificationStatus,
 )
 from .safety import (
     DomainRestrictionError,
@@ -85,18 +86,34 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
             response.mathematical_status = EngineStatus.OUT_OF_SCOPE
             response.error_message = f"Unsupported operation: {request.operation}"
 
+        if response.mathematical_status == EngineStatus.SUCCESS:
+            if request.operation == OperationType.CHECK_CANDIDATE:
+                response.verification_status = VerificationStatus.CANDIDATE_CHECKED
+            else:
+                response.verification_status = VerificationStatus.COMPUTED
+        elif response.mathematical_status == EngineStatus.PARTIAL:
+            response.verification_status = VerificationStatus.PARTIAL
+        elif response.mathematical_status == EngineStatus.UNRESOLVED:
+            response.verification_status = VerificationStatus.UNRESOLVED
+        else:
+            response.verification_status = VerificationStatus.ERROR
+
     except DomainRestrictionError as ex:
         response.mathematical_status = EngineStatus.DOMAIN_ERROR
+        response.verification_status = VerificationStatus.ERROR
         response.error_message = str(ex)
         response.warnings.append(str(ex))
     except SafetyError as ex:
         response.mathematical_status = EngineStatus.RESOURCE_EXHAUSTED
+        response.verification_status = VerificationStatus.ERROR
         response.error_message = str(ex)
     except ValueError as ex:
         response.mathematical_status = EngineStatus.INVALID_INPUT
+        response.verification_status = VerificationStatus.ERROR
         response.error_message = str(ex)
     except Exception as ex:
         response.mathematical_status = EngineStatus.INTERNAL_ERROR
+        response.verification_status = VerificationStatus.ERROR
         response.error_message = f"{type(ex).__name__}: {str(ex)}"
     finally:
         response.execution_duration_sec = time.monotonic() - start_time

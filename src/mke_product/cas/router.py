@@ -22,6 +22,7 @@ from .contracts import (
     ExecutionResponse,
     OperationType,
     SCHEMA_VERSION_P03A,
+    VerificationStatus,
 )
 from .registry import EngineRegistry, get_engine_registry
 from .safety import (
@@ -82,6 +83,7 @@ class EngineRouter:
                     original_input=input_str,
                     selected_engine="security_guard",
                     mathematical_status=EngineStatus.SECURITY_REJECTED,
+                    verification_status=VerificationStatus.ERROR,
                     error_message=f"Input rejected by security policy: forbidden pattern '{pattern}' detected.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -97,6 +99,7 @@ class EngineRouter:
                 original_input=input_str,
                 selected_engine="security_guard",
                 mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
+                verification_status=VerificationStatus.ERROR,
                 error_message=str(ex),
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -119,6 +122,7 @@ class EngineRouter:
                 original_input=input_str,
                 selected_engine="router",
                 mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
+                verification_status=VerificationStatus.ERROR,
                 error_message=str(ex),
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -130,6 +134,7 @@ class EngineRouter:
                 original_input=input_str,
                 selected_engine="router",
                 mathematical_status=EngineStatus.INVALID_INPUT,
+                verification_status=VerificationStatus.ERROR,
                 error_message=str(ex),
                 warnings=[str(ex)],
                 execution_duration_sec=time.monotonic() - start_time,
@@ -142,6 +147,7 @@ class EngineRouter:
                 original_input=input_str,
                 selected_engine="router",
                 mathematical_status=EngineStatus.INVALID_INPUT,
+                verification_status=VerificationStatus.ERROR,
                 error_message=f"Syntax Error: {str(ex)}",
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -153,6 +159,7 @@ class EngineRouter:
                 original_input=input_str,
                 selected_engine="router",
                 mathematical_status=EngineStatus.INTERNAL_ERROR,
+                verification_status=VerificationStatus.ERROR,
                 error_message=f"Parser Error: {str(ex)}",
                 execution_duration_sec=time.monotonic() - start_time,
             )
@@ -175,6 +182,7 @@ class EngineRouter:
                     original_input=input_str,
                     selected_engine=engine_override,
                     mathematical_status=EngineStatus.OUT_OF_SCOPE,
+                    verification_status=VerificationStatus.ERROR,
                     error_message=f"Engine '{engine_override}' cannot handle operation '{request.operation}'.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -186,6 +194,7 @@ class EngineRouter:
                     original_input=input_str,
                     selected_engine=engine_override,
                     mathematical_status=EngineStatus.OUT_OF_SCOPE,
+                    verification_status=VerificationStatus.ERROR,
                     error_message=f"Requested engine '{engine_override}' is not available or not installed.",
                     execution_duration_sec=time.monotonic() - start_time,
                 )
@@ -210,6 +219,7 @@ class EngineRouter:
             original_input=input_str,
             selected_engine="none",
             mathematical_status=EngineStatus.OUT_OF_SCOPE,
+            verification_status=VerificationStatus.ERROR,
             error_message=f"No available registered engine can handle operation '{request.operation}'.",
             execution_duration_sec=time.monotonic() - start_time,
         )

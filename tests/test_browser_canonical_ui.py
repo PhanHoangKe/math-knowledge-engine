@@ -30,7 +30,7 @@ if str(REPO_ROOT / "src") not in sys.path:
 
 from mke_product.cas.demo_server import MKEProductHTTPRequestHandler
 
-SCREENSHOTS_DIR = REPO_ROOT / "evidence" / "ui_r3" / "screenshots"
+SCREENSHOTS_DIR = REPO_ROOT / "evidence" / "ui_r4" / "screenshots"
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -387,6 +387,94 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         self.assertIn("status-computed-cert", badge_cas.get_attribute("class"))
 
         self._save_screenshot("14_verification_honesty_check")
+
+    # -------------------------------------------------------------------------
+    # Scenario 15: Input vs Output Card Separation
+    # -------------------------------------------------------------------------
+    def test_15_input_vs_output_separation(self):
+        self._submit_query("2*x + 3 = 7")
+        self._wait_for_math_render()
+
+        # Input card: must show the submitted expression (2*x + 3 = 7), NOT the solution
+        input_display = self.driver.find_element(By.ID, "res-math-display").text
+        self.assertIn("2", input_display)
+        self.assertIn("x", input_display)
+        self.assertIn("3", input_display)
+        self.assertIn("7", input_display)
+        self.assertNotIn("{2}", input_display)
+
+        # Solution card: must show the exact solution value 2
+        sol_val = self.driver.find_element(By.ID, "res-solution-val").text
+        self.assertIn("2", sol_val)
+
+        self._save_screenshot("15_input_vs_output_separation")
+
+    # -------------------------------------------------------------------------
+    # Scenario 16: HTTP 400 Invalid Input Preserves Online Connection
+    # -------------------------------------------------------------------------
+    def test_16_http_400_preserves_online_connection(self):
+        self._submit_query("1 / 0")
+        time.sleep(0.5)
+
+        # Verify status is syntax invalid / domain error
+        syntax_status = self.driver.find_element(By.ID, "res-syntax-status").text
+        self.assertTrue("LỖI" in syntax_status or "KHÔNG HỢP LỆ" in syntax_status or "INVALID" in syntax_status)
+
+        # Verify server connection banner remains CONNECTED (not CONNECTION_ERROR!)
+        banner = self.driver.find_element(By.ID, "app-connection-banner")
+        self.assertIn("banner-connected", banner.get_attribute("class"))
+
+        # Verify error message displayed in solution box
+        sol_val = self.driver.find_element(By.ID, "res-solution-val").text
+        self.assertTrue("Division by zero" in sol_val or "0" in sol_val)
+
+        self._save_screenshot("16_http_400_invalid_syntax")
+
+    # -------------------------------------------------------------------------
+    # Scenario 17: HTTP 403 Security Rejection Preserves Online Connection
+    # -------------------------------------------------------------------------
+    def test_17_http_403_preserves_online_connection(self):
+        self._submit_query("__import__('os').system('dir')")
+        time.sleep(0.5)
+
+        # Verify status is security rejected
+        syntax_status = self.driver.find_element(By.ID, "res-syntax-status").text
+        self.assertTrue("BẢO MẬT" in syntax_status or "SECURITY" in syntax_status)
+
+        # Verify server connection banner remains CONNECTED
+        banner = self.driver.find_element(By.ID, "app-connection-banner")
+        self.assertIn("banner-connected", banner.get_attribute("class"))
+
+        self._save_screenshot("17_http_403_security_rejected")
+
+    # -------------------------------------------------------------------------
+    # Scenario 18: Immediate Disconnection Banner Update
+    # -------------------------------------------------------------------------
+    def test_18_immediate_disconnection_banner_update(self):
+        self.driver.get(f"{self.base_url}/?lang=vi&theme=light")
+
+        # Simulate network drop by overriding window.fetch
+        self.driver.execute_script("""
+            window.fetch = function() {
+                return Promise.reject(new TypeError('Failed to fetch (Network unreachable)'));
+            };
+        """)
+
+        math_input = self.driver.find_element(By.ID, "math-input")
+        math_input.clear()
+        math_input.send_keys("x + 1 = 2")
+        self.driver.find_element(By.CLASS_NAME, "compute-btn").click()
+
+        WebDriverWait(self.driver, 5.0).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#screen-result.active"))
+        )
+        time.sleep(0.3)
+
+        # Verify connection banner immediately flipped to DISCONNECTED without delay
+        banner = self.driver.find_element(By.ID, "app-connection-banner")
+        self.assertIn("banner-disconnected", banner.get_attribute("class"))
+
+        self._save_screenshot("18_immediate_disconnection_banner")
 
 
 if __name__ == "__main__":

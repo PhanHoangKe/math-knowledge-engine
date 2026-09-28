@@ -36,6 +36,18 @@ class EngineStatus(str, Enum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
+class VerificationStatus(str, Enum):
+    """Standardized verification level for mathematical solutions."""
+    VERIFIED_WITH_EVIDENCE = "VERIFIED_WITH_EVIDENCE"
+    CANDIDATE_CHECKED = "CANDIDATE_CHECKED"
+    COMPUTED = "COMPUTED"
+    PARTIAL = "PARTIAL"
+    UNRESOLVED = "UNRESOLVED"
+    NOT_VERIFIED = "NOT_VERIFIED"
+    ERROR = "ERROR"
+
+
+
 @dataclass(frozen=True)
 class EngineCapability:
     """Metadata and capability declaration for a mathematical engine."""
@@ -100,6 +112,7 @@ class ExecutionResponse:
     plot_data: Optional[Dict[str, Any]] = None
     execution_duration_sec: float = 0.0
     error_message: Optional[str] = None
+    verification_status: Optional[VerificationStatus] = None
 
     @property
     def status(self) -> EngineStatus:
@@ -152,6 +165,7 @@ class ExecutionResponse:
             "original_input": self.original_input,
             "selected_engine": self.selected_engine,
             "mathematical_status": self.mathematical_status.value if isinstance(self.mathematical_status, EngineStatus) else str(self.mathematical_status),
+            "verification_status": self.verification_status.value if isinstance(self.verification_status, VerificationStatus) else (str(self.verification_status) if self.verification_status is not None else None),
             "symbolic_result": self.symbolic_result,
             "latex_output": self.latex_output,
             "domain_restrictions": self.domain_restrictions,

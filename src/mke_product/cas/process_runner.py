@@ -19,6 +19,7 @@ from .contracts import (
     ExecutionResponse,
     OperationType,
     SCHEMA_VERSION_P03A,
+    VerificationStatus,
 )
 
 logger = logging.getLogger("mke_cas_process_runner")
@@ -58,6 +59,7 @@ def _cas_worker_target(
             "original_input": request_dict.get("raw_input") or request_dict.get("expression", ""),
             "selected_engine": "sympy_cas_v0",
             "mathematical_status": EngineStatus.INTERNAL_ERROR.value,
+            "verification_status": VerificationStatus.ERROR.value,
             "symbolic_result": None,
             "latex_output": None,
             "domain_restrictions": [],
@@ -120,6 +122,7 @@ def run_in_supervised_process(
             original_input=request.raw_input or request.expression,
             selected_engine="sympy_cas_v0",
             mathematical_status=EngineStatus.RESOURCE_EXHAUSTED,
+            verification_status=VerificationStatus.ERROR,
             error_message=f"Computation timed out after {deadline:.1f}s. Child worker process was forcefully terminated.",
             execution_duration_sec=time.monotonic() - start_time,
         )
@@ -135,6 +138,12 @@ def run_in_supervised_process(
             except ValueError:
                 status_enum = EngineStatus.INTERNAL_ERROR
 
+            verif_val = res_dict.get("verification_status")
+            try:
+                verif_enum = VerificationStatus(verif_val) if verif_val else None
+            except ValueError:
+                verif_enum = None
+
             return ExecutionResponse(
                 schema_version=res_dict.get("schema_version", SCHEMA_VERSION_P03A),
                 request_id=res_dict.get("request_id", request.request_id),
@@ -142,6 +151,7 @@ def run_in_supervised_process(
                 original_input=res_dict.get("original_input", request.raw_input),
                 selected_engine=res_dict.get("selected_engine", "sympy_cas_v0"),
                 mathematical_status=status_enum,
+                verification_status=verif_enum,
                 symbolic_result=res_dict.get("symbolic_result"),
                 latex_output=res_dict.get("latex_output"),
                 domain_restrictions=res_dict.get("domain_restrictions", []),
@@ -159,6 +169,7 @@ def run_in_supervised_process(
                 original_input=request.raw_input or request.expression,
                 selected_engine="sympy_cas_v0",
                 mathematical_status=EngineStatus.INTERNAL_ERROR,
+                verification_status=VerificationStatus.ERROR,
                 error_message=f"Worker process exited with code {process.exitcode} without returning results.",
                 execution_duration_sec=elapsed,
             )
@@ -170,6 +181,7 @@ def run_in_supervised_process(
             original_input=request.raw_input or request.expression,
             selected_engine="sympy_cas_v0",
             mathematical_status=EngineStatus.INTERNAL_ERROR,
+            verification_status=VerificationStatus.ERROR,
             error_message=f"Failed to read result from worker process: {exc}",
             execution_duration_sec=elapsed,
         )

@@ -164,7 +164,9 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
         content_length_header = self.headers.get("Content-Length")
         if not content_length_header:
             self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
                 "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
                 "error_message": "Missing Content-Length header",
             })
             return
@@ -173,7 +175,9 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             content_length = int(content_length_header)
             if content_length > 65536:
                 self._send_json(413, {
+                    "schema_version": "mke.product03a.v0",
                     "mathematical_status": EngineStatus.RESOURCE_EXHAUSTED.value,
+                    "verification_status": "ERROR",
                     "error_message": "Payload exceeds maximum allowed size of 65536 bytes.",
                 })
                 return
@@ -181,7 +185,9 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as exc:
             self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
                 "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
                 "error_message": f"Invalid JSON payload: {exc}",
             })
             return
@@ -193,7 +199,9 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
 
         if not operation_str or not input_text:
             self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
                 "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
                 "error_message": "Both 'operation' and 'input' (or 'expression') fields are required.",
             })
             return
@@ -202,7 +210,9 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             op_type = OperationType(str(operation_str).upper())
         except ValueError:
             self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
                 "mathematical_status": EngineStatus.OUT_OF_SCOPE.value,
+                "verification_status": "ERROR",
                 "error_message": f"Unsupported operation: '{operation_str}'.",
             })
             return

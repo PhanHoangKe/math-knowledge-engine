@@ -590,33 +590,36 @@
   // ==========================================================================
   let isBackendHealthy = false;
 
-  async function checkBackendHealth() {
+  function updateConnectionBannerState(isHealthy) {
+    isBackendHealthy = isHealthy;
     const banner = document.getElementById('app-connection-banner');
     const tag = document.getElementById('app-banner-tag');
     const msg = document.getElementById('app-banner-msg');
 
+    if (isHealthy) {
+      if (banner) banner.className = 'disclaimer-banner banner-connected';
+      if (tag) tag.textContent = t('banner_tag');
+      if (msg) msg.textContent = t('banner_msg');
+    } else {
+      if (banner) banner.className = 'disclaimer-banner banner-disconnected';
+      if (tag) tag.textContent = t('banner_tag_disconnected');
+      if (msg) msg.textContent = t('banner_msg_disconnected');
+    }
+  }
+
+  async function checkBackendHealth() {
     try {
       const res = await fetch('/api/health', { method: 'GET', cache: 'no-cache' });
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'HEALTHY') {
-          isBackendHealthy = true;
-          if (banner) {
-            banner.className = 'disclaimer-banner banner-connected';
-          }
-          if (tag) tag.textContent = t('banner_tag');
-          if (msg) msg.textContent = t('banner_msg');
+          updateConnectionBannerState(true);
           return true;
         }
       }
       throw new Error('Health check returned non-healthy status');
     } catch (e) {
-      isBackendHealthy = false;
-      if (banner) {
-        banner.className = 'disclaimer-banner banner-disconnected';
-      }
-      if (tag) tag.textContent = t('banner_tag_disconnected');
-      if (msg) msg.textContent = t('banner_msg_disconnected');
+      updateConnectionBannerState(false);
       return false;
     }
   }
@@ -1033,10 +1036,9 @@
         : t('meta_mult_val');
     }
 
-    // Input math rendering via KaTeX
+    // Input math rendering via KaTeX (Always display submitted input expression, NEVER solution)
     if (mathDisplay) {
-      const latexInput = data.latex_output && isSuccess ? data.latex_output : trimmed;
-      renderMath(mathDisplay, latexInput, false);
+      renderMath(mathDisplay, trimmed, false);
     }
 
     // AST / Metadata view
@@ -1051,11 +1053,12 @@
     }
 
     // Handle Error / Rejection Notice
-    if (!isSuccess && data.error_message) {
+    if (!isSuccess) {
+      const errMsg = data.error_message || `Execution status: ${status}`;
       if (solutionCardTitle) solutionCardTitle.textContent = currentLanguage === 'vi' ? 'Thông báo Lỗi / Từ chối' : 'Error / Rejection Notice';
-      if (solutionVar) solutionVar.textContent = 'Error';
+      if (solutionVar) solutionVar.textContent = 'Status';
       if (solutionEq) solutionEq.textContent = ':';
-      if (solutionVal) solutionVal.textContent = data.error_message;
+      if (solutionVal) solutionVal.textContent = errMsg;
       if (solutionTag) solutionTag.textContent = status;
       if (plotWrapper) plotWrapper.style.display = 'none';
       if (stepTrace) stepTrace.style.display = 'none';
@@ -1187,7 +1190,12 @@
 
     // Domain information with KaTeX
     if (eqDomain) {
-      renderMath(eqDomain, '\\mathbb{R}', false);
+      if (data.domain_restrictions && data.domain_restrictions.length > 0) {
+        const excl = data.domain_restrictions.map(r => r.replace(/^x\s*!=\s*/, '')).join(', ');
+        renderMath(eqDomain, `\\mathbb{R} \\setminus \\{ ${excl} \\}`, false);
+      } else {
+        renderMath(eqDomain, '\\mathbb{R}', false);
+      }
     }
     if (domainConstraints) {
       if (data.domain_restrictions && data.domain_restrictions.length > 0) {
@@ -1203,10 +1211,13 @@
       candidateCheck.className = 'tile-val status-valid-text';
     }
 
-    // MANDATE 2: Honest Verification Classification
-    const verifStatus = data.verification_status || (selectedEngine === 'mke_native_v1' ? 'VERIFIED_WITH_EVIDENCE' : 'COMPUTED');
+    // MANDATE 2: Honest First-Class Verification Classification
+    const verifStatus = data.verification_status || (isSuccess ? (selectedEngine === 'mke_native_v1' && data.verification_evidence && (data.verification_evidence.step_trace || data.verification_evidence.steps) ? 'VERIFIED_WITH_EVIDENCE' : 'COMPUTED') : 'ERROR');
     if (certBadge) {
-      if (verifStatus === 'VERIFIED_WITH_EVIDENCE') {
+      if (!isSuccess || verifStatus === 'ERROR') {
+        certBadge.textContent = t('badge_error');
+        certBadge.className = 'cert-status status-invalid-cert';
+      } else if (verifStatus === 'VERIFIED_WITH_EVIDENCE') {
         certBadge.textContent = t('badge_verified_evidence');
         certBadge.className = 'cert-status status-valid-cert';
       } else if (verifStatus === 'CANDIDATE_CHECKED') {
@@ -1218,7 +1229,7 @@
       } else if (verifStatus === 'UNRESOLVED') {
         certBadge.textContent = t('badge_unresolved');
         certBadge.className = 'cert-status status-unresolved-cert';
-      } else if (selectedEngine === 'sympy_cas_v0' || verifStatus === 'COMPUTED') {
+      } else if (verifStatus === 'COMPUTED' || selectedEngine === 'sympy_cas_v0') {
         certBadge.textContent = t('badge_computed_cas');
         certBadge.className = 'cert-status status-computed-cert';
       } else {
@@ -1279,16 +1290,25 @@
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        renderConnectionError(trimmed, currentOperation, `HTTP ${res.status}: ${errBody.error_message || res.statusText}`);
-        return;
-      }
+      // Server is online because fetch responded successfully
+      updateConnectionBannerState(true);
 
-      const data = await res.json();
-      renderExecutionResponse(data, currentOperation, trimmed);
+      const data = await res.json().catch(() => null);
+      if (data && typeof data === 'object') {
+        renderExecutionResponse(data, currentOperation, trimmed);
+      } else {
+        const fallbackData = {
+          mathematical_status: 'INTERNAL_ERROR',
+          verification_status: 'ERROR',
+          selected_engine: 'server',
+          error_message: `HTTP ${res.status}: ${res.statusText || 'Unexpected non-JSON response'}`
+        };
+        renderExecutionResponse(fallbackData, currentOperation, trimmed);
+      }
     } catch (err) {
       // Backend disconnected: fail-closed with honest error, ZERO fake results!
+      // Immediately mark disconnected
+      updateConnectionBannerState(false);
       renderConnectionError(trimmed, currentOperation, err.message || 'Failed to connect to backend server');
     }
   }
