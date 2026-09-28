@@ -428,4 +428,68 @@ class TestProduct03BR1SoundnessAndCounterexamples:
         certainty = assess_domain_certainty(ast, restrictions)
         assert certainty == "NOT_FULLY_DETERMINED"
 
+    def test_zero_power_composite_linear_base_explicit_exclusions(self, router: EngineRouter):
+        """(x-1)^0 has domain restriction x != 1 and must receive EXPLICIT_EXCLUSIONS, never PROVEN_REALS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x - 1)^0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "1"
+        assert res.domain_certainty == DomainCertainty.EXPLICIT_EXCLUSIONS
+        assert "x != 1" in res.domain_restrictions
+
+    def test_zero_power_identically_zero_base_domain_error(self, router: EngineRouter):
+        """(x-x)^0 is 0^0 everywhere and must return DOMAIN_ERROR / INVALID_INPUT."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x - x)^0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status in {EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT}
+        assert res.verification_status == VerificationStatus.ERROR
+        assert "0^0" in res.error_message or "undefined" in res.error_message.lower()
+
+    def test_zero_power_variable_base_explicit_exclusions(self, router: EngineRouter):
+        """x^0 has domain restriction x != 0 and receives EXPLICIT_EXCLUSIONS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="x^0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "1"
+        assert res.domain_certainty == DomainCertainty.EXPLICIT_EXCLUSIONS
+        assert "x != 0" in res.domain_restrictions
+
+    def test_zero_power_irreducible_quadratic_base_proven_reals(self, router: EngineRouter):
+        """(x^2+1)^0 has no real zeros (x^2+1 >= 1 > 0) and receives PROVEN_REALS."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="(x^2 + 1)^0",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status == EngineStatus.SUCCESS
+        assert res.symbolic_result == "1"
+        assert res.domain_certainty == DomainCertainty.PROVEN_REALS
+        assert res.domain_restrictions == []
+
+    def test_division_by_identically_zero_expression_domain_error(self, router: EngineRouter):
+        """1/(x-x) is division by zero everywhere and must return DOMAIN_ERROR / INVALID_INPUT."""
+        req = ExecutionRequest(
+            operation=OperationType.SIMPLIFY,
+            raw_input="1 / (x - x)",
+            options={"in_process": True},
+        )
+        res = router.execute(req)
+        assert res.mathematical_status in {EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT}
+        assert res.verification_status == VerificationStatus.ERROR
+        assert "zero" in res.error_message.lower()
+
+
 

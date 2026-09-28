@@ -13,6 +13,7 @@ import json
 import logging
 import mimetypes
 import os
+import socket
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
@@ -204,8 +205,60 @@ class MKEProductHTTPRequestHandler(BaseHTTPRequestHandler):
             })
             return
 
+        BODY_READ_TIMEOUT_SEC = 2.0
+        orig_timeout = None
         try:
-            raw_body = self.rfile.read(content_length)
+            if hasattr(self.connection, "gettimeout"):
+                orig_timeout = self.connection.gettimeout()
+                self.connection.settimeout(BODY_READ_TIMEOUT_SEC)
+
+            bytes_to_read = content_length
+            chunks = []
+            bytes_read = 0
+            while bytes_read < bytes_to_read:
+                chunk = self.rfile.read(min(4096, bytes_to_read - bytes_read))
+                if not chunk:
+                    # Early EOF: client closed socket before sending full declared Content-Length
+                    self._send_json(400, {
+                        "schema_version": "mke.product03a.v0",
+                        "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                        "verification_status": "ERROR",
+                        "domain_certainty": "NOT_APPLICABLE",
+                        "error_message": f"Truncated request body: received {bytes_read} bytes, expected {content_length} bytes before connection closed.",
+                    })
+                    return
+                chunks.append(chunk)
+                bytes_read += len(chunk)
+            raw_body = b"".join(chunks)
+        except (socket.timeout, TimeoutError):
+            try:
+                self._send_json(408, {
+                    "schema_version": "mke.product03a.v0",
+                    "mathematical_status": EngineStatus.RESOURCE_EXHAUSTED.value,
+                    "verification_status": "ERROR",
+                    "domain_certainty": "NOT_APPLICABLE",
+                    "error_message": f"Request body read timed out after {BODY_READ_TIMEOUT_SEC} seconds (incomplete payload).",
+                })
+            except Exception:
+                pass
+            return
+        except Exception as exc:
+            self._send_json(400, {
+                "schema_version": "mke.product03a.v0",
+                "mathematical_status": EngineStatus.INVALID_INPUT.value,
+                "verification_status": "ERROR",
+                "domain_certainty": "NOT_APPLICABLE",
+                "error_message": f"Error reading request body: {exc}",
+            })
+            return
+        finally:
+            if orig_timeout is not None and hasattr(self.connection, "settimeout"):
+                try:
+                    self.connection.settimeout(orig_timeout)
+                except Exception:
+                    pass
+
+        try:
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as exc:
             self._send_json(400, {

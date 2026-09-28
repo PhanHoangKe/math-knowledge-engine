@@ -62,11 +62,12 @@ class NativeMKEAdapter(MathEngine):
                 ast_node = parse_cas_equation(request.raw_input or request.expression)
             if not isinstance(ast_node, Equation):
                 return False
-            # Check for non-linear powers (e.g. x^0, x^2, x^3) or variable denominators
+            # Check for non-linear powers (e.g. x^0, (x-1)^0, x^2, x^3) or variable denominators
             for n in ast_node.walk():
-                if isinstance(n, (Power, CASPower)) and isinstance(n.base, Variable) and n.exponent.value != 1:
-                    return False
-                if isinstance(n, BinaryOp) and n.op == "/" and "x" in n.right.variables():
+                if isinstance(n, (Power, CASPower)):
+                    if len(n.base.variables()) > 0 and n.exponent.value != 1:
+                        return False
+                if isinstance(n, BinaryOp) and n.op == "/" and len(n.right.variables()) > 0:
                     return False
             return True
         except Exception:

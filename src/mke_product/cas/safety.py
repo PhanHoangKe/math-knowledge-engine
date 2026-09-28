@@ -109,17 +109,38 @@ def inspect_ast_safety(node: ASTNode) -> None:
                     f"Integer literal exceeds maximum allowed size of {MAX_INTEGER_DIGITS} digits."
                 )
         elif isinstance(n, (Power, CASPower)):
-            # Check for 0^0 (direct or constant subtree)
-            if len(n.base.variables()) == 0:
-                b_val = evaluate_constant_ast(n.base)
-                if b_val == 0 and n.exponent.value == 0:
-                    raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+            # Check for 0^0 (direct literal, constant subtree, or symbolically identical zero)
+            if n.exponent.value == 0:
+                if len(n.base.variables()) == 0:
+                    b_val = evaluate_constant_ast(n.base)
+                    if b_val == 0:
+                        raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
+                else:
+                    from .ast_bridge import ast_to_sympy_expr
+                    try:
+                        sym_base = ast_to_sympy_expr(n.base)
+                        if sympy.simplify(sym_base) == 0:
+                            raise DomainRestrictionError("Indeterminate form (0)^0 is undefined everywhere in real domain.")
+                    except DomainRestrictionError:
+                        raise
+                    except Exception:
+                        pass
         elif isinstance(n, BinaryOp) and n.op == "/":
-            # Check for constant denominator: e.g. expr / 0 or expr / (2 - 2)
+            # Check for zero denominator: e.g. expr / 0, expr / (2 - 2), or expr / (x - x)
             if len(n.right.variables()) == 0:
                 denom_val = evaluate_constant_ast(n.right)
                 if denom_val == 0:
                     raise DivisionByZeroError("Division by zero constant is undefined.")
+            else:
+                from .ast_bridge import ast_to_sympy_expr
+                try:
+                    sym_denom = ast_to_sympy_expr(n.right)
+                    if sympy.simplify(sym_denom) == 0:
+                        raise DivisionByZeroError("Division by zero expression is undefined everywhere in real domain.")
+                except DivisionByZeroError:
+                    raise
+                except Exception:
+                    pass
 
 
 from .cas_parser import CASPower, Inequality, LinearSystem
@@ -156,9 +177,31 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
                 except Exception:
                     restrictions.append("denominator != 0")
         elif isinstance(n, (Power, CASPower)):
-            # v^0 requires v != 0 to avoid indeterminate 0^0
-            if isinstance(n.base, Variable) and n.exponent.value == 0:
-                restrictions.append(f"{n.base.name} != 0")
+            # B(x)^0 requires B(x) != 0 to avoid indeterminate 0^0
+            if n.exponent.value == 0:
+                vars_in_base = n.base.variables()
+                if vars_in_base:
+                    from .ast_bridge import ast_to_sympy_expr
+                    try:
+                        sym_base = ast_to_sympy_expr(n.base)
+                        for v_name in sorted(vars_in_base):
+                            v_sym = sympy.Symbol(v_name, real=True)
+                            roots = sympy.solve(sym_base, v_sym)
+                            if not isinstance(roots, (list, tuple, set)):
+                                roots = [roots]
+                            for root in roots:
+                                if hasattr(root, "is_real") and root.is_real is True:
+                                    restrictions.append(f"{v_name} != {root}")
+                                elif isinstance(root, (int, float, sympy.Integer, sympy.Rational)):
+                                    restrictions.append(f"{v_name} != {root}")
+                                else:
+                                    try:
+                                        if sympy.im(root) == 0:
+                                            restrictions.append(f"{v_name} != {root}")
+                                    except Exception:
+                                        restrictions.append(f"{sym_base} != 0")
+                    except Exception:
+                        restrictions.append("base != 0")
 
     # Deduplicate while preserving order
     seen: Set[str] = set()
@@ -400,8 +443,48 @@ def is_domain_determination_complete(node: Optional[ASTNode], restrictions: List
 
         elif isinstance(n, (Power, CASPower)):
             if isinstance(n.exponent, IntegerLiteral):
-                if n.exponent.value == 0 and isinstance(n.base, Variable):
-                    required_exclusions.add(f"{n.base.name} != 0")
+                if n.exponent.value == 0:
+                    base_vars = n.base.variables()
+                    if not base_vars:
+                        # Constant base: non-zero verified by inspect_ast_safety
+                        continue
+                    if not is_polynomial_ast(n.base):
+                        return False
+                    from .ast_bridge import ast_to_sympy_expr
+                    try:
+                        sym_base = ast_to_sympy_expr(n.base)
+                        poly = sympy.Poly(sym_base, v_sym)
+                        deg = poly.degree()
+                        if deg == 1:
+                            coeffs = poly.all_coeffs()
+                            a, b = coeffs[0], coeffs[1]
+                            root = -b / a
+                            required_exclusions.add(f"{var_name} != {root}")
+                        elif deg == 2:
+                            coeffs = poly.all_coeffs()
+                            a, b, c = coeffs[0], coeffs[1], coeffs[2]
+                            disc = b**2 - 4*a*c
+                            if disc < 0:
+                                # No real roots (e.g. x^2 + 1)
+                                pass
+                            elif disc == 0:
+                                root = -b / (2*a)
+                                required_exclusions.add(f"{var_name} != {root}")
+                            else:
+                                sqrt_disc = sympy.sqrt(disc)
+                                if isinstance(sqrt_disc, (int, sympy.Integer, sympy.Rational)) or (hasattr(sqrt_disc, "is_rational") and sqrt_disc.is_rational):
+                                    r1 = (-b - sqrt_disc) / (2*a)
+                                    r2 = (-b + sqrt_disc) / (2*a)
+                                    required_exclusions.add(f"{var_name} != {r1}")
+                                    required_exclusions.add(f"{var_name} != {r2}")
+                                else:
+                                    # Irrational roots
+                                    return False
+                        else:
+                            # Degree > 2 base
+                            return False
+                    except Exception:
+                        return False
                 elif n.exponent.value < 0:
                     return False
             else:

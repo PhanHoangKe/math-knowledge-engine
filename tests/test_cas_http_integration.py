@@ -491,6 +491,49 @@ class TestCASHTTPIntegration(unittest.TestCase):
         self.assertEqual(data["mathematical_status"], "INVALID_INPUT")
         self.assertIn("expected an object", data["error_message"].lower())
 
+    def test_http_incomplete_request_body_socket_timeout(self):
+        """Client declares Content-Length: 100 but sends only 20 bytes and holds connection open."""
+        raw_req = (
+            f"POST /api/execute HTTP/1.1\r\n"
+            f"Host: {self.host}:{self.port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: 100\r\n"
+            f"\r\n"
+            f'{{"operation": "SOLVE"'
+        ).encode("utf-8")
+        start_t = time.monotonic()
+        resp = self._raw_socket_request(raw_req, timeout=4.0)
+        elapsed = time.monotonic() - start_t
+        self.assertLess(elapsed, 3.5, f"Server hung for {elapsed:.2f}s on incomplete request body")
+        self.assertTrue(b"408" in resp or b"400" in resp or len(resp) == 0)
+
+    def test_http_incomplete_request_body_early_eof(self):
+        """Client declares Content-Length: 100 but sends only 20 bytes and closes connection."""
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(3.0)
+        try:
+            s.connect((self.host, self.port))
+            raw_req = (
+                f"POST /api/execute HTTP/1.1\r\n"
+                f"Host: {self.host}:{self.port}\r\n"
+                f"Content-Type: application/json\r\n"
+                f"Content-Length: 100\r\n"
+                f"\r\n"
+                f'{{"operation": "SOLVE"'
+            ).encode("utf-8")
+            s.sendall(raw_req)
+            s.shutdown(socket.SHUT_WR)
+            response = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                response += chunk
+            self.assertTrue(response.startswith(b"HTTP/1.0 400") or response.startswith(b"HTTP/1.1 400"))
+            self.assertIn(b"Truncated request body", response)
+        finally:
+            s.close()
+
     def test_http_liveness_after_adversarial_requests(self):
         """Verify the HTTP server remains fully functional and responsive after malformed payloads."""
         payload = {
@@ -505,6 +548,7 @@ class TestCASHTTPIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
