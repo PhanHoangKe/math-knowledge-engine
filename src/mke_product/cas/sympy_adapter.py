@@ -7,7 +7,15 @@ import time
 from typing import Any, Dict, List, Optional, Sequence, Set
 import sympy
 
-from mke_product.parser.ast import ASTNode, Equation
+from mke_product.parser.ast import (
+    AbsoluteValue,
+    ASTNode,
+    BinaryOp,
+    Equation,
+    Power,
+    Radical,
+)
+
 from .ast_bridge import ast_to_sympy, ast_to_sympy_expr
 from .cas_parser import (
     Inequality,
@@ -137,7 +145,24 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
                         response.error_message = f"Undecidable denominator definedness: {exc}"
                         return response
 
+            elif isinstance(n, Radical):
+                if len(n.radicand.variables()) == 0:
+                    sym_rad = ast_to_sympy_expr(n.radicand)
+                    try:
+                        simplified_rad = sympy.simplify(sym_rad)
+                        if simplified_rad.is_number and (simplified_rad.is_negative or (hasattr(simplified_rad, "evalf") and float(simplified_rad.evalf()) < -1e-9)):
+                            raise DomainRestrictionError("Square root of negative real number is undefined in real domain.")
+                    except DomainRestrictionError:
+                        raise
+                    except Exception as exc:
+                        response.mathematical_status = EngineStatus.UNRESOLVED
+                        response.verification_status = VerificationStatus.UNRESOLVED
+                        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                        response.error_message = f"Undecidable radical definedness: {exc}"
+                        return response
+
         domain_restrictions = extract_domain_restrictions(ast_node)
+
         response.domain_restrictions = domain_restrictions
 
         # 4. Convert AST to SymPy object via secure typed bridge (no eval / no sympify)
@@ -206,6 +231,169 @@ def execute_sympy_direct(request: ExecutionRequest) -> ExecutionResponse:
     return response
 
 
+def _collect_algebraic_candidates(ast_node: ASTNode, sym_eq: sympy.Eq, var: sympy.Symbol) -> List[Any]:
+    """Collect candidate roots for radical, rational, absolute value, and polynomial equations."""
+    candidates: List[Any] = []
+
+    # 1. Direct SymPy solve
+    try:
+        raw = sympy.solve(sym_eq, var)
+        if not isinstance(raw, (list, tuple, set)):
+            raw = [raw]
+        for r in raw:
+            if isinstance(r, dict):
+                r = r.get(var, r)
+            candidates.append(r)
+    except Exception:
+        pass
+
+    # 2. Pattern-based algebraic transformations for equations
+    if isinstance(ast_node, Equation):
+        left_ast = ast_node.left
+        right_ast = ast_node.right
+        lhs_sym = ast_to_sympy_expr(left_ast)
+        rhs_sym = ast_to_sympy_expr(right_ast)
+
+        # Radical: sqrt(f) = sqrt(g)
+        if isinstance(left_ast, Radical) and isinstance(right_ast, Radical):
+            f_sym = ast_to_sympy_expr(left_ast.radicand)
+            g_sym = ast_to_sympy_expr(right_ast.radicand)
+            try:
+                roots = sympy.solve(sympy.Eq(f_sym, g_sym), var)
+                if not isinstance(roots, (list, tuple, set)):
+                    roots = [roots]
+                candidates.extend(roots)
+            except Exception:
+                pass
+
+        # Radical: sqrt(f) = g
+        elif isinstance(left_ast, Radical):
+            f_sym = ast_to_sympy_expr(left_ast.radicand)
+            try:
+                roots = sympy.solve(sympy.Eq(f_sym, rhs_sym**2), var)
+                if not isinstance(roots, (list, tuple, set)):
+                    roots = [roots]
+                candidates.extend(roots)
+            except Exception:
+                pass
+
+        # Radical: g = sqrt(f)
+        elif isinstance(right_ast, Radical):
+            f_sym = ast_to_sympy_expr(right_ast.radicand)
+            try:
+                roots = sympy.solve(sympy.Eq(lhs_sym**2, f_sym), var)
+                if not isinstance(roots, (list, tuple, set)):
+                    roots = [roots]
+                candidates.extend(roots)
+            except Exception:
+                pass
+
+        # Absolute value: |f| = |g|
+        if isinstance(left_ast, AbsoluteValue) and isinstance(right_ast, AbsoluteValue):
+            f_sym = ast_to_sympy_expr(left_ast.inner)
+            g_sym = ast_to_sympy_expr(right_ast.inner)
+            try:
+                candidates.extend(sympy.solve(sympy.Eq(f_sym, g_sym), var))
+                candidates.extend(sympy.solve(sympy.Eq(f_sym, -g_sym), var))
+            except Exception:
+                pass
+
+        # Absolute value: |f| = g
+        elif isinstance(left_ast, AbsoluteValue):
+            f_sym = ast_to_sympy_expr(left_ast.inner)
+            try:
+                candidates.extend(sympy.solve(sympy.Eq(f_sym, rhs_sym), var))
+                candidates.extend(sympy.solve(sympy.Eq(f_sym, -rhs_sym), var))
+            except Exception:
+                pass
+
+        # Absolute value: g = |f|
+        elif isinstance(right_ast, AbsoluteValue):
+            f_sym = ast_to_sympy_expr(right_ast.inner)
+            try:
+                candidates.extend(sympy.solve(sympy.Eq(lhs_sym, f_sym), var))
+                candidates.extend(sympy.solve(sympy.Eq(lhs_sym, -f_sym), var))
+            except Exception:
+                pass
+
+        # Rational equations: cross multiply or together numerator
+        try:
+            diff = sympy.together(lhs_sym - rhs_sym)
+            num, _ = sympy.fraction(diff)
+            roots = sympy.solve(num, var)
+            if not isinstance(roots, (list, tuple, set)):
+                roots = [roots]
+            candidates.extend(roots)
+        except Exception:
+            pass
+
+    return candidates
+
+
+def _validate_root_in_ast(
+    r: Any,
+    ast_node: ASTNode,
+    var: sympy.Symbol,
+    lhs_sym: sympy.Expr,
+    rhs_sym: sympy.Expr,
+) -> Tuple[bool, str]:
+    """Strictly validate candidate root r against the original AST domain constraints and equation identity."""
+    # 1. Exact realness check
+    is_real = False
+    if hasattr(r, "is_real") and r.is_real is True:
+        is_real = True
+    elif isinstance(r, (int, float, sympy.Integer, sympy.Rational)):
+        is_real = True
+    else:
+        try:
+            imag_part = sympy.im(r)
+            if imag_part == 0 or sympy.simplify(imag_part) == 0:
+                is_real = True
+        except Exception:
+            pass
+    if not is_real:
+        return False, "non_real"
+
+    # 2. Check all division denominators in original AST
+    for n in ast_node.walk():
+        if isinstance(n, BinaryOp) and n.op == "/":
+            denom_sym = ast_to_sympy_expr(n.right)
+            val = denom_sym.subs(var, r)
+            try:
+                if sympy.simplify(val) == 0:
+                    return False, "division_by_zero"
+            except Exception:
+                pass
+
+    # 3. Check all radicals in original AST
+    for n in ast_node.walk():
+        if isinstance(n, Radical):
+            rad_sym = ast_to_sympy_expr(n.radicand)
+            val = rad_sym.subs(var, r)
+            try:
+                simplified_val = sympy.simplify(val)
+                if simplified_val.is_number:
+                    if simplified_val.is_negative or (hasattr(simplified_val, "evalf") and float(simplified_val.evalf()) < -1e-9):
+                        return False, "negative_radicand"
+            except Exception:
+                pass
+
+    # 4. Check LHS vs RHS substitution identity
+    try:
+        lhs_val = lhs_sym.subs(var, r)
+        rhs_val = rhs_sym.subs(var, r)
+        diff = sympy.simplify(lhs_val - rhs_val)
+        if diff != 0:
+            if hasattr(diff, "evalf") and abs(float(diff.evalf())) > 1e-9:
+                return False, "lhs_rhs_mismatch"
+            elif not hasattr(diff, "evalf"):
+                return False, "lhs_rhs_mismatch"
+    except Exception:
+        return False, "evaluation_failed"
+
+    return True, "valid"
+
+
 def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
     """Solve an equation or expression in the real domain."""
     x = sympy.Symbol("x", real=True)
@@ -230,63 +418,59 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
             response.mathematical_status = EngineStatus.SUCCESS
             return
 
-    # Solve for roots in real domain using sympy.solve
-    try:
-        raw_roots = sympy.solve(eq, x)
-    except NotImplementedError:
-        response.mathematical_status = EngineStatus.UNRESOLVED
-        response.error_message = "SymPy could not find closed-form analytic roots."
-        return
+    # Collect all candidate roots from SymPy solve and pattern-based algebraic transformations
+    raw_candidates = _collect_algebraic_candidates(ast_node, eq, x)
 
-    if not isinstance(raw_roots, (list, tuple, set)):
-        raw_roots = [raw_roots]
+    # Deduplicate candidate roots
+    unique_candidates: List[Any] = []
+    for c in raw_candidates:
+        if c is None:
+            continue
+        if not any(sympy.simplify(c - u) == 0 for u in unique_candidates):
+            unique_candidates.append(c)
 
-    # Filter real roots using exact algebraic methods (never float heuristics)
-    real_roots = []
-    for r in raw_roots:
-        if isinstance(r, dict):
-            r = r.get(x, r)
+    # Validate each candidate against the original AST and domain constraints
+    valid_roots: List[Any] = []
+    extraneous_roots: List[Any] = []
 
-        # Exact realness check
-        is_exact_real = False
-        if hasattr(r, "is_real") and r.is_real is True:
-            is_exact_real = True
-        elif isinstance(r, (int, float, sympy.Integer, sympy.Rational)):
-            is_exact_real = True
-        else:
-            try:
-                # Check if imaginary component is symbolically zero
-                imag_part = sympy.im(r)
-                if imag_part == 0 or sympy.simplify(imag_part) == 0:
-                    is_exact_real = True
-            except Exception:
-                pass
-
-        if is_exact_real:
-            real_roots.append(r)
-
-    # Filter against domain restrictions
-    valid_roots = []
-    for r in real_roots:
-        is_valid = True
-        for restriction in response.domain_restrictions:
-            if restriction.startswith("x != "):
-                try:
-                    excluded_val_node = parse_cas_expression(restriction.replace("x != ", ""))
-                    excluded_val = ast_to_sympy_expr(excluded_val_node)
-                    if sympy.simplify(r - excluded_val) == 0:
-                        is_valid = False
-                        break
-                except Exception:
-                    pass
+    for c in unique_candidates:
+        is_valid, reason = _validate_root_in_ast(c, ast_node, x, eq.lhs, eq.rhs)
         if is_valid:
-            valid_roots.append(r)
+            # Check against explicit string domain restrictions if any
+            restr_valid = True
+            for restriction in response.domain_restrictions:
+                if restriction.startswith("x != "):
+                    try:
+                        excluded_val_node = parse_cas_expression(restriction.replace("x != ", ""))
+                        excluded_val = ast_to_sympy_expr(excluded_val_node)
+                        if sympy.simplify(c - excluded_val) == 0:
+                            restr_valid = False
+                            break
+                    except Exception:
+                        pass
+            if restr_valid:
+                valid_roots.append(c)
+            else:
+                extraneous_roots.append(c)
+        else:
+            if reason != "non_real":
+                extraneous_roots.append(c)
 
     # Sort roots if comparable
     try:
         valid_roots.sort(key=lambda item: float(item.evalf()) if hasattr(item, "evalf") else float(item))
     except Exception:
         pass
+
+    try:
+        extraneous_roots.sort(key=lambda item: float(item.evalf()) if hasattr(item, "evalf") else float(item))
+    except Exception:
+        pass
+
+    if extraneous_roots:
+        response.warnings.append(
+            f"Eliminated {len(extraneous_roots)} extraneous root(s): {', '.join(str(r) for r in extraneous_roots)}"
+        )
 
     response.symbolic_result = format_solution_set_symbolic(valid_roots)
     response.latex_output = format_solution_set_latex(valid_roots)
@@ -295,8 +479,10 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         "root_count": len(valid_roots),
         "roots": [str(r) for r in valid_roots],
         "solution_set": [str(r) for r in valid_roots],
+        "extraneous_roots": [str(r) for r in extraneous_roots],
         "domain": "Reals",
     }
+
 
 
 def _execute_solve_system(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
@@ -501,9 +687,13 @@ def _execute_simplify(sym_obj: Any, response: ExecutionResponse) -> None:
         if str(expanded) != str(sym_obj) and str(simplified) == str(sym_obj):
             simplified = expanded
 
+    if hasattr(simplified, "has") and simplified.has(sympy.I):
+        raise DomainRestrictionError("Expression result is complex and undefined in real domain.")
+
     response.symbolic_result = format_sympy_symbolic(simplified)
     response.latex_output = format_sympy_latex(simplified)
     response.mathematical_status = EngineStatus.SUCCESS
+
 
 
 def _execute_differentiate(

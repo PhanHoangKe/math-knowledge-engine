@@ -8,12 +8,14 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import sympy
 
 from mke_product.parser.ast import (
+    AbsoluteValue,
     ASTNode,
     BinaryOp,
     Equation,
     Group,
     IntegerLiteral,
     Power,
+    Radical,
     UnaryOp,
     Variable,
 )
@@ -107,7 +109,12 @@ def ast_nodes_structurally_equal(a: ASTNode, b: ASTNode) -> bool:
             a.exponent.value == b.exponent.value
             and ast_nodes_structurally_equal(a.base, b.base)
         )
+    elif isinstance(a, Radical):
+        return ast_nodes_structurally_equal(a.radicand, b.radicand)
+    elif isinstance(a, AbsoluteValue):
+        return ast_nodes_structurally_equal(a.inner, b.inner)
     return False
+
 
 
 def _eval_constant_bounded(
@@ -195,6 +202,23 @@ def _eval_constant_bounded(
             )
         return res
 
+    elif isinstance(node, AbsoluteValue):
+        val = _eval_constant_bounded(node.inner, steps, max_steps, max_exp, max_bits)
+        return abs(val)
+
+    elif isinstance(node, Radical):
+        val = _eval_constant_bounded(node.radicand, steps, max_steps, max_exp, max_bits)
+        if val < 0:
+            raise DomainRestrictionError("Square root of negative real number is undefined.")
+        if val == 0:
+            return sympy.Integer(0)
+        p, q = val.p, val.q
+        isqrt_p = math.isqrt(p)
+        isqrt_q = math.isqrt(q)
+        if isqrt_p * isqrt_p == p and isqrt_q * isqrt_q == q:
+            return sympy.Rational(isqrt_p, isqrt_q)
+        raise ConstantEvalResourceLimitError("Irrational square root evaluation deferred to supervised worker.")
+
     else:
         raise TypeError(f"Unknown AST node type: {type(node).__name__}")
 
@@ -234,6 +258,25 @@ def prove_constant_zero_status(node: ASTNode) -> str:
 
     elif isinstance(node, UnaryOp):
         return prove_constant_zero_status(node.operand)
+
+    elif isinstance(node, AbsoluteValue):
+        return prove_constant_zero_status(node.inner)
+
+    elif isinstance(node, Radical):
+        rad_status = prove_constant_zero_status(node.radicand)
+        if rad_status == "ZERO":
+            return "ZERO"
+        elif rad_status == "NONZERO":
+            try:
+                val = evaluate_constant_ast(node.radicand)
+                if val < 0:
+                    raise DomainRestrictionError("Square root of negative real number is undefined.")
+                return "NONZERO"
+            except DomainRestrictionError:
+                raise
+            except Exception:
+                return "UNDECIDABLE"
+        return "UNDECIDABLE"
 
     elif isinstance(node, (Power, CASPower)):
         exp_val = int(node.exponent.value)
@@ -313,13 +356,17 @@ def inspect_ast_safety(node: ASTNode) -> None:
                 zero_status = prove_constant_zero_status(n.right)
                 if zero_status == "ZERO":
                     raise DivisionByZeroError("Division by zero constant is undefined.")
+        elif isinstance(n, Radical):
+            # Check for statically provable square root of negative constant
+            if len(n.radicand.variables()) == 0:
+                zero_status = prove_constant_zero_status(n.radicand)
 
 
 from .cas_parser import CASPower, Inequality, LinearSystem
 
 
 def extract_domain_restrictions(node: ASTNode) -> List[str]:
-    """Inspect all division denominators and powers in AST to find domain restrictions (e.g., x != 1, x != 0)."""
+    """Inspect all division denominators, powers, and radicals in AST to find domain restrictions."""
     restrictions: List[str] = []
 
     for n in node.walk():
@@ -374,6 +421,16 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
                                         restrictions.append(f"{sym_base} != 0")
                     except Exception:
                         restrictions.append("base != 0")
+        elif isinstance(n, Radical):
+            # Radical sqrt(R(x)) requires R(x) >= 0
+            vars_in_rad = n.radicand.variables()
+            if vars_in_rad:
+                from .ast_bridge import ast_to_sympy_expr
+                try:
+                    sym_rad = ast_to_sympy_expr(n.radicand)
+                    restrictions.append(f"{sym_rad} >= 0")
+                except Exception:
+                    restrictions.append("radicand >= 0")
 
     # Deduplicate while preserving order
     seen: Set[str] = set()
@@ -383,6 +440,7 @@ def extract_domain_restrictions(node: ASTNode) -> List[str]:
             seen.add(r)
             deduped.append(r)
     return deduped
+
 
 
 def parse_safe_numeric_bound(val: Any, name: str = "bound") -> Union[int, float, sympy.Rational]:

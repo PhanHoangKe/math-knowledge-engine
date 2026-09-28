@@ -14,12 +14,14 @@ from enum import Enum, auto
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 from mke_product.parser.ast import (
+    AbsoluteValue,
     ASTNode,
     BinaryOp,
     Equation,
     Group,
     IntegerLiteral,
     Power,
+    Radical,
     UnaryOp,
     Variable,
 )
@@ -140,6 +142,11 @@ class CASTokenType(Enum):
     SEMICOLON = auto()
     LBRACKET = auto()
     RBRACKET = auto()
+    LBRACE = auto()
+    RBRACE = auto()
+    SQRT = auto()
+    ABS = auto()
+    PIPE = auto()
     EOF = auto()
 
 
@@ -180,6 +187,23 @@ def tokenize_cas(text: str) -> List[CASToken]:
                 i += 1
             val = text[start:i]
             tokens.append(CASToken(CASTokenType.INTEGER, val, Span(start, i)))
+            continue
+
+        # LaTeX \sqrt command
+        if text.startswith("\\sqrt", i):
+            tokens.append(CASToken(CASTokenType.SQRT, "\\sqrt", Span(start, start + 5)))
+            i += 5
+            continue
+
+        # Named mathematical functions: sqrt, abs
+        if text.startswith("sqrt", i) and (i + 4 >= n or not (text[i + 4].isalnum() or text[i + 4] == "_")):
+            tokens.append(CASToken(CASTokenType.SQRT, "sqrt", Span(start, start + 4)))
+            i += 4
+            continue
+
+        if text.startswith("abs", i) and (i + 3 >= n or not (text[i + 3].isalnum() or text[i + 3] == "_")):
+            tokens.append(CASToken(CASTokenType.ABS, "abs", Span(start, start + 3)))
+            i += 3
             continue
 
         # Single letter variables [a-zA-Z]
@@ -266,6 +290,18 @@ def tokenize_cas(text: str) -> List[CASToken]:
             tokens.append(CASToken(CASTokenType.RBRACKET, "]", Span(start, start + 1)))
             i += 1
             continue
+        if ch == "{":
+            tokens.append(CASToken(CASTokenType.LBRACE, "{", Span(start, start + 1)))
+            i += 1
+            continue
+        if ch == "}":
+            tokens.append(CASToken(CASTokenType.RBRACE, "}", Span(start, start + 1)))
+            i += 1
+            continue
+        if ch == "|":
+            tokens.append(CASToken(CASTokenType.PIPE, "|", Span(start, start + 1)))
+            i += 1
+            continue
 
         raise LexerError(
             f"Invalid or unsupported character {ch!r} at position {start}.",
@@ -280,28 +316,87 @@ def tokenize_cas(text: str) -> List[CASToken]:
             f"Token count ({len(tokens)}) exceeds maximum limit of {MAX_TOKEN_COUNT}."
         )
 
-    # Check for implicit multiplication (e.g. 2x, 1/2x, xy, x(x+1), (x)(y))
+    # Check for implicit multiplication (e.g. 2x, 1/2x, xy, x(x+1), (x)(y), 2sqrt(x), 2|x|)
+    left_implicits = {
+        CASTokenType.INTEGER,
+        CASTokenType.VARIABLE,
+        CASTokenType.RPAREN,
+        CASTokenType.RBRACKET,
+        CASTokenType.RBRACE,
+    }
+    right_implicits = {
+        CASTokenType.VARIABLE,
+        CASTokenType.LPAREN,
+        CASTokenType.LBRACKET,
+        CASTokenType.LBRACE,
+        CASTokenType.SQRT,
+        CASTokenType.ABS,
+    }
+
+    # Classify each PIPE as OPEN or CLOSE
+    pipe_kinds: Dict[int, str] = {}
+    pipe_stack: List[int] = []
+    for idx, tok in enumerate(tokens):
+        if tok.type == CASTokenType.PIPE:
+            if idx == 0:
+                pipe_kinds[idx] = "OPEN"
+                pipe_stack.append(idx)
+            else:
+                prev_tok = tokens[idx - 1]
+                if prev_tok.type in (
+                    CASTokenType.PLUS,
+                    CASTokenType.MINUS,
+                    CASTokenType.STAR,
+                    CASTokenType.SLASH,
+                    CASTokenType.CARET,
+                    CASTokenType.EQUALS,
+                    CASTokenType.LT,
+                    CASTokenType.LE,
+                    CASTokenType.GT,
+                    CASTokenType.GE,
+                    CASTokenType.LPAREN,
+                    CASTokenType.LBRACKET,
+                    CASTokenType.LBRACE,
+                    CASTokenType.COMMA,
+                    CASTokenType.SEMICOLON,
+                ) or (prev_tok.type == CASTokenType.PIPE and pipe_kinds.get(idx - 1) == "OPEN"):
+                    pipe_kinds[idx] = "OPEN"
+                    pipe_stack.append(idx)
+                elif pipe_stack:
+                    pipe_kinds[idx] = "CLOSE"
+                    pipe_stack.pop()
+                else:
+                    pipe_kinds[idx] = "OPEN"
+                    pipe_stack.append(idx)
+
     for idx in range(len(tokens) - 1):
         curr_t = tokens[idx]
         next_t = tokens[idx + 1]
 
-        if curr_t.type == CASTokenType.INTEGER and next_t.type in (CASTokenType.VARIABLE, CASTokenType.LPAREN):
+        if curr_t.type in left_implicits and next_t.type in right_implicits:
             raise ImplicitMultiplicationError(
                 f"Implicit multiplication detected between '{curr_t.value}' and '{next_t.value}'. Use explicit '*' (e.g. '{curr_t.value}*{next_t.value}').",
                 Span(curr_t.span.start, next_t.span.end),
             )
-        if curr_t.type == CASTokenType.VARIABLE and next_t.type in (CASTokenType.VARIABLE, CASTokenType.LPAREN):
+        if curr_t.type in (CASTokenType.RPAREN, CASTokenType.RBRACKET, CASTokenType.RBRACE) and next_t.type == CASTokenType.INTEGER:
             raise ImplicitMultiplicationError(
-                f"Implicit multiplication detected between '{curr_t.value}' and '{next_t.value}'. Use explicit '*' (e.g. '{curr_t.value}*{next_t.value}').",
+                f"Implicit multiplication detected between '{curr_t.value}' and '{next_t.value}'. Use explicit '*'.",
                 Span(curr_t.span.start, next_t.span.end),
             )
-        if curr_t.type == CASTokenType.RPAREN and next_t.type in (CASTokenType.VARIABLE, CASTokenType.LPAREN, CASTokenType.INTEGER):
+        if curr_t.type in left_implicits and next_t.type == CASTokenType.PIPE and pipe_kinds.get(idx + 1) == "OPEN":
             raise ImplicitMultiplicationError(
-                f"Implicit multiplication detected after ')'. Use explicit '*'.",
+                f"Implicit multiplication detected between '{curr_t.value}' and '|'. Use explicit '*' (e.g. '{curr_t.value}*|').",
+                Span(curr_t.span.start, next_t.span.end),
+            )
+        if curr_t.type == CASTokenType.PIPE and pipe_kinds.get(idx) == "CLOSE" and next_t.type in (CASTokenType.INTEGER, CASTokenType.VARIABLE, CASTokenType.LPAREN, CASTokenType.SQRT, CASTokenType.ABS):
+            raise ImplicitMultiplicationError(
+                f"Implicit multiplication detected after '|'. Use explicit '*'.",
                 Span(curr_t.span.start, next_t.span.end),
             )
 
     return tokens
+
+
 
 
 class CASParser:
@@ -462,10 +557,110 @@ class CASParser:
                 span=Span(lparen_span.start, rparen_tok.span.end),
             )
 
+        if tok.type == CASTokenType.SQRT:
+            start_span = tok.span
+            self.advance()
+            if self.current.type == CASTokenType.LPAREN:
+                self.advance()
+                self._nesting_depth += 1
+                if self._nesting_depth > MAX_NESTING_DEPTH:
+                    raise InputBoundsExceededError(
+                        f"Parentheses nesting depth exceeds maximum limit of {MAX_NESTING_DEPTH}.",
+                        start_span,
+                    )
+                radicand = self.parse_expression()
+                if self.current.type != CASTokenType.RPAREN:
+                    raise ParserError(
+                        f"Expected matching closing ')' for 'sqrt(' at position {start_span.start}.",
+                        self.current.span,
+                    )
+                end_tok = self.advance()
+                self._nesting_depth -= 1
+                return Radical(
+                    radicand=radicand,
+                    span=Span(start_span.start, end_tok.span.end),
+                )
+            elif self.current.type == CASTokenType.LBRACE:
+                self.advance()
+                self._nesting_depth += 1
+                if self._nesting_depth > MAX_NESTING_DEPTH:
+                    raise InputBoundsExceededError(
+                        f"Braces nesting depth exceeds maximum limit of {MAX_NESTING_DEPTH}.",
+                        start_span,
+                    )
+                radicand = self.parse_expression()
+                if self.current.type != CASTokenType.RBRACE:
+                    raise ParserError(
+                        f"Expected matching closing '}}' for '\\sqrt{{' at position {start_span.start}.",
+                        self.current.span,
+                    )
+                end_tok = self.advance()
+                self._nesting_depth -= 1
+                return Radical(
+                    radicand=radicand,
+                    span=Span(start_span.start, end_tok.span.end),
+                )
+            else:
+                raise ParserError(
+                    f"Expected '(' or '{{' after 'sqrt' at position {start_span.start}.",
+                    self.current.span,
+                )
+
+        if tok.type == CASTokenType.ABS:
+            start_span = tok.span
+            self.advance()
+            if self.current.type != CASTokenType.LPAREN:
+                raise ParserError(
+                    f"Expected '(' after 'abs' at position {start_span.start}.",
+                    self.current.span,
+                )
+            self.advance()
+            self._nesting_depth += 1
+            if self._nesting_depth > MAX_NESTING_DEPTH:
+                raise InputBoundsExceededError(
+                    f"Parentheses nesting depth exceeds maximum limit of {MAX_NESTING_DEPTH}.",
+                    start_span,
+                )
+            inner = self.parse_expression()
+            if self.current.type != CASTokenType.RPAREN:
+                raise ParserError(
+                    f"Expected matching closing ')' for 'abs(' at position {start_span.start}.",
+                    self.current.span,
+                )
+            end_tok = self.advance()
+            self._nesting_depth -= 1
+            return AbsoluteValue(
+                inner=inner,
+                span=Span(start_span.start, end_tok.span.end),
+            )
+
+        if tok.type == CASTokenType.PIPE:
+            start_span = tok.span
+            self.advance()
+            self._nesting_depth += 1
+            if self._nesting_depth > MAX_NESTING_DEPTH:
+                raise InputBoundsExceededError(
+                    f"Absolute value nesting depth exceeds maximum limit of {MAX_NESTING_DEPTH}.",
+                    start_span,
+                )
+            inner = self.parse_expression()
+            if self.current.type != CASTokenType.PIPE:
+                raise ParserError(
+                    f"Expected matching closing '|' for '|' at position {start_span.start}.",
+                    self.current.span,
+                )
+            end_tok = self.advance()
+            self._nesting_depth -= 1
+            return AbsoluteValue(
+                inner=inner,
+                span=Span(start_span.start, end_tok.span.end),
+            )
+
         raise ParserError(
-            f"Unexpected token {tok.value!r} at position {tok.span.start}; expected integer, variable, or '('.",
+            f"Unexpected token {tok.value!r} at position {tok.span.start}; expected integer, variable, '(', 'sqrt', 'abs', or '|'.",
             tok.span,
         )
+
 
 
 def parse_cas_expression(text: str) -> ASTNode:

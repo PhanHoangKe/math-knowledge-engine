@@ -18,6 +18,8 @@ from .ast import (
     BinaryOp,
     Power,
     Equation,
+    Radical,
+    AbsoluteValue,
 )
 from .lexer import tokenize, MAX_INPUT_LENGTH, MAX_TOKEN_COUNT
 from .parser import Parser, parse, parse_equation, parse_expression, MAX_NESTING_DEPTH
@@ -39,11 +41,14 @@ __all__ = [
     "BinaryOp",
     "Power",
     "Equation",
+    "Radical",
+    "AbsoluteValue",
     "tokenize",
     "parse",
     "parse_equation",
     "parse_expression",
     "Parser",
+
     "MAX_INPUT_LENGTH",
     "MAX_TOKEN_COUNT",
     "MAX_NESTING_DEPTH",

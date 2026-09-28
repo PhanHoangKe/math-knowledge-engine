@@ -233,3 +233,52 @@ class Equation(ASTNode):
 
     def __repr__(self) -> str:
         return f"Equation({self.left!r}, {self.right!r})"
+
+
+@dataclass(frozen=True, slots=True)
+class Radical(ASTNode):
+    """Square root expression: sqrt(radicand) or \\sqrt{radicand}."""
+    radicand: ASTNode
+    span: Span
+
+    def walk(self) -> Iterator[ASTNode]:
+        yield self
+        yield from self.radicand.walk()
+
+    def variables(self) -> Set[str]:
+        return self.radicand.variables()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "Radical",
+            "radicand": self.radicand.to_dict(),
+            "span": self.span.to_tuple(),
+        }
+
+    def __repr__(self) -> str:
+        return f"Radical({self.radicand!r})"
+
+
+@dataclass(frozen=True, slots=True)
+class AbsoluteValue(ASTNode):
+    """Absolute value expression: abs(inner) or |inner|."""
+    inner: ASTNode
+    span: Span
+
+    def walk(self) -> Iterator[ASTNode]:
+        yield self
+        yield from self.inner.walk()
+
+    def variables(self) -> Set[str]:
+        return self.inner.variables()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "AbsoluteValue",
+            "inner": self.inner.to_dict(),
+            "span": self.span.to_tuple(),
+        }
+
+    def __repr__(self) -> str:
+        return f"AbsoluteValue({self.inner!r})"
+

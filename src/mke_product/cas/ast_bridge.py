@@ -11,12 +11,14 @@ from typing import Union
 import sympy
 
 from mke_product.parser.ast import (
+    AbsoluteValue,
     ASTNode,
     BinaryOp,
     Equation,
     Group,
     IntegerLiteral,
     Power,
+    Radical,
     UnaryOp,
     Variable,
 )
@@ -96,5 +98,14 @@ def ast_to_sympy_expr(node: ASTNode) -> sympy.Expr:
             raise DomainRestrictionError("Indeterminate form 0^0 is undefined in real domain.")
         return sympy.Pow(base_sym, exp_sym, evaluate=False)
 
+    elif isinstance(node, Radical):
+        rad_sym = ast_to_sympy_expr(node.radicand)
+        return sympy.sqrt(rad_sym, evaluate=False)
+
+    elif isinstance(node, AbsoluteValue):
+        inner_sym = ast_to_sympy_expr(node.inner)
+        return sympy.Abs(inner_sym, evaluate=False)
+
     else:
         raise TypeError(f"Unknown AST node type: {type(node).__name__}")
+
