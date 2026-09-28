@@ -91,7 +91,11 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         WebDriverWait(self.driver, 5.0).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "#screen-result.active"))
         )
-        time.sleep(0.5)
+        WebDriverWait(self.driver, 10.0).until(
+            lambda d: "ĐANG TÍNH TOÁN" not in d.find_element(By.ID, "res-syntax-status").text
+            and "COMPUTING" not in d.find_element(By.ID, "res-syntax-status").text
+        )
+        time.sleep(0.3)
 
     # -------------------------------------------------------------------------
     # Scenario 1: Load Original Homepage
@@ -233,7 +237,8 @@ class TestCanonicalUIBrowserSuite(unittest.TestCase):
         self._submit_query("(x-1)/(x-1) = 1")
         self._wait_for_math_render()
 
-        domain_constraints = self.driver.find_element(By.ID, "res-domain-constraints").text
+        domain_el = self.driver.find_element(By.ID, "res-domain-constraints")
+        domain_constraints = domain_el.get_attribute("textContent") or domain_el.text
         self.assertTrue("x" in domain_constraints and "1" in domain_constraints)
 
         self._save_screenshot("07_domain_exclusion_check")
