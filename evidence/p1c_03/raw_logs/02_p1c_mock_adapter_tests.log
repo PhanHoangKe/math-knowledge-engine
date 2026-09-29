@@ -29,4 +29,4 @@ tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanl
 tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
 tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
 
-============================= 22 passed in 1.09s ==============================
+============================= 22 passed in 0.93s ==============================

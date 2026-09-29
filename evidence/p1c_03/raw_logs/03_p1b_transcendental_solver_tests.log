@@ -51,4 +51,4 @@ tests/test_p03c_p1b_transcendental_solver.py::test_algebraic_radical_and_rationa
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_2_pow_x_plus_1_eq_2_pow_x_plus_1 PASSED [ 97%]
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_polynomial_multiplicity_distinct_root_sets PASSED [100%]
 
-============================= 44 passed in 49.04s =============================
+============================= 44 passed in 45.99s =============================

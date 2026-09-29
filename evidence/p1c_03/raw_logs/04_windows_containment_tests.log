@@ -87,4 +87,4 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 98%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============================= 80 passed in 52.13s =============================
+============================= 80 passed in 48.89s =============================
