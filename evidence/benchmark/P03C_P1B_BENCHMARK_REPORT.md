@@ -1,15 +1,18 @@
 # MKE P03C-P1B-R1 Transcendental Solver & Adversarial Soundness Benchmark Report
 
 - **Benchmark ID:** `P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1`
-- **Tested Source Commit:** `2d7a0720c4b1ee7cf25e3b6092c6f5395db9d9c1`
-- **Worktree Status:** `Clean`
-- **Dataset File:** `p03c_p1b_transcendental_benchmark.json`
-- **Dataset Canonical LF SHA-256 (Platform Independent):** `64f5eb610843295d0f0ebdd284c7b673a65aa139243dc3fd317bde3776821750`
-- **Dataset On-Disk SHA-256:** `76edfc7aa5b19323746121adcee75c4647c6a60f95f62e3ad74d61d56e8d6c4f`
+- **Tested Source Commit:** `f5e3a360a70fa99c7f76bd55500e83a8232495b8`
+- **Initial Clean-Checkout Status:** `Clean (verified at f5e3a36 with git status --porcelain empty)`
+- **P1B Dataset File:** `tests/benchmarks/p03c_p1b_transcendental_benchmark.json`
+- **P1B Dataset Canonical LF SHA-256:** `64f5eb610843295d0f0ebdd284c7b673a65aa139243dc3fd317bde3776821750`
+- **P1B Dataset On-Disk SHA-256:** `76edfc7aa5b19323746121adcee75c4647c6a60f95f62e3ad74d61d56e8d6c4f`
+- **THPT Pilot Dataset File:** `tests/benchmarks/thpt_pilot_benchmark_v1.json`
+- **THPT Pilot Dataset Canonical LF SHA-256:** `31f02dc19adf1754125e05d42c31569b52c9135f4bc81f3a9fcd7f5f646e5e37`
+- **THPT Pilot Dataset On-Disk SHA-256:** `a800d0a36fcecb6f4b6307e51f2f60535eff9fbe583ed21a132c53d32b394cbd`
 - **Build Version:** `v0.3.2-p03c-p1b-r1`
 - **Environment:** Python `3.10.11` on `Windows-10-10.0.26200-SP0`
-- **Timestamp:** `2026-09-29T05:28:57Z`
-- **Execution Duration:** `43.27s`
+- **Timestamp:** `2026-09-29T06:02:48Z`
+- **Execution Duration:** `47.96s`
 
 ## Executive Summary
 
@@ -40,15 +43,15 @@ All benchmark items are strictly reconciled against the official GDPT 2018 curri
 
 ## Longitudinal Pilot Benchmark Provenance
 
-In the 40-problem THPT pilot diagnostic benchmark (`tests/benchmarks/thpt_pilot_benchmark_v1.json`), P1B accurately unlocked 4 genuine new problems since accepted P1A:
-- `PILOT-11-0005` (`ARCH-11.1.1`): $\sin(x + \pi/4) - \cos(x - \pi/4) = 0$ -> **PASS** (simplification to 0)
+In the 40-problem THPT pilot diagnostic benchmark (`tests/benchmarks/thpt_pilot_benchmark_v1.json`), P1B accurately unlocked 4 genuine new problems over accepted P1A:
+- `PILOT-11-0005` (`ARCH-11.1.1`): $\sin(x + \pi/4) - \cos(x - \pi/4) = 0$ -> **PASS** (trigonometric simplification to 0)
 - `PILOT-11-0006` (`ARCH-11.1.3`): $\sin(x) = 1/2 \implies x = \pi/6 + 2k\pi \lor x = 5\pi/6 + 2k\pi$ -> **PASS** (elementary periodic trig families)
 - `PILOT-11-0007` (`ARCH-11.4.1`): $\log_2(12) - \log_2(3) = 2$ -> **PASS** (exact log quotient reduction)
 - `PILOT-11-0008` (`ARCH-11.4.3`): $\log_2(x-1) + \log_2(x+1) = 3 \implies S = \{3\}$ -> **PASS** (extraneous root $-3$ rejected via domain gating)
 
 Longitudinal Pilot Progression:
 - **Accepted P1A Baseline:** 13 / 40 (32.5%)
-- **P03C-P1B-R1 Final Release:** **17 / 40 (42.5%)** (+10.0% net progression over accepted P1A, +4 genuine problems solved: `PILOT-11-0005`, `PILOT-11-0006`, `PILOT-11-0007`, `PILOT-11-0008`, 0 extraneous root leaks)
+- **P03C-P1B Release:** **17 / 40 (42.5%)** (+10.0% net progression over accepted P1A, 0 extraneous root leaks)
 
 ## Mathematical Scope & Completeness Guarantees (Task 4)
 
@@ -144,3 +147,17 @@ Longitudinal Pilot Progression:
 | `P1B-ADV-013` | `ARCH-11.1.3` | PERIODIC_TRIG_EQUATION | `\sin(2*x - \pi/6) = 1/2` | `x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z)` | `x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z)` | **SUCCESS** |
 | `P1B-ADV-014` | `ARCH-11.1.3` | PERIODIC_TRIG_EQUATION | `\sin(x) = 2` | `{}` | `{}` | **SUCCESS** |
 | `P1B-ADV-015` | `ARCH-11.1.3` | UNSUPPORTED_NONLINEAR | `\sin(x) + \cos(x) = x` | `None` | `OUT_OF_SCOPE` | **SUCCESS** |
+
+## Raw Execution Logs & Closeout Manifest
+
+All test suites and benchmark runners were executed on a clean isolated checkout of accepted source commit `f5e3a360a70fa99c7f76bd55500e83a8232495b8`. Complete verbatim process logs and execution metadata are preserved in `evidence/benchmark/raw_logs/`:
+
+- `environment_info.txt`: Python `3.10.11`, Windows `10.0.26200`, pip freeze package inventory.
+- `execution_manifest.json`: Structured execution timeline, exit codes, and process commands.
+- `01_targeted_p1b_regression.log`: 44/44 passed (`pytest tests/test_p03c_p1b_transcendental_solver.py`).
+- `02_windows_containment.log`: Windows worker process isolation & memory confinement tests.
+- `03_browser_ui_regression.log`: Canonical UI rendering and browser workflow integration tests.
+- `04_full_repository_pytest.log`: 577/577 passed (complete repository test suite).
+- `05_p1b_benchmark_runner.log`: 47/47 passed (41 solved, 5 domain rejections, 1 out-of-scope).
+- `06_thpt_pilot_benchmark_runner.log`: 17/40 passed (+4 problems over P1A baseline, 0 extraneous root leaks).
+

@@ -28,9 +28,9 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-29T05:29:27Z",
+    "timestamp": "2026-09-29T06:03:15Z",
     "engine_version": "v0.3.2-p03c-p1b-r1",
-    "git_commit_sha": "2d7a0720c4b1ee7cf25e3b6092c6f5395db9d9c1",
+    "git_commit_sha": "f5e3a360a70fa99c7f76bd55500e83a8232495b8",
     "is_worktree_clean": false,
     "dataset_file": "thpt_pilot_benchmark_v1.json",
     "dataset_sha256": "a800d0a36fcecb6f4b6307e51f2f60535eff9fbe583ed21a132c53d32b394cbd",
@@ -40,7 +40,7 @@
       "platform": "Windows-10-10.0.26200-SP0",
       "system": "Windows"
     },
-    "duration_seconds": 23.219,
+    "duration_seconds": 25.547,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
@@ -186,7 +186,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'-2', '2'}",
+      "scoring_details": "Exact solution set matched: {'2', '-2'}",
       "engine_result": "{-2, 2}",
       "engine_solution_set": [
         "-2",

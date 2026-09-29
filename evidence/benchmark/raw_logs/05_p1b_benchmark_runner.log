@@ -1,0 +1,68 @@
+COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe scripts/run_p03c_p1b_benchmark.py
+START_TIME_UTC: 2026-09-29T06:02:00.973579+00:00
+END_TIME_UTC: 2026-09-29T06:02:48.930560+00:00
+EXIT_CODE: 0
+--- STDOUT ---
+================================================================================
+        MKE P03C-P1B-R1 TRANSCENDENTAL FUNCTIONS & CALCULUS BENCHMARK
+================================================================================
+Loaded 47 genuine transcendental problems from p03c_p1b_transcendental_benchmark.json
+[01/47] P1B-TRIG-001 (ARCH-11.1.1): [PASS] -> Got: 0 (Expected: 0)
+[02/47] P1B-TRIG-002 (ARCH-11.1.1): [PASS] -> Got: 1 (Expected: 1)
+[03/47] P1B-TRIG-003 (ARCH-11.1.1): [PASS] -> Got: 1 (Expected: 1)
+[04/47] P1B-TRIG-004 (ARCH-11.1.1): [PASS] -> Got: 2 (Expected: 2)
+[05/47] P1B-TRIG-005 (ARCH-11.1.1): [PASS] -> Got: 0 (Expected: 0)
+[06/47] P1B-TRIG-006 (ARCH-11.1.1): [PASS] -> Got: 0 (Expected: 0)
+[07/47] P1B-LOG-001 (ARCH-11.4.1): [PASS] -> Got: 2 (Expected: 2)
+[08/47] P1B-LOG-002 (ARCH-11.4.1): [PASS] -> Got: 4 (Expected: 4)
+[09/47] P1B-LOG-003 (ARCH-11.4.1): [PASS] -> Got: 3 (Expected: 3)
+[10/47] P1B-LOG-004 (ARCH-11.4.1): [PASS] -> Got: 3 (Expected: 3)
+[11/47] P1B-LOG-005 (ARCH-11.4.1): [PASS] -> Got: 6 (Expected: 6)
+[12/47] P1B-LOG-006 (ARCH-11.4.1): [PASS] -> Got: -4 (Expected: -4)
+[13/47] P1B-LOG-007 (ARCH-11.4.1): [PASS] -> Got: 1 (Expected: 1)
+[14/47] P1B-LOG-008 (ARCH-11.4.1): [PASS] -> Got: 1 (Expected: 1)
+[15/47] P1B-DIFF-001 (ARCH-11.5.1): [PASS] -> Got: 3*exp(3*x) + 2*cos(2*x) (Expected: 2*cos(2*x) + 3*exp(3*x))
+[16/47] P1B-DIFF-002 (ARCH-11.5.1): [PASS] -> Got: -5*sin(5*x) (Expected: -5*sin(5*x))
+[17/47] P1B-DIFF-003 (ARCH-11.5.1): [PASS] -> Got: -2*exp(-2*x) (Expected: -2*exp(-2*x))
+[18/47] P1B-DIFF-004 (ARCH-11.5.1): [PASS] -> Got: 1/x (Expected: 1/x)
+[19/47] P1B-DIFF-005 (ARCH-11.5.1): [PASS] -> Got: 1/(x*log(2)) (Expected: 1/(x*log(2)))
+[20/47] P1B-DIFF-006 (ARCH-11.5.1): [PASS] -> Got: -sin(x) + cos(x) (Expected: cos(x) - sin(x))
+[21/47] P1B-DIFF-007 (ARCH-11.5.1): [PASS] -> Got: tan(x)^2 + 1 (Expected: tan(x)**2 + 1)
+[22/47] P1B-DIFF-008 (ARCH-11.5.1): [PASS] -> Got: x*exp(x) + exp(x) (Expected: x*exp(x) + exp(x))
+[23/47] P1B-EQ-001 (ARCH-11.4.3): [PASS] -> Got: {3} (Expected: {3})
+[24/47] P1B-EQ-002 (ARCH-11.4.3): [PASS] -> Got: {3} (Expected: {3})
+[25/47] P1B-EQ-003 (ARCH-11.4.3): [PASS] -> Got: {11} (Expected: {11})
+[26/47] P1B-EQ-004 (ARCH-11.4.3): [PASS] -> Got: {2} (Expected: {2})
+[27/47] P1B-EQ-005 (ARCH-11.4.3): [PASS] -> Got: {2} (Expected: {2})
+[28/47] P1B-EQ-006 (ARCH-11.4.3): [PASS] -> Got: {0, log(2)} (Expected: {0, log(2)})
+[29/47] P1B-EQ-007 (ARCH-11.4.3): [PASS] -> Got: {3} (Expected: {3})
+[30/47] P1B-EQ-008 (ARCH-11.4.3): [PASS] -> Got: {0, 2} (Expected: {0, 2})
+[31/47] P1B-EQ-009 (ARCH-11.4.3): [PASS] -> Got: {1} (Expected: {1})
+[32/47] P1B-EQ-010 (ARCH-11.4.3): [PASS] -> Got: {32} (Expected: {32})
+[33/47] P1B-ADV-001 (ARCH-11.4.3): [PASS] -> Got: (0, oo) (Expected: (0, oo))
+[34/47] P1B-ADV-002 (ARCH-11.4.3): [PASS] -> Got: (1, oo) (Expected: (1, oo))
+[35/47] P1B-ADV-003 (ARCH-11.1.3): [PASS] -> Got: All real numbers except pi/2 + k*pi (k integer) (Expected: All real numbers except pi/2 + k*pi (k integer))
+[36/47] P1B-ADV-004 (ARCH-11.4.3): [PASS] -> Got: (0, 1) U (1, oo) (Expected: (0, 1) U (1, oo))
+[37/47] P1B-ADV-005 (ARCH-11.4.1): [PASS] -> Got: None (Expected: DOMAIN_ERROR)
+[38/47] P1B-ADV-006 (ARCH-11.4.1): [PASS] -> Got: None (Expected: DOMAIN_ERROR)
+[39/47] P1B-ADV-007 (ARCH-11.4.1): [PASS] -> Got: None (Expected: DOMAIN_ERROR)
+[40/47] P1B-ADV-008 (ARCH-11.4.1): [PASS] -> Got: None (Expected: DOMAIN_ERROR)
+[41/47] P1B-ADV-009 (ARCH-11.1.1): [PASS] -> Got: None (Expected: DOMAIN_ERROR)
+[42/47] P1B-ADV-010 (ARCH-11.1.3): [PASS] -> Got: x = pi/6 + 2*k*pi, x = 5*pi/6 + 2*k*pi (k in Z) (Expected: x = pi/6 + 2*k*pi, x = 5*pi/6 + 2*k*pi (k in Z))
+[43/47] P1B-ADV-011 (ARCH-11.1.3): [PASS] -> Got: x = pi/2 + k*pi (k in Z) (Expected: x = pi/2 + k*pi (k in Z))
+[44/47] P1B-ADV-012 (ARCH-11.1.3): [PASS] -> Got: x = pi/4 + k*pi (k in Z) (Expected: x = pi/4 + k*pi (k in Z))
+[45/47] P1B-ADV-013 (ARCH-11.1.3): [PASS] -> Got: x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z) (Expected: x = pi/6 + k*pi, x = pi/2 + k*pi (k in Z))
+[46/47] P1B-ADV-014 (ARCH-11.1.3): [PASS] -> Got: {} (Expected: {})
+[47/47] P1B-ADV-015 (ARCH-11.1.3): [PASS] -> Got: None (Expected: OUT_OF_SCOPE)
+================================================================================
+ORIGINAL 32 BENCHMARK: 32/32 Passed (100.0%)
+ADVERSARIAL 15 SUITE:  15/15 Passed (100.0%)
+TOTAL COMBINED SUITE:  47/47 Passed (100.0%) in 46.75s
+  - Mathematically Solved:          41
+  - Verified Domain Rejections:     5
+  - Verified Unsupported/Out Scope: 1
+================================================================================
+Saved results to D:\mke-product-ui-r4\evidence\benchmark\p03c_p1b_benchmark_results.json
+Saved report to D:\mke-product-ui-r4\evidence\benchmark\P03C_P1B_BENCHMARK_REPORT.md
+
+--- STDERR ---

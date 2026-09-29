@@ -1,0 +1,62 @@
+[
+  {
+    "id": "targeted_p1b_regression",
+    "desc": "Targeted P1B regression tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T05:56:46.184163+00:00",
+    "end_time": "2026-09-29T05:57:32.431942+00:00",
+    "exit_code": 0,
+    "log_file": "01_targeted_p1b_regression.log",
+    "passed": true
+  },
+  {
+    "id": "windows_containment",
+    "desc": "Windows process containment tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T05:57:32.433560+00:00",
+    "end_time": "2026-09-29T05:58:10.984093+00:00",
+    "exit_code": 0,
+    "log_file": "02_windows_containment.log",
+    "passed": true
+  },
+  {
+    "id": "browser_ui_regression",
+    "desc": "Browser UI regression tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T05:58:10.985590+00:00",
+    "end_time": "2026-09-29T05:58:55.295364+00:00",
+    "exit_code": 0,
+    "log_file": "03_browser_ui_regression.log",
+    "passed": true
+  },
+  {
+    "id": "full_repository_pytest",
+    "desc": "Full repository pytest suite",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest -v -o pythonpath=src",
+    "start_time": "2026-09-29T05:58:55.296368+00:00",
+    "end_time": "2026-09-29T06:02:00.971208+00:00",
+    "exit_code": 0,
+    "log_file": "04_full_repository_pytest.log",
+    "passed": true
+  },
+  {
+    "id": "p1b_benchmark",
+    "desc": "P1B 47-item benchmark runner",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe scripts/run_p03c_p1b_benchmark.py",
+    "start_time": "2026-09-29T06:02:00.973579+00:00",
+    "end_time": "2026-09-29T06:02:48.930560+00:00",
+    "exit_code": 0,
+    "log_file": "05_p1b_benchmark_runner.log",
+    "passed": true
+  },
+  {
+    "id": "thpt_pilot_benchmark",
+    "desc": "THPT 40-item pilot benchmark runner",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe scripts/run_thpt_pilot_benchmark.py",
+    "start_time": "2026-09-29T06:02:48.931559+00:00",
+    "end_time": "2026-09-29T06:03:15.433024+00:00",
+    "exit_code": 0,
+    "log_file": "06_thpt_pilot_benchmark_runner.log",
+    "passed": true
+  }
+]

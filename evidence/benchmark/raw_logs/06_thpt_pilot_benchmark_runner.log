@@ -1,0 +1,40 @@
+COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe scripts/run_thpt_pilot_benchmark.py
+START_TIME_UTC: 2026-09-29T06:02:48.931559+00:00
+END_TIME_UTC: 2026-09-29T06:03:15.433024+00:00
+EXIT_CODE: 0
+--- STDOUT ---
+================================================================================
+           MKE THPT 40-PROBLEM PILOT BENCHMARK BASELINE RUNNER
+================================================================================
+Loaded 40 genuine pilot problems from thpt_pilot_benchmark_v1.json
+
+--------------------------------------------------------------------------------
+                    PILOT BENCHMARK EXECUTION RESULTS SUMMARY                   
+--------------------------------------------------------------------------------
+Total Authentic Pilot Items:           40
+Attempted Symbolic Expressions:        34 (85.0%)
+Unsupported Modality (NLP/Data):       6 (15.0%)
+Mathematical Successes:                17
+Genuine Wrong Answers:                 4
+Extraneous Root Leaks:                 0
+Unsupported Grammar / Out of Scope:    13
+Domain Rejected / Safety Blocked:      0
+Engine Timeouts:                       0
+
+-> Full 40-Item Pilot Accuracy:        42.50% (17/40)
+-> Attempted Symbolic Subset Accuracy: 50.00% (17/34)
+--------------------------------------------------------------------------------
+Extraneous Roots Telemetry:
+  - Problems with Defined Extraneous Roots: 3
+  - Total Extraneous Candidates Tested:     3
+  - Extraneous Roots Leaked Count:          0
+--------------------------------------------------------------------------------
+Stratified Grade Breakdown:
+  - Grade 10: Total=15, Attempted=13, Solved=10
+  - Grade 11: Total=14, Attempted=11, Solved=6
+  - Grade 12: Total=11, Attempted=10, Solved=1
+--------------------------------------------------------------------------------
+Detailed machine-readable evidence saved to: D:\mke-product-ui-r4\evidence\benchmark\thpt_pilot_benchmark_results.json
+================================================================================
+
+--- STDERR ---
