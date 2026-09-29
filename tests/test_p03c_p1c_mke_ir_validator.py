@@ -25,6 +25,7 @@ from mke_product.ai.ir import (
     UncertaintyFlag,
     ValidationIssue,
     ValidationResult,
+    PublicValidationDiagnostic,
     MathIntermediateRepresentation,
 )
 from mke_product.ai.validator import (
@@ -1155,5 +1156,115 @@ def test_r4_public_validation_result_serialization_no_leakage():
         if res.validated_ir:
             for uf in res.validated_ir.uncertainty_flags:
                 assert sensitive not in uf.message
+
+
+# ===========================================================================
+# P1C-03-R4B Public Diagnostic Boundary & Adversarial Isolation Tests (Task B)
+# ===========================================================================
+
+def test_r4b_public_diagnostic_boundary_isolation():
+    """TASK B: Public diagnostic projection completely isolates metadata, raw query, and spans."""
+    raw = "Giải phương trình x = 1 với học sinh Nguyễn Văn A, email a@school.edu.vn, key sk-ant-secret-9999"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        metadata={
+            "caller_token": "token-xyz-12345",
+            "user_ip": "192.168.1.100",
+            "student_name": "Nguyen Van A"
+        },
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        uncertainty_flags=[
+            UncertaintyFlag(
+                code="AMBIGUOUS_VARIABLE_BINDING",
+                message="Internal model debug info containing sensitive token secret-12345",
+                severity="WARNING"
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_valid is True
+    assert res.is_cas_ready is True
+
+    # Project to public diagnostic representation
+    public_diag = res.to_public_diagnostic()
+    assert isinstance(public_diag, PublicValidationDiagnostic)
+    assert public_diag.is_valid is True
+    assert public_diag.is_cas_ready is True
+    assert public_diag.status == "VALID"
+    assert public_diag.target_operation == "SOLVE"
+
+    # Verify public serialization contains NO sensitive strings
+    public_json = public_diag.model_dump_json()
+    public_dict = res.to_public_dict()
+
+    sensitive_tokens = [
+        "Nguyễn Văn A",
+        "Nguyen Van A",
+        "a@school.edu.vn",
+        "sk-ant-secret-9999",
+        "token-xyz-12345",
+        "192.168.1.100",
+        "secret-12345",
+        "Internal model debug info"
+    ]
+
+    for token in sensitive_tokens:
+        assert token not in public_json
+        assert token not in str(public_dict)
+
+    # Verify that PublicValidationDiagnostic does NOT contain internal fields
+    assert not hasattr(public_diag, "validated_ir")
+    assert not hasattr(public_diag, "raw_query")
+    assert not hasattr(public_diag, "metadata")
+    assert not hasattr(public_diag, "source_spans")
+
+    # Verify that internal pipeline representation DOES retain mathematical details for CAS
+    assert res.validated_ir is not None
+    assert res.validated_ir.primary_expressions == ["x = 1"]
+    assert res.validated_ir.target_variables == ["x"]
+    assert res.validated_ir.metadata["caller_token"] == "token-xyz-12345"
+
+
+def test_r4b_public_diagnostic_on_fatal_adversarial_scenarios():
+    """TASK B: Public diagnostic projection on fatal validation failures contains only safe allowlisted issues."""
+    raw = "Attacker query with payload <script>alert(1)</script>"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["invalid^^syntax++"],
+        target_variables=["x"],
+        metadata={"injection": "DROP TABLE students;--"},
+        source_spans=[
+            SourceSpan(start_char=0, end_char=10, source_fragment="Attacker q", semantic_role="EQUATION")
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_valid is False
+    assert res.is_cas_ready is False
+
+    public_diag = res.to_public_diagnostic()
+    public_json = public_diag.model_dump_json()
+
+    assert "<script>" not in public_json
+    assert "DROP TABLE" not in public_json
+    assert "Attacker q" not in public_json
+
+    # Standardized issue messages only
+    for issue in public_diag.issues:
+        assert issue.message in [
+            "Primary expression failed mathematical syntax parsing.",
+            "Primary expression has no corresponding source span reference.",
+            "Payload failed MKE-IR schema validation. Structure does not conform to specification."
+        ] or not any(hostile in issue.message for hostile in ["<script>", "DROP TABLE", "Attacker q"])
+
 
 

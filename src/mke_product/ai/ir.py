@@ -116,8 +116,32 @@ class MathIntermediateRepresentation(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Contextual caller metadata")
 
 
+class PublicValidationDiagnostic(BaseModel):
+    """Sanitized, student-facing diagnostic projection of validation results.
+
+    SECURITY BOUNDARY:
+    This model excludes all internal pipeline data such as full mathematical IR,
+    raw student query text, caller metadata, and character source spans.
+    Only standardized, allowlisted issues and sanitized uncertainty flags are exposed.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    is_valid: bool = Field(..., description="True if mathematically valid and CAS-ready")
+    is_cas_ready: bool = Field(..., description="True if eligible for future CAS dispatch")
+    status: str = Field(..., description="'VALID', 'INVALID', 'UNSUPPORTED', 'AMBIGUOUS', 'UNVERIFIED_SEMANTICS'")
+    target_operation: Optional[str] = Field(default=None, description="Target CAS operation name if valid")
+    issues: List[ValidationIssue] = Field(default_factory=list, description="Sanitized validation issues")
+    uncertainties: List[UncertaintyFlag] = Field(default_factory=list, description="Sanitized uncertainty flags")
+
+
 class ValidationResult(BaseModel):
-    """Deterministic outcome of pre-dispatch intake validation."""
+    """Internal deterministic outcome of pre-dispatch intake validation.
+
+    INTERNAL PIPELINE USE ONLY:
+    Contains `validated_ir` which preserves the mathematical expressions, variables,
+    constraints, raw query, metadata, and character spans necessary for mathematical solving.
+    For public/student-facing API serialization, callers MUST use `.to_public_diagnostic()`.
+    """
     model_config = ConfigDict(extra="forbid")
 
     is_valid: bool = Field(..., description="True if valid and CAS-ready")
@@ -129,11 +153,27 @@ class ValidationResult(BaseModel):
     status: str = Field(..., description="'VALID', 'INVALID', 'UNSUPPORTED', 'AMBIGUOUS', 'UNVERIFIED_SEMANTICS'")
     issues: List[ValidationIssue] = Field(default_factory=list, description="Validation issues and diagnostics")
     uncertainties: List[UncertaintyFlag] = Field(default_factory=list, description="Uncertainty flags")
-    validated_ir: Optional[MathIntermediateRepresentation] = Field(default=None, description="Validated MKE-IR model")
+    validated_ir: Optional[MathIntermediateRepresentation] = Field(default=None, description="Validated MKE-IR model (INTERNAL USE ONLY)")
     target_operation: Optional[str] = Field(default=None, description="Target CAS OperationType name if valid")
 
     @property
     def is_ready_for_cas(self) -> bool:
         """Compatibility property matching is_cas_ready."""
         return self.is_cas_ready
+
+    def to_public_diagnostic(self) -> PublicValidationDiagnostic:
+        """Project the internal validation result to a safe, public diagnostic representation."""
+        return PublicValidationDiagnostic(
+            is_valid=self.is_valid,
+            is_cas_ready=self.is_cas_ready,
+            status=self.status,
+            target_operation=self.target_operation,
+            issues=[i.model_copy() for i in self.issues],
+            uncertainties=[u.model_copy() for u in self.uncertainties],
+        )
+
+    def to_public_dict(self) -> Dict[str, Any]:
+        """Serialize safe public diagnostic representation as dictionary."""
+        return self.to_public_diagnostic().model_dump()
+
 

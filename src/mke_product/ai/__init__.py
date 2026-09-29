@@ -63,6 +63,7 @@ __all__ = [
     "UncertaintyFlag",
     "ValidationIssue",
     "ValidationResult",
+    "PublicValidationDiagnostic",
     "MathIntermediateRepresentation",
     "MKEIntakeValidator",
 ]
