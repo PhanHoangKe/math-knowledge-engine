@@ -691,48 +691,48 @@ def _solve_periodic_trigonometric(
             alpha = sympy.asin(m)
             if m == 0:
                 c0 = sympy.simplify(-b / a)
-                ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+                ck = sympy.simplify(sympy.Rational(1, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 1 / abs(a))
                 families = [(c0, ck)]
             elif m == 1:
                 c0 = sympy.simplify((sympy.pi/2 - b) / a)
-                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0, ck)]
             elif m == -1:
                 c0 = sympy.simplify((-sympy.pi/2 - b) / a)
-                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0, ck)]
             else:
                 c0_1 = sympy.simplify((alpha - b) / a)
-                ck_1 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck_1 = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 c0_2 = sympy.simplify((sympy.pi - alpha - b) / a)
-                ck_2 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck_2 = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0_1, ck_1), (c0_2, ck_2)]
 
         elif func_name == "cos":
             alpha = sympy.acos(m)
             if m == 1:
                 c0 = sympy.simplify(-b / a)
-                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0, ck)]
             elif m == -1:
                 c0 = sympy.simplify((sympy.pi - b) / a)
-                ck = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0, ck)]
             elif m == 0:
                 c0 = sympy.simplify((sympy.pi/2 - b) / a)
-                ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+                ck = sympy.simplify(sympy.Rational(1, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 1 / abs(a))
                 families = [(c0, ck)]
             else:
                 c0_1 = sympy.simplify((alpha - b) / a)
-                ck_1 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck_1 = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 c0_2 = sympy.simplify((-alpha - b) / a)
-                ck_2 = sympy.simplify(sympy.Rational(2, a) if hasattr(a, "is_integer") and a.is_integer else 2 / a)
+                ck_2 = sympy.simplify(sympy.Rational(2, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 2 / abs(a))
                 families = [(c0_1, ck_1), (c0_2, ck_2)]
 
     elif func_name == "tan":
         alpha = sympy.atan(m)
         c0 = sympy.simplify((alpha - b) / a)
-        ck = sympy.simplify(sympy.Rational(1, a) if hasattr(a, "is_integer") and a.is_integer else 1 / a)
+        ck = sympy.simplify(sympy.Rational(1, abs(a)) if hasattr(a, "is_integer") and a.is_integer else 1 / abs(a))
         families = [(c0, ck)]
     else:
         response.mathematical_status = EngineStatus.OUT_OF_SCOPE

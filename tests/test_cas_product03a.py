@@ -358,7 +358,7 @@ class TestCASProduct03A(unittest.TestCase):
             expression="1 / 0",
         )
         res = self.router.execute(req)
-        self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+        self.assertEqual(res.status, EngineStatus.DOMAIN_ERROR)
         self.assertIn("Division by zero", res.error_message or "")
 
     def test_composite_constant_zero_denominator_rejected(self):
@@ -370,7 +370,7 @@ class TestCASProduct03A(unittest.TestCase):
                     expression=expr,
                 )
                 res = self.router.execute(req)
-                self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+                self.assertEqual(res.status, EngineStatus.DOMAIN_ERROR)
                 self.assertIn("Division by zero", res.error_message or "")
 
     def test_zero_power_zero_detection(self):
@@ -379,7 +379,7 @@ class TestCASProduct03A(unittest.TestCase):
             expression="0^0",
         )
         res = self.router.execute(req)
-        self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+        self.assertEqual(res.status, EngineStatus.DOMAIN_ERROR)
         self.assertIn("Indeterminate form 0^0", res.error_message or "")
 
     def test_composite_zero_power_zero_detection(self):
@@ -388,7 +388,7 @@ class TestCASProduct03A(unittest.TestCase):
             expression="(5 - 5)^0",
         )
         res = self.router.execute(req)
-        self.assertEqual(res.status, EngineStatus.INVALID_INPUT)
+        self.assertEqual(res.status, EngineStatus.DOMAIN_ERROR)
         self.assertIn("Indeterminate form 0^0", res.error_message or "")
 
     # -------------------------------------------------------------------------

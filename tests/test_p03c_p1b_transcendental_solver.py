@@ -12,6 +12,7 @@ Tests:
 9. Domain-guarded equation solving with extraneous root elimination.
 """
 
+import math
 import pytest
 import sympy
 
@@ -435,30 +436,133 @@ def test_periodic_trig_unsupported_nonlinear_fail_closed():
 
 
 def test_domain_error_invalid_log_and_tan():
-    """Verify invalid constant log arguments, bases, and tan poles raise DOMAIN_ERROR or INVALID_INPUT."""
+    """Verify invalid constant log arguments, bases, and tan poles strictly raise DOMAIN_ERROR."""
     res_neg_log = execute_cas_operation(
         OperationType.SIMPLIFY,
         "\\log(-4, 2)",
     )
-    assert res_neg_log.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+    assert res_neg_log.mathematical_status == EngineStatus.DOMAIN_ERROR
+    assert res_neg_log.verification_status == VerificationStatus.ERROR
 
     res_base_1 = execute_cas_operation(
         OperationType.SIMPLIFY,
         "\\log(5, 1)",
     )
-    assert res_base_1.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+    assert res_base_1.mathematical_status == EngineStatus.DOMAIN_ERROR
+    assert res_base_1.verification_status == VerificationStatus.ERROR
+
+    res_neg_base = execute_cas_operation(
+        OperationType.SIMPLIFY,
+        "\\log(8, -2)",
+    )
+    assert res_neg_base.mathematical_status == EngineStatus.DOMAIN_ERROR
+    assert res_neg_base.verification_status == VerificationStatus.ERROR
 
     res_ln_0 = execute_cas_operation(
         OperationType.SIMPLIFY,
         "\\ln(0)",
     )
-    assert res_ln_0.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+    assert res_ln_0.mathematical_status == EngineStatus.DOMAIN_ERROR
+    assert res_ln_0.verification_status == VerificationStatus.ERROR
 
     res_tan_pole = execute_cas_operation(
         OperationType.SIMPLIFY,
         "\\tan(\\pi/2)",
     )
-    assert res_tan_pole.mathematical_status in (EngineStatus.DOMAIN_ERROR, EngineStatus.INVALID_INPUT)
+    assert res_tan_pole.mathematical_status == EngineStatus.DOMAIN_ERROR
+    assert res_tan_pole.verification_status == VerificationStatus.ERROR
+
+
+def test_syntax_error_malformed_inputs_invalid_input():
+    """Verify actual malformed syntax and parsing failures return INVALID_INPUT."""
+    malformed_cases = [
+        "\\log(",
+        "\\sin(+-)",
+        "\\tan)x(",
+        "\\sin(x",
+        "1 + * 2",
+    ]
+    for expr in malformed_cases:
+        res = execute_cas_operation(OperationType.SIMPLIFY, expr)
+        assert res.mathematical_status == EngineStatus.INVALID_INPUT
+        assert res.verification_status == VerificationStatus.ERROR
+
+
+def test_periodic_trig_adversarial_sin_3x_zero():
+    """Verify sin(3*x) = 0 produces exact family x = k*pi/3 (k in Z) and algebraic substitution holds."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(3*x) = 0",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "k*pi/3" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+    # Algebraic verification across parameter range k in [-3, 3]
+    for k_val in range(-3, 4):
+        x_val = k_val * math.pi / 3
+        # sin(3 * (k*pi/3)) = sin(k*pi) = 0
+        val = math.sin(3 * x_val)
+        assert abs(val) < 1e-12, f"Failed at k={k_val}: sin(3*{x_val}) = {val}"
+
+
+def test_periodic_trig_adversarial_cos_2x_one():
+    """Verify cos(2*x) = 1 produces exact family x = k*pi (k in Z) and algebraic substitution holds."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\cos(2*x) = 1",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "k*pi" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+    # Algebraic verification across parameter range k in [-3, 3]
+    for k_val in range(-3, 4):
+        x_val = k_val * math.pi
+        val = math.cos(2 * x_val)
+        assert abs(val - 1.0) < 1e-12, f"Failed at k={k_val}: cos(2*{x_val}) = {val}"
+
+
+def test_periodic_trig_adversarial_tan_2x_one():
+    """Verify tan(2*x) = 1 produces exact family x = pi/8 + k*pi/2 (k in Z) and algebraic substitution holds."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\tan(2*x) = 1",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "pi/8" in res.symbolic_result
+    assert "k*pi/2" in res.symbolic_result
+    assert "k in Z" in res.symbolic_result
+
+    # Algebraic verification across parameter range k in [-3, 3]
+    for k_val in range(-3, 4):
+        x_val = math.pi / 8 + k_val * math.pi / 2
+        val = math.tan(2 * x_val)
+        assert abs(val - 1.0) < 1e-12, f"Failed at k={k_val}: tan(2*{x_val}) = {val}"
+
+
+def test_periodic_trig_adversarial_negative_coefficient():
+    """Verify transformed affine trigonometric equation with negative coefficient sin(-2*x + pi/3) = 1/2."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\sin(-2*x + \\pi/3) = 1/2",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert "k in Z" in res.symbolic_result
+    # Families are x = pi/12 + k*pi or x = -pi/4 + k*pi
+    assert "pi/12" in res.symbolic_result
+    assert "-pi/4" in res.symbolic_result or "3*pi/4" in res.symbolic_result or "pi/4" in res.symbolic_result
+
+    # Verification across parameters k in [-2, 2]
+    # Family 1: x = pi/12 + k*pi -> -2x + pi/3 = -pi/6 - 2k*pi + pi/3 = pi/6 - 2k*pi -> sin = 1/2
+    for k_val in range(-2, 3):
+        x1 = math.pi / 12 + k_val * math.pi
+        v1 = math.sin(-2 * x1 + math.pi / 3)
+        assert abs(v1 - 0.5) < 1e-12, f"Failed family 1 at k={k_val}"
+
+        x2 = -math.pi / 4 + k_val * math.pi
+        v2 = math.sin(-2 * x2 + math.pi / 3)
+        assert abs(v2 - 0.5) < 1e-12, f"Failed family 2 at k={k_val}"
 
 
 def test_supervised_transcendental_identity_and_trig_solver():
@@ -483,4 +587,5 @@ def test_supervised_transcendental_identity_and_trig_solver():
     assert res_trig.mathematical_status == EngineStatus.SUCCESS
     assert "pi/6 + 2*k*pi" in res_trig.symbolic_result
     assert "k in Z" in res_trig.symbolic_result
+
 

@@ -146,7 +146,7 @@ class EngineRouter:
                 operation=request.operation.value if isinstance(request.operation, OperationType) else str(request.operation),
                 original_input=input_str,
                 selected_engine="router",
-                mathematical_status=EngineStatus.INVALID_INPUT,
+                mathematical_status=EngineStatus.DOMAIN_ERROR,
                 verification_status=VerificationStatus.ERROR,
                 domain_certainty=DomainCertainty.NOT_APPLICABLE,
                 error_message=str(ex),

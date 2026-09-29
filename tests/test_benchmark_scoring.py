@@ -349,3 +349,21 @@ class TestBenchmarkScoringSuite:
         assert res["outcome"] == BenchmarkOutcome.GENUINE_WRONG_ANSWER
         assert res["matched_ground_truth"] is False
 
+    def test_exact_status_matching_domain_error_not_equated_with_invalid_input(self):
+        """Ensure DOMAIN_ERROR expected_status strictly requires DOMAIN_ERROR and rejects INVALID_INPUT."""
+        problem = {
+            "format_type": "FORMAT_III_SHORT_ANSWER",
+            "input_modality": "SYMBOLIC_TYPED",
+            "ground_truth": {"expected_status": "DOMAIN_ERROR"}
+        }
+        # Exact match -> SUCCESS
+        res_ok = evaluate_benchmark_response(problem, "DOMAIN_ERROR", {"error_message": "Domain error"})
+        assert res_ok["outcome"] == BenchmarkOutcome.SUCCESS
+        assert res_ok["matched_ground_truth"] is True
+
+        # Mismatch (INVALID_INPUT when DOMAIN_ERROR expected) -> UNSUPPORTED_GRAMMAR, matched_ground_truth=False
+        res_bad = evaluate_benchmark_response(problem, "INVALID_INPUT", {"error_message": "Syntax error"})
+        assert res_bad["outcome"] == BenchmarkOutcome.UNSUPPORTED_GRAMMAR
+        assert res_bad["matched_ground_truth"] is False
+
+

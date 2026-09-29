@@ -203,7 +203,6 @@ def evaluate_benchmark_response(
         if (
             engine_status == expected_status
             or (expected_status in ["OUT_OF_SCOPE", "UNRESOLVED"] and engine_status in ["OUT_OF_SCOPE", "UNRESOLVED"])
-            or (expected_status == "DOMAIN_ERROR" and engine_status in ["DOMAIN_ERROR", "INVALID_INPUT"])
         ):
             return {
                 "outcome": BenchmarkOutcome.SUCCESS,
