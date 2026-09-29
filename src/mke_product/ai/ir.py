@@ -131,3 +131,9 @@ class ValidationResult(BaseModel):
     uncertainties: List[UncertaintyFlag] = Field(default_factory=list, description="Uncertainty flags")
     validated_ir: Optional[MathIntermediateRepresentation] = Field(default=None, description="Validated MKE-IR model")
     target_operation: Optional[str] = Field(default=None, description="Target CAS OperationType name if valid")
+
+    @property
+    def is_ready_for_cas(self) -> bool:
+        """Compatibility property matching is_cas_ready."""
+        return self.is_cas_ready
+

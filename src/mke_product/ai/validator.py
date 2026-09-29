@@ -35,7 +35,45 @@ from mke_product.cas.contracts import OperationType
 
 IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 ALLOWED_CONSTRAINT_RELATIONS: Set[str] = {">", ">=", "<", "<=", "!=", "=", "in"}
+ALLOWED_CONSTRAINT_ROLES: Set[str] = {
+    "CONSTRAINT",
+    "DOMAIN_RESTRICTION",
+    "CONDITION",
+    "STEM",
+    "PROBLEM_STATEMENT",
+}
 ALLOWLISTED_OPTION_KEYS: Set[str] = {"A", "B", "C", "D"}
+
+ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
+    "UNCONFIRMED_INFERRED_CONSTRAINT": {
+        "severity": "ERROR",
+        "message": "Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution.",
+    },
+    "UNVERIFIED_SEMANTIC_TRANSFORMATION": {
+        "severity": "WARNING",
+        "message": "Primary expression is a normalized or inferred transformation.",
+    },
+    "MULTI_PART_AWAITING_STAGE": {
+        "severity": "WARNING",
+        "message": "Multi-part and multiple-choice questions are structurally validated but require downstream stage evaluation.",
+    },
+    "AMBIGUOUS_VARIABLE_BINDING": {
+        "severity": "WARNING",
+        "message": "Variable binding in problem statement has potential ambiguity.",
+    },
+    "ASSUMED_REAL_DOMAIN": {
+        "severity": "WARNING",
+        "message": "Real domain evaluation assumed for expressions without explicit domain.",
+    },
+    "UNSUPPORTED_NOTATION_NORMALIZED": {
+        "severity": "WARNING",
+        "message": "Non-standard mathematical notation was normalized during intake.",
+    },
+    "GENERIC_EXTRACTION_UNCERTAINTY": {
+        "severity": "WARNING",
+        "message": "Extraction contains unverified assumptions or ambiguous notation.",
+    },
+}
 
 MAX_RAW_QUERY_CHARS = 4000
 MAX_EXPRESSION_CHARS = 1000
@@ -43,6 +81,28 @@ MAX_SUBPART_STATEMENT_CHARS = 2000
 MAX_OPTION_CHARS = 1000
 MAX_METADATA_ENTRIES = 50
 MAX_BRACKET_DEPTH = 20
+
+
+def normalize_math_tokens(text: str) -> str:
+    """Normalize mathematical text by removing whitespace and standardizing common relational operators."""
+    s = text.replace(" ", "").replace("\t", "").replace("\n", "").replace("\r", "")
+    s = s.replace(r"\geq", ">=").replace(r"\ge", ">=")
+    s = s.replace(r"\leq", "<=").replace(r"\le", "<=")
+    s = s.replace(r"\neq", "!=").replace(r"\ne", "!=")
+    s = s.replace(r"\gt", ">").replace(r"\lt", "<")
+    s = s.replace(r"\in", "in")
+    return s
+
+
+def check_constraint_source_fidelity(constraint: ExtractedConstraint, fragment: str) -> bool:
+    """Check whether variable, relation, and bound are faithfully represented in the source fragment."""
+    norm_frag = normalize_math_tokens(fragment)
+    norm_var = normalize_math_tokens(constraint.variable)
+    norm_rel = normalize_math_tokens(constraint.relation)
+    norm_bound = normalize_math_tokens(constraint.bound_expression)
+
+    direct_pattern = f"{norm_var}{norm_rel}{norm_bound}"
+    return direct_pattern in norm_frag
 
 
 class MKEIntakeValidator:
@@ -187,8 +247,25 @@ class MKEIntakeValidator:
                 is_fatal=True
             ))
 
-        # Copy existing uncertainty flags from extraction
-        uncertainties.extend(ir.uncertainty_flags)
+        # Sanitize model-originated uncertainty flags (Task B)
+        for u in ir.uncertainty_flags:
+            u_code = u.code if isinstance(u.code, str) else ""
+            if u_code in ALLOWLISTED_UNCERTAINTIES:
+                defn = ALLOWLISTED_UNCERTAINTIES[u_code]
+                sev = u.severity if u.severity in {"WARNING", "ERROR", "CRITICAL"} else defn["severity"]
+                uncertainties.append(UncertaintyFlag(
+                    code=u_code,
+                    message=defn["message"],
+                    severity=sev
+                ))
+            else:
+                sev = u.severity if u.severity in {"WARNING", "ERROR", "CRITICAL"} else "WARNING"
+                uncertainties.append(UncertaintyFlag(
+                    code="GENERIC_EXTRACTION_UNCERTAINTY",
+                    message=ALLOWLISTED_UNCERTAINTIES["GENERIC_EXTRACTION_UNCERTAINTY"]["message"],
+                    severity=sev
+                ))
+
 
         # -------------------------------------------------------------------
         # Step 3: Validate Question Format and Required Subparts (Task 3 & 4)
@@ -434,13 +511,30 @@ class MKEIntakeValidator:
                             field_path=f"extracted_constraints[{idx}].source_span",
                             is_fatal=True
                         ))
+                    else:
+                        role_upper = c_span.semantic_role.upper()
+                        if role_upper not in ALLOWED_CONSTRAINT_ROLES:
+                            issues.append(ValidationIssue(
+                                code="INVALID_CONSTRAINT_ROLE",
+                                message="Constraint source span semantic role is not allowed for constraints.",
+                                field_path=f"extracted_constraints[{idx}].source_span",
+                                is_fatal=True
+                            ))
+                        elif not check_constraint_source_fidelity(c, c_span.source_fragment):
+                            issues.append(ValidationIssue(
+                                code="CONSTRAINT_SOURCE_MISMATCH",
+                                message="Explicit constraint does not match source span text.",
+                                field_path=f"extracted_constraints[{idx}].source_span",
+                                is_fatal=True
+                            ))
             else:
                 # Inferred constraint blocks CAS readiness
                 uncertainties.append(UncertaintyFlag(
                     code="UNCONFIRMED_INFERRED_CONSTRAINT",
-                    message="Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution.",
-                    severity="ERROR"
+                    message=ALLOWLISTED_UNCERTAINTIES["UNCONFIRMED_INFERRED_CONSTRAINT"]["message"],
+                    severity=ALLOWLISTED_UNCERTAINTIES["UNCONFIRMED_INFERRED_CONSTRAINT"]["severity"]
                 ))
+
 
         # -------------------------------------------------------------------
         # Step 5: Verify Source-Span Integrity (Phase 2 Fidelity)
@@ -727,6 +821,7 @@ class MKEIntakeValidator:
                 "EXCESSIVE_METADATA_ENTRIES",
                 "INVALID_EXPRESSION_CARDINALITY",
                 "MISSING_CONSTRAINT_PROVENANCE",
+                "INVALID_CONSTRAINT_ROLE",
             }
             for i in issues
         )
@@ -753,6 +848,8 @@ class MKEIntakeValidator:
                 "MISSING_EXPRESSION_PROVENANCE",
                 "UNLINKED_EXPRESSION_PROVENANCE",
                 "MISSING_CONSTRAINT_PROVENANCE",
+                "INVALID_CONSTRAINT_ROLE",
+                "CONSTRAINT_SOURCE_MISMATCH",
             }
             for i in issues
         )

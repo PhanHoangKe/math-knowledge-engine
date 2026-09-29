@@ -574,7 +574,7 @@ def test_mandatory_3_explicit_constraint_without_source_evidence_blocks_cas():
 
 
 def test_mandatory_4_multiple_choice_with_mismatched_option_not_cas_ready():
-    """TASK 5.4: Four-option multiple choice with mismatched options cannot become CAS-ready."""
+    """TASK 5.4: Four-option multiple choice with actually mismatched options cannot become CAS-ready."""
     raw = "Phương trình x = 1 có nghiệm:\nA. 1\nB. 2\nC. 3\nD. 4"
     ir = MathIntermediateRepresentation(
         problem_category=ProblemCategory.EQUATION_SINGLE,
@@ -585,7 +585,7 @@ def test_mandatory_4_multiple_choice_with_mismatched_option_not_cas_ready():
         source_spans=[
             SourceSpan(start_char=13, end_char=18, source_fragment="x = 1", semantic_role="EQUATION")
         ],
-        given_options={"A": "1", "B": "2", "C": "3", "D": "4"}
+        given_options={"A": "999", "B": "888", "C": "777", "D": "666"}  # Actually mismatched option values
     )
 
     res = MKEIntakeValidator.validate(raw, ir)
@@ -685,3 +685,271 @@ def test_mandatory_8_unsupported_or_transformed_inputs_fail_closed():
     res = MKEIntakeValidator.validate(raw, ir_transformed)
     assert res.is_cas_ready is False
     assert res.status == "UNVERIFIED_SEMANTICS"
+
+
+# ===========================================================================
+# Restored P1C-03-R1 Regression Tests (Task C)
+# ===========================================================================
+
+def test_adversarial_substituted_raw_query_rejected():
+    """TASK C.1: An IR containing a substituted raw_query differing from authoritative input is rejected."""
+    authoritative_query = "Giải phương trình 2^x = 8"
+    fake_query = "Giải phương trình x^2 - 4 = 0"
+
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=fake_query,  # Substituted
+        primary_expressions=["2^x = 8"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=25, source_fragment="2^x = 8", semantic_role="EQUATION")
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(authoritative_query, ir)
+    assert res.is_valid is False
+    assert res.is_cas_ready is False
+    assert res.is_source_faithful is False
+    assert any(i.code == "RAW_QUERY_MISMATCH" for i in res.issues)
+
+
+def test_adversarial_replacement_equation_unverified_semantics():
+    """TASK C.2: A transformed or synthesized equation is marked UNVERIFIED_SEMANTICS and blocks CAS."""
+    raw = "Giải phương trình x^2 - 5x + 6 = 0"
+    # Model extracted normalized 5*x instead of literal 5x excerpt
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x^2 - 5*x + 6 = 0"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=34, source_fragment="x^2 - 5x + 6 = 0", semantic_role="EQUATION")
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.semantic_status == SemanticVerificationStatus.UNVERIFIED_TRANSFORMATION
+    assert res.is_cas_ready is False
+    assert res.status == "UNVERIFIED_SEMANTICS"
+    assert any(u.code == "UNVERIFIED_SEMANTIC_TRANSFORMATION" for u in res.uncertainties)
+
+
+def test_adversarial_missing_provenance_blocks_cas_routing():
+    """TASK C.3: Missing source span provenance cannot silently authorize CAS routing."""
+    raw = "Giải phương trình x = 1"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[]  # No provenance link
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_valid is False
+    assert res.is_cas_ready is False
+    assert res.semantic_status == SemanticVerificationStatus.UNLINKED
+    assert any(i.code == "MISSING_EXPRESSION_PROVENANCE" for i in res.issues)
+
+
+def test_adversarial_schema_errors_do_not_expose_pii():
+    """TASK C.4: Malformed schema errors do not leak student names, emails or credentials."""
+    raw = "Query"
+    malformed_payload = {
+        "problem_category": "EQUATION_SINGLE",
+        "raw_query": "Student Le Van B email le.van.b@school.vn key sk-99887766554433221100",
+        "primary_expressions": 12345,  # Bad type triggering schema validation error
+        "student_secret_notes": "sensitive personal data"
+    }
+
+    res = MKEIntakeValidator.validate(raw, malformed_payload)
+    assert res.is_valid is False
+    assert res.status == "INVALID"
+
+    # Verify no PII or sensitive tokens appear anywhere in issue messages
+    for issue in res.issues:
+        msg = issue.message
+        assert "le.van.b" not in msg
+        assert "sk-998877" not in msg
+        assert "Le Van B" not in msg
+        assert "sensitive" not in msg
+        assert issue.message == "Payload failed MKE-IR schema validation. Structure does not conform to specification."
+
+
+def test_adversarial_subpart_and_constraint_complexity_limits():
+    """TASK C.5: Subpart statement and constraint bound complexity limits are strictly enforced."""
+    raw = "Bài toán kiểm tra giới hạn"
+
+    # 1. Subpart statement oversized (>2000 chars) passed as dictionary payload
+    oversized_stmt = "A" * 2050
+    payload_subpart = {
+        "problem_category": "EXPRESSION_SIMPLIFY",
+        "question_format": "TRUE_FALSE_4",
+        "raw_query": raw,
+        "primary_expressions": ["x + 1"],
+        "source_spans": [{"start_char": 0, "end_char": 8, "source_fragment": "Bài toán", "semantic_role": "STEM"}],
+        "subparts": [
+            {"subpart_id": "a", "statement": oversized_stmt},
+            {"subpart_id": "b", "statement": "Stmt B"},
+            {"subpart_id": "c", "statement": "Stmt C"},
+            {"subpart_id": "d", "statement": "Stmt D"},
+        ]
+    }
+    res_sub = MKEIntakeValidator.validate(raw, payload_subpart)
+    assert res_sub.is_valid is False
+    assert res_sub.is_structurally_valid is False
+    assert any(i.code == "SCHEMA_VALIDATION_ERROR" for i in res_sub.issues)
+
+    # 2. Constraint bound syntax error
+    ir_constraint = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[SourceSpan(start_char=0, end_char=8, source_fragment="Bài toán", semantic_role="STEM")],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="invalid^^syntax++",
+                source_span=SourceSpan(start_char=0, end_char=8, source_fragment="Bài toán", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+    res_const = MKEIntakeValidator.validate(raw, ir_constraint)
+    assert res_const.is_valid is False
+    assert any(i.code == "INVALID_CONSTRAINT_SYNTAX" for i in res_const.issues)
+
+
+def test_adversarial_unsupported_schema_version_rejected():
+    """TASK C.6: Unsupported schema versions are strictly rejected."""
+    raw = "Giải phương trình x = 1"
+    ir = MathIntermediateRepresentation(
+        schema_version="mke.ir.v999_unsupported",
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ]
+    )
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_valid is False
+    assert any(i.code == "UNSUPPORTED_SCHEMA_VERSION" for i in res.issues)
+
+
+# ===========================================================================
+# P1C-03-R3 Dedicated Safety & Source Binding Tests (Tasks A & B)
+# ===========================================================================
+
+def test_r3_explicit_constraint_source_mismatch_blocks_cas():
+    """TASK A: Explicit constraint x>2 pointing to span containing only x=1 MUST NOT become CAS-ready."""
+    raw = "Giải phương trình x = 1"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",
+                source_span=SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert res.is_valid is False
+    assert res.is_source_faithful is False
+    assert any(i.code == "CONSTRAINT_SOURCE_MISMATCH" for i in res.issues)
+
+
+def test_r3_explicit_constraint_invalid_role_rejected():
+    """TASK A: Explicit constraint pointing to an answer option span (role OPTION_A) is rejected."""
+    raw = "Phương trình x = 1 có điều kiện:\nA. x > 0"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=13, end_char=18, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="0",
+                source_span=SourceSpan(start_char=36, end_char=41, source_fragment="x > 0", semantic_role="OPTION_A"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert res.is_valid is False
+    assert any(i.code == "INVALID_CONSTRAINT_ROLE" for i in res.issues)
+
+
+def test_r3_untrusted_uncertainty_diagnostics_sanitized():
+    """TASK B: Untrusted model uncertainty flags containing PII, API keys, or hostile script are sanitized."""
+    raw = "Giải phương trình x = 1"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        uncertainty_flags=[
+            UncertaintyFlag(
+                code="CUSTOM_MODEL_LEAK",
+                message="Student Nguyen Van A email student@edu.vn API key sk-ant-api03-abcdef1234567890",
+                severity="WARNING"
+            ),
+            UncertaintyFlag(
+                code="INJECTION_ATTEMPT",
+                message="<script>alert('xss')</script> DROP TABLE users;--",
+                severity="ERROR"
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+
+    # Verify that all uncertainties are sanitized to allowlisted codes & messages
+    for u in res.uncertainties:
+        assert "Nguyen Van A" not in u.message
+        assert "student@edu.vn" not in u.message
+        assert "sk-ant-api03" not in u.message
+        assert "<script>" not in u.message
+        assert "DROP TABLE" not in u.message
+        assert u.code == "GENERIC_EXTRACTION_UNCERTAINTY"
+
+    # Verify no issue messages leak PII or hostile strings
+    for issue in res.issues:
+        assert "Nguyen Van A" not in issue.message
+        assert "student@edu.vn" not in issue.message
+        assert "sk-ant-api03" not in issue.message
+        assert "<script>" not in issue.message
+        assert "DROP TABLE" not in issue.message
+
