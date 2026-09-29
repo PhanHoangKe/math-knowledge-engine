@@ -109,17 +109,57 @@ ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
 }
 
 SEVERITY_ORDER: Dict[str, int] = {"WARNING": 1, "ERROR": 2, "CRITICAL": 3}
-SAFE_FIELD_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_]+(\[[0-9]+\])?(\.[a-zA-Z0-9_]+)?$")
+
+ALLOWLISTED_FIXED_PATHS: Set[str] = {
+    "root",
+    "raw_query",
+    "problem_category",
+    "question_format",
+    "schema_version",
+    "metadata",
+    "primary_expressions",
+    "target_variables",
+    "parameters",
+    "extracted_constraints",
+    "subparts",
+    "given_options",
+    "source_spans",
+    "uncertainty_flags",
+    "given_options.A",
+    "given_options.B",
+    "given_options.C",
+    "given_options.D",
+}
+
+ALLOWLISTED_INDEXED_PATH_PATTERNS: List[re.Pattern] = [
+    re.compile(r"^primary_expressions\[([0-9]{1,3})\]$"),
+    re.compile(r"^target_variables\[([0-9]{1,3})\]$"),
+    re.compile(r"^parameters\[([0-9]{1,3})\]$"),
+    re.compile(r"^extracted_constraints\[([0-9]{1,3})\]$"),
+    re.compile(r"^extracted_constraints\[([0-9]{1,3})\]\.(variable|relation|bound_expression|source_span|is_inferred)$"),
+    re.compile(r"^subparts\[([0-9]{1,3})\]$"),
+    re.compile(r"^subparts\[([0-9]{1,3})\]\.(subpart_id|statement|extracted_expression|source_span)$"),
+    re.compile(r"^source_spans\[([0-9]{1,3})\]$"),
+    re.compile(r"^source_spans\[([0-9]{1,3})\]\.(start_char|end_char|source_fragment|semantic_role)$"),
+    re.compile(r"^uncertainty_flags\[([0-9]{1,3})\]$"),
+]
 
 
 def sanitize_public_field_path(field_path: str) -> str:
-    """Ensure field_path conforms strictly to safe JSON path identifiers."""
+    """Ensure field_path conforms strictly to allowlisted validator path schemas."""
     if not isinstance(field_path, str) or not field_path.strip():
         return "root"
     clean = field_path.strip()
-    if SAFE_FIELD_PATH_PATTERN.match(clean):
+    if clean in ALLOWLISTED_FIXED_PATHS:
         return clean
+    for pattern in ALLOWLISTED_INDEXED_PATH_PATTERNS:
+        m = pattern.match(clean)
+        if m:
+            idx = int(m.group(1))
+            if 0 <= idx < 100:  # safe bounded index limit
+                return clean
     return "root"
+
 
 
 
@@ -289,10 +329,11 @@ class ValidationResult(BaseModel):
             if code in ALLOWLISTED_ISSUE_DEFINITIONS:
                 msg = ALLOWLISTED_ISSUE_DEFINITIONS[code]
                 safe_code = code
+                safe_path = sanitize_public_field_path(issue.field_path)
             else:
                 safe_code = "GENERIC_VALIDATION_ERROR"
                 msg = ALLOWLISTED_ISSUE_DEFINITIONS["GENERIC_VALIDATION_ERROR"]
-            safe_path = sanitize_public_field_path(issue.field_path)
+                safe_path = "root"
             is_fatal = bool(issue.is_fatal)
             sanitized_issues.append(ValidationIssue(
                 code=safe_code,
@@ -322,13 +363,30 @@ class ValidationResult(BaseModel):
                 severity=sev
             ))
 
-        # 5. Sanitize boolean flags
-        is_valid_val = bool(self.is_valid)
-        is_cas_ready_val = bool(self.is_cas_ready)
+        # 5. Conservative public readiness fail-closed evaluation
+        has_fatal_issues = any(i.is_fatal for i in sanitized_issues)
+        has_blocking_uncertainties = any(u.severity in ("ERROR", "CRITICAL") for u in sanitized_uncertainties)
+        is_status_valid = (safe_status == "VALID")
+        has_valid_operation = (safe_op is not None and safe_op in ALLOWLISTED_OPERATIONS)
+
+        public_cas_ready = bool(
+            self.is_cas_ready
+            and self.is_valid
+            and is_status_valid
+            and has_valid_operation
+            and not has_fatal_issues
+            and not has_blocking_uncertainties
+        )
+        public_is_valid = bool(
+            self.is_valid
+            and is_status_valid
+            and not has_fatal_issues
+            and not has_blocking_uncertainties
+        )
 
         return PublicValidationDiagnostic(
-            is_valid=is_valid_val,
-            is_cas_ready=is_cas_ready_val,
+            is_valid=public_is_valid,
+            is_cas_ready=public_cas_ready,
             status=safe_status,
             target_operation=safe_op,
             issues=sanitized_issues,

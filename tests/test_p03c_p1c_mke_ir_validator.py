@@ -1407,6 +1407,186 @@ def test_r4b_r1_public_diagnostic_enforces_strict_allowlist_on_mutated_result():
     assert mutated_res.uncertainties[0].code == "HOSTILE_UNAPPROVED_UNCERTAINTY"
 
 
+# ===========================================================================
+# P1C-03-R4B-R2 Public Diagnostic Closeout Tests (Task A & Task B)
+# ===========================================================================
+
+def test_r4b_r2_field_path_allowlist_blocks_syntactically_valid_identifiers_and_tokens():
+    """TASK A: Field path sanitizer strictly allowlists known schemas and rejects arbitrary identifiers."""
+    from mke_product.ai.ir import sanitize_public_field_path
+
+    # 1. Syntactically valid but unapproved identifiers/tokens MUST become "root"
+    unapproved_paths = [
+        "sk_ant_secret_9999",
+        "metadata.secret123",
+        "metadata.token",
+        "user_ip",
+        "student_email",
+        "api_key",
+        "authorization_header",
+        "client_session_id",
+        "__proto__",
+        "constructor",
+        "primary_expressions[999]",  # Bounded index overflow
+        "extracted_constraints[150].bound_expression",
+        "subparts[100].statement",
+        "metadata.user.role",
+        "given_options.E",
+        "primary_expressions.0",
+    ]
+    for path in unapproved_paths:
+        assert sanitize_public_field_path(path) == "root", f"Path {path} should have been sanitized to 'root'"
+
+    # 2. Legitimate, allowlisted schema paths MUST be preserved
+    valid_paths = [
+        "root",
+        "raw_query",
+        "problem_category",
+        "question_format",
+        "schema_version",
+        "metadata",
+        "primary_expressions",
+        "primary_expressions[0]",
+        "primary_expressions[1]",
+        "target_variables",
+        "target_variables[0]",
+        "parameters",
+        "parameters[0]",
+        "extracted_constraints",
+        "extracted_constraints[0]",
+        "extracted_constraints[0].variable",
+        "extracted_constraints[0].relation",
+        "extracted_constraints[0].bound_expression",
+        "extracted_constraints[0].source_span",
+        "subparts",
+        "subparts[0]",
+        "subparts[0].statement",
+        "subparts[0].extracted_expression",
+        "given_options",
+        "given_options.A",
+        "given_options.B",
+        "given_options.C",
+        "given_options.D",
+        "source_spans",
+        "source_spans[0]",
+        "source_spans[0].start_char",
+        "source_spans[0].source_fragment",
+        "uncertainty_flags",
+        "uncertainty_flags[0]",
+    ]
+    for path in valid_paths:
+        assert sanitize_public_field_path(path) == path, f"Valid path {path} was unexpectedly altered"
+
+    # 3. Unknown issue codes MUST force field_path to "root" even if candidate path was valid
+    res = ValidationResult(
+        is_valid=False,
+        is_cas_ready=False,
+        status="INVALID",
+        issues=[
+            ValidationIssue(
+                code="UNAPPROVED_CUSTOM_ISSUE_CODE",
+                message="Sensitive internal exception trace",
+                field_path="primary_expressions[0]",  # Valid path syntax
+                is_fatal=True
+            )
+        ]
+    )
+    public_diag = res.to_public_diagnostic()
+    assert public_diag.issues[0].code == "GENERIC_VALIDATION_ERROR"
+    assert public_diag.issues[0].field_path == "root"  # Forced to "root" for unknown code
+
+
+def test_r4b_r2_conservative_public_readiness_fail_closed_on_mutated_results():
+    """TASK B: Public diagnostic fails closed on directly constructed/mutated results with conflicting states."""
+    
+    # Case 1: is_cas_ready=True and is_valid=True, but status is INVALID
+    res_invalid_status = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="INVALID",
+        target_operation="SOLVE",
+        issues=[],
+        uncertainties=[]
+    )
+    diag1 = res_invalid_status.to_public_diagnostic()
+    assert diag1.is_cas_ready is False
+    assert diag1.is_valid is False
+
+    # Case 2: is_cas_ready=True and is_valid=True, but has fatal issue
+    res_fatal_issue = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[
+            ValidationIssue(
+                code="MATH_SYNTAX_ERROR",
+                message="Syntax error",
+                field_path="primary_expressions[0]",
+                is_fatal=True
+            )
+        ],
+        uncertainties=[]
+    )
+    diag2 = res_fatal_issue.to_public_diagnostic()
+    assert diag2.is_cas_ready is False
+    assert diag2.is_valid is False
+
+    # Case 3: is_cas_ready=True and is_valid=True, but has blocking ERROR uncertainty
+    res_blocking_uncertainty = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[],
+        uncertainties=[
+            UncertaintyFlag(
+                code="UNCONFIRMED_INFERRED_CONSTRAINT",
+                message="Unconfirmed",
+                severity="ERROR"
+            )
+        ]
+    )
+    diag3 = res_blocking_uncertainty.to_public_diagnostic()
+    assert diag3.is_cas_ready is False
+    assert diag3.is_valid is False
+
+    # Case 4: is_cas_ready=True and is_valid=True, but invalid target operation
+    res_invalid_op = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="ARBITRARY_UNSUPPORTED_OP",
+        issues=[],
+        uncertainties=[]
+    )
+    diag4 = res_invalid_op.to_public_diagnostic()
+    assert diag4.is_cas_ready is False
+    assert diag4.target_operation is None
+
+    # Case 5: Fully legitimate valid outcome maintains readiness
+    res_legit_valid = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[],
+        uncertainties=[]
+    )
+    diag5 = res_legit_valid.to_public_diagnostic()
+    assert diag5.is_cas_ready is True
+    assert diag5.is_valid is True
+    assert diag5.status == "VALID"
+    assert diag5.target_operation == "SOLVE"
+
+    # Verify original internal objects were untouched
+    assert res_invalid_status.is_cas_ready is True
+    assert res_fatal_issue.is_cas_ready is True
+    assert res_blocking_uncertainty.is_cas_ready is True
+    assert res_invalid_op.is_cas_ready is True
+
+
+
 
 
 
