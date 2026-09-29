@@ -324,3 +324,28 @@ flowchart LR
 2. **Complex Multi-Step Word Problems:** Highly nested applied optimization word problems may require multi-pass decomposition, planned for subsequent extension.
 3. **Research G4 Status:** Academic research modules remain completely frozen.
 4. **CAS Code Immutability:** The underlying CAS engine remains strictly frozen at `v0.3.2-p03c-p1b` (`73c54f7d22fad87dc8c323c7281a18636a1d8908`).
+
+---
+
+## 10. Design Addendum (Phase A Mandates)
+
+### 10.1 Operation-Specific Verification & Evidence Fields
+1. **DomainCertainty Invariant:** `DomainCertainty` alone (e.g. `PROVEN_REALS`) indicates domain validity only and **must never be conflated with solution completeness**. Mathematical completeness requires explicit certification from CAS evidence fields:
+   - `is_certified_complete`: Boolean flag emitted by CAS completeness gate.
+   - `completeness_category`: e.g. `CERTIFIED_POLYNOMIAL_DEGREE_N`, `CERTIFIED_PERIODIC_TRIG_AFFINE`, `PROVEN_EMPTY_POLYNOMIAL`, `PROVEN_EMPTY_EXPONENTIAL`.
+   - `reason`: Exact explanation string from Sturm isolation or AST root comparison.
+2. **No Invented Proof Nodes:** The explanation generator must reference only genuine CAS response fields (`symbolic_result`, `domain_certainty`, `completeness_category`, `reason`), and must never invent synthetic or speculative CAS AST nodes.
+
+### 10.2 Exact Frozen CAS API Signatures & Contract Alignment
+1. **Equation Systems:** Must serialize through the existing frozen parser/request contracts (`parse_cas_equation` / `OperationType.SOLVE_SYSTEM`), utilizing standard comma-delimited equation sets where supported.
+2. **Candidate Checking Scope:** `OperationType.CHECK_CANDIDATE` is strictly a substitution-based point evaluator for checking whether a given candidate value satisfies an equation/domain. It is **not** a general solver for parametric families ($m \in \mathbb{R}$) or quantifier elimination.
+3. **Fail-Closed on Non-Elementary Types:** Any category outside verified CAS algebraic/transcendental solvers must return `EngineStatus.OUT_OF_SCOPE`.
+
+### 10.3 Baseline Containment vs. Future Security Roadmaps
+1. **Verified Existing Confinement:**
+   - Worker execution timeout: configurable via `CAS_WORKER_TIMEOUT_SECONDS` (default: 10.0s, test sandbox: 3.0s).
+   - Worker memory limits: configurable via `CAS_WORKER_MAX_MEMORY_MB` (default: 512 MB).
+   - Windows Job Object kernel-level termination on timeout.
+2. **Future Security Roadmap Requirements:**
+   - Network isolation (e.g. Windows Firewall rule confinement or Windows AppContainer network restrictions) and strict file-system write deny ACLs represent future security hardening targets that require explicit implementation and regression verification before being asserted as active guarantees.
+
