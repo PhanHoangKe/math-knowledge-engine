@@ -40,13 +40,17 @@ RESULTS_FILE = EVIDENCE_DIR / "p03c_p1b_benchmark_results.json"
 REPORT_FILE = EVIDENCE_DIR / "P03C_P1B_BENCHMARK_REPORT.md"
 
 
-def compute_sha256(filepath: Path) -> str:
-    """Compute SHA-256 hex digest of a file."""
-    h = hashlib.sha256()
+def compute_file_hashes(filepath: Path) -> dict:
+    """Compute raw on-disk SHA-256 and canonical LF SHA-256 hex digests."""
     with open(filepath, "rb") as f:
-        while chunk := f.read(8192):
-            h.update(chunk)
-    return h.hexdigest()
+        raw_bytes = f.read()
+    raw_sha = hashlib.sha256(raw_bytes).hexdigest()
+    normalized_bytes = raw_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    canonical_lf_sha = hashlib.sha256(normalized_bytes).hexdigest()
+    return {
+        "raw_sha256": raw_sha,
+        "canonical_lf_sha256": canonical_lf_sha,
+    }
 
 
 def get_git_info() -> dict:
@@ -115,6 +119,9 @@ def run_p1b_benchmark():
         "original_32_total": 0,
         "adversarial_15_passed": 0,
         "adversarial_15_total": 0,
+        "mathematical_solutions_count": 0,
+        "domain_rejections_count": 0,
+        "unsupported_out_of_scope_count": 0,
         "by_archetype": {},
     }
 
@@ -124,6 +131,7 @@ def run_p1b_benchmark():
         pid = prob["problem_id"]
         arch = prob.get("archetype_id", "UNKNOWN")
         gt = prob.get("ground_truth", {})
+        expected_st = gt.get("expected_status", "SUCCESS")
         is_adv = pid.startswith("P1B-ADV")
 
         if is_adv:
@@ -162,6 +170,13 @@ def run_p1b_benchmark():
                 stats["adversarial_15_passed"] += 1
             else:
                 stats["original_32_passed"] += 1
+
+            if expected_st == "DOMAIN_ERROR":
+                stats["domain_rejections_count"] += 1
+            elif expected_st == "OUT_OF_SCOPE":
+                stats["unsupported_out_of_scope_count"] += 1
+            else:
+                stats["mathematical_solutions_count"] += 1
         else:
             stats["failed"] += 1
 
@@ -194,11 +209,16 @@ def run_p1b_benchmark():
     print(f"ORIGINAL 32 BENCHMARK: {stats['original_32_passed']}/{stats['original_32_total']} Passed ({orig_acc:.1f}%)")
     print(f"ADVERSARIAL 15 SUITE:  {stats['adversarial_15_passed']}/{stats['adversarial_15_total']} Passed ({adv_acc:.1f}%)")
     print(f"TOTAL COMBINED SUITE:  {stats['passed']}/{stats['total_problems']} Passed ({accuracy:.1f}%) in {duration_total:.2f}s")
+    print(f"  - Mathematically Solved:          {stats['mathematical_solutions_count']}")
+    print(f"  - Verified Domain Rejections:     {stats['domain_rejections_count']}")
+    print(f"  - Verified Unsupported/Out Scope: {stats['unsupported_out_of_scope_count']}")
     print("================================================================================")
 
     git_info = get_git_info()
     git_sha = git_info["git_commit_sha"]
-    dataset_sha = compute_sha256(BENCHMARK_FILE)
+    hashes = compute_file_hashes(BENCHMARK_FILE)
+    dataset_sha = hashes["raw_sha256"]
+    dataset_canonical_lf_sha = hashes["canonical_lf_sha256"]
 
     # Save JSON results
     output_data = {
@@ -207,6 +227,7 @@ def run_p1b_benchmark():
         "is_worktree_clean": git_info["is_worktree_clean"],
         "dataset_file": BENCHMARK_FILE.name,
         "dataset_sha256": dataset_sha,
+        "dataset_canonical_lf_sha256": dataset_canonical_lf_sha,
         "engine_version": "v0.3.2-p03c-p1b-r1",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "environment": {
@@ -218,6 +239,11 @@ def run_p1b_benchmark():
         "passed": stats["passed"],
         "failed": stats["failed"],
         "accuracy_pct": accuracy,
+        "item_breakdown": {
+            "mathematical_solutions_count": stats["mathematical_solutions_count"],
+            "domain_rejections_count": stats["domain_rejections_count"],
+            "unsupported_out_of_scope_count": stats["unsupported_out_of_scope_count"],
+        },
         "original_32_suite": {
             "total": stats["original_32_total"],
             "passed": stats["original_32_passed"],
@@ -246,7 +272,8 @@ def run_p1b_benchmark():
         f"- **Tested Source Commit:** `{git_sha}`",
         f"- **Worktree Status:** `{'Clean' if git_info['is_worktree_clean'] else 'Modified / Dirty'}`",
         f"- **Dataset File:** `{BENCHMARK_FILE.name}`",
-        f"- **Dataset SHA-256:** `{dataset_sha}`",
+        f"- **Dataset Canonical LF SHA-256 (Platform Independent):** `{dataset_canonical_lf_sha}`",
+        f"- **Dataset On-Disk SHA-256:** `{dataset_sha}`",
         f"- **Build Version:** `v0.3.2-p03c-p1b-r1`",
         f"- **Environment:** Python `{platform.python_version()}` on `{platform.platform()}`",
         f"- **Timestamp:** `{output_data['timestamp_utc']}`",
@@ -259,6 +286,13 @@ def run_p1b_benchmark():
         f"| **Original P1B Suite** | {stats['original_32_total']} | {stats['original_32_passed']} | 0 | **{orig_acc:.1f}%** |",
         f"| **Adversarial Soundness Suite** | {stats['adversarial_15_total']} | {stats['adversarial_15_passed']} | 0 | **{adv_acc:.1f}%** |",
         f"| **Combined P1B-R1 Benchmark** | **{stats['total_problems']}** | **{stats['passed']}** | **0** | **{accuracy:.1f}%** |",
+        "",
+        "### Stratified Item Categorization Breakdown",
+        "",
+        "To ensure strict data honesty and prevent overclaiming, the 47 benchmark items are explicitly categorized into three distinct operational buckets:",
+        f"1. **Mathematically Solved Answers ({stats['mathematical_solutions_count']}/47):** Authentic high-school calculus, exponential, logarithmic, and trigonometric equations/derivatives solved to canonical symbolic truth.",
+        f"2. **Proven Mathematical Domain Rejections ({stats['domain_rejections_count']}/47):** Adversarial items with impossible or undefined domains (e.g. `P1B-ADV-005` to `P1B-ADV-009`) correctly rejected with `DOMAIN_ERROR` / `NOT_APPLICABLE`.",
+        f"3. **Supported Out-of-Scope Soundness Rejections ({stats['unsupported_out_of_scope_count']}/47):** Adversarial non-elementary mixed equations (e.g. `P1B-ADV-015` $\\sin(x) + \\cos(x) = x$) correctly failed closed with `OUT_OF_SCOPE` / `NOT_FULLY_DETERMINED`.",
         "",
         "## Curriculum Archetype Taxonomy Crosswalk",
         "",

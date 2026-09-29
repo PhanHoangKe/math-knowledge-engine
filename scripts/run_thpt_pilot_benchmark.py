@@ -41,13 +41,17 @@ EVIDENCE_DIR = REPO_ROOT / "evidence" / "benchmark"
 RESULTS_FILE = EVIDENCE_DIR / "thpt_pilot_benchmark_results.json"
 
 
-def compute_sha256(filepath: Path) -> str:
-    """Compute SHA-256 hex digest of a file."""
-    h = hashlib.sha256()
+def compute_file_hashes(filepath: Path) -> dict:
+    """Compute raw on-disk SHA-256 and canonical LF SHA-256 hex digests."""
     with open(filepath, "rb") as f:
-        while chunk := f.read(8192):
-            h.update(chunk)
-    return h.hexdigest()
+        raw_bytes = f.read()
+    raw_sha = hashlib.sha256(raw_bytes).hexdigest()
+    normalized_bytes = raw_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    canonical_lf_sha = hashlib.sha256(normalized_bytes).hexdigest()
+    return {
+        "raw_sha256": raw_sha,
+        "canonical_lf_sha256": canonical_lf_sha,
+    }
 
 
 def get_git_info() -> dict:
@@ -277,7 +281,9 @@ def run_pilot_benchmark():
     symbolic_accuracy = (successes / attempted) * 100.0 if attempted > 0 else 0.0
 
     git_info = get_git_info()
-    dataset_sha = compute_sha256(BENCHMARK_FILE)
+    hashes = compute_file_hashes(BENCHMARK_FILE)
+    dataset_sha = hashes["raw_sha256"]
+    dataset_canonical_lf_sha = hashes["canonical_lf_sha256"]
 
     output_payload = {
         "benchmark_metadata": dataset.get("benchmark_metadata"),
@@ -288,6 +294,7 @@ def run_pilot_benchmark():
             "is_worktree_clean": git_info["is_worktree_clean"],
             "dataset_file": BENCHMARK_FILE.name,
             "dataset_sha256": dataset_sha,
+            "dataset_canonical_lf_sha256": dataset_canonical_lf_sha,
             "environment": {
                 "python_version": platform.python_version(),
                 "platform": platform.platform(),
