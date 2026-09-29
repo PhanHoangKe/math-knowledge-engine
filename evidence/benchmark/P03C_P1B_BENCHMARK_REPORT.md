@@ -1,10 +1,14 @@
 # MKE P03C-P1B-R1 Transcendental Solver & Adversarial Soundness Benchmark Report
 
 - **Benchmark ID:** `P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1`
-- **Tested Source Commit:** `bf7eb30429db95035f3f269fb3dd80f057c8662a`
+- **Tested Source Commit:** `0a7548b43fa833ae091de3616e45baf3038908a8`
+- **Worktree Status:** `Modified / Dirty`
+- **Dataset File:** `p03c_p1b_transcendental_benchmark.json`
+- **Dataset SHA-256:** `76edfc7aa5b19323746121adcee75c4647c6a60f95f62e3ad74d61d56e8d6c4f`
 - **Build Version:** `v0.3.2-p03c-p1b-r1`
-- **Timestamp:** `2026-09-28T22:37:51Z`
-- **Execution Duration:** `40.42s`
+- **Environment:** Python `3.10.11` on `Windows-10-10.0.26200-SP0`
+- **Timestamp:** `2026-09-29T03:20:57Z`
+- **Execution Duration:** `42.61s`
 
 ## Executive Summary
 
@@ -34,9 +38,21 @@ In the 40-problem THPT pilot diagnostic benchmark (`tests/benchmarks/thpt_pilot_
 - `PILOT-11-0008` (`ARCH-11.4.3`): $\log_2(x-1) + \log_2(x+1) = 3 \implies S = \{3\}$ -> **PASS** (extraneous root $-3$ rejected via domain gating)
 
 Longitudinal Pilot Progression:
-- **P03B Baseline:** 12 / 40 (30.0%)
-- **P03C-P1A Baseline:** 14 / 40 (35.0%)
-- **P03C-P1B-R1 Milestone:** **17 / 40 (42.5%)** (+12.5% progression over P03B, 0 extraneous root leaks)
+- **Accepted P1A Baseline:** 13 / 40 (32.5%)
+- **Initial P1B Milestone:** 16 / 40 (40.0%)
+- **P03C-P1B-R1 Gate Hotfix:** **17 / 40 (42.5%)** (+10.0% net progression over accepted P1A, 0 extraneous root leaks)
+
+## Mathematical Scope & Completeness Guarantees (Task 4)
+
+1. **Exhaustive Real-Root Completeness Boundary:**
+   - General candidate collection through SymPy `solve` does **not** itself establish exhaustive real-root completeness for general transcendental equations.
+   - Formal complete-solution set claims are **strictly restricted** to justified, certified problem classes:
+     - Elementary affine single-function periodic trigonometric equations: $\sin(ax+b)=m, \cos(ax+b)=m, \tan(ax+b)=m$ (with complete $k \in \mathbb{Z}$ parameterization).
+     - Identity equations with certified domain extraction ($f(x)=f(x)$ over verified continuous/periodic domain subsets).
+     - Quadratic, linear, and single/dual radical equations with certified extraneous root elimination.
+2. **Fail-Closed Unclassified Transcendental Scope:**
+   - Unsupported general exponential, logarithmic, and mixed transcendental equations (e.g. $\sin(x) + \cos(x) = x$, $\ln(x) + x = 0$, $2^x = x^2$) fail closed with `OUT_OF_SCOPE` or `UNRESOLVED` and domain certainty `NOT_FULLY_DETERMINED`.
+   - The engine **never** returns partial principal roots as complete solution sets for unclassified periodic equations.
 
 ## Mathematical Soundness Demonstrations
 
@@ -51,6 +67,10 @@ Longitudinal Pilot Progression:
 - $\cos(x) = 0 \implies x = \pi/2 + k\pi \quad (k \in \mathbb{Z})$
 - $\tan(x) = 1 \implies x = \pi/4 + k\pi \quad (k \in \mathbb{Z})$
 - $\sin(2x - \pi/6) = 1/2 \implies x = \pi/6 + k\pi \lor x = \pi/2 + k\pi \quad (k \in \mathbb{Z})$
+- $\sin(3x) = 0 \implies x = k\pi/3 \quad (k \in \mathbb{Z})$
+- $\cos(2x) = 1 \implies x = k\pi \quad (k \in \mathbb{Z})$
+- $\tan(2x) = 1 \implies x = \pi/8 + k\pi/2 \quad (k \in \mathbb{Z})$
+- $\sin(-2x + \pi/3) = 1/2 \implies x = \pi/12 + k\pi \lor x = -\pi/4 + k\pi \quad (k \in \mathbb{Z})$ (negative coefficient handling)
 - $\sin(x) = 2 \implies \emptyset$ (empty set)
 - Non-elementary periodic equation $\sin(x) + \cos(x) = x \implies \text{OUT\_OF\_SCOPE}$ / `UNRESOLVED` (fail-closed).
 

@@ -28,9 +28,18 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-28T22:38:16Z",
-    "engine_version": "v0.3.0-p03b-accepted",
-    "duration_seconds": 21.5,
+    "timestamp": "2026-09-29T03:21:27Z",
+    "engine_version": "v0.3.2-p03c-p1b-r1",
+    "git_commit_sha": "0a7548b43fa833ae091de3616e45baf3038908a8",
+    "is_worktree_clean": false,
+    "dataset_file": "thpt_pilot_benchmark_v1.json",
+    "dataset_sha256": "a800d0a36fcecb6f4b6307e51f2f60535eff9fbe583ed21a132c53d32b394cbd",
+    "environment": {
+      "python_version": "3.10.11",
+      "platform": "Windows-10-10.0.26200-SP0",
+      "system": "Windows"
+    },
+    "duration_seconds": 23.109,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
@@ -176,7 +185,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'2', '-2'}",
+      "scoring_details": "Exact solution set matched: {'-2', '2'}",
       "engine_result": "{-2, 2}",
       "engine_solution_set": [
         "-2",
@@ -252,7 +261,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'sqrt(3)+2', '2-sqrt(3)'}",
+      "scoring_details": "Exact solution set matched: {'2-sqrt(3)', 'sqrt(3)+2'}",
       "engine_result": "{2 - sqrt(3), sqrt(3) + 2}",
       "engine_solution_set": [
         "2 - sqrt(3)",

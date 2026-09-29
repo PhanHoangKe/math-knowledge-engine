@@ -1,8 +1,16 @@
 {
   "benchmark_id": "P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1",
-  "tested_git_sha": "bf7eb30429db95035f3f269fb3dd80f057c8662a",
-  "engine_version": "0.3.2-p03c-p1b-r1",
-  "timestamp_utc": "2026-09-28T22:37:51Z",
+  "tested_git_sha": "0a7548b43fa833ae091de3616e45baf3038908a8",
+  "is_worktree_clean": false,
+  "dataset_file": "p03c_p1b_transcendental_benchmark.json",
+  "dataset_sha256": "76edfc7aa5b19323746121adcee75c4647c6a60f95f62e3ad74d61d56e8d6c4f",
+  "engine_version": "v0.3.2-p03c-p1b-r1",
+  "timestamp_utc": "2026-09-29T03:20:57Z",
+  "environment": {
+    "python_version": "3.10.11",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "system": "Windows"
+  },
   "total_problems": 47,
   "passed": 47,
   "failed": 0,
@@ -17,7 +25,7 @@
     "passed": 15,
     "accuracy_pct": 100.0
   },
-  "duration_sec": 40.42199999996228,
+  "duration_sec": 42.60999999998603,
   "by_archetype": {
     "ARCH-11.1.1": {
       "total": 7,
@@ -66,7 +74,7 @@
       "latex_output": "0",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'0'}",
-      "duration_sec": 0.9219999999622814,
+      "duration_sec": 1.1399999999557622,
       "verification_evidence": null
     },
     {
@@ -87,7 +95,7 @@
       "latex_output": "1",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'1'}",
-      "duration_sec": 0.9530000000377186,
+      "duration_sec": 1.1410000000032596,
       "verification_evidence": null
     },
     {
@@ -108,7 +116,7 @@
       "latex_output": "1",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'1'}",
-      "duration_sec": 0.8899999999557622,
+      "duration_sec": 1.0,
       "verification_evidence": null
     },
     {
@@ -129,7 +137,7 @@
       "latex_output": "2",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'2'}",
-      "duration_sec": 0.875,
+      "duration_sec": 0.9370000000344589,
       "verification_evidence": null
     },
     {
@@ -150,7 +158,7 @@
       "latex_output": "0",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'0'}",
-      "duration_sec": 0.9220000000204891,
+      "duration_sec": 0.9059999999590218,
       "verification_evidence": null
     },
     {
@@ -171,7 +179,7 @@
       "latex_output": "0",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'0'}",
-      "duration_sec": 0.7660000000032596,
+      "duration_sec": 0.6880000000237487,
       "verification_evidence": null
     },
     {
@@ -192,7 +200,7 @@
       "latex_output": "2",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'2'}",
-      "duration_sec": 1.0320000000065193,
+      "duration_sec": 0.9369999999762513,
       "verification_evidence": null
     },
     {
@@ -213,7 +221,7 @@
       "latex_output": "4",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'4'}",
-      "duration_sec": 0.9220000000204891,
+      "duration_sec": 0.8599999999860302,
       "verification_evidence": null
     },
     {
@@ -234,7 +242,7 @@
       "latex_output": "3",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'3'}",
-      "duration_sec": 0.8279999999795109,
+      "duration_sec": 0.9220000000204891,
       "verification_evidence": null
     },
     {
@@ -255,7 +263,7 @@
       "latex_output": "3",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'3'}",
-      "duration_sec": 0.9380000000237487,
+      "duration_sec": 0.875,
       "verification_evidence": null
     },
     {
@@ -276,7 +284,7 @@
       "latex_output": "6",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'6'}",
-      "duration_sec": 0.9689999999827705,
+      "duration_sec": 0.9379999999655411,
       "verification_evidence": null
     },
     {
@@ -297,7 +305,7 @@
       "latex_output": "-4",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'-4'}",
-      "duration_sec": 0.7810000000172295,
+      "duration_sec": 0.9689999999827705,
       "verification_evidence": null
     },
     {
@@ -318,7 +326,7 @@
       "latex_output": "1",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'1'}",
-      "duration_sec": 0.9219999999622814,
+      "duration_sec": 0.9690000000409782,
       "verification_evidence": null
     },
     {
@@ -339,7 +347,7 @@
       "latex_output": "1",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'1'}",
-      "duration_sec": 0.9060000000172295,
+      "duration_sec": 0.7649999999557622,
       "verification_evidence": null
     },
     {
@@ -360,7 +368,7 @@
       "latex_output": "3 e^{3 x} + 2 \\cos{\\left(2 x \\right)}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: 3*exp(3*x)+2*cos(2*x)",
-      "duration_sec": 0.6560000000172295,
+      "duration_sec": 0.7820000000065193,
       "verification_evidence": null
     },
     {
@@ -381,7 +389,7 @@
       "latex_output": "- 5 \\sin{\\left(5 x \\right)}",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'-5*sin(5*x)'}",
-      "duration_sec": 0.75,
+      "duration_sec": 0.7189999999827705,
       "verification_evidence": null
     },
     {
@@ -402,7 +410,7 @@
       "latex_output": "- 2 e^{- 2 x}",
       "outcome": "SUCCESS",
       "detail": "Exact solution set matched: {'-2*exp(-2*x)'}",
-      "duration_sec": 0.7189999999827705,
+      "duration_sec": 0.75,
       "verification_evidence": null
     },
     {
@@ -423,7 +431,7 @@
       "latex_output": "\\frac{1}{x}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: 1/x",
-      "duration_sec": 0.6869999999762513,
+      "duration_sec": 0.7660000000032596,
       "verification_evidence": null
     },
     {
@@ -445,7 +453,7 @@
       "latex_output": "\\frac{1}{x \\log{\\left(2 \\right)}}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: 1/(x*log(2))",
-      "duration_sec": 0.6570000000065193,
+      "duration_sec": 0.6720000000204891,
       "verification_evidence": null
     },
     {
@@ -466,7 +474,7 @@
       "latex_output": "- \\sin{\\left(x \\right)} + \\cos{\\left(x \\right)}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: -sin(x)+cos(x)",
-      "duration_sec": 0.7339999999967404,
+      "duration_sec": 0.6869999999762513,
       "verification_evidence": null
     },
     {
@@ -489,7 +497,7 @@
       "latex_output": "\\tan^{2}{\\left(x \\right)} + 1",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: tan(x)^2+1",
-      "duration_sec": 0.7660000000032596,
+      "duration_sec": 0.7190000000409782,
       "verification_evidence": null
     },
     {
@@ -511,7 +519,7 @@
       "latex_output": "x e^{x} + e^{x}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: x*exp(x)+exp(x)",
-      "duration_sec": 0.75,
+      "duration_sec": 0.7649999999557622,
       "verification_evidence": null
     },
     {
@@ -532,7 +540,7 @@
       "latex_output": "\\left\\{ 3 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {3)",
-      "duration_sec": 1.625,
+      "duration_sec": 1.547000000020489,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -565,7 +573,7 @@
       "latex_output": "\\left\\{ 3 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {3)",
-      "duration_sec": 1.4530000000377186,
+      "duration_sec": 1.625,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -598,7 +606,7 @@
       "latex_output": "\\left\\{ 11 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {11)",
-      "duration_sec": 1.0309999999590218,
+      "duration_sec": 1.172000000020489,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -629,7 +637,7 @@
       "latex_output": "\\left\\{ 2 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {2)",
-      "duration_sec": 1.0160000000032596,
+      "duration_sec": 1.375,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -660,7 +668,7 @@
       "latex_output": "\\left\\{ 2 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {2)",
-      "duration_sec": 1.187000000034459,
+      "duration_sec": 1.25,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -692,7 +700,7 @@
       "latex_output": "\\left\\{ 0, \\log{\\left(2 \\right)} \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {0,log(2))",
-      "duration_sec": 0.9219999999622814,
+      "duration_sec": 1.0309999999590218,
       "verification_evidence": {
         "root_count": 2,
         "roots": [
@@ -725,7 +733,7 @@
       "latex_output": "\\left\\{ 3 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {3)",
-      "duration_sec": 1.5310000000172295,
+      "duration_sec": 1.672000000020489,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -759,7 +767,7 @@
       "latex_output": "\\left\\{ 0, 2 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {0,2)",
-      "duration_sec": 1.202999999979511,
+      "duration_sec": 1.2189999999827705,
       "verification_evidence": {
         "root_count": 2,
         "roots": [
@@ -792,7 +800,7 @@
       "latex_output": "\\left\\{ 1 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {1)",
-      "duration_sec": 0.9690000000409782,
+      "duration_sec": 1.125,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -823,7 +831,7 @@
       "latex_output": "\\left\\{ 32 \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: {32)",
-      "duration_sec": 1.0160000000032596,
+      "duration_sec": 1.047000000020489,
       "verification_evidence": {
         "root_count": 1,
         "roots": [
@@ -856,7 +864,7 @@
       "latex_output": "\\left(0, \\infty\\right)",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: (0,oo)",
-      "duration_sec": 0.7649999999557622,
+      "duration_sec": 0.7969999999622814,
       "verification_evidence": {
         "solution_type": "identity_interval",
         "domain_set": "Interval.open(0, oo)"
@@ -882,7 +890,7 @@
       "latex_output": "\\left(1, \\infty\\right)",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: (1,oo)",
-      "duration_sec": 1.0630000000237487,
+      "duration_sec": 0.9060000000172295,
       "verification_evidence": {
         "solution_type": "identity_interval",
         "domain_set": "Interval.open(1, oo)"
@@ -907,7 +915,7 @@
       "latex_output": "\\mathbb{R} \\setminus \\left\\{ \\frac{\\pi}{2} + k\\pi \\;\\middle|\\; k \\in \\mathbb{Z} \\right\\}",
       "outcome": "SUCCESS",
       "detail": "Interval set matched: {'mbersexceptpi/2+k*pi(kinteger)', 'allrealn'}",
-      "duration_sec": 0.9060000000172295,
+      "duration_sec": 0.75,
       "verification_evidence": {
         "solution_type": "identity_periodic_exclusions",
         "periodic_exclusions": [
@@ -934,7 +942,7 @@
       "latex_output": "\\left(0, 1\\right) \\cup \\left(1, \\infty\\right)",
       "outcome": "SUCCESS",
       "detail": "Interval set matched: {'(0,1)', '(1,oo)'}",
-      "duration_sec": 0.7649999999557622,
+      "duration_sec": 0.9060000000172295,
       "verification_evidence": {
         "solution_type": "identity_interval",
         "domain_set": "Union(Interval.open(0, 1), Interval.open(1, oo))"
@@ -953,11 +961,11 @@
           "DOMAIN_ERROR"
         ]
       },
-      "engine_status": "INVALID_INPUT",
+      "engine_status": "DOMAIN_ERROR",
       "symbolic_result": null,
       "latex_output": null,
       "outcome": "SUCCESS",
-      "detail": "Correctly produced expected status: INVALID_INPUT.",
+      "detail": "Correctly produced expected status: DOMAIN_ERROR.",
       "duration_sec": 0.0,
       "verification_evidence": null
     },
@@ -974,11 +982,11 @@
           "DOMAIN_ERROR"
         ]
       },
-      "engine_status": "INVALID_INPUT",
+      "engine_status": "DOMAIN_ERROR",
       "symbolic_result": null,
       "latex_output": null,
       "outcome": "SUCCESS",
-      "detail": "Correctly produced expected status: INVALID_INPUT.",
+      "detail": "Correctly produced expected status: DOMAIN_ERROR.",
       "duration_sec": 0.0,
       "verification_evidence": null
     },
@@ -995,11 +1003,11 @@
           "DOMAIN_ERROR"
         ]
       },
-      "engine_status": "INVALID_INPUT",
+      "engine_status": "DOMAIN_ERROR",
       "symbolic_result": null,
       "latex_output": null,
       "outcome": "SUCCESS",
-      "detail": "Correctly produced expected status: INVALID_INPUT.",
+      "detail": "Correctly produced expected status: DOMAIN_ERROR.",
       "duration_sec": 0.0,
       "verification_evidence": null
     },
@@ -1016,11 +1024,11 @@
           "DOMAIN_ERROR"
         ]
       },
-      "engine_status": "INVALID_INPUT",
+      "engine_status": "DOMAIN_ERROR",
       "symbolic_result": null,
       "latex_output": null,
       "outcome": "SUCCESS",
-      "detail": "Correctly produced expected status: INVALID_INPUT.",
+      "detail": "Correctly produced expected status: DOMAIN_ERROR.",
       "duration_sec": 0.0,
       "verification_evidence": null
     },
@@ -1042,7 +1050,7 @@
       "latex_output": null,
       "outcome": "SUCCESS",
       "detail": "Correctly produced expected status: DOMAIN_ERROR.",
-      "duration_sec": 0.7040000000270084,
+      "duration_sec": 0.7660000000032596,
       "verification_evidence": null
     },
     {
@@ -1065,7 +1073,7 @@
       "latex_output": "x = \\frac{\\pi}{6} + 2k\\pi \\quad \\lor \\quad x = \\frac{5 \\pi}{6} + 2k\\pi \\quad (k \\in \\mathbb{Z})",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: x=pi/6+2*k*pi,x=5*pi/6+2*k*pi(kinz)",
-      "duration_sec": 0.9369999999762513,
+      "duration_sec": 1.0939999999827705,
       "verification_evidence": {
         "solution_type": "periodic_family",
         "families": [
@@ -1099,7 +1107,7 @@
       "latex_output": "x = \\frac{\\pi}{2} + k\\pi \\quad (k \\in \\mathbb{Z})",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: x=pi/2+k*pi(kinz)",
-      "duration_sec": 0.9839999999967404,
+      "duration_sec": 1.0619999999762513,
       "verification_evidence": {
         "solution_type": "periodic_family",
         "families": [
@@ -1131,7 +1139,7 @@
       "latex_output": "x = \\frac{\\pi}{4} + k\\pi \\quad (k \\in \\mathbb{Z})",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: x=pi/4+k*pi(kinz)",
-      "duration_sec": 0.9220000000204891,
+      "duration_sec": 1.0310000000172295,
       "verification_evidence": {
         "solution_type": "periodic_family",
         "families": [
@@ -1163,7 +1171,7 @@
       "latex_output": "x = \\frac{\\pi}{6} + k\\pi \\quad \\lor \\quad x = \\frac{\\pi}{2} + k\\pi \\quad (k \\in \\mathbb{Z})",
       "outcome": "SUCCESS",
       "detail": "Expression matched expected form: x=pi/6+k*pi,x=pi/2+k*pi(kinz)",
-      "duration_sec": 1.0,
+      "duration_sec": 1.077999999979511,
       "verification_evidence": {
         "solution_type": "periodic_family",
         "families": [
@@ -1222,7 +1230,7 @@
       "latex_output": null,
       "outcome": "SUCCESS",
       "detail": "Correctly produced expected status: OUT_OF_SCOPE.",
-      "duration_sec": 0.9529999999795109,
+      "duration_sec": 1.047000000020489,
       "verification_evidence": null
     }
   ]

@@ -4,8 +4,10 @@ Executes the product engine across the 32 original problems and 15 adversarial p
 evaluates exact mathematical equivalence, detects extraneous roots, and outputs transparent evidence.
 """
 
+import hashlib
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -38,13 +40,32 @@ RESULTS_FILE = EVIDENCE_DIR / "p03c_p1b_benchmark_results.json"
 REPORT_FILE = EVIDENCE_DIR / "P03C_P1B_BENCHMARK_REPORT.md"
 
 
-def get_git_commit_sha() -> str:
-    """Retrieve current git commit SHA."""
+def compute_sha256(filepath: Path) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def get_git_info() -> dict:
+    """Retrieve current git commit SHA and clean/dirty status."""
     try:
         sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).decode().strip()
-        return sha
-    except Exception:
-        return "UNKNOWN_COMMIT"
+        status_out = subprocess.check_output(["git", "status", "--porcelain"], cwd=REPO_ROOT).decode().strip()
+        is_clean = len(status_out) == 0
+        return {
+            "git_commit_sha": sha,
+            "is_worktree_clean": is_clean,
+            "dirty_status_raw": status_out if not is_clean else "clean",
+        }
+    except Exception as ex:
+        return {
+            "git_commit_sha": "UNKNOWN_COMMIT",
+            "is_worktree_clean": False,
+            "dirty_status_raw": str(ex),
+        }
 
 
 def determine_p1b_operation(problem: dict) -> tuple[OperationType, str]:
@@ -81,7 +102,8 @@ def run_p1b_benchmark():
     problems = dataset.get("problems", [])
     print(f"Loaded {len(problems)} genuine transcendental problems from {BENCHMARK_FILE.name}")
 
-    git_sha = get_git_commit_sha()
+    git_info = get_git_info()
+    git_sha = git_info["git_commit_sha"]
     router = EngineRouter()
     results = []
 
@@ -174,12 +196,24 @@ def run_p1b_benchmark():
     print(f"TOTAL COMBINED SUITE:  {stats['passed']}/{stats['total_problems']} Passed ({accuracy:.1f}%) in {duration_total:.2f}s")
     print("================================================================================")
 
+    git_info = get_git_info()
+    git_sha = git_info["git_commit_sha"]
+    dataset_sha = compute_sha256(BENCHMARK_FILE)
+
     # Save JSON results
     output_data = {
         "benchmark_id": "P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1",
         "tested_git_sha": git_sha,
-        "engine_version": "0.3.2-p03c-p1b-r1",
+        "is_worktree_clean": git_info["is_worktree_clean"],
+        "dataset_file": BENCHMARK_FILE.name,
+        "dataset_sha256": dataset_sha,
+        "engine_version": "v0.3.2-p03c-p1b-r1",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "environment": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "system": platform.system(),
+        },
         "total_problems": stats["total_problems"],
         "passed": stats["passed"],
         "failed": stats["failed"],
@@ -210,7 +244,11 @@ def run_p1b_benchmark():
         "",
         f"- **Benchmark ID:** `P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1`",
         f"- **Tested Source Commit:** `{git_sha}`",
+        f"- **Worktree Status:** `{'Clean' if git_info['is_worktree_clean'] else 'Modified / Dirty'}`",
+        f"- **Dataset File:** `{BENCHMARK_FILE.name}`",
+        f"- **Dataset SHA-256:** `{dataset_sha}`",
         f"- **Build Version:** `v0.3.2-p03c-p1b-r1`",
+        f"- **Environment:** Python `{platform.python_version()}` on `{platform.platform()}`",
         f"- **Timestamp:** `{output_data['timestamp_utc']}`",
         f"- **Execution Duration:** `{duration_total:.2f}s`",
         "",
@@ -246,9 +284,21 @@ def run_p1b_benchmark():
         "- `PILOT-11-0008` (`ARCH-11.4.3`): $\\log_2(x-1) + \\log_2(x+1) = 3 \\implies S = \\{3\\}$ -> **PASS** (extraneous root $-3$ rejected via domain gating)",
         "",
         "Longitudinal Pilot Progression:",
-        "- **P03B Baseline:** 12 / 40 (30.0%)",
-        "- **P03C-P1A Baseline:** 13 / 40 (32.5%)",
-        "- **P03C-P1B-R1 Milestone:** **16 / 40 (40.0%)** (+7.5% net progression, 0 extraneous root leaks)",
+        "- **Accepted P1A Baseline:** 13 / 40 (32.5%)",
+        "- **Initial P1B Milestone:** 16 / 40 (40.0%)",
+        "- **P03C-P1B-R1 Gate Hotfix:** **17 / 40 (42.5%)** (+10.0% net progression over accepted P1A, 0 extraneous root leaks)",
+        "",
+        "## Mathematical Scope & Completeness Guarantees (Task 4)",
+        "",
+        "1. **Exhaustive Real-Root Completeness Boundary:**",
+        "   - General candidate collection through SymPy `solve` does **not** itself establish exhaustive real-root completeness for general transcendental equations.",
+        "   - Formal complete-solution set claims are **strictly restricted** to justified, certified problem classes:",
+        "     - Elementary affine single-function periodic trigonometric equations: $\\sin(ax+b)=m, \\cos(ax+b)=m, \\tan(ax+b)=m$ (with complete $k \\in \\mathbb{Z}$ parameterization).",
+        "     - Identity equations with certified domain extraction ($f(x)=f(x)$ over verified continuous/periodic domain subsets).",
+        "     - Quadratic, linear, and single/dual radical equations with certified extraneous root elimination.",
+        "2. **Fail-Closed Unclassified Transcendental Scope:**",
+        "   - Unsupported general exponential, logarithmic, and mixed transcendental equations (e.g. $\\sin(x) + \\cos(x) = x$, $\\ln(x) + x = 0$, $2^x = x^2$) fail closed with `OUT_OF_SCOPE` or `UNRESOLVED` and domain certainty `NOT_FULLY_DETERMINED`.",
+        "   - The engine **never** returns partial principal roots as complete solution sets for unclassified periodic equations.",
         "",
         "## Mathematical Soundness Demonstrations",
         "",
@@ -263,6 +313,10 @@ def run_p1b_benchmark():
         "- $\\cos(x) = 0 \\implies x = \\pi/2 + k\\pi \\quad (k \\in \\mathbb{Z})$",
         "- $\\tan(x) = 1 \\implies x = \\pi/4 + k\\pi \\quad (k \\in \\mathbb{Z})$",
         "- $\\sin(2x - \\pi/6) = 1/2 \\implies x = \\pi/6 + k\\pi \\lor x = \\pi/2 + k\\pi \\quad (k \\in \\mathbb{Z})$",
+        "- $\\sin(3x) = 0 \\implies x = k\\pi/3 \\quad (k \\in \\mathbb{Z})$",
+        "- $\\cos(2x) = 1 \\implies x = k\\pi \\quad (k \\in \\mathbb{Z})$",
+        "- $\\tan(2x) = 1 \\implies x = \\pi/8 + k\\pi/2 \\quad (k \\in \\mathbb{Z})$",
+        "- $\\sin(-2x + \\pi/3) = 1/2 \\implies x = \\pi/12 + k\\pi \\lor x = -\\pi/4 + k\\pi \\quad (k \\in \\mathbb{Z})$ (negative coefficient handling)",
         "- $\\sin(x) = 2 \\implies \\emptyset$ (empty set)",
         "- Non-elementary periodic equation $\\sin(x) + \\cos(x) = x \\implies \\text{OUT\\_OF\\_SCOPE}$ / `UNRESOLVED` (fail-closed).",
         "",

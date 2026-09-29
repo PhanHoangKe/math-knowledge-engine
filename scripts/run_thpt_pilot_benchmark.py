@@ -5,8 +5,12 @@ applies normalized mathematical scoring, detects extraneous root leaks, and gene
 transparent, machine-readable evidence.
 """
 
+import hashlib
 import json
+import os
+import platform
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -35,6 +39,35 @@ from scripts.benchmark_scoring import (
 BENCHMARK_FILE = REPO_ROOT / "tests" / "benchmarks" / "thpt_pilot_benchmark_v1.json"
 EVIDENCE_DIR = REPO_ROOT / "evidence" / "benchmark"
 RESULTS_FILE = EVIDENCE_DIR / "thpt_pilot_benchmark_results.json"
+
+
+def compute_sha256(filepath: Path) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def get_git_info() -> dict:
+    """Retrieve current git commit SHA and clean/dirty status."""
+    try:
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).decode().strip()
+        status_out = subprocess.check_output(["git", "status", "--porcelain"], cwd=REPO_ROOT).decode().strip()
+        is_clean = len(status_out) == 0
+        return {
+            "git_commit_sha": sha,
+            "is_worktree_clean": is_clean,
+            "dirty_status_raw": status_out if not is_clean else "clean",
+        }
+    except Exception as ex:
+        return {
+            "git_commit_sha": "UNKNOWN_COMMIT",
+            "is_worktree_clean": False,
+            "dirty_status_raw": str(ex),
+        }
+
 
 def determine_pilot_operation(problem: dict) -> tuple[OperationType, str]:
     """
@@ -243,11 +276,23 @@ def run_pilot_benchmark():
     full_accuracy = (successes / total_problems) * 100.0 if total_problems > 0 else 0.0
     symbolic_accuracy = (successes / attempted) * 100.0 if attempted > 0 else 0.0
 
+    git_info = get_git_info()
+    dataset_sha = compute_sha256(BENCHMARK_FILE)
+
     output_payload = {
         "benchmark_metadata": dataset.get("benchmark_metadata"),
         "pilot_execution_metadata": {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "engine_version": "v0.3.0-p03b-accepted",
+            "engine_version": "v0.3.2-p03c-p1b-r1",
+            "git_commit_sha": git_info["git_commit_sha"],
+            "is_worktree_clean": git_info["is_worktree_clean"],
+            "dataset_file": BENCHMARK_FILE.name,
+            "dataset_sha256": dataset_sha,
+            "environment": {
+                "python_version": platform.python_version(),
+                "platform": platform.platform(),
+                "system": platform.system(),
+            },
             "duration_seconds": round(total_duration, 3),
             "summary_metrics": {
                 "total_pilot_problems": total_problems,
