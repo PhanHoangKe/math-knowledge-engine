@@ -1,3 +1,10 @@
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src
+CWD: D:\mke-product-ui-r4
+Start: 2026-09-29T10:18:40.518585+00:00
+End: 2026-09-29T10:19:29.244834+00:00
+Exit Code: 0
+
+STDOUT:
 ============================= test session starts =============================
 platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
 cachedir: .pytest_cache
@@ -28,4 +35,5 @@ tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_21_honest_
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_22_solve_linear_system_browser_ui PASSED [ 95%]
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_23_solve_inequality_browser_ui PASSED [100%]
 
-============================= 21 passed in 47.40s =============================
+============================= 21 passed in 47.78s =============================
+

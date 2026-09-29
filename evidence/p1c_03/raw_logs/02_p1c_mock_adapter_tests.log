@@ -1,3 +1,10 @@
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
+CWD: D:\mke-product-ui-r4
+Start: 2026-09-29T10:16:59.499685+00:00
+End: 2026-09-29T10:17:01.482740+00:00
+Exit Code: 0
+
+STDOUT:
 ============================= test session starts =============================
 platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
 cachedir: .pytest_cache
@@ -29,4 +36,5 @@ tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanl
 tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
 tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
 
-============================= 22 passed in 0.93s ==============================
+============================= 22 passed in 0.98s ==============================
+

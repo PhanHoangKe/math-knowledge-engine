@@ -1,3 +1,10 @@
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src
+CWD: D:\mke-product-ui-r4
+Start: 2026-09-29T10:17:49.116990+00:00
+End: 2026-09-29T10:18:40.517599+00:00
+Exit Code: 0
+
+STDOUT:
 ============================= test session starts =============================
 platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
 cachedir: .pytest_cache
@@ -87,4 +94,5 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 98%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============================= 80 passed in 48.89s =============================
+============================= 80 passed in 50.55s =============================
+
