@@ -6,12 +6,121 @@ Prohibits extra fields, mandates strict types, and preserves source provenance.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 from pydantic import BaseModel, ConfigDict, Field
 
 
 SUPPORTED_MKE_IR_SCHEMA_VERSION = "mke.ir.v1"
+
+ALLOWLISTED_STATUSES: Set[str] = {
+    "VALID",
+    "INVALID",
+    "UNSUPPORTED",
+    "AMBIGUOUS",
+    "UNVERIFIED_SEMANTICS",
+}
+
+ALLOWLISTED_OPERATIONS: Set[str] = {
+    "SOLVE",
+    "SOLVE_SYSTEM",
+    "SOLVE_INEQUALITY",
+    "SIMPLIFY",
+    "DIFFERENTIATE",
+    "INTEGRATE",
+}
+
+ALLOWLISTED_ISSUE_DEFINITIONS: Dict[str, str] = {
+    "EMPTY_RAW_QUERY": "Raw student query must be a non-empty string.",
+    "OVERSIZED_INPUT": "Raw student query length exceeds maximum allowed character limit.",
+    "RAW_QUERY_MISMATCH": "Payload raw_query does not match authoritative input query.",
+    "SCHEMA_VALIDATION_ERROR": "Payload failed MKE-IR schema validation. Structure does not conform to specification.",
+    "INVALID_PAYLOAD_TYPE": "Payload must be a dictionary or MathIntermediateRepresentation instance.",
+    "UNSUPPORTED_SCHEMA_VERSION": "MKE-IR schema version is unsupported.",
+    "EXCESSIVE_METADATA_ENTRIES": "Metadata dictionary exceeds maximum allowed entry count.",
+    "MISSING_OPTIONS": "Multiple choice question format requires 4 options (A, B, C, D).",
+    "INVALID_OPTION_KEYS": "Multiple choice question options must contain exactly keys 'A', 'B', 'C', and 'D'.",
+    "EMPTY_OPTION_TEXT": "Multiple choice option text cannot be empty.",
+    "OPTION_TEXT_TOO_LONG": "Multiple choice option text exceeds maximum allowed character length.",
+    "INVALID_TRUE_FALSE_SUBPARTS_COUNT": "Four-part True/False question must have exactly 4 subparts (a, b, c, d).",
+    "INVALID_TRUE_FALSE_SUBPART_IDS": "Four-part True/False subparts must have IDs 'a', 'b', 'c', and 'd'.",
+    "EMPTY_SUBPART_STATEMENT": "Subpart statement cannot be empty.",
+    "SUBPART_STATEMENT_TOO_LONG": "Subpart statement exceeds maximum allowed character length.",
+    "MISSING_SUBPARTS": "Multi-part stem question format requires at least one subpart.",
+    "DUPLICATE_SUBPART_ID": "Duplicate subpart ID detected in multi-part question.",
+    "INVALID_EXPRESSION_CARDINALITY": "Single mathematical operation category requires exactly one primary expression.",
+    "MISSING_TARGET_VARIABLE": "Problem category requires explicit target_variables.",
+    "INVALID_VARIABLE_IDENTIFIER": "Target variable contains invalid identifier characters.",
+    "INVALID_PARAMETER_IDENTIFIER": "Parameter contains invalid identifier characters.",
+    "OVERLAPPING_VARIABLES_AND_PARAMETERS": "Target variables and parameters must be disjoint sets.",
+    "INVALID_CONSTRAINT_VARIABLE": "Constraint variable identifier is invalid.",
+    "INVALID_CONSTRAINT_RELATION": "Constraint relation is not supported.",
+    "EMPTY_CONSTRAINT_BOUND": "Constraint bound expression cannot be empty.",
+    "CONSTRAINT_BOUND_TOO_LONG": "Constraint bound expression exceeds maximum allowed character length.",
+    "INVALID_CONSTRAINT_SYNTAX": "Constraint bound expression failed syntax parsing.",
+    "MISSING_CONSTRAINT_PROVENANCE": "Explicit student constraint lacks required source span evidence.",
+    "INVALID_CONSTRAINT_ROLE": "Constraint source span semantic role is not allowed for constraints.",
+    "CONSTRAINT_SOURCE_MISMATCH": "Explicit constraint does not match source span text.",
+    "SOURCE_SPAN_OUT_OF_BOUNDS": "Source span character offsets exceed raw query bounds.",
+    "SOURCE_FRAGMENT_MISMATCH": "Source fragment text does not match character range in raw query.",
+    "MISSING_EXPRESSION_PROVENANCE": "Primary mathematical expression lacks required source span provenance.",
+    "UNLINKED_EXPRESSION_PROVENANCE": "Primary expression has no corresponding source span reference.",
+    "UNSUPPORTED_PROBLEM_CATEGORY": "Problem category is not supported for automated CAS proof.",
+    "EMPTY_PRIMARY_EXPRESSION": "Primary mathematical expression cannot be empty.",
+    "EXPRESSION_TOO_LONG": "Primary expression exceeds maximum allowed character length.",
+    "EXCESSIVE_NESTING_DEPTH": "Expression exceeds maximum allowed bracket nesting depth.",
+    "MATH_SYNTAX_ERROR": "Primary expression failed mathematical syntax parsing.",
+    "SUBPART_EXPRESSION_TOO_LONG": "Subpart expression exceeds maximum allowed character length.",
+    "SUBPART_EXCESSIVE_NESTING_DEPTH": "Subpart expression exceeds maximum allowed bracket nesting depth.",
+    "SUBPART_SYNTAX_ERROR": "Subpart expression failed mathematical syntax parsing.",
+    "GENERIC_VALIDATION_ERROR": "Validation check failed specification criteria.",
+}
+
+ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
+    "UNCONFIRMED_INFERRED_CONSTRAINT": {
+        "severity": "ERROR",
+        "message": "Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution.",
+    },
+    "UNVERIFIED_SEMANTIC_TRANSFORMATION": {
+        "severity": "WARNING",
+        "message": "Primary expression is a normalized or inferred transformation.",
+    },
+    "MULTI_PART_AWAITING_STAGE": {
+        "severity": "WARNING",
+        "message": "Multi-part and multiple-choice questions are structurally validated but require downstream stage evaluation.",
+    },
+    "AMBIGUOUS_VARIABLE_BINDING": {
+        "severity": "WARNING",
+        "message": "Variable binding in problem statement has potential ambiguity.",
+    },
+    "ASSUMED_REAL_DOMAIN": {
+        "severity": "WARNING",
+        "message": "Real domain evaluation assumed for expressions without explicit domain.",
+    },
+    "UNSUPPORTED_NOTATION_NORMALIZED": {
+        "severity": "WARNING",
+        "message": "Non-standard mathematical notation was normalized during intake.",
+    },
+    "GENERIC_EXTRACTION_UNCERTAINTY": {
+        "severity": "ERROR",
+        "message": "Extraction contains unverified assumptions or unreviewed uncertainty.",
+    },
+}
+
+SEVERITY_ORDER: Dict[str, int] = {"WARNING": 1, "ERROR": 2, "CRITICAL": 3}
+SAFE_FIELD_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_]+(\[[0-9]+\])?(\.[a-zA-Z0-9_]+)?$")
+
+
+def sanitize_public_field_path(field_path: str) -> str:
+    """Ensure field_path conforms strictly to safe JSON path identifiers."""
+    if not isinstance(field_path, str) or not field_path.strip():
+        return "root"
+    clean = field_path.strip()
+    if SAFE_FIELD_PATH_PATTERN.match(clean):
+        return clean
+    return "root"
+
 
 
 class ProblemCategory(str, Enum):
@@ -162,18 +271,73 @@ class ValidationResult(BaseModel):
         return self.is_cas_ready
 
     def to_public_diagnostic(self) -> PublicValidationDiagnostic:
-        """Project the internal validation result to a safe, public diagnostic representation."""
+        """Project the internal validation result to a safe, allowlisted public diagnostic representation.
+
+        Guarantees that untrusted contents, malformed codes, hostile messages, or unapproved
+        statuses/operations cannot bypass the public security boundary.
+        """
+        # 1. Sanitize status
+        safe_status = self.status if (isinstance(self.status, str) and self.status in ALLOWLISTED_STATUSES) else "INVALID"
+
+        # 2. Sanitize target_operation
+        safe_op = self.target_operation if (isinstance(self.target_operation, str) and self.target_operation in ALLOWLISTED_OPERATIONS) else None
+
+        # 3. Sanitize issues with allowlisted codes, fixed messages, and safe field paths
+        sanitized_issues: List[ValidationIssue] = []
+        for issue in self.issues:
+            code = issue.code if isinstance(issue.code, str) else ""
+            if code in ALLOWLISTED_ISSUE_DEFINITIONS:
+                msg = ALLOWLISTED_ISSUE_DEFINITIONS[code]
+                safe_code = code
+            else:
+                safe_code = "GENERIC_VALIDATION_ERROR"
+                msg = ALLOWLISTED_ISSUE_DEFINITIONS["GENERIC_VALIDATION_ERROR"]
+            safe_path = sanitize_public_field_path(issue.field_path)
+            is_fatal = bool(issue.is_fatal)
+            sanitized_issues.append(ValidationIssue(
+                code=safe_code,
+                message=msg,
+                field_path=safe_path,
+                is_fatal=is_fatal
+            ))
+
+        # 4. Sanitize uncertainties with allowlisted codes, fixed messages, and resolved severities
+        sanitized_uncertainties: List[UncertaintyFlag] = []
+        for u in self.uncertainties:
+            u_code = u.code if isinstance(u.code, str) else ""
+            if u_code in ALLOWLISTED_UNCERTAINTIES:
+                defn = ALLOWLISTED_UNCERTAINTIES[u_code]
+                auth_val = SEVERITY_ORDER.get(defn["severity"], 2)
+                cand_val = SEVERITY_ORDER.get(u.severity, 1) if isinstance(u.severity, str) else 1
+                sev = u.severity if (isinstance(u.severity, str) and cand_val >= auth_val and u.severity in SEVERITY_ORDER) else defn["severity"]
+                msg = defn["message"]
+                safe_u_code = u_code
+            else:
+                safe_u_code = "GENERIC_EXTRACTION_UNCERTAINTY"
+                msg = ALLOWLISTED_UNCERTAINTIES["GENERIC_EXTRACTION_UNCERTAINTY"]["message"]
+                sev = "ERROR"
+            sanitized_uncertainties.append(UncertaintyFlag(
+                code=safe_u_code,
+                message=msg,
+                severity=sev
+            ))
+
+        # 5. Sanitize boolean flags
+        is_valid_val = bool(self.is_valid)
+        is_cas_ready_val = bool(self.is_cas_ready)
+
         return PublicValidationDiagnostic(
-            is_valid=self.is_valid,
-            is_cas_ready=self.is_cas_ready,
-            status=self.status,
-            target_operation=self.target_operation,
-            issues=[i.model_copy() for i in self.issues],
-            uncertainties=[u.model_copy() for u in self.uncertainties],
+            is_valid=is_valid_val,
+            is_cas_ready=is_cas_ready_val,
+            status=safe_status,
+            target_operation=safe_op,
+            issues=sanitized_issues,
+            uncertainties=sanitized_uncertainties
         )
 
     def to_public_dict(self) -> Dict[str, Any]:
         """Serialize safe public diagnostic representation as dictionary."""
         return self.to_public_diagnostic().model_dump()
+
 
 

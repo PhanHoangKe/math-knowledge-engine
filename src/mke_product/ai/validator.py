@@ -21,7 +21,10 @@ from mke_product.ai.ir import (
     UncertaintyFlag,
     ValidationIssue,
     ValidationResult,
+    PublicValidationDiagnostic,
     MathIntermediateRepresentation,
+    ALLOWLISTED_UNCERTAINTIES,
+    SEVERITY_ORDER,
 )
 from mke_product.cas.cas_parser import (
     parse_cas_expression,
@@ -43,39 +46,6 @@ ALLOWED_CONSTRAINT_ROLES: Set[str] = {
     "PROBLEM_STATEMENT",
 }
 ALLOWLISTED_OPTION_KEYS: Set[str] = {"A", "B", "C", "D"}
-
-ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
-    "UNCONFIRMED_INFERRED_CONSTRAINT": {
-        "severity": "ERROR",
-        "message": "Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution.",
-    },
-    "UNVERIFIED_SEMANTIC_TRANSFORMATION": {
-        "severity": "WARNING",
-        "message": "Primary expression is a normalized or inferred transformation.",
-    },
-    "MULTI_PART_AWAITING_STAGE": {
-        "severity": "WARNING",
-        "message": "Multi-part and multiple-choice questions are structurally validated but require downstream stage evaluation.",
-    },
-    "AMBIGUOUS_VARIABLE_BINDING": {
-        "severity": "WARNING",
-        "message": "Variable binding in problem statement has potential ambiguity.",
-    },
-    "ASSUMED_REAL_DOMAIN": {
-        "severity": "WARNING",
-        "message": "Real domain evaluation assumed for expressions without explicit domain.",
-    },
-    "UNSUPPORTED_NOTATION_NORMALIZED": {
-        "severity": "WARNING",
-        "message": "Non-standard mathematical notation was normalized during intake.",
-    },
-    "GENERIC_EXTRACTION_UNCERTAINTY": {
-        "severity": "ERROR",
-        "message": "Extraction contains unverified assumptions or unreviewed uncertainty.",
-    },
-}
-
-SEVERITY_ORDER: Dict[str, int] = {"WARNING": 1, "ERROR": 2, "CRITICAL": 3}
 
 MAX_RAW_QUERY_CHARS = 4000
 MAX_EXPRESSION_CHARS = 1000

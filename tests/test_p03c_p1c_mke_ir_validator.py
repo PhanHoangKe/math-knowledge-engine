@@ -1267,4 +1267,146 @@ def test_r4b_public_diagnostic_on_fatal_adversarial_scenarios():
         ] or not any(hostile in issue.message for hostile in ["<script>", "DROP TABLE", "Attacker q"])
 
 
+# ===========================================================================
+# P1C-03-R4B-R1 Audit Remediation Tests (Task A & Task B)
+# ===========================================================================
+
+def test_r4b_r1_package_export_direct_and_wildcard():
+    """TASK A: PublicValidationDiagnostic is exported from mke_product.ai directly and via wildcard __all__."""
+    import mke_product.ai as ai_mod
+    
+    # 1. Direct import from package root
+    from mke_product.ai import PublicValidationDiagnostic as DirectImportDiagnostic
+    assert DirectImportDiagnostic is not None
+    assert DirectImportDiagnostic.__name__ == "PublicValidationDiagnostic"
+    
+    # 2. Package module attribute access
+    assert hasattr(ai_mod, "PublicValidationDiagnostic")
+    assert getattr(ai_mod, "PublicValidationDiagnostic") is DirectImportDiagnostic
+    
+    # 3. Present in __all__
+    assert "PublicValidationDiagnostic" in ai_mod.__all__
+    
+    # 4. Wildcard import population
+    wildcard_ns = {}
+    exec("from mke_product.ai import *", wildcard_ns)
+    assert "PublicValidationDiagnostic" in wildcard_ns
+    assert wildcard_ns["PublicValidationDiagnostic"] is DirectImportDiagnostic
+
+
+def test_r4b_r1_public_diagnostic_enforces_strict_allowlist_on_mutated_result():
+    """TASK B: to_public_diagnostic() strictly sanitizes unapproved status, operations, issues and uncertainties."""
+    # Construct a ValidationResult that has been directly constructed or mutated with adversarial data
+    raw_issue_unapproved = ValidationIssue(
+        code="ATTACKER_CUSTOM_CODE",
+        message="<script>alert('steal_keys')</script> student le van d key sk-live-secret-12345",
+        field_path="validated_ir.metadata['token']",
+        is_fatal=True
+    )
+    raw_issue_allowlisted_tampered_msg = ValidationIssue(
+        code="MATH_SYNTAX_ERROR",
+        message="Hostile expression details at /root/.ssh/id_rsa",
+        field_path="../../etc/passwd",
+        is_fatal=True
+    )
+    raw_issue_valid_path = ValidationIssue(
+        code="MISSING_TARGET_VARIABLE",
+        message="Hostile error message to be overwritten",
+        field_path="primary_expressions[0]",
+        is_fatal=True
+    )
+    raw_uncertainty_unapproved = UncertaintyFlag(
+        code="HOSTILE_UNAPPROVED_UNCERTAINTY",
+        message="Confidential API key leaked in extraction sk-ant-secret-9999",
+        severity="SUPER_CRITICAL"
+    )
+    raw_uncertainty_allowlisted_tampered = UncertaintyFlag(
+        code="UNCONFIRMED_INFERRED_CONSTRAINT",
+        message="Attempted prompt injection payload in uncertainty message",
+        severity="INFO"  # Attempt downgrade from authoritative ERROR
+    )
+
+    mutated_res = ValidationResult(
+        is_valid=False,
+        is_cas_ready=False,
+        status="MALICIOUS_STATUS_1337",
+        target_operation="DROP_DATABASE",
+        issues=[raw_issue_unapproved, raw_issue_allowlisted_tampered_msg, raw_issue_valid_path],
+        uncertainties=[raw_uncertainty_unapproved, raw_uncertainty_allowlisted_tampered],
+        validated_ir=None
+    )
+
+    # Convert to public diagnostic
+    public_diag = mutated_res.to_public_diagnostic()
+    assert isinstance(public_diag, PublicValidationDiagnostic)
+
+    # 1. Verify status and target_operation were sanitized to safe defaults
+    assert public_diag.status == "INVALID"
+    assert public_diag.target_operation is None  # Unapproved operation dropped
+
+    # 2. Verify issues were strictly sanitized
+    assert len(public_diag.issues) == 3
+
+    # Issue 0: unapproved code -> fallback
+    assert public_diag.issues[0].code == "GENERIC_VALIDATION_ERROR"
+    assert public_diag.issues[0].message == "Validation check failed specification criteria."
+    assert public_diag.issues[0].field_path == "root"  # Unsafe path sanitized to root
+    assert public_diag.issues[0].is_fatal is True
+
+    # Issue 1: allowlisted code with hostile message and traversal path -> authoritative message, path sanitized to root
+    assert public_diag.issues[1].code == "MATH_SYNTAX_ERROR"
+    assert public_diag.issues[1].message == "Primary expression failed mathematical syntax parsing."
+    assert public_diag.issues[1].field_path == "root"  # Path with traversal sanitized to root
+    assert public_diag.issues[1].is_fatal is True
+
+    # Issue 2: allowlisted code with safe field path -> authoritative message, safe path preserved
+    assert public_diag.issues[2].code == "MISSING_TARGET_VARIABLE"
+    assert public_diag.issues[2].message == "Problem category requires explicit target_variables."
+    assert public_diag.issues[2].field_path == "primary_expressions[0]"
+    assert public_diag.issues[2].is_fatal is True
+
+    # 3. Verify uncertainties were strictly sanitized
+    assert len(public_diag.uncertainties) == 2
+
+    # Uncertainty 0: unapproved code -> fallback
+    assert public_diag.uncertainties[0].code == "GENERIC_EXTRACTION_UNCERTAINTY"
+    assert public_diag.uncertainties[0].message == "Extraction contains unverified assumptions or unreviewed uncertainty."
+    assert public_diag.uncertainties[0].severity == "ERROR"
+
+    # Uncertainty 1: allowlisted code with hostile message and downgraded severity -> authoritative msg & severity
+    assert public_diag.uncertainties[1].code == "UNCONFIRMED_INFERRED_CONSTRAINT"
+    assert public_diag.uncertainties[1].message == "Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution."
+    assert public_diag.uncertainties[1].severity == "ERROR"  # Authoritative ERROR maintained!
+
+    # 4. Verify that JSON serialization contains ZERO hostile/leaked strings
+    public_json = public_diag.model_dump_json()
+    public_dict = mutated_res.to_public_dict()
+    assert isinstance(public_dict, dict)
+
+    hostile_tokens = [
+        "MALICIOUS_STATUS_1337",
+        "DROP_DATABASE",
+        "ATTACKER_CUSTOM_CODE",
+        "steal_keys",
+        "sk-live-secret-12345",
+        "le van d",
+        "id_rsa",
+        "passwd",
+        "HOSTILE_UNAPPROVED_UNCERTAINTY",
+        "sk-ant-secret-9999",
+        "prompt injection"
+    ]
+    for token in hostile_tokens:
+        assert token not in public_json
+        assert token not in str(public_dict)
+
+    # 5. Verify that internal ValidationResult was NOT destructively mutated
+    assert mutated_res.status == "MALICIOUS_STATUS_1337"
+    assert mutated_res.target_operation == "DROP_DATABASE"
+    assert mutated_res.issues[0].code == "ATTACKER_CUSTOM_CODE"
+    assert mutated_res.uncertainties[0].code == "HOSTILE_UNAPPROVED_UNCERTAINTY"
+
+
+
+
 

@@ -31,6 +31,7 @@ from mke_product.ai.ir import (
     UncertaintyFlag,
     ValidationIssue,
     ValidationResult,
+    PublicValidationDiagnostic,
     MathIntermediateRepresentation,
 )
 from mke_product.ai.validator import MKEIntakeValidator
