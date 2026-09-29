@@ -1,0 +1,29 @@
+COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
+START_TIME_UTC: 2026-09-29T06:40:01.810958+00:00
+END_TIME_UTC: 2026-09-29T06:40:03.173216+00:00
+EXIT_CODE: 0
+--- STDOUT ---
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_p03c_p1c_mock_adapter.py::test_registry_registration_and_resolution PASSED [  8%]
+tests/test_p03c_p1c_mock_adapter.py::test_mock_adapter_successful_extraction PASSED [ 16%]
+tests/test_p03c_p1c_mock_adapter.py::test_malformed_json_raises_schema_validation_error PASSED [ 25%]
+tests/test_p03c_p1c_mock_adapter.py::test_missing_required_keys_raises_schema_validation_error PASSED [ 33%]
+tests/test_p03c_p1c_mock_adapter.py::test_provider_timeout_exceeded PASSED [ 41%]
+tests/test_p03c_p1c_mock_adapter.py::test_simulated_timeout_fault_mode PASSED [ 50%]
+tests/test_p03c_p1c_mock_adapter.py::test_retryable_transient_error_recovers PASSED [ 58%]
+tests/test_p03c_p1c_mock_adapter.py::test_permanent_authentication_error_does_not_retry PASSED [ 66%]
+tests/test_p03c_p1c_mock_adapter.py::test_prompt_injection_detection_and_rejection PASSED [ 75%]
+tests/test_p03c_p1c_mock_adapter.py::test_no_arbitrary_code_execution PASSED [ 83%]
+tests/test_p03c_p1c_mock_adapter.py::test_sanitization_removes_credentials_and_emails PASSED [ 91%]
+tests/test_p03c_p1c_mock_adapter.py::test_grounded_explanation_generation PASSED [100%]
+
+============================= 12 passed in 0.67s ==============================
+
+--- STDERR ---

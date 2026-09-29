@@ -1,0 +1,52 @@
+[
+  {
+    "id": "p1c_mock_adapter_tests",
+    "desc": "P1C-02 Provider-Agnostic Mock Adapter Unit Tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T06:40:01.810958+00:00",
+    "end_time": "2026-09-29T06:40:03.173216+00:00",
+    "exit_code": 0,
+    "log_file": "01_p1c_mock_adapter_tests.log",
+    "passed": true
+  },
+  {
+    "id": "p1b_transcendental_solver_tests",
+    "desc": "P1B Transcendental Solver Regression Tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T06:40:03.174210+00:00",
+    "end_time": "2026-09-29T06:40:49.258884+00:00",
+    "exit_code": 0,
+    "log_file": "02_p1b_transcendental_solver_tests.log",
+    "passed": true
+  },
+  {
+    "id": "windows_containment_tests",
+    "desc": "Windows Process Confinement Tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T06:40:49.260005+00:00",
+    "end_time": "2026-09-29T06:41:27.597641+00:00",
+    "exit_code": 0,
+    "log_file": "03_windows_containment_tests.log",
+    "passed": true
+  },
+  {
+    "id": "browser_ui_regression_tests",
+    "desc": "Browser UI Canonical Flow Tests",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src",
+    "start_time": "2026-09-29T06:41:27.598633+00:00",
+    "end_time": "2026-09-29T06:42:09.490935+00:00",
+    "exit_code": 0,
+    "log_file": "04_browser_ui_regression_tests.log",
+    "passed": true
+  },
+  {
+    "id": "full_repository_pytest",
+    "desc": "Full Repository Pytest Suite (589 items)",
+    "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest -v -o pythonpath=src",
+    "start_time": "2026-09-29T06:42:09.492927+00:00",
+    "end_time": "2026-09-29T06:45:12.742739+00:00",
+    "exit_code": 0,
+    "log_file": "05_full_repository_pytest.log",
+    "passed": true
+  }
+]
