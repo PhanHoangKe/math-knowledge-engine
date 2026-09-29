@@ -589,3 +589,46 @@ def test_supervised_transcendental_identity_and_trig_solver():
     assert "k in Z" in res_trig.symbolic_result
 
 
+def test_counterexample_2_pow_x_eq_x_sq_fails_closed():
+    """Task A Counterexample 1: 2^x = x^2 has 2, 4 and a negative root in (-1, 0).
+    The engine must NOT return partial roots {2, 4} as a complete SUCCESS solution set.
+    It must fail closed with OUT_OF_SCOPE / UNRESOLVED.
+    """
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "2^x = x^2",
+    )
+    assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+    assert res.verification_status == VerificationStatus.UNRESOLVED
+    assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+def test_counterexample_ln_x_plus_x_eq_zero_fails_closed():
+    """Task A Counterexample 2: ln(x) + x = 0 has root x = W(1) ~ 0.56714.
+    The engine must NOT claim an empty set {} or uncertified LambertW as complete SUCCESS.
+    It must fail closed with OUT_OF_SCOPE / UNRESOLVED.
+    """
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "\\ln(x) + x = 0",
+    )
+    assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+    assert res.verification_status == VerificationStatus.UNRESOLVED
+    assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+def test_counterexample_mixed_transcendental_fails_closed():
+    """Task A Counterexample 3: Genuinely unsupported mixed transcendental equations fail closed."""
+    cases = [
+        "\\sin(x) + x = 1",
+        "\\exp(x) - \\cos(x) = 2",
+        "x*\\log(x, 2) = 4",
+    ]
+    for expr in cases:
+        res = execute_cas_operation(OperationType.SOLVE, expr)
+        assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+        assert res.verification_status == VerificationStatus.UNRESOLVED
+        assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+

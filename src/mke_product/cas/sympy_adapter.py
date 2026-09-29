@@ -13,14 +13,18 @@ from mke_product.parser.ast import (
     BinaryOp,
     Equation,
     FunctionCall,
+    Group,
     IntegerLiteral,
     NamedConstant,
     Power,
     Radical,
+    UnaryOp,
+    Variable,
 )
 
 from .ast_bridge import ast_to_sympy, ast_to_sympy_expr
 from .cas_parser import (
+    CASPower,
     Inequality,
     LinearSystem,
     is_top_level_system,
@@ -763,6 +767,153 @@ def _solve_periodic_trigonometric(
     }
 
 
+def _collect_variable_positions(
+    node: ASTNode,
+    var_name: str,
+    in_exp: bool = False,
+    in_log: bool = False,
+    in_trig: bool = False,
+) -> Tuple[bool, bool, bool, bool]:
+    """Inspect AST positions where variable appears: (in_poly, in_exp, in_log, in_trig)."""
+    if isinstance(node, Variable):
+        if node.name == var_name:
+            return (not in_exp and not in_log and not in_trig, in_exp, in_log, in_trig)
+        return (False, False, False, False)
+
+    if isinstance(node, (Power, CASPower)):
+        b_poly, b_exp, b_log, b_trig = _collect_variable_positions(node.base, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+        e_poly, e_exp, e_log, e_trig = _collect_variable_positions(node.exponent, var_name, in_exp=True, in_log=in_log, in_trig=in_trig)
+        return (b_poly or e_poly, b_exp or e_exp, b_log or e_log, b_trig or e_trig)
+
+    if isinstance(node, FunctionCall):
+        if node.name == "exp":
+            res = [_collect_variable_positions(arg, var_name, in_exp=True, in_log=in_log, in_trig=in_trig) for arg in node.args]
+        elif node.name in ("log", "ln"):
+            res = [_collect_variable_positions(arg, var_name, in_exp=in_exp, in_log=True, in_trig=in_trig) for arg in node.args]
+        elif node.name in ("sin", "cos", "tan"):
+            res = [_collect_variable_positions(arg, var_name, in_exp=in_exp, in_log=in_log, in_trig=True) for arg in node.args]
+        else:
+            res = [_collect_variable_positions(arg, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig) for arg in node.args]
+        p = any(r[0] for r in res)
+        e = any(r[1] for r in res)
+        l = any(r[2] for r in res)
+        t = any(r[3] for r in res)
+        return (p, e, l, t)
+
+    if isinstance(node, AbsoluteValue):
+        return _collect_variable_positions(node.inner, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+
+    if isinstance(node, Radical):
+        return _collect_variable_positions(node.radicand, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+
+    if isinstance(node, Group):
+        return _collect_variable_positions(node.inner, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+
+    if isinstance(node, UnaryOp):
+        return _collect_variable_positions(node.operand, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+
+    if isinstance(node, BinaryOp):
+        l_res = _collect_variable_positions(node.left, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+        r_res = _collect_variable_positions(node.right, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+        return (l_res[0] or r_res[0], l_res[1] or r_res[1], l_res[2] or r_res[2], l_res[3] or r_res[3])
+
+    if isinstance(node, Equation):
+        l_res = _collect_variable_positions(node.left, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+        r_res = _collect_variable_positions(node.right, var_name, in_exp=in_exp, in_log=in_log, in_trig=in_trig)
+        return (l_res[0] or r_res[0], l_res[1] or r_res[1], l_res[2] or r_res[2], l_res[3] or r_res[3])
+
+    return (False, False, False, False)
+
+
+def _has_non_elementary_atoms(expr: Any) -> bool:
+    """Check if expression contains non-elementary or unresolved symbolic constructs."""
+    if expr is None:
+        return False
+    if hasattr(expr, "atoms"):
+        for atom in expr.atoms():
+            name = type(atom).__name__
+            if name in ("LambertW", "RootOf", "Integral", "Derivative", "AccumBounds", "Piecewise", "ConditionSet"):
+                return True
+    return False
+
+
+def _certify_equation_completeness(
+    ast_node: ASTNode,
+    eq: sympy.Eq,
+    var: sympy.Symbol,
+    valid_roots: List[Any],
+    unique_candidates: List[Any],
+) -> Tuple[bool, str, str]:
+    """Certify whether the equation and computed solution set are mathematically guaranteed exhaustive and complete.
+    
+    Returns (is_certified, category, reason).
+    """
+    var_name = var.name
+
+    # 1. Reject non-elementary symbolic objects in candidate roots (e.g. LambertW)
+    for c in unique_candidates:
+        if _has_non_elementary_atoms(c):
+            return False, "NON_ELEMENTARY", "Candidates contain non-elementary functions (e.g. LambertW/RootOf)"
+    for r in valid_roots:
+        if _has_non_elementary_atoms(r):
+            return False, "NON_ELEMENTARY", "Valid roots contain non-elementary functions (e.g. LambertW/RootOf)"
+
+    # 2. Check variable positions across the AST
+    has_poly, has_exp, has_log, has_trig = _collect_variable_positions(ast_node, var_name)
+
+    # 3. Reject mixed transcendental equations (Task A mandatory counterexamples)
+    # Mixed exponential + polynomial (e.g. 2^x = x^2, e^x - x = 2)
+    if has_exp and has_poly:
+        return False, "MIXED_EXP_POLY", "Mixed exponential-polynomial equation is out of scope for complete certified solving"
+
+    # Mixed log + polynomial (e.g. ln(x) + x = 0, x*log(x) = 1)
+    if has_log and has_poly:
+        return False, "MIXED_LOG_POLY", "Mixed logarithmic-polynomial equation is out of scope for complete certified solving"
+
+    # Mixed trig + polynomial / exp / log (e.g. sin(x) + x = 1, e^x = cos(x))
+    if has_trig and (has_poly or has_exp or has_log):
+        return False, "MIXED_TRIG_TRANSCENDENTAL", "Mixed trigonometric-transcendental equation is out of scope for complete certified solving"
+
+    # Mixed exp + log (e.g. 2^x = log_2(x))
+    if has_exp and has_log:
+        return False, "MIXED_EXP_LOG", "Mixed exponential-logarithmic equation is out of scope for complete certified solving"
+
+    # 4. Pure Polynomial Equations
+    if is_polynomial_ast(ast_node):
+        diff = sympy.simplify(eq.lhs - eq.rhs)
+        try:
+            poly = sympy.Poly(diff, var)
+            if poly.degree() >= 1:
+                return True, "POLYNOMIAL", "Complete real roots of polynomial algebraically verified"
+        except Exception:
+            pass
+
+    # 5. Pure Exponential Equations (GDPT 2018 high-school standard forms)
+    if has_exp and not has_poly and not has_log and not has_trig:
+        return True, "PURE_EXPONENTIAL", "Standard high-school exponential equation form certified"
+
+    # 6. Pure Logarithmic Equations (GDPT 2018 high-school standard forms)
+    if has_log and not has_poly and not has_exp and not has_trig:
+        return True, "PURE_LOGARITHMIC", "Standard high-school logarithmic equation form certified"
+
+    # 7. Algebraic Equations: Radical, Rational, Absolute Value
+    has_radical = any(isinstance(n, Radical) and var_name in n.variables() for n in ast_node.walk())
+    has_abs = any(isinstance(n, AbsoluteValue) and var_name in n.variables() for n in ast_node.walk())
+    has_division = any(isinstance(n, BinaryOp) and n.op == "/" and var_name in n.right.variables() for n in ast_node.walk())
+
+    if has_radical or has_abs or has_division:
+        if not has_exp and not has_log and not has_trig:
+            return True, "ALGEBRAIC_RADICAL_RATIONAL_ABS", "Algebraic equation with verified candidate domain validation certified"
+
+    # 8. Uncertified Fallback Gate:
+    # If the equation produced 0 candidates or unclassified roots without an algebraic completeness proof:
+    if not valid_roots and not unique_candidates:
+        return False, "UNCERTIFIED_EMPTY", "Empty solution set cannot be certified without an algebraic completeness proof"
+
+    # Default fail-closed for unclassified expressions
+    return False, "UNCLASSIFIED_NON_ELEMENTARY", "Equation class is not certified for exhaustive completeness"
+
+
 def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse) -> None:
     """Solve an equation or expression in the real domain."""
     x = sympy.Symbol("x", real=True)
@@ -1004,6 +1155,7 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         _solve_periodic_trigonometric(ast_node, eq, x, response)
         return
 
+
     # Collect all candidate roots from SymPy solve and pattern-based algebraic transformations
     raw_candidates = _collect_algebraic_candidates(ast_node, eq, x)
 
@@ -1053,6 +1205,20 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
     except Exception:
         pass
 
+    # Certify mathematical completeness before declaring SUCCESS
+    is_certified, cert_cat, cert_reason = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots, unique_candidates
+    )
+
+    if not is_certified:
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.verification_status = VerificationStatus.UNRESOLVED
+        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        response.symbolic_result = None
+        response.latex_output = None
+        response.error_message = f"Equation cannot be certified as an exhaustive complete solution set: {cert_reason}"
+        return
+
     if extraneous_roots:
         response.warnings.append(
             f"Eliminated {len(extraneous_roots)} extraneous root(s): {', '.join(str(r) for r in extraneous_roots)}"
@@ -1067,6 +1233,8 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         "solution_set": [str(r) for r in valid_roots],
         "extraneous_roots": [str(r) for r in extraneous_roots],
         "domain": "Reals",
+        "completeness_category": cert_cat,
+        "completeness_certified": True,
     }
 
 
