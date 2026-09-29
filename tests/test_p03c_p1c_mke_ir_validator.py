@@ -1562,6 +1562,7 @@ def test_r4b_r2_conservative_public_readiness_fail_closed_on_mutated_results():
     )
     diag4 = res_invalid_op.to_public_diagnostic()
     assert diag4.is_cas_ready is False
+    assert diag4.is_valid is False
     assert diag4.target_operation is None
 
     # Case 5: Fully legitimate valid outcome maintains readiness
@@ -1584,6 +1585,140 @@ def test_r4b_r2_conservative_public_readiness_fail_closed_on_mutated_results():
     assert res_fatal_issue.is_cas_ready is True
     assert res_blocking_uncertainty.is_cas_ready is True
     assert res_invalid_op.is_cas_ready is True
+
+
+# ===========================================================================
+# P1C-03 Final Closeout Tests (Case 1 & Case 2)
+# ===========================================================================
+
+def test_final_closeout_case1_invalid_or_absent_operation_blocks_public_validity():
+    """MANDATORY 1: An invalid or absent target_operation cannot produce public is_valid=True."""
+    # 1. Absent target_operation (None)
+    res_none_op = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation=None,
+        issues=[],
+        uncertainties=[]
+    )
+    diag_none = res_none_op.to_public_diagnostic()
+    assert diag_none.is_valid is False
+    assert diag_none.is_cas_ready is False
+    assert diag_none.target_operation is None
+
+    # 2. Arbitrary / attacker-supplied operation string
+    res_bad_op = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="EXECUTE_ARBITRARY_CODE",
+        issues=[],
+        uncertainties=[]
+    )
+    diag_bad = res_bad_op.to_public_diagnostic()
+    assert diag_bad.is_valid is False
+    assert diag_bad.is_cas_ready is False
+    assert diag_bad.target_operation is None
+
+    # 3. Internal is_cas_ready=False blocks public is_valid=True even if internal is_valid=True
+    res_not_cas_ready = ValidationResult(
+        is_valid=True,
+        is_cas_ready=False,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[],
+        uncertainties=[]
+    )
+    diag_not_cas_ready = res_not_cas_ready.to_public_diagnostic()
+    assert diag_not_cas_ready.is_valid is False
+    assert diag_not_cas_ready.is_cas_ready is False
+
+
+def test_final_closeout_case2_authoritative_issue_fatality_overrides_caller():
+    """MANDATORY 2 & 3: Conversion enforces authoritative issue fatality regardless of caller is_fatal=False."""
+    # 1. Known validator issue with attacker-supplied is_fatal=False
+    res_tampered_known_issue = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[
+            ValidationIssue(
+                code="MATH_SYNTAX_ERROR",
+                message="Tampered non-fatal syntax error",
+                field_path="primary_expressions[0]",
+                is_fatal=False  # Attacker attempt to mark fatal syntax error as non-fatal
+            )
+        ],
+        uncertainties=[]
+    )
+    diag_known = res_tampered_known_issue.to_public_diagnostic()
+    assert diag_known.issues[0].code == "MATH_SYNTAX_ERROR"
+    assert diag_known.issues[0].is_fatal is True  # Authoritative policy enforced
+    assert diag_known.is_cas_ready is False       # Readiness blocked
+    assert diag_known.is_valid is False           # Validity blocked
+
+    # 2. Unknown unapproved issue code with attacker-supplied is_fatal=False
+    res_tampered_unknown_issue = ValidationResult(
+        is_valid=True,
+        is_cas_ready=True,
+        status="VALID",
+        target_operation="SOLVE",
+        issues=[
+            ValidationIssue(
+                code="UNAPPROVED_CUSTOM_INJECTION",
+                message="Hostile issue",
+                field_path="primary_expressions[0]",
+                is_fatal=False  # Attacker attempt to bypass via unknown code with is_fatal=False
+            )
+        ],
+        uncertainties=[]
+    )
+    diag_unknown = res_tampered_unknown_issue.to_public_diagnostic()
+    assert diag_unknown.issues[0].code == "GENERIC_VALIDATION_ERROR"
+    assert diag_unknown.issues[0].is_fatal is True  # Unknown code strictly fatal
+    assert diag_unknown.issues[0].field_path == "root"
+    assert diag_unknown.is_cas_ready is False
+    assert diag_unknown.is_valid is False
+
+    # 3. Verify internal ValidationResult objects remain completely unchanged
+    assert res_tampered_known_issue.issues[0].is_fatal is False
+    assert res_tampered_known_issue.is_valid is True
+    assert res_tampered_unknown_issue.issues[0].is_fatal is False
+    assert res_tampered_unknown_issue.is_valid is True
+
+
+def test_final_closeout_case4_canonical_valid_outcome_passes():
+    """MANDATORY 4 & 5: Canonical valid outcome remains valid and internal result is preserved."""
+    raw = "Giải phương trình x^2 - 4 = 0"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x^2 - 4 = 0"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=29, source_fragment="x^2 - 4 = 0", semantic_role="EQUATION")
+        ]
+    )
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_valid is True
+    assert res.is_cas_ready is True
+    assert res.status == "VALID"
+    assert res.target_operation == "SOLVE"
+
+    public_diag = res.to_public_diagnostic()
+    assert public_diag.is_valid is True
+    assert public_diag.is_cas_ready is True
+    assert public_diag.status == "VALID"
+    assert public_diag.target_operation == "SOLVE"
+    assert len(public_diag.issues) == 0
+
+    # Ensure internal representation is preserved intact
+    assert res.validated_ir is not None
+    assert res.validated_ir.primary_expressions == ["x^2 - 4 = 0"]
+
 
 
 

@@ -77,6 +77,20 @@ ALLOWLISTED_ISSUE_DEFINITIONS: Dict[str, str] = {
     "GENERIC_VALIDATION_ERROR": "Validation check failed specification criteria.",
 }
 
+ALLOWLISTED_NON_FATAL_ISSUE_CODES: Set[str] = set()
+
+
+def is_authoritative_fatal_issue(code: str) -> bool:
+    """Determine authoritatively whether a validation issue code is fatal.
+
+    All current validator-defined issues and unknown/unapproved codes are strictly fatal.
+    Future non-fatal warning issues must be explicitly registered in ALLOWLISTED_NON_FATAL_ISSUE_CODES.
+    """
+    if code in ALLOWLISTED_ISSUE_DEFINITIONS:
+        return code not in ALLOWLISTED_NON_FATAL_ISSUE_CODES
+    return True  # Unknown/unapproved issue codes fail closed as fatal
+
+
 ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
     "UNCONFIRMED_INFERRED_CONSTRAINT": {
         "severity": "ERROR",
@@ -334,7 +348,7 @@ class ValidationResult(BaseModel):
                 safe_code = "GENERIC_VALIDATION_ERROR"
                 msg = ALLOWLISTED_ISSUE_DEFINITIONS["GENERIC_VALIDATION_ERROR"]
                 safe_path = "root"
-            is_fatal = bool(issue.is_fatal)
+            is_fatal = is_authoritative_fatal_issue(safe_code)
             sanitized_issues.append(ValidationIssue(
                 code=safe_code,
                 message=msg,
@@ -363,7 +377,7 @@ class ValidationResult(BaseModel):
                 severity=sev
             ))
 
-        # 5. Conservative public readiness fail-closed evaluation
+        # 5. Conservative public readiness & validity fail-closed evaluation
         has_fatal_issues = any(i.is_fatal for i in sanitized_issues)
         has_blocking_uncertainties = any(u.severity in ("ERROR", "CRITICAL") for u in sanitized_uncertainties)
         is_status_valid = (safe_status == "VALID")
@@ -379,7 +393,9 @@ class ValidationResult(BaseModel):
         )
         public_is_valid = bool(
             self.is_valid
+            and self.is_cas_ready
             and is_status_valid
+            and has_valid_operation
             and not has_fatal_issues
             and not has_blocking_uncertainties
         )
