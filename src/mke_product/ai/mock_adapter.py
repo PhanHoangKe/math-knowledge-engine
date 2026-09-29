@@ -1,14 +1,15 @@
 """Deterministic Mock Model Provider Adapter for MKE AI Intake testing.
 
 Provides zero-network, zero-GPU, fixture-driven extraction and explanation generation
-with configurable fault injection (malformed JSON, timeouts, retries, security rejections).
+with strict deterministic fixture matching, structural schema validation, and safe
+explanation rendering.
 """
 
 import asyncio
 import json
 import re
 import time
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List
 
 from mke_product.ai.contracts import (
     ModelExtractionRequest,
@@ -47,13 +48,115 @@ def sanitize_text(text: str) -> str:
     return sanitized
 
 
+def normalize_query_key(query: str) -> str:
+    """Normalize query string for deterministic exact fixture lookup."""
+    return re.sub(r"\s+", " ", query.strip().lower())
+
+
+# Exact deterministic mock fixtures for recognized test queries
+EXACT_MOCK_FIXTURES: Dict[str, Dict[str, Any]] = {
+    normalize_query_key("Giải phương trình log(x-1, 2) = 3"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["log(x-1, 2) = 3"],
+        "extracted_constraints": [
+            {"variable": "x", "relation": ">", "bound_expression": "1"}
+        ],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.95,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("2^x = 8"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["2^x = 8"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.98,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("Giải phương trình 2^x = 8"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["2^x = 8"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.98,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("sin(x) = 1/2"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["sin(x) = 1/2"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.92,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("x^2 = 4"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["x^2 = 4"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.99,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("x + 1 = 2"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["x + 1 = 2"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.99,
+        "uncertainty_flags": []
+    },
+    normalize_query_key("x = 1"): {
+        "problem_category": "EQUATION_SINGLE",
+        "question_format": "FREE_FORM",
+        "target_variables": ["x"],
+        "parameters": [],
+        "primary_expressions": ["x = 1"],
+        "extracted_constraints": [],
+        "subparts": [],
+        "given_options": None,
+        "model_confidence": 0.99,
+        "uncertainty_flags": []
+    }
+}
+
+
 class MockModelProviderAdapter(ModelProviderAdapter):
-    """Deterministic Mock Adapter for AI Intake unit and integration testing."""
+    """Deterministic Mock Adapter for AI Intake unit and integration testing.
+
+    Safety Guarantee:
+    - This adapter NEVER executes text returned by a model via exec(), eval(), or subshell.
+    - All model strings remain inert data objects.
+    - Mathematical AST validation and certified execution are exclusively handled by CAS dispatcher in P1C-03.
+    """
 
     def __init__(
         self,
         model_id: str = "mock-math-v1",
-        simulated_latency_seconds: float = 0.01,
+        simulated_latency_seconds: float = 0.001,
         fixture_override: Optional[Dict[str, Any]] = None,
         raw_text_override: Optional[str] = None,
         fault_mode: Optional[str] = None,
@@ -86,7 +189,7 @@ class MockModelProviderAdapter(ModelProviderAdapter):
         start_time = time.perf_counter()
         self.call_count += 1
 
-        # 1. Check prompt injection in raw query
+        # 1. Prompt injection filter on raw query
         sanitized_query = sanitize_text(request.raw_query)
         for pattern in PROMPT_INJECTION_PATTERNS:
             if pattern.search(request.raw_query):
@@ -94,14 +197,14 @@ class MockModelProviderAdapter(ModelProviderAdapter):
                     provider_id=self.provider_id,
                     model_id=self.model_id,
                     latency_seconds=time.perf_counter() - start_time,
-                    token_usage={"input_tokens": len(sanitized_query) // 4, "output_tokens": 0},
+                    token_usage={"input_tokens": max(1, len(sanitized_query) // 4), "output_tokens": 0},
                     query_char_length=len(sanitized_query),
                     is_success=False,
                     error_type="SECURITY_REJECTION"
                 )
                 self.telemetry_history.append(record)
                 raise ProviderSecurityRejectionError(
-                    f"Security filter blocked prompt with adversarial injection signature",
+                    "Security filter blocked prompt with adversarial injection signature",
                     provider_id=self.provider_id
                 )
 
@@ -122,7 +225,7 @@ class MockModelProviderAdapter(ModelProviderAdapter):
         if self.fault_mode == "auth_error":
             raise ProviderAuthenticationError("Simulated 401 Invalid Authentication", provider_id=self.provider_id)
 
-        # 3. Simulate latency
+        # 3. Simulate latency & timeout boundary
         if timeout and self.simulated_latency_seconds > timeout:
             await asyncio.sleep(timeout)
             raise ProviderTimeoutError(
@@ -131,13 +234,12 @@ class MockModelProviderAdapter(ModelProviderAdapter):
             )
         await asyncio.sleep(self.simulated_latency_seconds)
 
-        # 4. Determine response payload
+        # 4. Resolve response payload with strict fixture mapping (Task A)
         if self.raw_text_override is not None:
             raw_text = self.raw_text_override
             try:
                 parsed_payload = json.loads(raw_text)
             except Exception as e:
-                # Malformed JSON mode
                 raise ProviderSchemaValidationError(
                     f"Model output is not valid JSON: {str(e)}",
                     provider_id=self.provider_id
@@ -146,11 +248,21 @@ class MockModelProviderAdapter(ModelProviderAdapter):
             parsed_payload = self.fixture_override
             raw_text = json.dumps(parsed_payload)
         else:
-            # Default deterministic mock extraction for standard queries
-            parsed_payload = self._generate_default_fixture(request.raw_query)
-            raw_text = json.dumps(parsed_payload)
+            # Look up exact recognized fixture
+            norm_key = normalize_query_key(request.raw_query)
+            if norm_key in EXACT_MOCK_FIXTURES:
+                parsed_payload = EXACT_MOCK_FIXTURES[norm_key]
+                raw_text = json.dumps(parsed_payload)
+            else:
+                # Unmatched input -> fail explicitly with typed error rather than inventing equations
+                raise ProviderError(
+                    f"Mock adapter has no registered fixture for query: '{request.raw_query}'. "
+                    f"To test custom queries, provide fixture_override.",
+                    provider_id=self.provider_id,
+                    is_retryable=False
+                )
 
-        # 5. Schema validation check on required keys
+        # 5. Schema and structural type validation (Task B)
         self._validate_fixture_schema(parsed_payload)
 
         latency = time.perf_counter() - start_time
@@ -188,79 +300,135 @@ class MockModelProviderAdapter(ModelProviderAdapter):
         cas_evidence: Dict[str, Any],
         timeout: Optional[float] = None
     ) -> str:
-        """Render deterministic step-by-step Vietnamese explanation grounded in CAS evidence."""
-        status = cas_evidence.get("mathematical_status", "UNKNOWN")
-        result = cas_evidence.get("symbolic_result", "None")
-        certainty = cas_evidence.get("domain_certainty", "NOT_FULLY_DETERMINED")
+        """Render deterministic step-by-step Vietnamese explanation grounded in CAS evidence.
 
-        if status == "OUT_OF_SCOPE":
+        Task C:
+        - OUT_OF_SCOPE, INVALID_INPUT, UNRESOLVED, DOMAIN_ERROR, SECURITY_REJECTED,
+          RESOURCE_EXHAUSTED and missing statuses are never presented as verified solutions.
+        - Never invents domain derivations, algebraic transformations or proof nodes.
+        """
+        status = cas_evidence.get("mathematical_status")
+
+        if not status:
             return (
-                "### Thông báo phạm vi giải toán\n"
-                "- Bài toán thuộc dạng chưa được hỗ trợ chứng minh tự động trong MKE.\n"
-                f"- Trạng thái động cơ: `OUT_OF_SCOPE`."
+                "### Thông báo lỗi kiểm chứng\n"
+                "- Trạng thái động cơ không xác định (thiếu mathematical_status).\n"
+                "- Không thể tạo lời giải khi thiếu bằng chứng toán học."
             )
 
-        explanation_lines = [
-            "### Hướng dẫn giải chi tiết (GDPT 2018)",
-            "1. **Điều kiện xác định (ĐKXĐ):**",
-            f"   - Đánh giá miền xác định: `{certainty}`.",
-            "2. **Các bước biến đổi đại số:**",
-            f"   - Phương trình / biểu thức chính: `{structured_ir.get('primary_expressions', [])}`.",
-            "3. **Đối chiếu điều kiện & Kết luận:**",
-            f"   - Tập nghiệm / Kết quả: **{result}** (Trạng thái: `{status}`)."
-        ]
-        return "\n".join(explanation_lines)
+        status_str = str(status).upper()
 
-    def _generate_default_fixture(self, raw_query: str) -> Dict[str, Any]:
-        """Generate a realistic deterministic MKE-IR fixture based on simple heuristic cues."""
-        if "log" in raw_query.lower() or "ln" in raw_query.lower():
-            return {
-                "problem_category": "EQUATION_SINGLE",
-                "question_format": "FREE_FORM",
-                "target_variables": ["x"],
-                "parameters": [],
-                "primary_expressions": ["log(x-1, 2) = 3"],
-                "extracted_constraints": [
-                    {"variable": "x", "relation": ">", "bound_expression": "1"}
-                ],
-                "subparts": [],
-                "given_options": None,
-                "model_confidence": 0.95,
-                "uncertainty_flags": []
-            }
-        elif "sin" in raw_query.lower() or "cos" in raw_query.lower() or "tan" in raw_query.lower():
-            return {
-                "problem_category": "EQUATION_SINGLE",
-                "question_format": "FREE_FORM",
-                "target_variables": ["x"],
-                "parameters": [],
-                "primary_expressions": ["sin(x) = 1/2"],
-                "extracted_constraints": [],
-                "subparts": [],
-                "given_options": None,
-                "model_confidence": 0.92,
-                "uncertainty_flags": []
-            }
+        if status_str == "OUT_OF_SCOPE":
+            return (
+                "### Thông báo phạm vi giải toán\n"
+                "- Dạng bài toán chưa được hỗ trợ chứng minh tự động trong MKE.\n"
+                "- Trạng thái động cơ: `OUT_OF_SCOPE`."
+            )
+        elif status_str == "INVALID_INPUT":
+            return (
+                "### Thông báo dữ liệu đầu vào\n"
+                "- Dữ liệu bài toán không hợp lệ hoặc cú pháp biểu thức không được chấp nhận.\n"
+                "- Trạng thái động cơ: `INVALID_INPUT`."
+            )
+        elif status_str == "UNRESOLVED":
+            return (
+                "### Thông báo kết quả\n"
+                "- Động cơ toán học chưa thể xác định lời giải đóng hoàn chỉnh.\n"
+                "- Trạng thái động cơ: `UNRESOLVED`."
+            )
+        elif status_str == "DOMAIN_ERROR":
+            return (
+                "### Thông báo vi phạm miền xác định\n"
+                "- Biểu thức bài toán vi phạm điều kiện xác định toán học (ví dụ: căn bậc chẵn âm, chia cho 0 hoặc logarit số không dương).\n"
+                "- Trạng thái động cơ: `DOMAIN_ERROR`."
+            )
+        elif status_str == "SECURITY_REJECTED":
+            return (
+                "### Cảnh báo an toàn\n"
+                "- Yêu cầu tính toán bị từ chối do vi phạm quy tắc an toàn hoặc chứa nội dung không hợp lệ.\n"
+                "- Trạng thái động cơ: `SECURITY_REJECTED`."
+            )
+        elif status_str == "RESOURCE_EXHAUSTED":
+            return (
+                "### Thông báo giới hạn tài nguyên\n"
+                "- Quá trình tính toán vượt quá giới hạn thời gian hoặc bộ nhớ cho phép.\n"
+                "- Trạng thái động cơ: `RESOURCE_EXHAUSTED`."
+            )
+        elif status_str == "PARTIAL":
+            res = cas_evidence.get("symbolic_result", "None")
+            return (
+                "### Kết quả một phần (Chưa chứng minh tính đầy đủ)\n"
+                f"- Kết quả tìm được: `{res}`.\n"
+                "- Lưu ý: Động cơ chưa thể chứng minh tính vét cạn của toàn bộ tập nghiệm.\n"
+                "- Trạng thái động cơ: `PARTIAL`."
+            )
+        elif status_str == "SUCCESS":
+            # For SUCCESS: format illustrative explanation citing explicit evidence fields
+            ve = cas_evidence.get("verification_evidence") or {}
+            cert = ve.get("completeness_certified", False)
+            cert_cat = ve.get("completeness_category", "UNCERTIFIED")
+            certainty = cas_evidence.get("domain_certainty", "NOT_FULLY_DETERMINED")
+            result = cas_evidence.get("symbolic_result", "None")
+            exprs = structured_ir.get("primary_expressions", [])
+
+            explanation_lines = [
+                "### Hướng dẫn giải chi tiết (Minh họa giao diện GDPT 2018)",
+                "1. **Điều kiện xác định (ĐKXĐ):**",
+                f"   - Đánh giá miền xác định: `{certainty}`.",
+                "2. **Các bước biến đổi đại số:**",
+                f"   - Biểu thức chính: `{exprs}`.",
+                "3. **Đối chiếu điều kiện & Kết luận:**",
+                f"   - Tập nghiệm / Kết quả: **{result}** (Tính đầy đủ: `{cert}`, Phân loại: `{cert_cat}`)."
+            ]
+            return "\n".join(explanation_lines)
         else:
-            return {
-                "problem_category": "EQUATION_SINGLE",
-                "question_format": "FREE_FORM",
-                "target_variables": ["x"],
-                "parameters": [],
-                "primary_expressions": ["x^2 - 4 = 0"],
-                "extracted_constraints": [],
-                "subparts": [],
-                "given_options": None,
-                "model_confidence": 0.98,
-                "uncertainty_flags": []
-            }
+            return (
+                f"### Thông báo trạng thái không xác định\n"
+                f"- Trạng thái động cơ `{status_str}` không được công nhận là lời giải hợp lệ."
+            )
 
-    def _validate_fixture_schema(self, payload: Dict[str, Any]) -> None:
-        """Validate presence of fundamental MKE-IR keys."""
-        required_keys = ["problem_category", "question_format", "primary_expressions"]
-        for k in required_keys:
-            if k not in payload:
+    def _validate_fixture_schema(self, payload: Any) -> None:
+        """Validate presence of fundamental MKE-IR keys and basic types (Task B).
+
+        Note: This preliminary structural validation checks JSON format and data types only.
+        It does NOT prove mathematical AST safety or semantic correctness. Mathematical AST
+        validation is strictly enforced by the CAS dispatcher in P1C-03.
+        """
+        if not isinstance(payload, dict):
+            raise ProviderSchemaValidationError(
+                f"Structured payload must be a dictionary, got {type(payload).__name__}",
+                provider_id=self.provider_id
+            )
+
+        # 1. problem_category
+        cat = payload.get("problem_category")
+        if not isinstance(cat, str) or not cat.strip():
+            raise ProviderSchemaValidationError(
+                "Payload missing valid non-empty string 'problem_category'",
+                provider_id=self.provider_id
+            )
+
+        # 2. question_format
+        qf = payload.get("question_format")
+        if not isinstance(qf, str) or not qf.strip():
+            raise ProviderSchemaValidationError(
+                "Payload missing valid non-empty string 'question_format'",
+                provider_id=self.provider_id
+            )
+
+        # 3. primary_expressions
+        exprs = payload.get("primary_expressions")
+        if not isinstance(exprs, list) or len(exprs) == 0 or not all(isinstance(e, str) and e.strip() for e in exprs):
+            raise ProviderSchemaValidationError(
+                "Payload 'primary_expressions' must be a non-empty list of non-empty strings",
+                provider_id=self.provider_id
+            )
+
+        # 4. target_variables (if present, must be list)
+        if "target_variables" in payload:
+            tvars = payload["target_variables"]
+            if not isinstance(tvars, list) or not all(isinstance(v, str) for v in tvars):
                 raise ProviderSchemaValidationError(
-                    f"Structured payload missing required key: '{k}'",
+                    "Payload 'target_variables' must be a list of strings",
                     provider_id=self.provider_id
                 )

@@ -330,11 +330,18 @@ flowchart LR
 ## 10. Design Addendum (Phase A Mandates)
 
 ### 10.1 Operation-Specific Verification & Evidence Fields
-1. **DomainCertainty Invariant:** `DomainCertainty` alone (e.g. `PROVEN_REALS`) indicates domain validity only and **must never be conflated with solution completeness**. Mathematical completeness requires explicit certification from CAS evidence fields:
-   - `is_certified_complete`: Boolean flag emitted by CAS completeness gate.
-   - `completeness_category`: e.g. `CERTIFIED_POLYNOMIAL_DEGREE_N`, `CERTIFIED_PERIODIC_TRIG_AFFINE`, `PROVEN_EMPTY_POLYNOMIAL`, `PROVEN_EMPTY_EXPONENTIAL`.
-   - `reason`: Exact explanation string from Sturm isolation or AST root comparison.
-2. **No Invented Proof Nodes:** The explanation generator must reference only genuine CAS response fields (`symbolic_result`, `domain_certainty`, `completeness_category`, `reason`), and must never invent synthetic or speculative CAS AST nodes.
+1. **DomainCertainty Invariant:** `DomainCertainty` alone (e.g. `PROVEN_REALS`) indicates domain validity only and **must never be conflated with solution completeness**. Mathematical completeness requires explicit certification from CAS evidence fields within `ExecutionResponse`:
+   - `verification_evidence.completeness_certified`: Boolean flag emitted by CAS completeness gate.
+   - `verification_evidence.completeness_category`: e.g. `CERTIFIED_POLYNOMIAL_DEGREE_N`, `CERTIFIED_PERIODIC_TRIG_AFFINE`, `PROVEN_EMPTY_POLYNOMIAL`, `PROVEN_EMPTY_EXPONENTIAL`.
+   - `verification_evidence.root_count` and `verification_evidence.roots`: Exact root lists and counts.
+   - `error_message` / `warnings`: Descriptive diagnostic strings when completeness cannot be established.
+2. **Actual Frozen ExecutionResponse Structure:**
+   - `mathematical_status`: `EngineStatus` (`SUCCESS`, `PARTIAL`, `UNRESOLVED`, `OUT_OF_SCOPE`, `DOMAIN_ERROR`, `INVALID_INPUT`, `SECURITY_REJECTED`, `RESOURCE_EXHAUSTED`).
+   - `symbolic_result`: `Optional[str]`.
+   - `domain_restrictions`: `List[str]`.
+   - `domain_certainty`: `Optional[DomainCertainty]`.
+   - `verification_evidence`: `Optional[Dict[str, Any]]`.
+3. **No Invented Proof Nodes:** The explanation generator must reference only genuine CAS response fields (`symbolic_result`, `domain_certainty`, `verification_evidence.completeness_certified`, `verification_evidence.completeness_category`), and must never invent synthetic or speculative CAS AST nodes. Neither `DomainCertainty` nor `EngineStatus.SUCCESS` alone is sufficient to assert exhaustive completeness without `verification_evidence.completeness_certified == True`.
 
 ### 10.2 Exact Frozen CAS API Signatures & Contract Alignment
 1. **Equation Systems:** Must serialize through the existing frozen parser/request contracts (`parse_cas_equation` / `OperationType.SOLVE_SYSTEM`), utilizing standard comma-delimited equation sets where supported.
