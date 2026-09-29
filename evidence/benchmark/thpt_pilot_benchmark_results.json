@@ -28,9 +28,9 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-29T04:58:02Z",
+    "timestamp": "2026-09-29T05:29:27Z",
     "engine_version": "v0.3.2-p03c-p1b-r1",
-    "git_commit_sha": "2dc9fdd30e7dd3099a6f8c0f724665041fb92e1d",
+    "git_commit_sha": "2d7a0720c4b1ee7cf25e3b6092c6f5395db9d9c1",
     "is_worktree_clean": false,
     "dataset_file": "thpt_pilot_benchmark_v1.json",
     "dataset_sha256": "a800d0a36fcecb6f4b6307e51f2f60535eff9fbe583ed21a132c53d32b394cbd",
@@ -40,7 +40,7 @@
       "platform": "Windows-10-10.0.26200-SP0",
       "system": "Windows"
     },
-    "duration_seconds": 21.797,
+    "duration_seconds": 23.219,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
@@ -186,7 +186,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'2', '-2'}",
+      "scoring_details": "Exact solution set matched: {'-2', '2'}",
       "engine_result": "{-2, 2}",
       "engine_solution_set": [
         "-2",
@@ -354,7 +354,7 @@
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "OUT_OF_SCOPE",
-      "scoring_details": "Equation cannot be certified as an exhaustive complete solution set: Equation does not match recognized algebraic complete forms",
+      "scoring_details": "Equation cannot be certified as an exhaustive complete solution set: Cannot compute polynomial real roots: sorted roots not supported over ZZ[y]",
       "engine_result": null,
       "engine_solution_set": []
     },
