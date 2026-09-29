@@ -1,7 +1,7 @@
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-29T15:19:01.190017+00:00
-End: 2026-09-29T15:19:03.400736+00:00
+Start: 2026-09-29T15:33:22.792262+00:00
+End: 2026-09-29T15:33:24.707211+00:00
 Exit Code: 0
 
 STDOUT:
@@ -36,5 +36,5 @@ tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanl
 tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
 tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
 
-============================= 22 passed in 1.14s ==============================
+============================= 22 passed in 1.08s ==============================
 

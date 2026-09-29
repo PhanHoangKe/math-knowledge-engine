@@ -1,7 +1,7 @@
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-29T15:19:03.401744+00:00
-End: 2026-09-29T15:19:56.784104+00:00
+Start: 2026-09-29T15:33:24.708229+00:00
+End: 2026-09-29T15:34:13.411310+00:00
 Exit Code: 0
 
 STDOUT:
@@ -58,5 +58,5 @@ tests/test_p03c_p1b_transcendental_solver.py::test_algebraic_radical_and_rationa
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_2_pow_x_plus_1_eq_2_pow_x_plus_1 PASSED [ 97%]
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_polynomial_multiplicity_distinct_root_sets PASSED [100%]
 
-============================= 44 passed in 52.02s =============================
+============================= 44 passed in 47.69s =============================
 
