@@ -1,4 +1,4 @@
-"""Unit tests for P1C-02-R1 Provider-Agnostic Mock Adapter, Validation, and Safety."""
+"""Unit tests for P1C-02-R2 Provider-Agnostic Mock Adapter, Validation, and Safety."""
 
 import asyncio
 import pytest
@@ -36,12 +36,12 @@ def setup_registry():
 
 
 # ---------------------------------------------------------------------------
-# Task A: Strict Mock Fixture Boundary Tests
+# Task 1: Protect Student Data & Strict Fixture Boundary Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_exact_mock_fixture_mapping_2_pow_x_eq_8():
-    """TASK A: Verify exact fixture lookup. '2^x = 8' must NEVER return 'x^2 - 4 = 0'."""
+    """TASK 1: Verify exact fixture lookup. '2^x = 8' must NEVER return 'x^2 - 4 = 0'."""
     adapter = MockModelProviderAdapter()
     req = ModelExtractionRequest(raw_query="2^x = 8")
 
@@ -53,18 +53,44 @@ async def test_exact_mock_fixture_mapping_2_pow_x_eq_8():
 
 @pytest.mark.asyncio
 async def test_unmatched_query_fails_explicitly_without_guessing():
-    """TASK A: Unmatched queries (e.g. word problems) must fail explicitly with typed ProviderError."""
+    """TASK 1: Unmatched queries (e.g. word problems) must fail explicitly with typed ProviderError."""
     adapter = MockModelProviderAdapter()
     req = ModelExtractionRequest(raw_query="Một người đi xe máy từ Hà Nội về Hải Phòng...")
 
     with pytest.raises(ProviderError) as exc_info:
         await adapter.extract_math_ir(req)
-    assert "Mock adapter has no registered fixture for query" in str(exc_info.value)
+    assert "No matching mock fixture registered for request" in str(exc_info.value)
+    assert "Một người đi xe máy" not in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_unmatched_query_with_sensitive_student_data_fails_safely():
+    """TASK 1: Raw student PII and credentials must never appear in error messages or telemetry."""
+    adapter = MockModelProviderAdapter()
+    sensitive_query = "Học sinh Nguyễn Văn A email nguyen.van.a@school.edu.vn dùng key sk-1234567890abcdef1234567890abcdef và Bearer tok_xyz987 giải phương trình khó"
+    req = ModelExtractionRequest(raw_query=sensitive_query)
+
+    with pytest.raises(ProviderError) as exc_info:
+        await adapter.extract_math_ir(req)
+
+    error_msg = str(exc_info.value)
+    assert "nguyen.van.a@school.edu.vn" not in error_msg
+    assert "Nguyễn Văn A" not in error_msg
+    assert "sk-1234567890abcdef1234567890abcdef" not in error_msg
+    assert "tok_xyz987" not in error_msg
+    assert "No matching mock fixture registered for request" in error_msg
+
+    # Verify telemetry history does not contain student query or PII
+    for record in adapter.telemetry_history:
+        telemetry_str = str(record.dict())
+        assert "nguyen.van.a" not in telemetry_str
+        assert "sk-1234567890" not in telemetry_str
+        assert "Nguyễn Văn A" not in telemetry_str
 
 
 @pytest.mark.asyncio
 async def test_custom_fixture_override_takes_precedence():
-    """TASK A: fixture_override allows testing arbitrary custom problem structures."""
+    """TASK 1: fixture_override allows testing arbitrary custom problem structures."""
     custom_fixture = {
         "problem_category": "EQUATION_SYSTEM",
         "question_format": "FREE_FORM",
@@ -80,12 +106,12 @@ async def test_custom_fixture_override_takes_precedence():
 
 
 # ---------------------------------------------------------------------------
-# Task B: Structural Validation Contract Tests (Positive & Negative)
+# Schema and Structural Validation Contract Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_positive_structural_validation():
-    """TASK B: Valid dictionary payload passes structural validation cleanly."""
+    """Valid dictionary payload passes structural validation cleanly."""
     valid_fixture = {
         "problem_category": "EQUATION_SINGLE",
         "question_format": "FREE_FORM",
@@ -101,7 +127,7 @@ async def test_positive_structural_validation():
 
 @pytest.mark.asyncio
 async def test_negative_structural_validation_non_dict_payload():
-    """TASK B: Non-dict payload raises ProviderSchemaValidationError."""
+    """Non-dict payload raises ProviderSchemaValidationError."""
     adapter = MockModelProviderAdapter(raw_text_override='"A plain string JSON"')
     req = ModelExtractionRequest(raw_query="x = 1")
 
@@ -112,7 +138,7 @@ async def test_negative_structural_validation_non_dict_payload():
 
 @pytest.mark.asyncio
 async def test_negative_structural_validation_primary_expressions_as_string():
-    """TASK B: primary_expressions as str instead of list raises ProviderSchemaValidationError."""
+    """primary_expressions as str instead of list raises ProviderSchemaValidationError."""
     invalid_fixture = {
         "problem_category": "EQUATION_SINGLE",
         "question_format": "FREE_FORM",
@@ -129,7 +155,7 @@ async def test_negative_structural_validation_primary_expressions_as_string():
 
 @pytest.mark.asyncio
 async def test_negative_structural_validation_empty_primary_expressions():
-    """TASK B: Empty primary_expressions list raises ProviderSchemaValidationError."""
+    """Empty primary_expressions list raises ProviderSchemaValidationError."""
     invalid_fixture = {
         "problem_category": "EQUATION_SINGLE",
         "question_format": "FREE_FORM",
@@ -146,7 +172,7 @@ async def test_negative_structural_validation_empty_primary_expressions():
 
 @pytest.mark.asyncio
 async def test_negative_structural_validation_invalid_target_variables_type():
-    """TASK B: target_variables as non-list raises ProviderSchemaValidationError."""
+    """target_variables as non-list raises ProviderSchemaValidationError."""
     invalid_fixture = {
         "problem_category": "EQUATION_SINGLE",
         "question_format": "FREE_FORM",
@@ -163,7 +189,7 @@ async def test_negative_structural_validation_invalid_target_variables_type():
 
 @pytest.mark.asyncio
 async def test_malicious_math_string_remains_inert():
-    """TASK B: Adversarial code string in payload is deserialized as plain text without execution."""
+    """Adversarial code string in payload is deserialized as plain text without execution."""
     malicious_fixture = {
         "problem_category": "EQUATION_SINGLE",
         "question_format": "FREE_FORM",
@@ -178,28 +204,176 @@ async def test_malicious_math_string_remains_inert():
 
 
 # ---------------------------------------------------------------------------
-# Task C: Explanation Safety & Adversarial Status Tests
+# Task 2: Honest Explanation Output Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_explanation_missing_status_fails_safely():
-    """TASK C: Missing mathematical_status returns error notice rather than solution."""
+async def test_explanation_illustrative_mock_banner_present():
+    """TASK 2: All mock explanations must remain explicitly marked as illustrative mock output."""
     adapter = MockModelProviderAdapter()
     raw_query = "x^2 = 4"
-    structured_ir = {"primary_expressions": ["x^2 = 4"]}
-    cas_evidence = {}  # Missing mathematical_status
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x^2 = 4"]}
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "symbolic_result": "{-2, 2}",
+        "domain_certainty": "PROVEN_REALS",
+        "verification_evidence": {
+            "completeness_certified": True,
+            "completeness_category": "CERTIFIED_POLYNOMIAL_DEGREE_2"
+        }
+    }
 
     explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "[MINH HỌA MÔ PHỎNG - MOCK ONLY]" in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_missing_status_fails_safely():
+    """TASK 2: Missing mathematical_status returns error notice rather than solution."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "x^2 = 4"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x^2 = 4"]}
+
+    # Missing status in dict
+    explanation = await adapter.render_explanation(raw_query, structured_ir, {})
     assert "Thông báo lỗi kiểm chứng" in explanation
     assert "thiếu mathematical_status" in explanation
+    assert "[MINH HỌA MÔ PHỎNG - MOCK ONLY]" in explanation
+
+    # None cas_evidence
+    explanation_none = await adapter.render_explanation(raw_query, structured_ir, None)
+    assert "Thông báo lỗi kiểm chứng" in explanation_none
+
+
+@pytest.mark.asyncio
+async def test_explanation_unexpected_or_unsupported_status():
+    """TASK 2: Unexpected / uncertified statuses return unconfirmed status notice."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "test"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x = 1"]}
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, {"mathematical_status": "SUPER_RESOLVED"})
+    assert "Thông báo trạng thái không xác định" in explanation
+    assert "SUPER_RESOLVED" in explanation
+    assert "không được công nhận là trạng thái toán học hợp lệ" in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_success_without_verification_evidence():
+    """TASK 2: SUCCESS without verification_evidence must NOT imply complete solution."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "2^x = 8"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["2^x = 8"]}
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "symbolic_result": "{3}",
+        "domain_certainty": "PROVEN_REALS"
+        # verification_evidence omitted
+    }
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "Chưa chứng minh tính đầy đủ" in explanation
+    assert "Chưa chứng minh tính vét cạn" in explanation
+    assert "Tính đầy đủ: `False`" in explanation
+    assert "Đã chứng minh đầy đủ" not in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_success_with_completeness_certified_false():
+    """TASK 2: SUCCESS with completeness_certified=False must state completeness is uncertified."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "2^x + 3^x = 7"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["2^x + 3^x = 7"]}
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "symbolic_result": "{1.5}",
+        "domain_certainty": "PROVEN_REALS",
+        "verification_evidence": {
+            "completeness_certified": False,
+            "completeness_category": "UNCERTIFIED"
+        }
+    }
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "Chưa chứng minh tính đầy đủ" in explanation
+    assert "Tính đầy đủ: `False`" in explanation
+    assert "UNCERTIFIED" in explanation
+    assert "Đã chứng minh đầy đủ" not in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_success_with_missing_symbolic_result():
+    """TASK 2: SUCCESS with missing symbolic_result must explicitly flag absence."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "x = 1"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x = 1"]}
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "domain_certainty": "PROVEN_REALS",
+        "verification_evidence": {
+            "completeness_certified": True,
+            "completeness_category": "CERTIFIED_LINEAR"
+        }
+        # symbolic_result omitted
+    }
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "thiếu symbolic_result" in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_success_certified_equation():
+    """TASK 2: SUCCESS with certified completeness properly reports full verified solution."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "x^2 = 4"
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x^2 = 4"]}
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "symbolic_result": "{-2, 2}",
+        "domain_certainty": "PROVEN_REALS",
+        "verification_evidence": {
+            "completeness_certified": True,
+            "completeness_category": "CERTIFIED_POLYNOMIAL_DEGREE_2",
+            "root_count": 2,
+            "roots": ["-2", "2"]
+        }
+    }
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "Đã chứng minh đầy đủ" in explanation
+    assert "{-2, 2}" in explanation
+    assert "Tính đầy đủ: `True`" in explanation
+    assert "CERTIFIED_POLYNOMIAL_DEGREE_2" in explanation
+
+
+@pytest.mark.asyncio
+async def test_explanation_non_equation_operation_does_not_infer_completeness():
+    """TASK 2: For non-equation operations, do not infer solution-set completeness from SUCCESS."""
+    adapter = MockModelProviderAdapter()
+    raw_query = "Rút gọn biểu thức (x+1)^2"
+    structured_ir = {
+        "problem_category": "EXPRESSION_SIMPLIFY",
+        "primary_expressions": ["(x+1)^2"]
+    }
+    cas_evidence = {
+        "mathematical_status": "SUCCESS",
+        "symbolic_result": "x^2 + 2*x + 1",
+        "domain_certainty": "PROVEN_REALS"
+    }
+
+    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
+    assert "Kết quả biến đổi / tính toán" in explanation
+    assert "x^2 + 2*x + 1" in explanation
+    assert "Không áp dụng chứng nhận tập nghiệm" in explanation
+    assert "Tập nghiệm" not in explanation
 
 
 @pytest.mark.asyncio
 async def test_explanation_adversarial_statuses():
-    """TASK C: Non-SUCCESS statuses must never be presented as verified solutions."""
+    """TASK 2: Non-SUCCESS statuses must never be presented as verified solutions."""
     adapter = MockModelProviderAdapter()
     raw_query = "test query"
-    structured_ir = {"primary_expressions": ["x = 1"]}
+    structured_ir = {"problem_category": "EQUATION_SINGLE", "primary_expressions": ["x = 1"]}
 
     # 1. OUT_OF_SCOPE
     oos = await adapter.render_explanation(raw_query, structured_ir, {"mathematical_status": "OUT_OF_SCOPE"})
@@ -239,39 +413,13 @@ async def test_explanation_adversarial_statuses():
     assert "Chưa chứng minh tính đầy đủ" in part
 
 
-@pytest.mark.asyncio
-async def test_explanation_success_with_verification_evidence():
-    """TASK C & D: SUCCESS explanation cites verification_evidence.completeness_certified."""
-    adapter = MockModelProviderAdapter()
-    raw_query = "x^2 = 4"
-    structured_ir = {"primary_expressions": ["x^2 = 4"]}
-    cas_evidence = {
-        "mathematical_status": "SUCCESS",
-        "symbolic_result": "{-2, 2}",
-        "domain_certainty": "PROVEN_REALS",
-        "verification_evidence": {
-            "completeness_certified": True,
-            "completeness_category": "CERTIFIED_POLYNOMIAL_DEGREE_2",
-            "root_count": 2,
-            "roots": ["-2", "2"]
-        }
-    }
-
-    explanation = await adapter.render_explanation(raw_query, structured_ir, cas_evidence)
-    assert "Minh họa giao diện GDPT 2018" in explanation
-    assert "{-2, 2}" in explanation
-    assert "PROVEN_REALS" in explanation
-    assert "Tính đầy đủ: `True`" in explanation
-    assert "CERTIFIED_POLYNOMIAL_DEGREE_2" in explanation
-
-
 # ---------------------------------------------------------------------------
-# Task E: Cancellation and Error Propagation Tests
+# Cancellation and Error Propagation Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_asyncio_cancellation_propagates_cleanly():
-    """TASK E: Verify CancelledError propagates without being swallowed."""
+    """Verify CancelledError propagates without being swallowed."""
     adapter = MockModelProviderAdapter(simulated_latency_seconds=1.0)
     req = ModelExtractionRequest(raw_query="x = 1")
 

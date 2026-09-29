@@ -254,10 +254,9 @@ class MockModelProviderAdapter(ModelProviderAdapter):
                 parsed_payload = EXACT_MOCK_FIXTURES[norm_key]
                 raw_text = json.dumps(parsed_payload)
             else:
-                # Unmatched input -> fail explicitly with typed error rather than inventing equations
+                # Unmatched input -> fail explicitly with fixed typed error without leaking student input
                 raise ProviderError(
-                    f"Mock adapter has no registered fixture for query: '{request.raw_query}'. "
-                    f"To test custom queries, provide fixture_override.",
+                    "No matching mock fixture registered for request. Use fixture_override for custom test fixtures.",
                     provider_id=self.provider_id,
                     is_retryable=False
                 )
@@ -302,16 +301,27 @@ class MockModelProviderAdapter(ModelProviderAdapter):
     ) -> str:
         """Render deterministic step-by-step Vietnamese explanation grounded in CAS evidence.
 
-        Task C:
-        - OUT_OF_SCOPE, INVALID_INPUT, UNRESOLVED, DOMAIN_ERROR, SECURITY_REJECTED,
-          RESOURCE_EXHAUSTED and missing statuses are never presented as verified solutions.
-        - Never invents domain derivations, algebraic transformations or proof nodes.
+        Task 2 (Honest Explanation Output):
+        - All mock responses remain explicitly marked as illustrative mock output.
+        - Non-SUCCESS statuses (OUT_OF_SCOPE, INVALID_INPUT, UNRESOLVED, DOMAIN_ERROR,
+          SECURITY_REJECTED, RESOURCE_EXHAUSTED, PARTIAL) and missing statuses are never
+          presented as verified complete solutions.
+        - For equation solving under SUCCESS, requires explicit completeness certification
+          (completeness_certified == True) before using complete-solution language.
+        - For non-equation operations under SUCCESS, does not infer solution-set completeness.
+        - Never invents proof steps, derivations, or fictitious CAS nodes.
         """
-        status = cas_evidence.get("mathematical_status")
+        if not isinstance(cas_evidence, dict):
+            return (
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo lỗi kiểm chứng\n"
+                "- Trạng thái động cơ không xác định (thiếu mathematical_status).\n"
+                "- Không thể tạo lời giải khi thiếu bằng chứng toán học."
+            )
 
+        status = cas_evidence.get("mathematical_status")
         if not status:
             return (
-                "### Thông báo lỗi kiểm chứng\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo lỗi kiểm chứng\n"
                 "- Trạng thái động cơ không xác định (thiếu mathematical_status).\n"
                 "- Không thể tạo lời giải khi thiếu bằng chứng toán học."
             )
@@ -320,71 +330,89 @@ class MockModelProviderAdapter(ModelProviderAdapter):
 
         if status_str == "OUT_OF_SCOPE":
             return (
-                "### Thông báo phạm vi giải toán\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo phạm vi giải toán\n"
                 "- Dạng bài toán chưa được hỗ trợ chứng minh tự động trong MKE.\n"
                 "- Trạng thái động cơ: `OUT_OF_SCOPE`."
             )
         elif status_str == "INVALID_INPUT":
             return (
-                "### Thông báo dữ liệu đầu vào\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo dữ liệu đầu vào\n"
                 "- Dữ liệu bài toán không hợp lệ hoặc cú pháp biểu thức không được chấp nhận.\n"
                 "- Trạng thái động cơ: `INVALID_INPUT`."
             )
         elif status_str == "UNRESOLVED":
             return (
-                "### Thông báo kết quả\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo kết quả\n"
                 "- Động cơ toán học chưa thể xác định lời giải đóng hoàn chỉnh.\n"
                 "- Trạng thái động cơ: `UNRESOLVED`."
             )
         elif status_str == "DOMAIN_ERROR":
             return (
-                "### Thông báo vi phạm miền xác định\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo vi phạm miền xác định\n"
                 "- Biểu thức bài toán vi phạm điều kiện xác định toán học (ví dụ: căn bậc chẵn âm, chia cho 0 hoặc logarit số không dương).\n"
                 "- Trạng thái động cơ: `DOMAIN_ERROR`."
             )
         elif status_str == "SECURITY_REJECTED":
             return (
-                "### Cảnh báo an toàn\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Cảnh báo an toàn\n"
                 "- Yêu cầu tính toán bị từ chối do vi phạm quy tắc an toàn hoặc chứa nội dung không hợp lệ.\n"
                 "- Trạng thái động cơ: `SECURITY_REJECTED`."
             )
         elif status_str == "RESOURCE_EXHAUSTED":
             return (
-                "### Thông báo giới hạn tài nguyên\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo giới hạn tài nguyên\n"
                 "- Quá trình tính toán vượt quá giới hạn thời gian hoặc bộ nhớ cho phép.\n"
                 "- Trạng thái động cơ: `RESOURCE_EXHAUSTED`."
             )
         elif status_str == "PARTIAL":
-            res = cas_evidence.get("symbolic_result", "None")
+            res = cas_evidence.get("symbolic_result")
+            res_str = str(res) if res is not None else "Không có kết quả ký hiệu"
             return (
-                "### Kết quả một phần (Chưa chứng minh tính đầy đủ)\n"
-                f"- Kết quả tìm được: `{res}`.\n"
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Kết quả một phần (Chưa chứng minh tính đầy đủ)\n"
+                f"- Kết quả tìm được: `{res_str}`.\n"
                 "- Lưu ý: Động cơ chưa thể chứng minh tính vét cạn của toàn bộ tập nghiệm.\n"
                 "- Trạng thái động cơ: `PARTIAL`."
             )
         elif status_str == "SUCCESS":
-            # For SUCCESS: format illustrative explanation citing explicit evidence fields
-            ve = cas_evidence.get("verification_evidence") or {}
-            cert = ve.get("completeness_certified", False)
-            cert_cat = ve.get("completeness_category", "UNCERTIFIED")
+            # Determine operation type and completeness certification
+            raw_result = cas_evidence.get("symbolic_result")
+            has_result = raw_result is not None
+            result_str = str(raw_result) if has_result else "Không có kết quả ký hiệu (thiếu symbolic_result)"
+
+            category = str(structured_ir.get("problem_category", "EQUATION_SINGLE")).upper()
+            is_equation_op = category in {"EQUATION_SINGLE", "EQUATION_SYSTEM", "INEQUALITY_SINGLE"}
+
+            ve = cas_evidence.get("verification_evidence")
+            has_ve = isinstance(ve, dict)
+            cert_complete = (ve.get("completeness_certified") is True) if has_ve else False
+            cert_cat = str(ve.get("completeness_category", "UNCERTIFIED")) if has_ve else "UNCERTIFIED"
             certainty = cas_evidence.get("domain_certainty", "NOT_FULLY_DETERMINED")
-            result = cas_evidence.get("symbolic_result", "None")
             exprs = structured_ir.get("primary_expressions", [])
 
-            explanation_lines = [
-                "### Hướng dẫn giải chi tiết (Minh họa giao diện GDPT 2018)",
+            lines = [
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Hướng dẫn giải (GDPT 2018)",
                 "1. **Điều kiện xác định (ĐKXĐ):**",
                 f"   - Đánh giá miền xác định: `{certainty}`.",
-                "2. **Các bước biến đổi đại số:**",
-                f"   - Biểu thức chính: `{exprs}`.",
-                "3. **Đối chiếu điều kiện & Kết luận:**",
-                f"   - Tập nghiệm / Kết quả: **{result}** (Tính đầy đủ: `{cert}`, Phân loại: `{cert_cat}`)."
+                "2. **Biểu thức toán học tiếp nhận:**",
+                f"   - Biểu thức: `{exprs}`.",
             ]
-            return "\n".join(explanation_lines)
+
+            if is_equation_op:
+                if cert_complete and has_result:
+                    lines.append("3. **Kết luận nghiệm (Đã chứng minh đầy đủ):**")
+                    lines.append(f"   - Tập nghiệm: **{result_str}** (Tính đầy đủ: `True`, Phân loại: `{cert_cat}`).")
+                else:
+                    lines.append("3. **Kết quả tính toán (Chưa chứng minh tính đầy đủ):**")
+                    lines.append(f"   - Giá trị nghiệm tìm được: **{result_str}** (Lưu ý: Chưa chứng minh tính vét cạn, Tính đầy đủ: `{cert_complete}`, Phân loại: `{cert_cat}`).")
+            else:
+                lines.append("3. **Kết quả biến đổi / tính toán:**")
+                lines.append(f"   - Kết quả: **{result_str}** (Trạng thái: `SUCCESS`, Không áp dụng chứng nhận tập nghiệm).")
+
+            return "\n".join(lines)
         else:
             return (
-                f"### Thông báo trạng thái không xác định\n"
-                f"- Trạng thái động cơ `{status_str}` không được công nhận là lời giải hợp lệ."
+                "### [MINH HỌA MÔ PHỎNG - MOCK ONLY] Thông báo trạng thái không xác định\n"
+                f"- Trạng thái động cơ `{status_str}` không được công nhận là trạng thái toán học hợp lệ."
             )
 
     def _validate_fixture_schema(self, payload: Any) -> None:
