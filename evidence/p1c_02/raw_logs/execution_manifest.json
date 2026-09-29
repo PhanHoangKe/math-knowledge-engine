@@ -41,7 +41,7 @@
   },
   {
     "id": "full_repository_pytest",
-    "desc": "Full Repository Pytest Suite (592 items, 18 subtests)",
+    "desc": "Full Repository Pytest Suite (599 passed, 18 subtests passed)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest -v -o pythonpath=src",
     "start_time": "2026-09-29T07:14:32.048598+00:00",
     "end_time": "2026-09-29T07:17:28.823103+00:00",
