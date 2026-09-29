@@ -873,6 +873,87 @@ def _get_primary_base(base_sym: Any) -> Optional[Tuple[Any, int]]:
     return None
 
 
+def _is_certified_polynomial_equation(
+    poly: sympy.Poly,
+    var: sympy.Symbol,
+    valid_roots: List[Any],
+) -> Tuple[bool, str, str]:
+    """Certify polynomial real root completeness against exact Sturm real roots."""
+    try:
+        exact_roots = poly.real_roots()
+    except Exception as exc:
+        return False, "UNCERTIFIED_POLYNOMIAL", f"Cannot compute polynomial real roots: {exc}"
+
+    N_real = len(exact_roots)
+    if len(valid_roots) != N_real:
+        return False, "INCOMPLETE_POLYNOMIAL_ROOTS", f"Found {len(valid_roots)} root(s), but polynomial has {N_real} real root(s)"
+
+    for vr in valid_roots:
+        if not any(sympy.simplify(vr - er) == 0 for er in exact_roots):
+            return False, "INCORRECT_POLYNOMIAL_ROOT", f"Valid root {vr} not among exact polynomial roots {exact_roots}"
+
+    if N_real == 0:
+        return True, "PROVEN_EMPTY_POLYNOMIAL", "Sturm sequence proves polynomial has no real roots"
+    return True, f"CERTIFIED_POLYNOMIAL_DEGREE_{poly.degree()}", f"Polynomial degree {poly.degree()} real root completeness certified"
+
+
+def _normalize_exponential_to_u(
+    expr: sympy.Expr,
+    b0: Any,
+    var: sympy.Symbol,
+    u: sympy.Symbol,
+) -> Optional[sympy.Expr]:
+    """Transform an expression containing powers of primary base b0 into a polynomial in u = b0^x."""
+    def replace_node(e: sympy.Expr) -> sympy.Expr:
+        if isinstance(e, sympy.Pow):
+            base, exponent = e.as_base_exp()
+            if base == b0 or (base == sympy.E and b0 == sympy.E):
+                try:
+                    poly = sympy.Poly(exponent, var)
+                    if poly.degree() == 1:
+                        coeffs = poly.all_coeffs()
+                        p, q = coeffs[0], coeffs[1]
+                        return (b0 ** q) * (u ** p)
+                except Exception:
+                    pass
+            elif isinstance(base, (int, sympy.Integer)) and isinstance(b0, (int, sympy.Integer)):
+                k = 0
+                val = int(base)
+                b0_int = int(b0)
+                temp = val
+                while temp > 1 and temp % b0_int == 0:
+                    temp //= b0_int
+                    k += 1
+                if temp == 1 and k > 0:
+                    try:
+                        poly = sympy.Poly(exponent, var)
+                        if poly.degree() == 1:
+                            coeffs = poly.all_coeffs()
+                            p, q = coeffs[0], coeffs[1]
+                            return (b0 ** (k * q)) * (u ** (k * p))
+                    except Exception:
+                        pass
+        elif isinstance(e, sympy.exp) and b0 == sympy.E:
+            arg = e.args[0]
+            try:
+                poly = sympy.Poly(arg, var)
+                if poly.degree() == 1:
+                    coeffs = poly.all_coeffs()
+                    p, q = coeffs[0], coeffs[1]
+                    return sympy.exp(q) * (u ** p)
+            except Exception:
+                pass
+        return e
+
+    try:
+        transformed = expr.replace(lambda e: isinstance(e, (sympy.Pow, sympy.exp)), replace_node)
+        if var in transformed.free_symbols:
+            return None
+        return transformed
+    except Exception:
+        return None
+
+
 def _is_certified_exponential_equation(
     ast_node: ASTNode,
     eq: sympy.Eq,
@@ -915,46 +996,73 @@ def _is_certified_exponential_equation(
         except Exception:
             return False, "NON_POLYNOMIAL_EXPONENT", "Non-polynomial exponent is out of scope"
 
-    diff = sympy.cancel(eq.lhs - eq.rhs)
+    if isinstance(ast_node, Equation):
+        lhs_sym = ast_to_sympy_expr(ast_node.left)
+        rhs_sym = ast_to_sympy_expr(ast_node.right)
+        diff = sympy.cancel(lhs_sym - rhs_sym)
+    elif hasattr(eq, "lhs") and hasattr(eq, "rhs"):
+        lhs_sym = eq.lhs
+        rhs_sym = eq.rhs
+        diff = sympy.cancel(eq.lhs - eq.rhs)
+    else:
+        lhs_sym = ast_to_sympy_expr(ast_node)
+        rhs_sym = sympy.Integer(0)
+        diff = sympy.cancel(lhs_sym)
 
-    # Empty solution set verification: must have explicit constructive proof
-    if not valid_roots:
-        if isinstance(ast_node, Equation):
-            l_atoms = _extract_exponential_atoms(ast_node.left, var_name)
-            r_atoms = _extract_exponential_atoms(ast_node.right, var_name)
-            if len(l_atoms) == 1 and not r_atoms:
-                rhs_sym = ast_to_sympy_expr(ast_node.right)
-                if rhs_sym.is_number and rhs_sym <= 0:
-                    return True, "PROVEN_EMPTY_EXPONENTIAL", "Exponential expression is strictly positive; RHS <= 0 has no real solutions"
-            elif len(r_atoms) == 1 and not l_atoms:
-                lhs_sym = ast_to_sympy_expr(ast_node.left)
-                if lhs_sym.is_number and lhs_sym <= 0:
-                    return True, "PROVEN_EMPTY_EXPONENTIAL", "Exponential expression is strictly positive; LHS <= 0 has no real solutions"
+    # Check exponential equality: b^(f(x)) = b^(g(x))
+    if isinstance(ast_node, Equation):
+        l_atoms = _extract_exponential_atoms(ast_node.left, var_name)
+        r_atoms = _extract_exponential_atoms(ast_node.right, var_name)
+        if len(l_atoms) == 1 and len(r_atoms) == 1:
+            l_base = ast_to_sympy_expr(l_atoms[0][0]) if isinstance(l_atoms[0][0], ASTNode) else l_atoms[0][0]
+            r_base = ast_to_sympy_expr(r_atoms[0][0]) if isinstance(r_atoms[0][0], ASTNode) else r_atoms[0][0]
+            if sympy.simplify(l_base - r_base) == 0:
+                l_exp = ast_to_sympy_expr(l_atoms[0][1])
+                r_exp = ast_to_sympy_expr(r_atoms[0][1])
+                try:
+                    exp_poly = sympy.Poly(l_exp - r_exp, var)
+                    return _is_certified_polynomial_equation(exp_poly, var, valid_roots)
+                except Exception:
+                    pass
 
+    # Standard transformation to u = b0^x
+    u = sympy.Symbol("__u__", positive=True)
+    transformed_u = _normalize_exponential_to_u(diff, common_b0, var, u)
+    if transformed_u is not None:
         try:
-            u = sympy.Symbol("__u__", positive=True)
-            diff_u = diff
-            if common_b0 == 2:
-                diff_u = diff_u.subs(4**var, u**2).subs(2**var, u)
-            elif common_b0 == sympy.E:
-                diff_u = diff_u.subs(sympy.exp(2*var), u**2).subs(sympy.exp(var), u)
+            num, den = sympy.fraction(sympy.together(transformed_u))
+            poly_u = sympy.Poly(num, u)
+            u_roots = poly_u.real_roots()
+            expected_x: List[Any] = []
+            for ur in u_roots:
+                if ur > 0:
+                    if sympy.simplify(den.subs(u, ur)) != 0:
+                        if common_b0 == sympy.E:
+                            x_val = sympy.log(ur)
+                        else:
+                            x_val = sympy.simplify(sympy.log(ur, common_b0))
+                        expected_x.append(x_val)
 
-            u_poly = sympy.Poly(diff_u, u)
-            if u_poly.degree() == 2:
-                coeffs = u_poly.all_coeffs()
-                A, B, C = coeffs[0], coeffs[1], coeffs[2]
-                delta = B**2 - 4*A*C
-                if delta < 0:
-                    return True, "PROVEN_EMPTY_EXP_QUADRATIC", "Discriminant < 0 in exponential quadratic substitution proves no real solutions"
-                u_roots = sympy.solve(u_poly, u)
-                if all(hasattr(ur, "is_real") and ur.is_real and ur <= 0 for ur in u_roots):
-                    return True, "PROVEN_EMPTY_EXP_QUADRATIC", "All auxiliary roots u <= 0 prove no real solutions for exponential equation"
+            # Deduplicate expected roots
+            uniq_expected: List[Any] = []
+            for ex in expected_x:
+                if not any(sympy.simplify(ex - uq) == 0 for uq in uniq_expected):
+                    uniq_expected.append(ex)
+
+            if len(valid_roots) != len(uniq_expected):
+                return False, "INCOMPLETE_EXPONENTIAL_ROOTS", f"Expected {len(uniq_expected)} real root(s), but found {len(valid_roots)}"
+
+            for vr in valid_roots:
+                if not any(sympy.simplify(vr - ex) == 0 for ex in uniq_expected):
+                    return False, "INCORRECT_EXPONENTIAL_ROOT", f"Valid root {vr} not in expected set {uniq_expected}"
+
+            if len(uniq_expected) == 0:
+                return True, "PROVEN_EMPTY_EXPONENTIAL", "Positivity of exponential term proves no real solutions exist"
+            return True, "CERTIFIED_SINGLE_BASE_EXPONENTIAL", "Single-base elementary exponential equation completeness certified"
         except Exception:
             pass
 
-        return False, "UNPROVEN_EMPTY_EXPONENTIAL", "Empty exponential solution set cannot be certified without a constructive proof"
-
-    return True, "CERTIFIED_SINGLE_BASE_EXPONENTIAL", "Single-base elementary exponential equation completeness certified"
+    return False, "UNCERTIFIED_EXPONENTIAL_PATTERN", "Exponential equation does not match verified transformation pattern"
 
 
 def _extract_logarithmic_atoms(ast_node: ASTNode, var_name: str) -> List[Tuple[ASTNode, Any]]:
@@ -997,6 +1105,8 @@ def _is_certified_logarithmic_equation(
     if len(bases) != 1:
         return False, "MULTI_BASE_LOGARITHMIC", "Multiple log bases cannot be certified as complete"
 
+    common_base = list(bases)[0]
+
     # Check argument polynomials are degree <= 2
     for arg_ast, _ in log_atoms:
         arg_sym = ast_to_sympy_expr(arg_ast)
@@ -1007,12 +1117,112 @@ def _is_certified_logarithmic_equation(
         except Exception:
             return False, "NON_POLYNOMIAL_LOG_ARG", "Non-polynomial log argument is out of scope"
 
-    if not valid_roots:
-        if candidates and all(_validate_root_in_ast(c, ast_node, var, eq.lhs, eq.rhs)[0] is False for c in candidates):
-            return True, "PROVEN_EMPTY_LOGARITHMIC", "All algebraic candidates proved extraneous by domain constraints"
-        return False, "UNPROVEN_EMPTY_LOGARITHMIC", "Empty logarithmic solution set cannot be certified without proof"
+    if isinstance(ast_node, Equation):
+        left_ast = ast_node.left
+        right_ast = ast_node.right
+        lhs_sym = ast_to_sympy_expr(left_ast)
+        rhs_sym = ast_to_sympy_expr(right_ast)
 
-    return True, "CERTIFIED_SINGLE_BASE_LOGARITHMIC", "Single-base elementary logarithmic equation completeness certified"
+        # Form A: Single log atom: log_b(f(x)) = c
+        if (
+            isinstance(left_ast, FunctionCall)
+            and left_ast.name in ("log", "ln")
+            and len(right_ast.variables()) == 0
+        ):
+            f_sym = ast_to_sympy_expr(left_ast.args[0])
+            b_val = common_base
+            try:
+                poly = sympy.Poly(f_sym - (b_val ** rhs_sym), var)
+                return _is_certified_polynomial_equation(poly, var, valid_roots)
+            except Exception:
+                pass
+
+        elif (
+            isinstance(right_ast, FunctionCall)
+            and right_ast.name in ("log", "ln")
+            and len(left_ast.variables()) == 0
+        ):
+            f_sym = ast_to_sympy_expr(right_ast.args[0])
+            b_val = common_base
+            try:
+                poly = sympy.Poly(f_sym - (b_val ** lhs_sym), var)
+                return _is_certified_polynomial_equation(poly, var, valid_roots)
+            except Exception:
+                pass
+
+        # Form B: Log equality: log_b(f(x)) = log_b(g(x))
+        if (
+            isinstance(left_ast, FunctionCall)
+            and left_ast.name in ("log", "ln")
+            and isinstance(right_ast, FunctionCall)
+            and right_ast.name in ("log", "ln")
+        ):
+            f_sym = ast_to_sympy_expr(left_ast.args[0])
+            g_sym = ast_to_sympy_expr(right_ast.args[0])
+            try:
+                poly = sympy.Poly(f_sym - g_sym, var)
+                cand_roots = poly.real_roots()
+                admissible: List[Any] = []
+                for r in cand_roots:
+                    f_val = sympy.simplify(f_sym.subs(var, r))
+                    g_val = sympy.simplify(g_sym.subs(var, r))
+                    if f_val > 0 and g_val > 0:
+                        admissible.append(r)
+
+                if len(valid_roots) != len(admissible):
+                    return False, "INCOMPLETE_LOG_EQUALITY_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                for vr in valid_roots:
+                    if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                        return False, "INCORRECT_LOG_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                if len(admissible) == 0:
+                    return True, "PROVEN_EMPTY_LOGARITHMIC", "All candidates eliminated by log domain constraints"
+                return True, "CERTIFIED_LOG_EQUALITY", "Logarithmic equality completeness certified"
+            except Exception:
+                pass
+
+        # Form C: Log sum/diff: log_b(f(x)) +/- log_b(g(x)) = c
+        if (
+            isinstance(left_ast, BinaryOp)
+            and left_ast.op in ("+", "-")
+            and isinstance(left_ast.left, FunctionCall)
+            and left_ast.left.name in ("log", "ln")
+            and isinstance(left_ast.right, FunctionCall)
+            and left_ast.right.name in ("log", "ln")
+            and len(right_ast.variables()) == 0
+        ):
+            f_sym = ast_to_sympy_expr(left_ast.left.args[0])
+            g_sym = ast_to_sympy_expr(left_ast.right.args[0])
+            b_val = common_base
+            try:
+                if left_ast.op == "+":
+                    transformed = f_sym * g_sym - (b_val ** rhs_sym)
+                else:
+                    transformed = f_sym - g_sym * (b_val ** rhs_sym)
+                poly = sympy.Poly(transformed, var)
+                cand_roots = poly.real_roots()
+                admissible = []
+                for r in cand_roots:
+                    f_val = sympy.simplify(f_sym.subs(var, r))
+                    g_val = sympy.simplify(g_sym.subs(var, r))
+                    if f_val > 0 and g_val > 0:
+                        admissible.append(r)
+
+                if len(valid_roots) != len(admissible):
+                    return False, "INCOMPLETE_LOG_SUM_DIFF_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                for vr in valid_roots:
+                    if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                        return False, "INCORRECT_LOG_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                if len(admissible) == 0:
+                    return True, "PROVEN_EMPTY_LOGARITHMIC", "All candidates eliminated by log domain constraints"
+                return True, "CERTIFIED_LOG_SUM_DIFF", "Logarithmic sum/difference completeness certified"
+            except Exception:
+                pass
+
+    return False, "UNCERTIFIED_LOGARITHMIC_PATTERN", "Logarithmic equation does not match verified transformation pattern"
 
 
 def _is_certified_algebraic_equation(
@@ -1027,25 +1237,17 @@ def _is_certified_algebraic_equation(
 
     # Polynomial equations
     if is_polynomial_ast(ast_node):
-        diff = sympy.simplify(eq.lhs - eq.rhs)
+        if isinstance(ast_node, Equation):
+            lhs_sym = ast_to_sympy_expr(ast_node.left)
+            rhs_sym = ast_to_sympy_expr(ast_node.right)
+            diff = sympy.cancel(lhs_sym - rhs_sym)
+        elif hasattr(eq, "lhs") and hasattr(eq, "rhs"):
+            diff = sympy.cancel(eq.lhs - eq.rhs)
+        else:
+            diff = ast_to_sympy_expr(ast_node)
         try:
             poly = sympy.Poly(diff, var)
-            deg = poly.degree()
-            if deg == 1:
-                return True, "POLYNOMIAL_LINEAR", "Linear polynomial root completeness proven"
-            if deg == 2:
-                coeffs = poly.all_coeffs()
-                A, B, C = coeffs[0], coeffs[1], coeffs[2]
-                delta = B**2 - 4*A*C
-                if delta < 0:
-                    return True, "POLYNOMIAL_QUADRATIC_EMPTY", "Quadratic discriminant < 0 proves empty real solution set"
-                return True, "POLYNOMIAL_QUADRATIC", "Quadratic polynomial roots completeness proven"
-            if deg > 2:
-                if valid_roots:
-                    return True, "POLYNOMIAL_HIGHER_DEGREE", "Higher degree polynomial roots algebraically verified"
-                real_r = poly.real_roots()
-                if len(real_r) == 0:
-                    return True, "POLYNOMIAL_HIGHER_DEGREE_EMPTY", "Sturm sequence proves polynomial has no real roots"
+            return _is_certified_polynomial_equation(poly, var, valid_roots)
         except Exception:
             pass
 
@@ -1053,13 +1255,171 @@ def _is_certified_algebraic_equation(
     has_abs = any(isinstance(n, AbsoluteValue) and var_name in n.variables() for n in ast_node.walk())
     has_division = any(isinstance(n, BinaryOp) and n.op == "/" and var_name in n.right.variables() for n in ast_node.walk())
 
-    if has_radical or has_abs or has_division:
-        if not valid_roots:
-            if candidates and all(_validate_root_in_ast(c, ast_node, var, eq.lhs, eq.rhs)[0] is False for c in candidates):
-                return True, "PROVEN_EMPTY_ALGEBRAIC", "All algebraic candidates proved extraneous by domain/singularity constraints"
-            return False, "UNPROVEN_EMPTY_ALGEBRAIC", "Empty algebraic solution set cannot be certified without proof"
+    # Rational equations
+    if has_division and not has_radical and not has_abs:
+        try:
+            if isinstance(ast_node, Equation):
+                lhs_sym = ast_to_sympy_expr(ast_node.left)
+                rhs_sym = ast_to_sympy_expr(ast_node.right)
+                diff = sympy.together(lhs_sym - rhs_sym)
+            elif hasattr(eq, "lhs") and hasattr(eq, "rhs"):
+                diff = sympy.together(eq.lhs - eq.rhs)
+            else:
+                diff = sympy.together(ast_to_sympy_expr(ast_node))
+            num, den = sympy.fraction(diff)
+            poly_num = sympy.Poly(num, var)
+            cand_roots = poly_num.real_roots()
+            admissible: List[Any] = []
+            for r in cand_roots:
+                if sympy.simplify(den.subs(var, r)) != 0:
+                    admissible.append(r)
 
-        return True, "CERTIFIED_ALGEBRAIC", "Algebraic equation candidate completeness and domain verification certified"
+            if len(valid_roots) != len(admissible):
+                return False, "INCOMPLETE_RATIONAL_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+            for vr in valid_roots:
+                if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                    return False, "INCORRECT_RATIONAL_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+            if len(admissible) == 0:
+                return True, "PROVEN_EMPTY_RATIONAL", "All numerator roots eliminated by denominator singularities"
+            return True, "CERTIFIED_RATIONAL", "Rational equation completeness certified against numerator roots and denominator exclusions"
+        except Exception:
+            pass
+
+    # Single/Dual Radical equations
+    if has_radical and not has_abs:
+        if isinstance(ast_node, Equation):
+            left_ast = ast_node.left
+            right_ast = ast_node.right
+            lhs_sym = ast_to_sympy_expr(left_ast)
+            rhs_sym = ast_to_sympy_expr(right_ast)
+
+            # sqrt(f) = sqrt(g)
+            if isinstance(left_ast, Radical) and isinstance(right_ast, Radical):
+                f_sym = ast_to_sympy_expr(left_ast.radicand)
+                g_sym = ast_to_sympy_expr(right_ast.radicand)
+                try:
+                    poly = sympy.Poly(f_sym - g_sym, var)
+                    cand_roots = poly.real_roots()
+                    admissible = [r for r in cand_roots if sympy.simplify(f_sym.subs(var, r)) >= 0]
+
+                    if len(valid_roots) != len(admissible):
+                        return False, "INCOMPLETE_RADICAL_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                    for vr in valid_roots:
+                        if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                            return False, "INCORRECT_RADICAL_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                    if len(admissible) == 0:
+                        return True, "PROVEN_EMPTY_RADICAL", "All candidates eliminated by radicand domain constraints"
+                    return True, "CERTIFIED_DUAL_RADICAL", "Dual radical equation completeness certified"
+                except Exception:
+                    pass
+
+            # sqrt(f) = g
+            elif isinstance(left_ast, Radical) and not isinstance(right_ast, Radical) and not any(isinstance(n, Radical) for n in right_ast.walk()):
+                f_sym = ast_to_sympy_expr(left_ast.radicand)
+                try:
+                    poly = sympy.Poly(f_sym - (rhs_sym ** 2), var)
+                    cand_roots = poly.real_roots()
+                    admissible = []
+                    for r in cand_roots:
+                        if sympy.simplify(f_sym.subs(var, r)) >= 0 and sympy.simplify(rhs_sym.subs(var, r)) >= 0:
+                            admissible.append(r)
+
+                    if len(valid_roots) != len(admissible):
+                        return False, "INCOMPLETE_RADICAL_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                    for vr in valid_roots:
+                        if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                            return False, "INCORRECT_RADICAL_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                    if len(admissible) == 0:
+                        return True, "PROVEN_EMPTY_RADICAL", "All candidates eliminated by non-negativity constraints"
+                    return True, "CERTIFIED_SINGLE_RADICAL", "Single radical equation completeness certified"
+                except Exception:
+                    pass
+
+            # g = sqrt(f)
+            elif isinstance(right_ast, Radical) and not isinstance(left_ast, Radical) and not any(isinstance(n, Radical) for n in left_ast.walk()):
+                f_sym = ast_to_sympy_expr(right_ast.radicand)
+                try:
+                    poly = sympy.Poly(f_sym - (lhs_sym ** 2), var)
+                    cand_roots = poly.real_roots()
+                    admissible = []
+                    for r in cand_roots:
+                        if sympy.simplify(f_sym.subs(var, r)) >= 0 and sympy.simplify(lhs_sym.subs(var, r)) >= 0:
+                            admissible.append(r)
+
+                    if len(valid_roots) != len(admissible):
+                        return False, "INCOMPLETE_RADICAL_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                    for vr in valid_roots:
+                        if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                            return False, "INCORRECT_RADICAL_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                    if len(admissible) == 0:
+                        return True, "PROVEN_EMPTY_RADICAL", "All candidates eliminated by non-negativity constraints"
+                    return True, "CERTIFIED_SINGLE_RADICAL", "Single radical equation completeness certified"
+                except Exception:
+                    pass
+
+    # Absolute value equations
+    if has_abs and not has_radical:
+        if isinstance(ast_node, Equation):
+            left_ast = ast_node.left
+            right_ast = ast_node.right
+            lhs_sym = ast_to_sympy_expr(left_ast)
+            rhs_sym = ast_to_sympy_expr(right_ast)
+
+            # |f| = |g|
+            if isinstance(left_ast, AbsoluteValue) and isinstance(right_ast, AbsoluteValue):
+                f_sym = ast_to_sympy_expr(left_ast.inner)
+                g_sym = ast_to_sympy_expr(right_ast.inner)
+                try:
+                    cand_roots = sympy.Poly(f_sym - g_sym, var).real_roots() + sympy.Poly(f_sym + g_sym, var).real_roots()
+                    uniq_cand: List[Any] = []
+                    for c in cand_roots:
+                        if not any(sympy.simplify(c - uq) == 0 for uq in uniq_cand):
+                            uniq_cand.append(c)
+
+                    if len(valid_roots) != len(uniq_cand):
+                        return False, "INCOMPLETE_ABS_ROOTS", f"Expected {len(uniq_cand)} root(s), but found {len(valid_roots)}"
+
+                    for vr in valid_roots:
+                        if not any(sympy.simplify(vr - ar) == 0 for ar in uniq_cand):
+                            return False, "INCORRECT_ABS_ROOT", f"Root {vr} not in candidate set {uniq_cand}"
+
+                    if len(uniq_cand) == 0:
+                        return True, "PROVEN_EMPTY_ABS", "No real solutions for |f| = |g|"
+                    return True, "CERTIFIED_DUAL_ABS", "Dual absolute value equation completeness certified"
+                except Exception:
+                    pass
+
+            # |f| = g
+            elif isinstance(left_ast, AbsoluteValue) and not isinstance(right_ast, AbsoluteValue) and not any(isinstance(n, AbsoluteValue) for n in right_ast.walk()):
+                f_sym = ast_to_sympy_expr(left_ast.inner)
+                try:
+                    cand_roots = sympy.Poly(f_sym - rhs_sym, var).real_roots() + sympy.Poly(f_sym + rhs_sym, var).real_roots()
+                    uniq_cand = []
+                    for c in cand_roots:
+                        if not any(sympy.simplify(c - uq) == 0 for uq in uniq_cand):
+                            uniq_cand.append(c)
+                    admissible = [r for r in uniq_cand if sympy.simplify(rhs_sym.subs(var, r)) >= 0]
+
+                    if len(valid_roots) != len(admissible):
+                        return False, "INCOMPLETE_ABS_ROOTS", f"Expected {len(admissible)} admissible root(s), but found {len(valid_roots)}"
+
+                    for vr in valid_roots:
+                        if not any(sympy.simplify(vr - ar) == 0 for ar in admissible):
+                            return False, "INCORRECT_ABS_ROOT", f"Root {vr} not in admissible set {admissible}"
+
+                    if len(admissible) == 0:
+                        return True, "PROVEN_EMPTY_ABS", "All candidates eliminated by non-negativity constraint RHS >= 0"
+                    return True, "CERTIFIED_SINGLE_ABS", "Single absolute value equation completeness certified"
+                except Exception:
+                    pass
 
     return False, "UNCERTIFIED_ALGEBRAIC", "Equation does not match recognized algebraic complete forms"
 

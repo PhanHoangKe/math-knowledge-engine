@@ -674,4 +674,105 @@ def test_simulated_empty_candidates_on_unclassified_fails_closed():
             assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
 
 
+def test_mandatory_counterexample_2_pow_x_minus_5_eq_minus_4_normal_and_injected_empty():
+    """TASK 1: Mandatory equation 2^x - 5 = -4.
+    1. Supervised real execution must find the genuine real solution x = 0 with SUCCESS.
+    2. Injecting an empty candidate list must NOT conclude the equation is empty.
+       Completeness certification must reject certification and fail closed.
+    """
+    # 1. Genuine supervised solve
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "2^x - 5 = -4",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert res.symbolic_result == "{0}"
+
+    # 2. Injected empty candidate list on completeness certification
+    from mke_product.cas.sympy_adapter import _certify_equation_completeness
+    ast_node = parse_cas_equation("2^x - 5 = -4")
+    x = sympy.Symbol("x", real=True)
+    eq = sympy.Eq(ast_to_sympy_expr(ast_node.left), ast_to_sympy_expr(ast_node.right))
+    is_cert, cat, reason = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots=[], unique_candidates=[]
+    )
+    assert is_cert is False
+    assert cat == "INCOMPLETE_EXPONENTIAL_ROOTS"
+    assert "Expected 1 real root(s)" in reason
+
+
+def test_mandatory_counterexample_x_pow_4_minus_5x_sq_plus_4_eq_0_injected_incomplete():
+    """TASK 2: Mandatory equation x^4 - 5*x^2 + 4 = 0.
+    True real roots: -2, -1, 1, 2.
+    1. Supervised real execution must find all 4 roots with SUCCESS.
+    2. Injecting a deliberately incomplete candidate result containing only x=1 must be rejected by certification.
+    """
+    # 1. Genuine supervised solve
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "x^4 - 5*x^2 + 4 = 0",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert set(res.symbolic_result.strip("{}").replace(" ", "").split(",")) == {"-2", "-1", "1", "2"}
+
+    # 2. Injected incomplete candidate list on completeness certification
+    from mke_product.cas.sympy_adapter import _certify_equation_completeness
+    ast_node = parse_cas_equation("x^4 - 5*x^2 + 4 = 0")
+    x = sympy.Symbol("x", real=True)
+    eq = sympy.Eq(ast_to_sympy_expr(ast_node.left), ast_to_sympy_expr(ast_node.right))
+    is_cert, cat, reason = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots=[sympy.Integer(1)], unique_candidates=[sympy.Integer(1)]
+    )
+    assert is_cert is False
+    assert cat == "INCOMPLETE_POLYNOMIAL_ROOTS"
+    assert "Found 1 root(s), but polynomial has 4 real root(s)" in reason
+
+
+def test_polynomial_completeness_sturm_isolation():
+    """TASK 2 / TASK 4: Verify polynomial completeness certification against Sturm real roots."""
+    from mke_product.cas.sympy_adapter import _certify_equation_completeness
+    x = sympy.Symbol("x", real=True)
+
+    # 1. Cubic: x^3 - x = 0 (roots: -1, 0, 1)
+    ast_node = parse_cas_equation("x^3 - x = 0")
+    eq = sympy.Eq(ast_to_sympy_expr(ast_node.left), ast_to_sympy_expr(ast_node.right))
+    # Incomplete set [0, 1] rejected:
+    is_cert, cat, _ = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots=[sympy.Integer(0), sympy.Integer(1)], unique_candidates=[sympy.Integer(0), sympy.Integer(1)]
+    )
+    assert is_cert is False
+    assert cat == "INCOMPLETE_POLYNOMIAL_ROOTS"
+
+    # Complete set [-1, 0, 1] accepted:
+    is_cert, cat, _ = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots=[sympy.Integer(-1), sympy.Integer(0), sympy.Integer(1)], unique_candidates=[sympy.Integer(-1), sympy.Integer(0), sympy.Integer(1)]
+    )
+    assert is_cert is True
+    assert cat == "CERTIFIED_POLYNOMIAL_DEGREE_3"
+
+    # 2. Proven empty polynomial: x^2 + 1 = 0
+    ast_node_empty = parse_cas_equation("x^2 + 1 = 0")
+    eq_empty = sympy.Eq(ast_to_sympy_expr(ast_node_empty.left), ast_to_sympy_expr(ast_node_empty.right))
+    is_cert, cat, _ = _certify_equation_completeness(
+        ast_node_empty, eq_empty, x, valid_roots=[], unique_candidates=[]
+    )
+    assert is_cert is True
+    assert cat == "PROVEN_EMPTY_POLYNOMIAL"
+
+
+def test_algebraic_radical_and_rational_completeness():
+    """TASK 3 / TASK 4: Verify radical and rational completeness and domain validation."""
+    # 1. Radical: sqrt(x - 2) = x - 4 -> squared gives x^2 - 9x + 18 = 0 -> candidates {3, 6}.
+    # x=3 is extraneous (3-4 = -1 < 0). Only x=6 is admissible.
+    res_rad = execute_cas_operation(OperationType.SOLVE, "\\sqrt(x - 2) = x - 4")
+    assert res_rad.mathematical_status == EngineStatus.SUCCESS
+    assert res_rad.symbolic_result == "{6}"
+
+    # 2. Rational: 1 / (x - 2) = 0 -> numerator is 1 (no roots) -> proven empty {}
+    res_rat = execute_cas_operation(OperationType.SOLVE, "1 / (x - 2) = 0")
+    assert res_rat.mathematical_status == EngineStatus.SUCCESS
+    assert res_rat.symbolic_result == "{}"
+
+
+
 
