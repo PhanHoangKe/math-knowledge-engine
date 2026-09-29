@@ -1,6 +1,6 @@
 COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src
-START_TIME_UTC: 2026-09-29T06:56:02.601557+00:00
-END_TIME_UTC: 2026-09-29T06:56:41.470139+00:00
+START_TIME_UTC: 2026-09-29T07:13:10.777250+00:00
+END_TIME_UTC: 2026-09-29T07:13:48.841567+00:00
 EXIT_CODE: 0
 --- STDOUT ---
 ============================= test session starts =============================
@@ -92,6 +92,6 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 98%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============================= 80 passed in 37.99s =============================
+============================= 80 passed in 37.18s =============================
 
 --- STDERR ---
