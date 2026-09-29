@@ -953,3 +953,207 @@ def test_r3_untrusted_uncertainty_diagnostics_sanitized():
         assert "<script>" not in issue.message
         assert "DROP TABLE" not in issue.message
 
+
+# ===========================================================================
+# P1C-03-R4 Targeted Security & Boundary Tests (Tasks A & B)
+# ===========================================================================
+
+def test_r4_constraint_binding_x_gt_20_vs_x_gt_2_fails():
+    """TASK A: Actual source x>20 versus extracted x>2 must fail with CONSTRAINT_SOURCE_MISMATCH."""
+    raw = "Giải phương trình x = 1 với điều kiện x > 20"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",  # Substring match "x > 2" vs source "x > 20"
+                source_span=SourceSpan(start_char=38, end_char=44, source_fragment="x > 20", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert res.is_valid is False
+    assert res.is_source_faithful is False
+    assert any(i.code == "CONSTRAINT_SOURCE_MISMATCH" for i in res.issues)
+
+
+def test_r4_constraint_binding_exact_literal_match_passes():
+    """TASK A: Exact literal constraint x>2 against source x>2 passes and is CAS ready."""
+    raw = "Giải phương trình x = 1 với điều kiện x > 2"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",
+                source_span=SourceSpan(start_char=38, end_char=43, source_fragment="x > 2", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is True
+    assert res.is_valid is True
+    assert res.is_source_faithful is True
+    assert len(res.issues) == 0
+
+
+def test_r4_constraint_binding_mismatched_relation_fails():
+    """TASK A: Source x>=2 versus extracted constraint relation '>' must fail."""
+    raw = "Giải phương trình x = 1 với điều kiện x >= 2"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",
+                source_span=SourceSpan(start_char=38, end_char=44, source_fragment="x >= 2", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert any(i.code == "CONSTRAINT_SOURCE_MISMATCH" for i in res.issues)
+
+
+def test_r4_constraint_binding_mismatched_variable_fails():
+    """TASK A: Source y>2 versus extracted constraint variable 'x' must fail."""
+    raw = "Giải phương trình x = 1 với điều kiện y > 2"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",
+                source_span=SourceSpan(start_char=38, end_char=43, source_fragment="y > 2", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert any(i.code == "CONSTRAINT_SOURCE_MISMATCH" for i in res.issues)
+
+
+def test_r4_constraint_binding_mismatched_bound_fails():
+    """TASK A: Source x>3 versus extracted constraint bound '2' must fail."""
+    raw = "Giải phương trình x = 1 với điều kiện x > 3"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        extracted_constraints=[
+            ExtractedConstraint(
+                variable="x",
+                relation=">",
+                bound_expression="2",
+                source_span=SourceSpan(start_char=38, end_char=43, source_fragment="x > 3", semantic_role="CONSTRAINT"),
+                is_inferred=False
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+    assert res.is_cas_ready is False
+    assert any(i.code == "CONSTRAINT_SOURCE_MISMATCH" for i in res.issues)
+
+
+def test_r4_public_validation_result_serialization_no_leakage():
+    """TASK B: Serializing complete ValidationResult and validated_ir leaks no PII, keys or untrusted messages."""
+    raw = "Giải phương trình x = 1"
+    ir = MathIntermediateRepresentation(
+        problem_category=ProblemCategory.EQUATION_SINGLE,
+        question_format=QuestionFormat.FREE_FORM,
+        raw_query=raw,
+        primary_expressions=["x = 1"],
+        target_variables=["x"],
+        source_spans=[
+            SourceSpan(start_char=18, end_char=23, source_fragment="x = 1", semantic_role="EQUATION")
+        ],
+        uncertainty_flags=[
+            # Unknown code attempting benign WARNING level
+            UncertaintyFlag(
+                code="UNAPPROVED_CUSTOM_CODE",
+                message="Student Le Van C email levanc@edu.vn key sk-ant-api03-abcdef1234567890",
+                severity="WARNING"
+            ),
+            # Allowlisted code with attempted severity downgrade to WARNING
+            UncertaintyFlag(
+                code="UNCONFIRMED_INFERRED_CONSTRAINT",
+                message="<script>alert('xss')</script> Injection payload",
+                severity="WARNING"
+            )
+        ]
+    )
+
+    res = MKEIntakeValidator.validate(raw, ir)
+
+    # 1. CAS readiness blocked by unknown code and unconfirmed constraint
+    assert res.is_cas_ready is False
+
+    # 2. Attempted severity downgrade blocked
+    unconfirmed_flags = [u for u in res.uncertainties if u.code == "UNCONFIRMED_INFERRED_CONSTRAINT"]
+    assert len(unconfirmed_flags) == 1
+    assert unconfirmed_flags[0].severity == "ERROR"  # Authoritative policy preserved!
+
+    # 3. Unknown code mapped to blocking ERROR
+    generic_flags = [u for u in res.uncertainties if u.code == "GENERIC_EXTRACTION_UNCERTAINTY"]
+    assert len(generic_flags) == 1
+    assert generic_flags[0].severity == "ERROR"
+
+    # 4. Complete serialization of ValidationResult has zero leaked strings
+    dump_dict = res.model_dump()
+    dump_json = res.model_dump_json()
+
+    for sensitive in ["levanc@edu.vn", "sk-ant-api03", "<script>", "Le Van C", "Injection payload"]:
+        assert sensitive not in dump_json
+        # Also check inside validated_ir uncertainty flags
+        if res.validated_ir:
+            for uf in res.validated_ir.uncertainty_flags:
+                assert sensitive not in uf.message
+
+

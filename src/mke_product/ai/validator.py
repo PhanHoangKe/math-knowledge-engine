@@ -70,10 +70,12 @@ ALLOWLISTED_UNCERTAINTIES: Dict[str, Dict[str, str]] = {
         "message": "Non-standard mathematical notation was normalized during intake.",
     },
     "GENERIC_EXTRACTION_UNCERTAINTY": {
-        "severity": "WARNING",
-        "message": "Extraction contains unverified assumptions or ambiguous notation.",
+        "severity": "ERROR",
+        "message": "Extraction contains unverified assumptions or unreviewed uncertainty.",
     },
 }
+
+SEVERITY_ORDER: Dict[str, int] = {"WARNING": 1, "ERROR": 2, "CRITICAL": 3}
 
 MAX_RAW_QUERY_CHARS = 4000
 MAX_EXPRESSION_CHARS = 1000
@@ -95,14 +97,24 @@ def normalize_math_tokens(text: str) -> str:
 
 
 def check_constraint_source_fidelity(constraint: ExtractedConstraint, fragment: str) -> bool:
-    """Check whether variable, relation, and bound are faithfully represented in the source fragment."""
+    """Check whether variable, relation, and bound are faithfully and exactly represented in the source fragment."""
     norm_frag = normalize_math_tokens(fragment)
     norm_var = normalize_math_tokens(constraint.variable)
     norm_rel = normalize_math_tokens(constraint.relation)
     norm_bound = normalize_math_tokens(constraint.bound_expression)
 
-    direct_pattern = f"{norm_var}{norm_rel}{norm_bound}"
-    return direct_pattern in norm_frag
+    expected_pattern = f"{norm_var}{norm_rel}{norm_bound}"
+    return norm_frag == expected_pattern
+
+
+def resolve_uncertainty_severity(authoritative_default: str, candidate_severity: Optional[str]) -> str:
+    """Resolve uncertainty severity ensuring model-supplied severity cannot downgrade authoritative policy."""
+    auth_val = SEVERITY_ORDER.get(authoritative_default, 2)
+    if not candidate_severity or candidate_severity not in SEVERITY_ORDER:
+        return authoritative_default
+    cand_val = SEVERITY_ORDER.get(candidate_severity, 1)
+    return candidate_severity if cand_val >= auth_val else authoritative_default
+
 
 
 class MKEIntakeValidator:
@@ -252,19 +264,20 @@ class MKEIntakeValidator:
             u_code = u.code if isinstance(u.code, str) else ""
             if u_code in ALLOWLISTED_UNCERTAINTIES:
                 defn = ALLOWLISTED_UNCERTAINTIES[u_code]
-                sev = u.severity if u.severity in {"WARNING", "ERROR", "CRITICAL"} else defn["severity"]
+                sev = resolve_uncertainty_severity(defn["severity"], u.severity)
                 uncertainties.append(UncertaintyFlag(
                     code=u_code,
                     message=defn["message"],
                     severity=sev
                 ))
             else:
-                sev = u.severity if u.severity in {"WARNING", "ERROR", "CRITICAL"} else "WARNING"
+                # Unknown uncertainty codes must block CAS readiness until reviewed or resolved
                 uncertainties.append(UncertaintyFlag(
                     code="GENERIC_EXTRACTION_UNCERTAINTY",
                     message=ALLOWLISTED_UNCERTAINTIES["GENERIC_EXTRACTION_UNCERTAINTY"]["message"],
-                    severity=sev
+                    severity="ERROR"
                 ))
+
 
 
         # -------------------------------------------------------------------
@@ -886,6 +899,11 @@ class MKEIntakeValidator:
         else:
             status = "INVALID"
 
+        # Ensure validated_ir uncertainty_flags are completely sanitized as well
+        validated_ir_obj = None
+        if is_structurally_valid and not any(i.code == "RAW_QUERY_MISMATCH" for i in issues):
+            validated_ir_obj = ir.model_copy(update={"uncertainty_flags": list(uncertainties)})
+
         return ValidationResult(
             is_valid=is_cas_ready,
             is_structurally_valid=is_structurally_valid,
@@ -896,6 +914,7 @@ class MKEIntakeValidator:
             status=status,
             issues=issues,
             uncertainties=uncertainties,
-            validated_ir=ir if (is_structurally_valid and not any(i.code == "RAW_QUERY_MISMATCH" for i in issues)) else None,
+            validated_ir=validated_ir_obj,
             target_operation=target_op if is_cas_ready else None
         )
+
