@@ -631,4 +631,47 @@ def test_counterexample_mixed_transcendental_fails_closed():
         assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
 
 
+def test_counterexample_2_pow_x_plus_3_pow_x_eq_7_fails_closed():
+    """Task 1 Mandatory Counterexample: 2^x + 3^x = 7 has real root in (1, 2).
+    SymPy solve cannot solve this multi-base sum and returns empty candidate list.
+    The engine must NEVER certify an empty candidate list as SUCCESS with {}.
+    It MUST fail closed with OUT_OF_SCOPE or UNRESOLVED.
+    """
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "2^x + 3^x = 7",
+    )
+    assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+    assert res.symbolic_result != "{}"
+    assert res.symbolic_result is None
+    assert res.verification_status == VerificationStatus.UNRESOLVED
+    assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
+def test_proven_empty_exponential_equation():
+    """Verify that a genuine mathematically proven empty exponential equation 2^(x+1) = -4 yields {} with SUCCESS."""
+    res = execute_cas_operation(
+        OperationType.SOLVE,
+        "2^(x+1) = -4",
+    )
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert res.symbolic_result == "{}"
+
+
+def test_simulated_empty_candidates_on_unclassified_fails_closed():
+    """Verify that empty candidate list on unclassified transcendental equations fails closed."""
+    cases = [
+        "2^x + 5^x = 10",
+        "3^x + 4^x = 25",  # has root x=2, but multi-base must not claim {} if solver fails
+        "\\log(x, 2) + \\log(x, 3) = 5",  # multi-base log
+    ]
+    for expr in cases:
+        res = execute_cas_operation(OperationType.SOLVE, expr)
+        if res.mathematical_status == EngineStatus.SUCCESS:
+            assert res.symbolic_result != "{}"
+        else:
+            assert res.mathematical_status in (EngineStatus.OUT_OF_SCOPE, EngineStatus.UNRESOLVED)
+            assert res.domain_certainty == DomainCertainty.NOT_FULLY_DETERMINED
+
+
 

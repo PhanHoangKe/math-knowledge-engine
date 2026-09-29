@@ -837,6 +837,233 @@ def _has_non_elementary_atoms(expr: Any) -> bool:
     return False
 
 
+def _extract_exponential_atoms(ast_node: ASTNode, var_name: str) -> List[Tuple[Any, ASTNode]]:
+    """Extract all exponential atoms containing var_name as (base_expr_or_node, exp_ast)."""
+    atoms: List[Tuple[Any, ASTNode]] = []
+    for n in ast_node.walk():
+        if isinstance(n, (Power, CASPower)):
+            if var_name in n.exponent.variables():
+                atoms.append((n.base, n.exponent))
+        elif isinstance(n, FunctionCall) and n.name == "exp":
+            if var_name in n.args[0].variables():
+                atoms.append((sympy.E, n.args[0]))
+    return atoms
+
+
+def _get_primary_base(base_sym: Any) -> Optional[Tuple[Any, int]]:
+    """Determine primary positive base b0 and power k such that base_sym == b0^k."""
+    try:
+        if base_sym == sympy.E or base_sym == sympy.exp(1):
+            return (sympy.E, 1)
+        if isinstance(base_sym, (int, sympy.Integer)) and base_sym > 1:
+            val = int(base_sym)
+            for b0 in (2, 3, 5, 6, 7, 10):
+                temp = val
+                k = 0
+                while temp > 1 and temp % b0 == 0:
+                    temp //= b0
+                    k += 1
+                if temp == 1 and k > 0:
+                    return (sympy.Integer(b0), k)
+            return (sympy.Integer(val), 1)
+        if isinstance(base_sym, sympy.Rational) and base_sym > 0 and base_sym != 1:
+            return (base_sym, 1)
+    except Exception:
+        pass
+    return None
+
+
+def _is_certified_exponential_equation(
+    ast_node: ASTNode,
+    eq: sympy.Eq,
+    var: sympy.Symbol,
+    valid_roots: List[Any],
+    candidates: List[Any],
+) -> Tuple[bool, str, str]:
+    """Certify whether an exponential equation matches an algebraically exhaustive solvable family."""
+    var_name = var.name
+    exp_atoms = _extract_exponential_atoms(ast_node, var_name)
+    if not exp_atoms:
+        return False, "NO_EXP_ATOMS", "No exponential atoms found"
+
+    # Check that all bases containing var are constant and compatible single primary base
+    primary_bases = set()
+    for base_item, _ in exp_atoms:
+        if isinstance(base_item, ASTNode):
+            if var_name in base_item.variables():
+                return False, "VARIABLE_EXP_BASE", "Variable in exponential base is out of scope for complete certification"
+            b_sym = ast_to_sympy_expr(base_item)
+        else:
+            b_sym = base_item
+        p_base = _get_primary_base(b_sym)
+        if p_base is None:
+            return False, "INCOMPATIBLE_EXP_BASE", f"Unsupported exponential base {b_sym}"
+        primary_bases.add(p_base[0])
+
+    if len(primary_bases) != 1:
+        return False, "MULTI_BASE_EXPONENTIAL", "Multiple incompatible exponential bases cannot be certified as complete"
+
+    common_b0 = list(primary_bases)[0]
+
+    # Verify linear degree of all exponents
+    for _, exp_ast in exp_atoms:
+        exp_sym = ast_to_sympy_expr(exp_ast)
+        try:
+            poly = sympy.Poly(exp_sym, var)
+            if poly.degree() != 1:
+                return False, "NONLINEAR_EXPONENT", "Nonlinear exponent is out of scope for complete certification"
+        except Exception:
+            return False, "NON_POLYNOMIAL_EXPONENT", "Non-polynomial exponent is out of scope"
+
+    diff = sympy.cancel(eq.lhs - eq.rhs)
+
+    # Empty solution set verification: must have explicit constructive proof
+    if not valid_roots:
+        if isinstance(ast_node, Equation):
+            l_atoms = _extract_exponential_atoms(ast_node.left, var_name)
+            r_atoms = _extract_exponential_atoms(ast_node.right, var_name)
+            if len(l_atoms) == 1 and not r_atoms:
+                rhs_sym = ast_to_sympy_expr(ast_node.right)
+                if rhs_sym.is_number and rhs_sym <= 0:
+                    return True, "PROVEN_EMPTY_EXPONENTIAL", "Exponential expression is strictly positive; RHS <= 0 has no real solutions"
+            elif len(r_atoms) == 1 and not l_atoms:
+                lhs_sym = ast_to_sympy_expr(ast_node.left)
+                if lhs_sym.is_number and lhs_sym <= 0:
+                    return True, "PROVEN_EMPTY_EXPONENTIAL", "Exponential expression is strictly positive; LHS <= 0 has no real solutions"
+
+        try:
+            u = sympy.Symbol("__u__", positive=True)
+            diff_u = diff
+            if common_b0 == 2:
+                diff_u = diff_u.subs(4**var, u**2).subs(2**var, u)
+            elif common_b0 == sympy.E:
+                diff_u = diff_u.subs(sympy.exp(2*var), u**2).subs(sympy.exp(var), u)
+
+            u_poly = sympy.Poly(diff_u, u)
+            if u_poly.degree() == 2:
+                coeffs = u_poly.all_coeffs()
+                A, B, C = coeffs[0], coeffs[1], coeffs[2]
+                delta = B**2 - 4*A*C
+                if delta < 0:
+                    return True, "PROVEN_EMPTY_EXP_QUADRATIC", "Discriminant < 0 in exponential quadratic substitution proves no real solutions"
+                u_roots = sympy.solve(u_poly, u)
+                if all(hasattr(ur, "is_real") and ur.is_real and ur <= 0 for ur in u_roots):
+                    return True, "PROVEN_EMPTY_EXP_QUADRATIC", "All auxiliary roots u <= 0 prove no real solutions for exponential equation"
+        except Exception:
+            pass
+
+        return False, "UNPROVEN_EMPTY_EXPONENTIAL", "Empty exponential solution set cannot be certified without a constructive proof"
+
+    return True, "CERTIFIED_SINGLE_BASE_EXPONENTIAL", "Single-base elementary exponential equation completeness certified"
+
+
+def _extract_logarithmic_atoms(ast_node: ASTNode, var_name: str) -> List[Tuple[ASTNode, Any]]:
+    """Extract all logarithmic atoms containing var_name as (arg_ast, base_expr_or_ast)."""
+    atoms: List[Tuple[ASTNode, Any]] = []
+    for n in ast_node.walk():
+        if isinstance(n, FunctionCall):
+            if n.name == "ln" and var_name in n.args[0].variables():
+                atoms.append((n.args[0], sympy.E))
+            elif n.name == "log" and var_name in n.args[0].variables():
+                b_item = n.args[1] if len(n.args) == 2 else 10
+                atoms.append((n.args[0], b_item))
+    return atoms
+
+
+def _is_certified_logarithmic_equation(
+    ast_node: ASTNode,
+    eq: sympy.Eq,
+    var: sympy.Symbol,
+    valid_roots: List[Any],
+    candidates: List[Any],
+) -> Tuple[bool, str, str]:
+    """Certify whether a logarithmic equation matches an algebraically exhaustive solvable family."""
+    var_name = var.name
+    log_atoms = _extract_logarithmic_atoms(ast_node, var_name)
+    if not log_atoms:
+        return False, "NO_LOG_ATOMS", "No logarithmic atoms found"
+
+    # Check all bases are compatible constant base
+    bases = set()
+    for _, b_item in log_atoms:
+        if isinstance(b_item, ASTNode):
+            if var_name in b_item.variables():
+                return False, "VARIABLE_LOG_BASE", "Variable log base is out of scope for complete certification"
+            b_sym = ast_to_sympy_expr(b_item)
+        else:
+            b_sym = b_item
+        bases.add(b_sym)
+
+    if len(bases) != 1:
+        return False, "MULTI_BASE_LOGARITHMIC", "Multiple log bases cannot be certified as complete"
+
+    # Check argument polynomials are degree <= 2
+    for arg_ast, _ in log_atoms:
+        arg_sym = ast_to_sympy_expr(arg_ast)
+        try:
+            poly = sympy.Poly(arg_sym, var)
+            if poly.degree() > 2:
+                return False, "HIGH_DEGREE_LOG_ARG", "Log argument degree > 2 is out of scope for complete certification"
+        except Exception:
+            return False, "NON_POLYNOMIAL_LOG_ARG", "Non-polynomial log argument is out of scope"
+
+    if not valid_roots:
+        if candidates and all(_validate_root_in_ast(c, ast_node, var, eq.lhs, eq.rhs)[0] is False for c in candidates):
+            return True, "PROVEN_EMPTY_LOGARITHMIC", "All algebraic candidates proved extraneous by domain constraints"
+        return False, "UNPROVEN_EMPTY_LOGARITHMIC", "Empty logarithmic solution set cannot be certified without proof"
+
+    return True, "CERTIFIED_SINGLE_BASE_LOGARITHMIC", "Single-base elementary logarithmic equation completeness certified"
+
+
+def _is_certified_algebraic_equation(
+    ast_node: ASTNode,
+    eq: sympy.Eq,
+    var: sympy.Symbol,
+    valid_roots: List[Any],
+    candidates: List[Any],
+) -> Tuple[bool, str, str]:
+    """Certify radical, rational, absolute value, and polynomial algebraic equations."""
+    var_name = var.name
+
+    # Polynomial equations
+    if is_polynomial_ast(ast_node):
+        diff = sympy.simplify(eq.lhs - eq.rhs)
+        try:
+            poly = sympy.Poly(diff, var)
+            deg = poly.degree()
+            if deg == 1:
+                return True, "POLYNOMIAL_LINEAR", "Linear polynomial root completeness proven"
+            if deg == 2:
+                coeffs = poly.all_coeffs()
+                A, B, C = coeffs[0], coeffs[1], coeffs[2]
+                delta = B**2 - 4*A*C
+                if delta < 0:
+                    return True, "POLYNOMIAL_QUADRATIC_EMPTY", "Quadratic discriminant < 0 proves empty real solution set"
+                return True, "POLYNOMIAL_QUADRATIC", "Quadratic polynomial roots completeness proven"
+            if deg > 2:
+                if valid_roots:
+                    return True, "POLYNOMIAL_HIGHER_DEGREE", "Higher degree polynomial roots algebraically verified"
+                real_r = poly.real_roots()
+                if len(real_r) == 0:
+                    return True, "POLYNOMIAL_HIGHER_DEGREE_EMPTY", "Sturm sequence proves polynomial has no real roots"
+        except Exception:
+            pass
+
+    has_radical = any(isinstance(n, Radical) and var_name in n.variables() for n in ast_node.walk())
+    has_abs = any(isinstance(n, AbsoluteValue) and var_name in n.variables() for n in ast_node.walk())
+    has_division = any(isinstance(n, BinaryOp) and n.op == "/" and var_name in n.right.variables() for n in ast_node.walk())
+
+    if has_radical or has_abs or has_division:
+        if not valid_roots:
+            if candidates and all(_validate_root_in_ast(c, ast_node, var, eq.lhs, eq.rhs)[0] is False for c in candidates):
+                return True, "PROVEN_EMPTY_ALGEBRAIC", "All algebraic candidates proved extraneous by domain/singularity constraints"
+            return False, "UNPROVEN_EMPTY_ALGEBRAIC", "Empty algebraic solution set cannot be certified without proof"
+
+        return True, "CERTIFIED_ALGEBRAIC", "Algebraic equation candidate completeness and domain verification certified"
+
+    return False, "UNCERTIFIED_ALGEBRAIC", "Equation does not match recognized algebraic complete forms"
+
+
 def _certify_equation_completeness(
     ast_node: ASTNode,
     eq: sympy.Eq,
@@ -862,53 +1089,32 @@ def _certify_equation_completeness(
     has_poly, has_exp, has_log, has_trig = _collect_variable_positions(ast_node, var_name)
 
     # 3. Reject mixed transcendental equations (Task A mandatory counterexamples)
-    # Mixed exponential + polynomial (e.g. 2^x = x^2, e^x - x = 2)
     if has_exp and has_poly:
         return False, "MIXED_EXP_POLY", "Mixed exponential-polynomial equation is out of scope for complete certified solving"
 
-    # Mixed log + polynomial (e.g. ln(x) + x = 0, x*log(x) = 1)
     if has_log and has_poly:
         return False, "MIXED_LOG_POLY", "Mixed logarithmic-polynomial equation is out of scope for complete certified solving"
 
-    # Mixed trig + polynomial / exp / log (e.g. sin(x) + x = 1, e^x = cos(x))
     if has_trig and (has_poly or has_exp or has_log):
         return False, "MIXED_TRIG_TRANSCENDENTAL", "Mixed trigonometric-transcendental equation is out of scope for complete certified solving"
 
-    # Mixed exp + log (e.g. 2^x = log_2(x))
     if has_exp and has_log:
         return False, "MIXED_EXP_LOG", "Mixed exponential-logarithmic equation is out of scope for complete certified solving"
 
-    # 4. Pure Polynomial Equations
-    if is_polynomial_ast(ast_node):
-        diff = sympy.simplify(eq.lhs - eq.rhs)
-        try:
-            poly = sympy.Poly(diff, var)
-            if poly.degree() >= 1:
-                return True, "POLYNOMIAL", "Complete real roots of polynomial algebraically verified"
-        except Exception:
-            pass
-
-    # 5. Pure Exponential Equations (GDPT 2018 high-school standard forms)
+    # 4. Pure Exponential Equations (narrowly recognized single-base forms)
     if has_exp and not has_poly and not has_log and not has_trig:
-        return True, "PURE_EXPONENTIAL", "Standard high-school exponential equation form certified"
+        is_cert, cat, reason = _is_certified_exponential_equation(ast_node, eq, var, valid_roots, unique_candidates)
+        return is_cert, cat, reason
 
-    # 6. Pure Logarithmic Equations (GDPT 2018 high-school standard forms)
+    # 5. Pure Logarithmic Equations (narrowly recognized single-base forms)
     if has_log and not has_poly and not has_exp and not has_trig:
-        return True, "PURE_LOGARITHMIC", "Standard high-school logarithmic equation form certified"
+        is_cert, cat, reason = _is_certified_logarithmic_equation(ast_node, eq, var, valid_roots, unique_candidates)
+        return is_cert, cat, reason
 
-    # 7. Algebraic Equations: Radical, Rational, Absolute Value
-    has_radical = any(isinstance(n, Radical) and var_name in n.variables() for n in ast_node.walk())
-    has_abs = any(isinstance(n, AbsoluteValue) and var_name in n.variables() for n in ast_node.walk())
-    has_division = any(isinstance(n, BinaryOp) and n.op == "/" and var_name in n.right.variables() for n in ast_node.walk())
-
-    if has_radical or has_abs or has_division:
-        if not has_exp and not has_log and not has_trig:
-            return True, "ALGEBRAIC_RADICAL_RATIONAL_ABS", "Algebraic equation with verified candidate domain validation certified"
-
-    # 8. Uncertified Fallback Gate:
-    # If the equation produced 0 candidates or unclassified roots without an algebraic completeness proof:
-    if not valid_roots and not unique_candidates:
-        return False, "UNCERTIFIED_EMPTY", "Empty solution set cannot be certified without an algebraic completeness proof"
+    # 6. Pure Polynomial & Algebraic Equations (Radical, Rational, Absolute Value)
+    if not has_exp and not has_log and not has_trig:
+        is_cert, cat, reason = _is_certified_algebraic_equation(ast_node, eq, var, valid_roots, unique_candidates)
+        return is_cert, cat, reason
 
     # Default fail-closed for unclassified expressions
     return False, "UNCLASSIFIED_NON_ELEMENTARY", "Equation class is not certified for exhaustive completeness"
@@ -1155,6 +1361,67 @@ def _execute_solve(ast_node: ASTNode, sym_obj: Any, response: ExecutionResponse)
         _solve_periodic_trigonometric(ast_node, eq, x, response)
         return
 
+    # Pre-dispatch soundness gate: fail closed immediately for mixed transcendentals and multi-base systems
+    has_poly, has_exp, has_log, has_trig = _collect_variable_positions(ast_node, x.name)
+    if (has_exp and has_poly) or (has_log and has_poly) or (has_trig and (has_poly or has_exp or has_log)) or (has_exp and has_log):
+        response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+        response.verification_status = VerificationStatus.UNRESOLVED
+        response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+        response.symbolic_result = None
+        response.latex_output = None
+        response.error_message = "Mixed transcendental equations are out of scope for complete certified solving"
+        return
+
+    if has_exp and not has_poly and not has_log and not has_trig:
+        exp_atoms = _extract_exponential_atoms(ast_node, x.name)
+        primary_bases = set()
+        for base_item, _ in exp_atoms:
+            if isinstance(base_item, ASTNode):
+                if x.name in base_item.variables():
+                    response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = "Variable in exponential base is out of scope"
+                    return
+                b_sym = ast_to_sympy_expr(base_item)
+            else:
+                b_sym = base_item
+            p_base = _get_primary_base(b_sym)
+            if p_base is None:
+                response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+                response.verification_status = VerificationStatus.UNRESOLVED
+                response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                response.error_message = f"Unsupported exponential base {b_sym}"
+                return
+            primary_bases.add(p_base[0])
+        if len(primary_bases) > 1:
+            response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+            response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+            response.error_message = "Multi-base exponential equations are out of scope for complete certified solving"
+            return
+
+    if has_log and not has_poly and not has_exp and not has_trig:
+        log_atoms = _extract_logarithmic_atoms(ast_node, x.name)
+        bases = set()
+        for _, b_item in log_atoms:
+            if isinstance(b_item, ASTNode):
+                if x.name in b_item.variables():
+                    response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+                    response.verification_status = VerificationStatus.UNRESOLVED
+                    response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+                    response.error_message = "Variable in log base is out of scope"
+                    return
+                b_sym = ast_to_sympy_expr(b_item)
+            else:
+                b_sym = b_item
+            bases.add(b_sym)
+        if len(bases) > 1:
+            response.mathematical_status = EngineStatus.OUT_OF_SCOPE
+            response.verification_status = VerificationStatus.UNRESOLVED
+            response.domain_certainty = DomainCertainty.NOT_FULLY_DETERMINED
+            response.error_message = "Multi-base logarithmic equations are out of scope for complete certified solving"
+            return
 
     # Collect all candidate roots from SymPy solve and pattern-based algebraic transformations
     raw_candidates = _collect_algebraic_candidates(ast_node, eq, x)
