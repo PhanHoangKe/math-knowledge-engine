@@ -28,9 +28,9 @@
     }
   },
   "pilot_execution_metadata": {
-    "timestamp": "2026-09-29T04:27:32Z",
+    "timestamp": "2026-09-29T04:58:02Z",
     "engine_version": "v0.3.2-p03c-p1b-r1",
-    "git_commit_sha": "4d47d002e0f0ef59475de5809903cad9911e8ac0",
+    "git_commit_sha": "2dc9fdd30e7dd3099a6f8c0f724665041fb92e1d",
     "is_worktree_clean": false,
     "dataset_file": "thpt_pilot_benchmark_v1.json",
     "dataset_sha256": "a800d0a36fcecb6f4b6307e51f2f60535eff9fbe583ed21a132c53d32b394cbd",
@@ -40,15 +40,15 @@
       "platform": "Windows-10-10.0.26200-SP0",
       "system": "Windows"
     },
-    "duration_seconds": 26.109,
+    "duration_seconds": 21.797,
     "summary_metrics": {
       "total_pilot_problems": 40,
       "attempted_symbolic": 34,
       "unsupported_modality": 6,
       "success": 17,
-      "genuine_wrong_answer": 5,
+      "genuine_wrong_answer": 4,
       "extraneous_root_leak": 0,
-      "unsupported_grammar": 12,
+      "unsupported_grammar": 13,
       "domain_rejected": 0,
       "timeout": 0,
       "internal_error": 0,
@@ -262,7 +262,7 @@
       "matched_ground_truth": true,
       "selected_engine": "sympy_cas_v0",
       "engine_status": "SUCCESS",
-      "scoring_details": "Exact solution set matched: {'2-sqrt(3)', 'sqrt(3)+2'}",
+      "scoring_details": "Exact solution set matched: {'sqrt(3)+2', '2-sqrt(3)'}",
       "engine_result": "{2 - sqrt(3), sqrt(3) + 2}",
       "engine_solution_set": [
         "2 - sqrt(3)",
@@ -349,13 +349,13 @@
       "input_modality": "SYMBOLIC_TYPED",
       "operation_dispatched": "SOLVE",
       "expression_dispatched": "x^2 + y^2 - 4*x + 6*y - 12 = 0",
-      "outcome": "GENUINE_WRONG_ANSWER",
+      "outcome": "UNSUPPORTED_GRAMMAR",
       "attempted": true,
       "matched_ground_truth": false,
       "selected_engine": "sympy_cas_v0",
-      "engine_status": "SUCCESS",
-      "scoring_details": "Engine did not produce boolean sub-statement judgements for Format II.",
-      "engine_result": "{}",
+      "engine_status": "OUT_OF_SCOPE",
+      "scoring_details": "Equation cannot be certified as an exhaustive complete solution set: Equation does not match recognized algebraic complete forms",
+      "engine_result": null,
       "engine_solution_set": []
     },
     {

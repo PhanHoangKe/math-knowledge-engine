@@ -1,15 +1,15 @@
 # MKE P03C-P1B-R1 Transcendental Solver & Adversarial Soundness Benchmark Report
 
 - **Benchmark ID:** `P03C_P1B_TRANSCENDENTAL_BENCHMARK_R1`
-- **Tested Source Commit:** `4d47d002e0f0ef59475de5809903cad9911e8ac0`
-- **Worktree Status:** `Modified / Dirty`
+- **Tested Source Commit:** `2dc9fdd30e7dd3099a6f8c0f724665041fb92e1d`
+- **Worktree Status:** `Clean`
 - **Dataset File:** `p03c_p1b_transcendental_benchmark.json`
 - **Dataset Canonical LF SHA-256 (Platform Independent):** `64f5eb610843295d0f0ebdd284c7b673a65aa139243dc3fd317bde3776821750`
 - **Dataset On-Disk SHA-256:** `76edfc7aa5b19323746121adcee75c4647c6a60f95f62e3ad74d61d56e8d6c4f`
 - **Build Version:** `v0.3.2-p03c-p1b-r1`
 - **Environment:** Python `3.10.11` on `Windows-10-10.0.26200-SP0`
-- **Timestamp:** `2026-09-29T04:26:30Z`
-- **Execution Duration:** `47.19s`
+- **Timestamp:** `2026-09-29T04:57:34Z`
+- **Execution Duration:** `44.66s`
 
 ## Executive Summary
 
