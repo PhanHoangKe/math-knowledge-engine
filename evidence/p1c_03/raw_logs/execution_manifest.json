@@ -1,10 +1,10 @@
 [
   {
     "id": "p1c_ir_validator_tests",
-    "desc": "P1C-03 MKE-IR and Deterministic Validator Tests (20 items)",
+    "desc": "P1C-03-R1 MKE-IR and Deterministic Validator Tests (26 items)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_mke_ir_validator.py -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:28:45.093369+00:00",
-    "end_time": "2026-09-29T07:28:46.870412+00:00",
+    "start_time": "2026-09-29T07:43:27.786472+00:00",
+    "end_time": "2026-09-29T07:43:29.480861+00:00",
     "exit_code": 0,
     "log_file": "01_p1c_ir_validator_tests.log",
     "passed": true
@@ -13,8 +13,8 @@
     "id": "p1c_mock_adapter_tests",
     "desc": "P1C-02 Provider-Agnostic Mock Adapter Unit Tests (22 items)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:28:46.870412+00:00",
-    "end_time": "2026-09-29T07:28:48.786186+00:00",
+    "start_time": "2026-09-29T07:43:29.480861+00:00",
+    "end_time": "2026-09-29T07:43:31.033394+00:00",
     "exit_code": 0,
     "log_file": "02_p1c_mock_adapter_tests.log",
     "passed": true
@@ -23,8 +23,8 @@
     "id": "p1b_transcendental_solver_tests",
     "desc": "P1B Transcendental Solver Regression Tests (44 items)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:28:48.787193+00:00",
-    "end_time": "2026-09-29T07:29:34.578105+00:00",
+    "start_time": "2026-09-29T07:43:31.035399+00:00",
+    "end_time": "2026-09-29T07:44:16.061360+00:00",
     "exit_code": 0,
     "log_file": "03_p1b_transcendental_solver_tests.log",
     "passed": true
@@ -33,8 +33,8 @@
     "id": "windows_containment_tests",
     "desc": "Windows Process Confinement Tests (80 items)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:29:34.579092+00:00",
-    "end_time": "2026-09-29T07:30:11.306553+00:00",
+    "start_time": "2026-09-29T07:44:16.061360+00:00",
+    "end_time": "2026-09-29T07:45:01.860243+00:00",
     "exit_code": 0,
     "log_file": "04_windows_containment_tests.log",
     "passed": true
@@ -43,18 +43,18 @@
     "id": "browser_ui_regression_tests",
     "desc": "Browser UI Canonical Flow Tests (21 items)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:30:11.307555+00:00",
-    "end_time": "2026-09-29T07:30:53.033245+00:00",
+    "start_time": "2026-09-29T07:45:01.861249+00:00",
+    "end_time": "2026-09-29T07:45:53.250092+00:00",
     "exit_code": 0,
     "log_file": "05_browser_ui_regression_tests.log",
     "passed": true
   },
   {
     "id": "full_repository_pytest",
-    "desc": "Full Repository Pytest Suite (612 passed, 18 subtests passed)",
+    "desc": "Full Repository Pytest Suite (619 passed, 18 subtests passed)",
     "cmd": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest -v -o pythonpath=src",
-    "start_time": "2026-09-29T07:30:53.034246+00:00",
-    "end_time": "2026-09-29T07:34:10.984378+00:00",
+    "start_time": "2026-09-29T07:45:53.250092+00:00",
+    "end_time": "2026-09-29T07:48:57.713439+00:00",
     "exit_code": 0,
     "log_file": "06_full_repository_pytest.log",
     "passed": true

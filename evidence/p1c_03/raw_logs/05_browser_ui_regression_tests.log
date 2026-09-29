@@ -1,6 +1,6 @@
 COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src
-START_TIME_UTC: 2026-09-29T07:30:11.307555+00:00
-END_TIME_UTC: 2026-09-29T07:30:53.033245+00:00
+START_TIME_UTC: 2026-09-29T07:45:01.861249+00:00
+END_TIME_UTC: 2026-09-29T07:45:53.250092+00:00
 EXIT_CODE: 0
 --- STDOUT ---
 ============================= test session starts =============================
@@ -33,6 +33,6 @@ tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_21_honest_
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_22_solve_linear_system_browser_ui PASSED [ 95%]
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_23_solve_inequality_browser_ui PASSED [100%]
 
-============================= 21 passed in 40.79s =============================
+============================= 21 passed in 50.42s =============================
 
 --- STDERR ---
