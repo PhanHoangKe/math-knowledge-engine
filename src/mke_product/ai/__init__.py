@@ -21,8 +21,10 @@ from mke_product.ai.adapter import ModelProviderAdapter
 from mke_product.ai.registry import ModelProviderRegistry
 from mke_product.ai.mock_adapter import MockModelProviderAdapter
 from mke_product.ai.ir import (
+    SUPPORTED_MKE_IR_SCHEMA_VERSION,
     ProblemCategory,
     QuestionFormat,
+    SemanticVerificationStatus,
     SourceSpan,
     ExtractedConstraint,
     QuestionSubpart,
@@ -51,8 +53,10 @@ __all__ = [
     "ModelProviderRegistry",
     "MockModelProviderAdapter",
     # MKE-IR Models & Validation
+    "SUPPORTED_MKE_IR_SCHEMA_VERSION",
     "ProblemCategory",
     "QuestionFormat",
+    "SemanticVerificationStatus",
     "SourceSpan",
     "ExtractedConstraint",
     "QuestionSubpart",

@@ -1,8 +1,8 @@
 """Deterministic Pre-Dispatch MKE-IR Validator.
 
 Phase 3, 4 & 5: Validates mathematical intermediate representations against strict
-schemas, question format rules, source-span fidelity, variable declarations, and
-syntactic AST validity using frozen CAS parsers without mathematical execution.
+schemas, question format rules, source-span fidelity, expression provenance,
+variable declarations, and syntactic AST validity using frozen CAS parsers without execution.
 """
 
 from __future__ import annotations
@@ -11,8 +11,10 @@ import re
 from typing import Any, Dict, List, Optional, Set, Union
 
 from mke_product.ai.ir import (
+    SUPPORTED_MKE_IR_SCHEMA_VERSION,
     ProblemCategory,
     QuestionFormat,
+    SemanticVerificationStatus,
     SourceSpan,
     ExtractedConstraint,
     QuestionSubpart,
@@ -36,6 +38,9 @@ ALLOWED_CONSTRAINT_RELATIONS: Set[str] = {">", ">=", "<", "<=", "!=", "=", "in"}
 
 MAX_RAW_QUERY_CHARS = 4000
 MAX_EXPRESSION_CHARS = 1000
+MAX_SUBPART_STATEMENT_CHARS = 2000
+MAX_OPTION_CHARS = 1000
+MAX_METADATA_ENTRIES = 50
 MAX_BRACKET_DEPTH = 20
 
 
@@ -43,13 +48,14 @@ class MKEIntakeValidator:
     """Deterministic Pre-Dispatch Validator for MKE AI Intake.
 
     Enforces:
-    1. Size and input boundaries (no oversized or deeply nested inputs).
-    2. Strict MKE-IR schema structure (no unexpected fields).
-    3. Format and subpart completeness (A/B/C/D for MC4, a/b/c/d for TF4).
-    4. Target variables, parameters, and domain constraint integrity.
-    5. Source span fidelity against raw student query.
-    6. Problem category scope mapping.
-    7. Syntactic AST parsing via frozen CAS parsers without execution.
+    1. Authoritative raw query comparison and provenance tracking.
+    2. Strict MKE-IR schema validation and supported version enforcement.
+    3. Non-sensitive fixed error messages protecting student PII.
+    4. Mathematical expression provenance and semantic verification state.
+    5. Format and subpart completeness (A/B/C/D for MC4, a/b/c/d for TF4).
+    6. Target variables, parameters, and unconfirmed inferred constraint blocking.
+    7. Source span fidelity against raw student query.
+    8. Syntactic AST parsing via frozen CAS parsers without execution.
     """
 
     @classmethod
@@ -63,15 +69,20 @@ class MKEIntakeValidator:
         uncertainties: List[UncertaintyFlag] = []
 
         # -------------------------------------------------------------------
-        # Step 1: Reject malformed or oversized input
+        # Step 1: Reject malformed or oversized authoritative input
         # -------------------------------------------------------------------
         if not isinstance(raw_query, str) or not raw_query.strip():
             return ValidationResult(
                 is_valid=False,
+                is_structurally_valid=False,
+                is_syntactically_valid=False,
+                is_source_faithful=False,
+                is_cas_ready=False,
+                semantic_status=SemanticVerificationStatus.UNLINKED,
                 status="INVALID",
                 issues=[ValidationIssue(
                     code="EMPTY_RAW_QUERY",
-                    message="Raw student query must be a non-empty string",
+                    message="Raw student query must be a non-empty string.",
                     field_path="raw_query",
                     is_fatal=True
                 )]
@@ -80,35 +91,62 @@ class MKEIntakeValidator:
         if len(raw_query) > MAX_RAW_QUERY_CHARS:
             return ValidationResult(
                 is_valid=False,
+                is_structurally_valid=False,
+                is_syntactically_valid=False,
+                is_source_faithful=False,
+                is_cas_ready=False,
+                semantic_status=SemanticVerificationStatus.UNLINKED,
                 status="INVALID",
                 issues=[ValidationIssue(
                     code="OVERSIZED_INPUT",
-                    message=f"Raw student query length exceeds maximum limit of {MAX_RAW_QUERY_CHARS} characters",
+                    message="Raw student query length exceeds maximum allowed character limit.",
                     field_path="raw_query",
                     is_fatal=True
                 )]
             )
 
         # -------------------------------------------------------------------
-        # Step 2: Validate strict MKE-IR structure (Pydantic schema)
+        # Step 2: Authoritative Raw Query Check & Schema Parsing
         # -------------------------------------------------------------------
         ir: MathIntermediateRepresentation
         if isinstance(ir_payload, MathIntermediateRepresentation):
+            if ir_payload.raw_query != raw_query:
+                issues.append(ValidationIssue(
+                    code="RAW_QUERY_MISMATCH",
+                    message="Payload raw_query does not match authoritative input query.",
+                    field_path="raw_query",
+                    is_fatal=True
+                ))
             ir = ir_payload
         elif isinstance(ir_payload, dict):
-            # Ensure raw_query is set or matched
             payload_copy = dict(ir_payload)
-            if "raw_query" not in payload_copy or not payload_copy["raw_query"]:
+            if "raw_query" in payload_copy and payload_copy["raw_query"] is not None:
+                if payload_copy["raw_query"] != raw_query:
+                    issues.append(ValidationIssue(
+                        code="RAW_QUERY_MISMATCH",
+                        message="Payload raw_query does not match authoritative input query.",
+                        field_path="raw_query",
+                        is_fatal=True
+                    ))
+            else:
+                # System-populated raw query
                 payload_copy["raw_query"] = raw_query
+                payload_copy["raw_query_provenance"] = "SYSTEM_POPULATED"
+
             try:
                 ir = MathIntermediateRepresentation.model_validate(payload_copy)
-            except Exception as e:
+            except Exception:
                 return ValidationResult(
                     is_valid=False,
+                    is_structurally_valid=False,
+                    is_syntactically_valid=False,
+                    is_source_faithful=False,
+                    is_cas_ready=False,
+                    semantic_status=SemanticVerificationStatus.UNLINKED,
                     status="INVALID",
                     issues=[ValidationIssue(
                         code="SCHEMA_VALIDATION_ERROR",
-                        message=f"Payload failed MKE-IR schema validation: {str(e)}",
+                        message="Payload failed MKE-IR schema validation. Structure does not conform to specification.",
                         field_path="root",
                         is_fatal=True
                     )]
@@ -116,14 +154,37 @@ class MKEIntakeValidator:
         else:
             return ValidationResult(
                 is_valid=False,
+                is_structurally_valid=False,
+                is_syntactically_valid=False,
+                is_source_faithful=False,
+                is_cas_ready=False,
+                semantic_status=SemanticVerificationStatus.UNLINKED,
                 status="INVALID",
                 issues=[ValidationIssue(
                     code="INVALID_PAYLOAD_TYPE",
-                    message="Payload must be a dictionary or MathIntermediateRepresentation instance",
+                    message="Payload must be a dictionary or MathIntermediateRepresentation instance.",
                     field_path="root",
                     is_fatal=True
                 )]
             )
+
+        # Check Schema Version
+        if ir.schema_version != SUPPORTED_MKE_IR_SCHEMA_VERSION:
+            issues.append(ValidationIssue(
+                code="UNSUPPORTED_SCHEMA_VERSION",
+                message="MKE-IR schema version is unsupported.",
+                field_path="schema_version",
+                is_fatal=True
+            ))
+
+        # Check Metadata complexity
+        if len(ir.metadata) > MAX_METADATA_ENTRIES:
+            issues.append(ValidationIssue(
+                code="EXCESSIVE_METADATA_ENTRIES",
+                message="Metadata dictionary exceeds maximum allowed entry count.",
+                field_path="metadata",
+                is_fatal=True
+            ))
 
         # Copy existing uncertainty flags from extraction
         uncertainties.extend(ir.uncertainty_flags)
@@ -135,7 +196,7 @@ class MKEIntakeValidator:
             if not ir.given_options or not isinstance(ir.given_options, dict):
                 issues.append(ValidationIssue(
                     code="MISSING_OPTIONS",
-                    message="Multiple choice question format requires 4 options (A, B, C, D)",
+                    message="Multiple choice question format requires 4 options (A, B, C, D).",
                     field_path="given_options",
                     is_fatal=True
                 ))
@@ -145,7 +206,7 @@ class MKEIntakeValidator:
                 if set(normalized_keys.keys()) != expected_keys:
                     issues.append(ValidationIssue(
                         code="INVALID_OPTION_KEYS",
-                        message="Multiple choice question options must contain exactly keys 'A', 'B', 'C', and 'D'",
+                        message="Multiple choice question options must contain exactly keys 'A', 'B', 'C', and 'D'.",
                         field_path="given_options",
                         is_fatal=True
                     ))
@@ -153,7 +214,14 @@ class MKEIntakeValidator:
                     if not isinstance(opt_val, str) or not opt_val.strip():
                         issues.append(ValidationIssue(
                             code="EMPTY_OPTION_TEXT",
-                            message=f"Multiple choice option '{opt_key}' cannot be empty",
+                            message="Multiple choice option text cannot be empty.",
+                            field_path=f"given_options.{opt_key}",
+                            is_fatal=True
+                        ))
+                    elif len(opt_val) > MAX_OPTION_CHARS:
+                        issues.append(ValidationIssue(
+                            code="OPTION_TEXT_TOO_LONG",
+                            message="Multiple choice option text exceeds maximum allowed character length.",
                             field_path=f"given_options.{opt_key}",
                             is_fatal=True
                         ))
@@ -162,7 +230,7 @@ class MKEIntakeValidator:
             if len(ir.subparts) != 4:
                 issues.append(ValidationIssue(
                     code="INVALID_TRUE_FALSE_SUBPARTS_COUNT",
-                    message="Four-part True/False question must have exactly 4 subparts (a, b, c, d)",
+                    message="Four-part True/False question must have exactly 4 subparts (a, b, c, d).",
                     field_path="subparts",
                     is_fatal=True
                 ))
@@ -172,7 +240,7 @@ class MKEIntakeValidator:
                 if actual_ids != expected_ids:
                     issues.append(ValidationIssue(
                         code="INVALID_TRUE_FALSE_SUBPART_IDS",
-                        message="Four-part True/False subparts must have IDs 'a', 'b', 'c', and 'd'",
+                        message="Four-part True/False subparts must have IDs 'a', 'b', 'c', and 'd'.",
                         field_path="subparts",
                         is_fatal=True
                     ))
@@ -180,7 +248,14 @@ class MKEIntakeValidator:
                     if not s.statement.strip():
                         issues.append(ValidationIssue(
                             code="EMPTY_SUBPART_STATEMENT",
-                            message=f"Subpart '{s.subpart_id}' statement cannot be empty",
+                            message="Subpart statement cannot be empty.",
+                            field_path=f"subparts.{s.subpart_id}",
+                            is_fatal=True
+                        ))
+                    elif len(s.statement) > MAX_SUBPART_STATEMENT_CHARS:
+                        issues.append(ValidationIssue(
+                            code="SUBPART_STATEMENT_TOO_LONG",
+                            message="Subpart statement exceeds maximum allowed character length.",
                             field_path=f"subparts.{s.subpart_id}",
                             is_fatal=True
                         ))
@@ -189,7 +264,7 @@ class MKEIntakeValidator:
             if not ir.subparts or len(ir.subparts) == 0:
                 issues.append(ValidationIssue(
                     code="MISSING_SUBPARTS",
-                    message="Multi-part stem question format requires at least one subpart",
+                    message="Multi-part stem question format requires at least one subpart.",
                     field_path="subparts",
                     is_fatal=True
                 ))
@@ -200,7 +275,7 @@ class MKEIntakeValidator:
                     if sid in seen_ids:
                         issues.append(ValidationIssue(
                             code="DUPLICATE_SUBPART_ID",
-                            message=f"Duplicate subpart ID '{s.subpart_id}' in multi-part question",
+                            message="Duplicate subpart ID detected in multi-part question.",
                             field_path=f"subparts.{s.subpart_id}",
                             is_fatal=True
                         ))
@@ -208,7 +283,14 @@ class MKEIntakeValidator:
                     if not s.statement.strip():
                         issues.append(ValidationIssue(
                             code="EMPTY_SUBPART_STATEMENT",
-                            message=f"Subpart '{s.subpart_id}' statement cannot be empty",
+                            message="Subpart statement cannot be empty.",
+                            field_path=f"subparts.{s.subpart_id}",
+                            is_fatal=True
+                        ))
+                    elif len(s.statement) > MAX_SUBPART_STATEMENT_CHARS:
+                        issues.append(ValidationIssue(
+                            code="SUBPART_STATEMENT_TOO_LONG",
+                            message="Subpart statement exceeds maximum allowed character length.",
                             field_path=f"subparts.{s.subpart_id}",
                             is_fatal=True
                         ))
@@ -216,7 +298,6 @@ class MKEIntakeValidator:
         # -------------------------------------------------------------------
         # Step 4: Validate Variables, Parameters, and Constraints
         # -------------------------------------------------------------------
-        # Equation, System, Inequality, Calculus require explicit target variables
         needs_target_vars = ir.problem_category in {
             ProblemCategory.EQUATION_SINGLE,
             ProblemCategory.EQUATION_SYSTEM,
@@ -228,7 +309,7 @@ class MKEIntakeValidator:
         if needs_target_vars and (not ir.target_variables or len(ir.target_variables) == 0):
             issues.append(ValidationIssue(
                 code="MISSING_TARGET_VARIABLE",
-                message=f"Problem category '{ir.problem_category.value}' requires explicit target_variables",
+                message="Problem category requires explicit target_variables.",
                 field_path="target_variables",
                 is_fatal=True
             ))
@@ -237,7 +318,7 @@ class MKEIntakeValidator:
             if not IDENTIFIER_PATTERN.match(v):
                 issues.append(ValidationIssue(
                     code="INVALID_VARIABLE_IDENTIFIER",
-                    message=f"Target variable identifier '{v}' is invalid (must match [a-zA-Z][a-zA-Z0-9_]*)",
+                    message="Target variable contains invalid identifier characters.",
                     field_path="target_variables",
                     is_fatal=True
                 ))
@@ -246,7 +327,7 @@ class MKEIntakeValidator:
             if not IDENTIFIER_PATTERN.match(p):
                 issues.append(ValidationIssue(
                     code="INVALID_PARAMETER_IDENTIFIER",
-                    message=f"Parameter identifier '{p}' is invalid (must match [a-zA-Z][a-zA-Z0-9_]*)",
+                    message="Parameter contains invalid identifier characters.",
                     field_path="parameters",
                     is_fatal=True
                 ))
@@ -256,39 +337,58 @@ class MKEIntakeValidator:
         if overlap:
             issues.append(ValidationIssue(
                 code="OVERLAPPING_VARIABLES_AND_PARAMETERS",
-                message=f"Identifiers {sorted(list(overlap))} declared as both target variable and parameter",
+                message="Target variables and parameters must be disjoint sets.",
                 field_path="parameters",
                 is_fatal=True
             ))
 
-        # Constraint validation
+        # Constraint validation & Inferred Assumption Guard
         for idx, c in enumerate(ir.extracted_constraints):
             if not IDENTIFIER_PATTERN.match(c.variable):
                 issues.append(ValidationIssue(
                     code="INVALID_CONSTRAINT_VARIABLE",
-                    message=f"Constraint variable '{c.variable}' is invalid",
+                    message="Constraint variable identifier is invalid.",
                     field_path=f"extracted_constraints[{idx}].variable",
                     is_fatal=True
                 ))
             if c.relation not in ALLOWED_CONSTRAINT_RELATIONS:
                 issues.append(ValidationIssue(
                     code="INVALID_CONSTRAINT_RELATION",
-                    message=f"Constraint relation '{c.relation}' not supported (allowed: {sorted(list(ALLOWED_CONSTRAINT_RELATIONS))})",
+                    message="Constraint relation is not supported.",
                     field_path=f"extracted_constraints[{idx}].relation",
                     is_fatal=True
                 ))
             if not c.bound_expression.strip():
                 issues.append(ValidationIssue(
                     code="EMPTY_CONSTRAINT_BOUND",
-                    message="Constraint bound expression cannot be empty",
+                    message="Constraint bound expression cannot be empty.",
                     field_path=f"extracted_constraints[{idx}].bound_expression",
                     is_fatal=True
                 ))
+            elif len(c.bound_expression) > MAX_EXPRESSION_CHARS:
+                issues.append(ValidationIssue(
+                    code="CONSTRAINT_BOUND_TOO_LONG",
+                    message="Constraint bound expression exceeds maximum allowed character length.",
+                    field_path=f"extracted_constraints[{idx}].bound_expression",
+                    is_fatal=True
+                ))
+            else:
+                # Syntax check on bound expression
+                try:
+                    parse_cas_expression(c.bound_expression)
+                except Exception:
+                    issues.append(ValidationIssue(
+                        code="INVALID_CONSTRAINT_SYNTAX",
+                        message="Constraint bound expression failed syntax parsing.",
+                        field_path=f"extracted_constraints[{idx}].bound_expression",
+                        is_fatal=True
+                    ))
+
             if c.is_inferred:
                 uncertainties.append(UncertaintyFlag(
-                    code="INFERRED_CONSTRAINT",
-                    message=f"Constraint on '{c.variable}' was model-inferred rather than explicitly student-stated",
-                    severity="WARNING"
+                    code="UNCONFIRMED_INFERRED_CONSTRAINT",
+                    message="Model-inferred mathematical constraint is unconfirmed and blocks automatic CAS execution.",
+                    severity="ERROR"
                 ))
 
         # -------------------------------------------------------------------
@@ -306,7 +406,7 @@ class MKEIntakeValidator:
             if span.start_char < 0 or span.end_char < 0 or span.start_char >= span.end_char or span.end_char > len(raw_query):
                 issues.append(ValidationIssue(
                     code="SOURCE_SPAN_OUT_OF_BOUNDS",
-                    message=f"Source span [{span.start_char}:{span.end_char}] exceeds raw query length of {len(raw_query)}",
+                    message="Source span character offsets exceed raw query bounds.",
                     field_path=f"source_spans[{s_idx}]",
                     is_fatal=True
                 ))
@@ -315,13 +415,60 @@ class MKEIntakeValidator:
                 if expected_sub != span.source_fragment:
                     issues.append(ValidationIssue(
                         code="SOURCE_FRAGMENT_MISMATCH",
-                        message="Source fragment text does not match character range in raw query",
+                        message="Source fragment text does not match character range in raw query.",
                         field_path=f"source_spans[{s_idx}]",
                         is_fatal=True
                     ))
 
         # -------------------------------------------------------------------
-        # Step 6: Identify Problem Category Scope & Operation Mapping
+        # Step 6: Mathematical Expression Provenance & Semantic State (Task 2)
+        # -------------------------------------------------------------------
+        semantic_status = SemanticVerificationStatus.UNLINKED
+
+        if not ir.source_spans or len(ir.source_spans) == 0:
+            issues.append(ValidationIssue(
+                code="MISSING_EXPRESSION_PROVENANCE",
+                message="Primary mathematical expression lacks required source span provenance.",
+                field_path="source_spans",
+                is_fatal=True
+            ))
+        else:
+            # Check whether primary expressions have verified literal source spans
+            has_literal_match = False
+            has_transformed_span = False
+
+            for expr in ir.primary_expressions:
+                clean_expr = expr.strip()
+                matched_span = False
+                for span in ir.source_spans:
+                    clean_frag = span.source_fragment.strip()
+                    if clean_frag == clean_expr:
+                        matched_span = True
+                        has_literal_match = True
+                        break
+                    elif span.semantic_role in {"EQUATION", "SYSTEM", "INEQUALITY", "EXPRESSION"}:
+                        has_transformed_span = True
+
+                if not matched_span and not has_transformed_span:
+                    issues.append(ValidationIssue(
+                        code="UNLINKED_EXPRESSION_PROVENANCE",
+                        message="Primary expression has no corresponding source span reference.",
+                        field_path="primary_expressions",
+                        is_fatal=True
+                    ))
+
+            if has_literal_match and not any(i.code == "UNLINKED_EXPRESSION_PROVENANCE" for i in issues):
+                semantic_status = SemanticVerificationStatus.VERIFIED_LITERAL
+            elif has_transformed_span:
+                semantic_status = SemanticVerificationStatus.UNVERIFIED_TRANSFORMATION
+                uncertainties.append(UncertaintyFlag(
+                    code="UNVERIFIED_SEMANTIC_TRANSFORMATION",
+                    message="Primary expression is a normalized or inferred transformation.",
+                    severity="WARNING"
+                ))
+
+        # -------------------------------------------------------------------
+        # Step 7: Problem Category Scope & Target Operation Mapping
         # -------------------------------------------------------------------
         target_op: Optional[str] = None
         is_unsupported_category = False
@@ -342,19 +489,19 @@ class MKEIntakeValidator:
             is_unsupported_category = True
             issues.append(ValidationIssue(
                 code="UNSUPPORTED_PROBLEM_CATEGORY",
-                message=f"Problem category '{ir.problem_category.value}' is not supported for automated CAS proof",
+                message="Problem category is not supported for automated CAS proof.",
                 field_path="problem_category",
                 is_fatal=True
             ))
 
         # -------------------------------------------------------------------
-        # Step 7: Syntactic AST Validation Using Frozen CAS Parsers (No Execution)
+        # Step 8: Syntactic AST Validation Using Frozen CAS Parsers (No Execution)
         # -------------------------------------------------------------------
         for expr_idx, expr in enumerate(ir.primary_expressions):
             if not isinstance(expr, str) or not expr.strip():
                 issues.append(ValidationIssue(
                     code="EMPTY_PRIMARY_EXPRESSION",
-                    message="Primary mathematical expression cannot be empty",
+                    message="Primary mathematical expression cannot be empty.",
                     field_path=f"primary_expressions[{expr_idx}]",
                     is_fatal=True
                 ))
@@ -363,7 +510,7 @@ class MKEIntakeValidator:
             if len(expr) > MAX_EXPRESSION_CHARS:
                 issues.append(ValidationIssue(
                     code="EXPRESSION_TOO_LONG",
-                    message=f"Expression length {len(expr)} exceeds limit of {MAX_EXPRESSION_CHARS} characters",
+                    message="Primary expression exceeds maximum allowed character length.",
                     field_path=f"primary_expressions[{expr_idx}]",
                     is_fatal=True
                 ))
@@ -381,7 +528,7 @@ class MKEIntakeValidator:
             if max_depth_seen > MAX_BRACKET_DEPTH:
                 issues.append(ValidationIssue(
                     code="EXCESSIVE_NESTING_DEPTH",
-                    message=f"Expression bracket nesting depth {max_depth_seen} exceeds maximum allowed of {MAX_BRACKET_DEPTH}",
+                    message="Expression exceeds maximum allowed bracket nesting depth.",
                     field_path=f"primary_expressions[{expr_idx}]",
                     is_fatal=True
                 ))
@@ -398,17 +545,17 @@ class MKEIntakeValidator:
                         parse_cas_inequality(expr)
                     elif ir.problem_category in {ProblemCategory.EXPRESSION_SIMPLIFY, ProblemCategory.DIFFERENTIATION, ProblemCategory.INTEGRATION}:
                         parse_cas_expression(expr)
-                except ParserError as pe:
+                except ParserError:
                     issues.append(ValidationIssue(
                         code="MATH_SYNTAX_ERROR",
-                        message="Primary expression failed mathematical syntax parsing",
+                        message="Primary expression failed mathematical syntax parsing.",
                         field_path=f"primary_expressions[{expr_idx}]",
                         is_fatal=True
                     ))
-                except Exception as ex:
+                except Exception:
                     issues.append(ValidationIssue(
                         code="MATH_SYNTAX_ERROR",
-                        message="Primary expression failed mathematical syntax parsing",
+                        message="Primary expression failed mathematical syntax parsing.",
                         field_path=f"primary_expressions[{expr_idx}]",
                         is_fatal=True
                     ))
@@ -417,6 +564,32 @@ class MKEIntakeValidator:
         for s in ir.subparts:
             if s.extracted_expression and s.extracted_expression.strip():
                 sub_expr = s.extracted_expression.strip()
+                if len(sub_expr) > MAX_EXPRESSION_CHARS:
+                    issues.append(ValidationIssue(
+                        code="SUBPART_EXPRESSION_TOO_LONG",
+                        message="Subpart expression exceeds maximum allowed character length.",
+                        field_path=f"subparts.{s.subpart_id}.extracted_expression",
+                        is_fatal=True
+                    ))
+                    continue
+
+                sub_depth = 0
+                max_sub_depth = 0
+                for ch in sub_expr:
+                    if ch in "([{":
+                        sub_depth += 1
+                        max_sub_depth = max(max_sub_depth, sub_depth)
+                    elif ch in ")]}":
+                        sub_depth = max(0, sub_depth - 1)
+                if max_sub_depth > MAX_BRACKET_DEPTH:
+                    issues.append(ValidationIssue(
+                        code="SUBPART_EXCESSIVE_NESTING_DEPTH",
+                        message="Subpart expression exceeds maximum allowed bracket nesting depth.",
+                        field_path=f"subparts.{s.subpart_id}.extracted_expression",
+                        is_fatal=True
+                    ))
+                    continue
+
                 try:
                     if "=" in sub_expr:
                         parse_cas_equation(sub_expr)
@@ -427,32 +600,105 @@ class MKEIntakeValidator:
                 except Exception:
                     issues.append(ValidationIssue(
                         code="SUBPART_SYNTAX_ERROR",
-                        message=f"Subpart '{s.subpart_id}' expression failed syntax parsing",
+                        message="Subpart expression failed mathematical syntax parsing.",
                         field_path=f"subparts.{s.subpart_id}.extracted_expression",
                         is_fatal=True
                     ))
 
         # -------------------------------------------------------------------
-        # Step 8: Assemble Deterministic ValidationResult
+        # Step 9: Assemble Deterministic ValidationResult
         # -------------------------------------------------------------------
         fatal_issues = [i for i in issues if i.is_fatal]
-        is_valid = len(fatal_issues) == 0
+        has_blocking_uncertainty = any(u.severity in {"ERROR", "CRITICAL"} for u in uncertainties)
+
+        is_structurally_valid = not any(
+            i.code in {
+                "SCHEMA_VALIDATION_ERROR",
+                "INVALID_PAYLOAD_TYPE",
+                "UNSUPPORTED_SCHEMA_VERSION",
+                "OVERSIZED_INPUT",
+                "EMPTY_RAW_QUERY",
+                "RAW_QUERY_MISMATCH",
+                "MISSING_OPTIONS",
+                "INVALID_OPTION_KEYS",
+                "EMPTY_OPTION_TEXT",
+                "OPTION_TEXT_TOO_LONG",
+                "INVALID_TRUE_FALSE_SUBPARTS_COUNT",
+                "INVALID_TRUE_FALSE_SUBPART_IDS",
+                "EMPTY_SUBPART_STATEMENT",
+                "SUBPART_STATEMENT_TOO_LONG",
+                "MISSING_SUBPARTS",
+                "DUPLICATE_SUBPART_ID",
+                "MISSING_TARGET_VARIABLE",
+                "INVALID_VARIABLE_IDENTIFIER",
+                "INVALID_PARAMETER_IDENTIFIER",
+                "OVERLAPPING_VARIABLES_AND_PARAMETERS",
+                "INVALID_CONSTRAINT_VARIABLE",
+                "INVALID_CONSTRAINT_RELATION",
+                "EMPTY_CONSTRAINT_BOUND",
+                "CONSTRAINT_BOUND_TOO_LONG",
+                "EXCESSIVE_METADATA_ENTRIES",
+            }
+            for i in issues
+        )
+
+        is_syntactically_valid = not any(
+            i.code in {
+                "EMPTY_PRIMARY_EXPRESSION",
+                "EXPRESSION_TOO_LONG",
+                "EXCESSIVE_NESTING_DEPTH",
+                "MATH_SYNTAX_ERROR",
+                "SUBPART_EXPRESSION_TOO_LONG",
+                "SUBPART_EXCESSIVE_NESTING_DEPTH",
+                "SUBPART_SYNTAX_ERROR",
+                "INVALID_CONSTRAINT_SYNTAX",
+            }
+            for i in issues
+        )
+
+        is_source_faithful = not any(
+            i.code in {
+                "RAW_QUERY_MISMATCH",
+                "SOURCE_SPAN_OUT_OF_BOUNDS",
+                "SOURCE_FRAGMENT_MISMATCH",
+                "MISSING_EXPRESSION_PROVENANCE",
+                "UNLINKED_EXPRESSION_PROVENANCE",
+            }
+            for i in issues
+        )
+
+        is_cas_ready = (
+            (len(fatal_issues) == 0)
+            and (semantic_status == SemanticVerificationStatus.VERIFIED_LITERAL)
+            and (not has_blocking_uncertainty)
+            and (target_op is not None)
+            and is_source_faithful
+            and is_syntactically_valid
+            and is_structurally_valid
+        )
 
         status: str
-        if is_valid:
+        if is_cas_ready:
             status = "VALID"
         elif is_unsupported_category:
             status = "UNSUPPORTED"
-        elif any(u.severity == "CRITICAL" for u in uncertainties):
+        elif has_blocking_uncertainty:
             status = "AMBIGUOUS"
+        elif semantic_status == SemanticVerificationStatus.UNVERIFIED_TRANSFORMATION:
+            status = "UNVERIFIED_SEMANTICS"
         else:
             status = "INVALID"
 
         return ValidationResult(
-            is_valid=is_valid,
+            is_valid=is_cas_ready,
+            is_structurally_valid=is_structurally_valid,
+            is_syntactically_valid=is_syntactically_valid,
+            is_source_faithful=is_source_faithful,
+            semantic_status=semantic_status,
+            is_cas_ready=is_cas_ready,
             status=status,
             issues=issues,
             uncertainties=uncertainties,
-            validated_ir=ir if is_valid else None,
-            target_operation=target_op if is_valid else None
+            validated_ir=ir if (is_structurally_valid and not any(i.code == "RAW_QUERY_MISMATCH" for i in issues)) else None,
+            target_operation=target_op if is_cas_ready else None
         )
