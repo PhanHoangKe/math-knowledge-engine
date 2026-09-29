@@ -19,7 +19,7 @@
 | **Accepted Limited Source** | `7d9dba12b28cdc8afd656c53979589f08e024e79` | MKE-IR models, intake validator, public diagnostic allowlist, authoritative issue fatality, and test suites. |
 | **Accepted Release Evidence** | `6c04cdf3d892b81fc8fb7b04ae5f12055a807e85` | Execution manifests, test summary logs, and raw process logs in `evidence/p1c_03/raw_logs/`. |
 | **Proposed Acceptance Tag** | `v0.3.3-p03c-p1c-03-accepted-limited` | Proposed immutable release tag (pending Project Owner tagging approval). |
-| **Intended Tag Target SHA** | `6c04cdf3d892b81fc8fb7b04ae5f12055a807e85` (or documentation closeout commit) | Intended commit target for the proposed release tag. |
+| **Intended Tag Target SHA** | Final corrected documentation commit | The proposed tag `v0.3.3-p03c-p1c-03-accepted-limited` will target the final corrected documentation commit on `product/p03c-p1c-03-mke-ir-validator` (exact SHA reported in delivery report). |
 
 ---
 
@@ -43,22 +43,22 @@
 
 ## 3. Test & Verification Summary
 
-Execution evidence was verified from a clean worktree on Python `3.10.11` (Windows 10/11 x64).
+Execution evidence was produced and reported by the Implementer (Antigravity) from a clean worktree on Python `3.10.11` (Windows 10/11 x64).
 
 ### Test Results Breakdown
 
 | # | Suite Identifier | Test Scope | Result | Test Count / Details | Raw Log Artifact |
 |---|---|---|---|---|---|
-| 1 | `p1c_ir_validator_tests` | P1C-03 MKE-IR and Deterministic Validator Suite | **PASS** | **52 / 52 passed** | [`evidence/p1c_03/raw_logs/01_p1c_ir_validator_tests.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/01_p1c_ir_validator_tests.log) |
-| 2 | `p1c_mock_adapter_tests` | P1C-02 Provider-Agnostic Mock Adapter Unit Tests | **PASS** | **22 / 22 passed** | [`evidence/p1c_03/raw_logs/02_p1c_mock_adapter_tests.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/02_p1c_mock_adapter_tests.log) |
-| 3 | `p1b_transcendental_solver_tests` | Frozen P1B Transcendental Solver Regression Tests | **PASS** | **44 / 44 passed** | [`evidence/p1c_03/raw_logs/03_p1b_transcendental_solver_tests.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/03_p1b_transcendental_solver_tests.log) |
-| 4 | `windows_containment_tests` | Windows Process Confinement Tests | **PASS** | **80 / 80 passed** | [`evidence/p1c_03/raw_logs/04_windows_containment_tests.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/04_windows_containment_tests.log) |
-| 5 | `browser_ui_regression_tests` | Browser UI Canonical Flow Tests | **PASS** | **21 / 21 passed** | [`evidence/p1c_03/raw_logs/05_browser_ui_regression_tests.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/05_browser_ui_regression_tests.log) |
-| 6 | `full_repository_pytest` | Full Repository Pytest Suite | **PASS** | **651 passed, 18 subtests passed** | [`evidence/p1c_03/raw_logs/06_full_repository_pytest.log`](file:///D:/mke-product-ui-r4/evidence/p1c_03/raw_logs/06_full_repository_pytest.log) |
+| 1 | `p1c_ir_validator_tests` | P1C-03 MKE-IR and Deterministic Validator Suite | **PASS** | **52 / 52 passed** | [`01_p1c_ir_validator_tests.log`](p1c_03/raw_logs/01_p1c_ir_validator_tests.log) |
+| 2 | `p1c_mock_adapter_tests` | P1C-02 Provider-Agnostic Mock Adapter Unit Tests | **PASS** | **22 / 22 passed** | [`02_p1c_mock_adapter_tests.log`](p1c_03/raw_logs/02_p1c_mock_adapter_tests.log) |
+| 3 | `p1b_transcendental_solver_tests` | Frozen P1B Transcendental Solver Regression Tests | **PASS** | **44 / 44 passed** | [`03_p1b_transcendental_solver_tests.log`](p1c_03/raw_logs/03_p1b_transcendental_solver_tests.log) |
+| 4 | `windows_containment_tests` | Windows Process Confinement Tests | **PASS** | **80 / 80 passed** | [`04_windows_containment_tests.log`](p1c_03/raw_logs/04_windows_containment_tests.log) |
+| 5 | `browser_ui_regression_tests` | Browser UI Canonical Flow Tests | **PASS** | **21 / 21 passed** | [`05_browser_ui_regression_tests.log`](p1c_03/raw_logs/05_browser_ui_regression_tests.log) |
+| 6 | `full_repository_pytest` | Full Repository Pytest Suite | **PASS** | **651 passed, 18 subtests passed** | [`06_full_repository_pytest.log`](p1c_03/raw_logs/06_full_repository_pytest.log) |
 
 ### Audit & Verification Boundary Distinction
-- **Verified GitHub Evidence:** The commit SHAs `7d9dba12b28cdc8afd656c53979589f08e024e79` (source) and `6c04cdf3d892b81fc8fb7b04ae5f12055a807e85` (evidence), as well as the execution manifest and log files, have been committed and pushed to the remote repository.
-- **Auditor Evaluation Scope:** The Independent Auditor (ChatGPT) verified source code logic, security allowlists, test suites, and logged evidence artifacts. Tests not independently re-executed in the auditor's local environment rely on the deterministic logs, execution manifest, and recorded exit codes in the repository.
+- **Implementer Local Test Execution:** The Implementer executed the full test suite locally on Windows from clean source baseline `7d9dba12b28cdc8afd656c53979589f08e024e79`, producing raw execution logs and manifests committed at `6c04cdf3d892b81fc8fb7b04ae5f12055a807e85`.
+- **Independent Auditor Verification:** The Independent Auditor (ChatGPT) inspected and verified the source code, security boundaries, allowlists, regression tests, and immutable log artifacts published to GitHub. The auditor did not perform an independent local Windows test rerun; audit approval is based on authoritative verification of the published source and evidence commits.
 
 ---
 
