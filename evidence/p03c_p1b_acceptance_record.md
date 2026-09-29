@@ -29,7 +29,7 @@ All verification suites were executed from a verified clean worktree (`git statu
 
 1. **Full Repository Pytest Suite:** **577 / 577 PASSED** (100.0%, duration 185.7s, log: `evidence/benchmark/raw_logs/04_full_repository_pytest.log`).
 2. **Targeted Transcendental Solver Suite:** **44 / 44 PASSED** (100.0%, duration 46.2s, log: `evidence/benchmark/raw_logs/01_targeted_p1b_regression.log`).
-3. **Windows Confinement & Worker Isolation:** **37 / 37 PASSED** (100.0%, duration 38.5s, log: `evidence/benchmark/raw_logs/02_windows_containment.log`).
+3. **Windows Confinement & Worker Isolation:** **80 / 80 PASSED** (100.0%, duration 37.8s, log: `evidence/benchmark/raw_logs/02_windows_containment.log`).
 4. **Canonical Browser UI Suite:** **21 / 21 PASSED** (100.0%, duration 44.3s, log: `evidence/benchmark/raw_logs/03_browser_ui_regression.log`).
 5. **Dedicated P1B Transcendental Benchmark:** **47 / 47 PASSED** (100.0%, duration 48.0s, log: `evidence/benchmark/raw_logs/05_p1b_benchmark_runner.log`).
 6. **Longitudinal THPT Pilot Benchmark:** **17 / 40 SOLVED** (42.5%, duration 26.5s, 0 extraneous root leaks, log: `evidence/benchmark/raw_logs/06_thpt_pilot_benchmark_runner.log`).
