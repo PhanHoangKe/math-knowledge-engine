@@ -1,6 +1,6 @@
 COMMAND: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
-START_TIME_UTC: 2026-09-29T07:43:29.480861+00:00
-END_TIME_UTC: 2026-09-29T07:43:31.033394+00:00
+START_TIME_UTC: 2026-09-29T07:55:42.262935+00:00
+END_TIME_UTC: 2026-09-29T07:55:44.121934+00:00
 EXIT_CODE: 0
 --- STDOUT ---
 ============================= test session starts =============================
@@ -34,6 +34,6 @@ tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanl
 tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
 tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
 
-============================= 22 passed in 0.81s ==============================
+============================= 22 passed in 1.02s ==============================
 
 --- STDERR ---
