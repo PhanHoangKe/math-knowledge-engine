@@ -725,7 +725,7 @@ def test_mandatory_counterexample_x_pow_4_minus_5x_sq_plus_4_eq_0_injected_incom
     )
     assert is_cert is False
     assert cat == "INCOMPLETE_POLYNOMIAL_ROOTS"
-    assert "Found 1 root(s), but polynomial has 4 real root(s)" in reason
+    assert "Found 1 root(s), but polynomial has 4 distinct real root(s)" in reason
 
 
 def test_polynomial_completeness_sturm_isolation():
@@ -772,6 +772,49 @@ def test_algebraic_radical_and_rational_completeness():
     res_rat = execute_cas_operation(OperationType.SOLVE, "1 / (x - 2) = 0")
     assert res_rat.mathematical_status == EngineStatus.SUCCESS
     assert res_rat.symbolic_result == "{}"
+
+
+def test_mandatory_counterexample_2_pow_x_plus_1_eq_2_pow_x_plus_1():
+    """TASK 1 (P1B Restricted Release Closure):
+    Mandatory equation: 2^x + 1 = 2^(x+1). Correct solution: x = 0.
+    1. Supervised execution must find x = 0 with SUCCESS.
+    2. Injected empty candidate list must NEVER report an empty complete solution.
+       Completeness certification must reject certification and fail closed.
+    """
+    # 1. Supervised real execution
+    res = execute_cas_operation(OperationType.SOLVE, "2^x + 1 = 2^(x+1)")
+    assert res.mathematical_status == EngineStatus.SUCCESS
+    assert res.symbolic_result == "{0}"
+
+    # 2. Injected empty candidates rejection
+    from mke_product.cas.sympy_adapter import _certify_equation_completeness
+    ast_node = parse_cas_equation("2^x + 1 = 2^(x+1)")
+    x = sympy.Symbol("x", real=True)
+    eq = sympy.Eq(ast_to_sympy_expr(ast_node.left), ast_to_sympy_expr(ast_node.right))
+    is_cert, cat, reason = _certify_equation_completeness(
+        ast_node, eq, x, valid_roots=[], unique_candidates=[]
+    )
+    assert is_cert is False
+    assert cat == "INCOMPLETE_EXPONENTIAL_ROOTS"
+    assert "Expected 1 real root(s)" in reason
+
+
+def test_mandatory_polynomial_multiplicity_distinct_root_sets():
+    """TASK 2 (P1B Restricted Release Closure):
+    Mandatory equation: x^2 = 0. Expected distinct real solution set: {0}.
+    Polynomial certification must compare mathematical SETS of distinct roots,
+    not count root multiplicities against deduplicated valid roots.
+    """
+    # 1. Quadratic multiple root: x^2 = 0 -> {0}
+    res_x2 = execute_cas_operation(OperationType.SOLVE, "x^2 = 0")
+    assert res_x2.mathematical_status == EngineStatus.SUCCESS
+    assert res_x2.symbolic_result == "{0}"
+
+    # 2. Cubic multiple root: (x - 1)^3 = 0 -> {1}
+    res_cube = execute_cas_operation(OperationType.SOLVE, "(x - 1)^3 = 0")
+    assert res_cube.mathematical_status == EngineStatus.SUCCESS
+    assert res_cube.symbolic_result == "{1}"
+
 
 
 
