@@ -901,3 +901,230 @@ class TestLiveWindowsWorkerQuadraticIntegration:
         assert res.solution_type == "NO_REAL_ROOT"
         assert res.verified_roots == []
 
+
+class TestB0SerializationAndFieldCompatibility:
+    """Verify ControlledDispatchResult exact field layout and B0 backward compatibility."""
+
+    def test_base_result_field_set(self):
+        from mke_product.cas.bridge import (
+            ControlledDispatchResult,
+            ExecutionStatus,
+            IntakeStatus,
+            PublicValidationDiagnostic,
+            VerificationStatus,
+        )
+        res = ControlledDispatchResult(
+            intake_status=IntakeStatus.VALIDATED,
+            intake_diagnostic=PublicValidationDiagnostic(
+                is_valid=True,
+                is_cas_ready=True,
+                status="VALID",
+            ),
+            execution_status=ExecutionStatus.SUCCESS,
+            verification_status=VerificationStatus.VERIFIED_COMPLETE,
+            is_verified=True,
+            solution_type="UNIQUE_ROOT",
+            verified_root=None,
+            completeness_proven=True,
+            error_code=None,
+        )
+        dumped = res.model_dump()
+        expected_keys = {
+            "intake_status",
+            "intake_diagnostic",
+            "execution_status",
+            "verification_status",
+            "is_verified",
+            "solution_type",
+            "verified_root",
+            "completeness_proven",
+            "error_code",
+        }
+        assert set(dumped.keys()) == expected_keys
+        assert len(dumped) == 9
+
+    def test_b0_linear_query_serialization_backward_compat(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ControlledDispatchResult, QuadraticControlledDispatchResult
+        for expr in ["x = 1", "x = x", "x = x + 1"]:
+            ir = make_test_ir(expr)
+            res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=MockBridgeWorkerController())
+            assert type(res) is ControlledDispatchResult
+            assert not isinstance(res, QuadraticControlledDispatchResult)
+            dumped = res.model_dump()
+            assert len(dumped) == 9
+            assert "verified_roots" not in dumped
+            assert "discriminant" not in dumped
+
+    def test_quadratic_result_inheritance_and_fields(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ControlledDispatchResult, QuadraticControlledDispatchResult
+        ir = make_test_ir("x^2 - 4 = 0")
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=MockBridgeWorkerController())
+        assert isinstance(res, QuadraticControlledDispatchResult)
+        assert isinstance(res, ControlledDispatchResult)
+        dumped = res.model_dump()
+        assert "verified_roots" in dumped
+        assert "discriminant" in dumped
+        assert len(dumped) == 11
+
+
+class TestHostArithmeticResourceLimits:
+    """Verify host proof bounded arithmetic overflow triggers ERR_RESOURCE_EXHAUSTED_HOST_PROOF."""
+
+    def test_host_overflow_intake_large_coefficient(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        huge = 2**260
+        expr = f"{huge}*x^2 - 1 = 0"
+        ir = make_test_ir(expr)
+        mock = MockBridgeWorkerController()
+        res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == "ERR_RESOURCE_EXHAUSTED_HOST_PROOF"
+        assert len(mock.call_history) == 0
+
+    def test_host_overflow_discriminant_calculation(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        b = 2**130
+        expr = f"x^2 + {b}*x + 1 = 0"
+        ir = make_test_ir(expr)
+        mock = MockBridgeWorkerController()
+        res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == "ERR_RESOURCE_EXHAUSTED_HOST_PROOF"
+        assert len(mock.call_history) == 0
+
+
+class TestWorkerInfrastructureTaxonomy:
+    """Verify all worker infrastructure failure taxonomies are strictly mapped."""
+
+    @pytest.mark.parametrize(
+        "worker_status,expected_exec,expected_err",
+        [
+            ("WORKER_TIMEOUT", "TIMEOUT", "ERR_TIMEOUT"),
+            ("WORKER_RESOURCE_EXHAUSTED", "ENGINE_ERROR", "ERR_RESOURCE_EXHAUSTED"),
+            ("WORKER_STARTUP_FAILURE", "ENGINE_ERROR", "ERR_WORKER_STARTUP_FAILURE"),
+            ("WORKER_ASSIGNMENT_FAILURE", "ENGINE_ERROR", "ERR_WORKER_ASSIGNMENT_FAILURE"),
+            ("WORKER_EXIT_FAILURE", "ENGINE_ERROR", "ERR_WORKER_EXIT_FAILURE"),
+            ("WORKER_PROTOCOL_FAILURE", "ENGINE_ERROR", "ERR_WORKER_PROTOCOL_FAILURE"),
+            ("ERR_RESOURCE_EXHAUSTED", "ENGINE_ERROR", "ERR_RESOURCE_EXHAUSTED"),
+            ("ERR_PAYLOAD_TOO_LARGE", "ENGINE_ERROR", "ERR_PAYLOAD_TOO_LARGE"),
+            ("ERR_RESPONSE_LIMIT_EXCEEDED", "ENGINE_ERROR", "ERR_RESPONSE_LIMIT_EXCEEDED"),
+            ("PROTOCOL_ERROR", "ENGINE_ERROR", "ERR_PROTOCOL_ERROR"),
+        ],
+    )
+    def test_worker_infrastructure_errors_solve_quadratic(self, worker_status, expected_exec, expected_err):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "status": worker_status,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == getattr(ExecutionStatus, expected_exec)
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == expected_err
+
+    def test_worker_direct_v2_resource_exhaustion_outcome(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "RESOURCE_EXHAUSTED",
+                "status": "ERR_RESOURCE_EXHAUSTED",
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == "ERR_RESOURCE_EXHAUSTED"
+
+
+class TestCollusiveWorkerVerificationDefeat:
+    """Verify that even if worker colludes in both solve and candidate check, host proof prevents false verification."""
+
+    def test_collusive_wrong_root_with_fake_check_success(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {"numerator": "1", "denominator": "1"},
+                    {"numerator": "2", "denominator": "1"},
+                ],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": False,
+            },
+            check_res={
+                "schema_version": SCHEMA_VERSION_V1,
+                "operation": OPERATION_CHECK_CANDIDATE,
+                "outcome": "SUCCESS",
+                "status": "VALID",
+                "candidate": {"numerator": "1", "denominator": "1"},
+                "exact_equality": True,
+                "residual": {"numerator": "0", "denominator": "1"},
+                "left_value": {"numerator": "0", "denominator": "1"},
+                "right_value": {"numerator": "0", "denominator": "1"},
+                "definedness": True,
+                "is_provisional_evidence": True,
+            },
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_VERIFICATION_MISMATCH"
+
+
+class TestCumulativeDeadlineStrictBudget:
+    """Verify monotonic decreasing budget passed across all worker invocations."""
+
+    def test_cumulative_deadline_3_calls(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(solve_delay_sec=0.01)
+        res = ControlledDispatchBridge._dispatch_internal(
+            raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock, _budget_sec=5.0
+        )
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFIED_COMPLETE
+        assert len(mock.call_history) == 3
+        req1, to1 = mock.call_history[0]
+        req2, to2 = mock.call_history[1]
+        req3, to3 = mock.call_history[2]
+        assert to1 is not None and to2 is not None and to3 is not None
+        assert to1 <= 5.0
+        assert to2 < to1
+        assert to3 < to2
+        assert to3 > 0.0
+
+
+class TestBridgeHostArchitectureIndependence:
+    """Verify architectural boundary: bridge.py must NOT import mke_product.solver.quadratic."""
+
+    def test_bridge_does_not_import_solver_quadratic(self):
+        import inspect
+        from mke_product.cas import bridge
+        source = inspect.getsource(bridge)
+        assert "from mke_product.solver.quadratic" not in source
+        assert "import mke_product.solver.quadratic" not in source
+        assert "solve_quadratic_equation" not in source
+
+

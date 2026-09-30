@@ -115,7 +115,7 @@ class RationalRoot(BaseModel):
 
 
 class ControlledDispatchResult(BaseModel):
-    """Authoritative public execution and verification outcome."""
+    """Authoritative public execution and verification outcome (B0 Baseline Contract)."""
     model_config = ConfigDict(extra="forbid")
 
     intake_status: IntakeStatus = Field(..., description="Intake validation phase outcome")
@@ -123,12 +123,18 @@ class ControlledDispatchResult(BaseModel):
     execution_status: ExecutionStatus = Field(..., description="Sandboxed worker execution outcome")
     verification_status: VerificationStatus = Field(..., description="Independent mathematical verification outcome")
     is_verified: bool = Field(..., description="True ONLY when fully intake-valid, executed, and independently verified")
-    solution_type: Optional[str] = Field(default=None, description="'UNIQUE_ROOT', 'ALL_REALS', 'EMPTY_SET', 'NO_REAL_ROOT', 'UNIQUE_REAL_ROOT', 'TWO_DISTINCT_REAL_ROOTS', or None")
+    solution_type: Optional[str] = Field(default=None, description="'UNIQUE_ROOT', 'ALL_REALS', 'EMPTY_SET', or None")
     verified_root: Optional[RationalRoot] = Field(default=None, description="Exact rational root if unique solution verified")
-    verified_roots: Optional[List[RationalRoot]] = Field(default=None, description="Exact rational roots for multi-root or quadratic equations")
-    discriminant: Optional[RationalRoot] = Field(default=None, description="Exact rational discriminant if quadratic")
     completeness_proven: bool = Field(default=False, description="True if mathematical uniqueness/completeness is independently proven")
     error_code: Optional[str] = Field(default=None, description="Sanitized, standardized error code")
+
+
+class QuadraticControlledDispatchResult(ControlledDispatchResult):
+    """B1-specific outcome model carrying quadratic multi-root and discriminant properties."""
+    model_config = ConfigDict(extra="forbid")
+
+    verified_roots: List[RationalRoot] = Field(default_factory=list, description="Exact rational roots for quadratic equations")
+    discriminant: Optional[RationalRoot] = Field(default=None, description="Exact rational discriminant if quadratic")
 
 
 class NonAffineExpressionError(Exception):
@@ -300,6 +306,54 @@ class NonQuadraticExpressionError(Exception):
     pass
 
 
+class HostQuadraticResourceLimitError(Exception):
+    """Raised when host quadratic proof intermediate exceeds 256-bit integer bounds."""
+    pass
+
+
+def _host_check_rational_bounds(val: Rational, max_bits: int = 256) -> Rational:
+    """Validate that rational numerator and denominator strictly respect max_bits."""
+    if val.numerator.bit_length() > max_bits or val.denominator.bit_length() > max_bits:
+        raise HostQuadraticResourceLimitError(f"Host rational intermediate exceeded {max_bits} bits limit.")
+    return val
+
+
+def _host_add(a: Rational, b: Rational, max_bits: int = 256) -> Rational:
+    _host_check_rational_bounds(a, max_bits)
+    _host_check_rational_bounds(b, max_bits)
+    res = a + b
+    return _host_check_rational_bounds(res, max_bits)
+
+
+def _host_sub(a: Rational, b: Rational, max_bits: int = 256) -> Rational:
+    _host_check_rational_bounds(a, max_bits)
+    _host_check_rational_bounds(b, max_bits)
+    res = a - b
+    return _host_check_rational_bounds(res, max_bits)
+
+
+def _host_mul(a: Rational, b: Rational, max_bits: int = 256) -> Rational:
+    _host_check_rational_bounds(a, max_bits)
+    _host_check_rational_bounds(b, max_bits)
+    res = a * b
+    return _host_check_rational_bounds(res, max_bits)
+
+
+def _host_div(a: Rational, b: Rational, max_bits: int = 256) -> Rational:
+    _host_check_rational_bounds(a, max_bits)
+    _host_check_rational_bounds(b, max_bits)
+    if b.is_zero:
+        raise NonQuadraticExpressionError("Host division by zero rational.")
+    res = a / b
+    return _host_check_rational_bounds(res, max_bits)
+
+
+def _host_neg(a: Rational, max_bits: int = 256) -> Rational:
+    _host_check_rational_bounds(a, max_bits)
+    res = -a
+    return _host_check_rational_bounds(res, max_bits)
+
+
 def extract_quadratic_coefficients_host(
     node: ASTNode,
     target_var: str = "x",
@@ -313,7 +367,7 @@ def extract_quadratic_coefficients_host(
 
     Guarantees:
     - Independent verification implementation (never imports or calls mke_product.solver.quadratic).
-    - Strict 256-bit integer bounds on all intermediate numerators and denominators.
+    - Strict 256-bit integer bounds checked on every arithmetic intermediate.
     - Bounded recursion depth (20) and AST node count (100).
     - Domain safe: fails closed on variable-dependent power 0, 0^0, and zero constant division.
     - Pure Python exact rational arithmetic over Q.
@@ -330,7 +384,7 @@ def extract_quadratic_coefficients_host(
 
     if isinstance(node, IntegerLiteral):
         if node.value.bit_length() > max_bits:
-            raise NonQuadraticExpressionError("Integer bit length exceeded in literal.")
+            raise HostQuadraticResourceLimitError("Integer bit length exceeded in literal.")
         return (Rational(0), Rational(0), Rational(node.value))
 
     elif isinstance(node, Variable):
@@ -350,13 +404,7 @@ def extract_quadratic_coefficients_host(
         if node.op == "+":
             return (c2, c1, c0)
         elif node.op == "-":
-            if (
-                c2.numerator.bit_length() > max_bits
-                or c1.numerator.bit_length() > max_bits
-                or c0.numerator.bit_length() > max_bits
-            ):
-                raise NonQuadraticExpressionError("Integer bit length exceeded in unary negation.")
-            return (-c2, -c1, -c0)
+            return (_host_neg(c2, max_bits), _host_neg(c1, max_bits), _host_neg(c0, max_bits))
         raise NonQuadraticExpressionError(f"Unsupported unary operator: {node.op!r}")
 
     elif isinstance(node, BinaryOp):
@@ -368,17 +416,16 @@ def extract_quadratic_coefficients_host(
         )
 
         for val in (l2, l1, l0, r2, r1, r0):
-            if val.numerator.bit_length() > max_bits or val.denominator.bit_length() > max_bits:
-                raise NonQuadraticExpressionError("Integer bit length exceeded before binary operation.")
+            _host_check_rational_bounds(val, max_bits)
 
         if node.op == "+":
-            res2 = l2 + r2
-            res1 = l1 + r1
-            res0 = l0 + r0
+            res2 = _host_add(l2, r2, max_bits)
+            res1 = _host_add(l1, r1, max_bits)
+            res0 = _host_add(l0, r0, max_bits)
         elif node.op == "-":
-            res2 = l2 - r2
-            res1 = l1 - r1
-            res0 = l0 - r0
+            res2 = _host_sub(l2, r2, max_bits)
+            res1 = _host_sub(l1, r1, max_bits)
+            res0 = _host_sub(l0, r0, max_bits)
         elif node.op == "*":
             # Check Cauchy product terms for degree > 2
             deg4 = l2 * r2
@@ -386,23 +433,29 @@ def extract_quadratic_coefficients_host(
             if not deg4.is_zero or not deg3.is_zero:
                 raise NonQuadraticExpressionError("Polynomial degree exceeds 2 in multiplication.")
 
-            res2 = l2 * r0 + l1 * r1 + l0 * r2
-            res1 = l1 * r0 + l0 * r1
-            res0 = l0 * r0
+            # res2 = l2 * r0 + l1 * r1 + l0 * r2
+            term2_a = _host_mul(l2, r0, max_bits)
+            term2_b = _host_mul(l1, r1, max_bits)
+            term2_c = _host_mul(l0, r2, max_bits)
+            res2 = _host_add(_host_add(term2_a, term2_b, max_bits), term2_c, max_bits)
+
+            # res1 = l1 * r0 + l0 * r1
+            term1_a = _host_mul(l1, r0, max_bits)
+            term1_b = _host_mul(l0, r1, max_bits)
+            res1 = _host_add(term1_a, term1_b, max_bits)
+
+            # res0 = l0 * r0
+            res0 = _host_mul(l0, r0, max_bits)
         elif node.op == "/":
             if not r2.is_zero or not r1.is_zero:
                 raise NonQuadraticExpressionError("Division by variable-dependent expression is not permitted.")
             if r0.is_zero:
                 raise NonQuadraticExpressionError("Division by zero constant in expression.")
-            res2 = l2 / r0
-            res1 = l1 / r0
-            res0 = l0 / r0
+            res2 = _host_div(l2, r0, max_bits)
+            res1 = _host_div(l1, r0, max_bits)
+            res0 = _host_div(l0, r0, max_bits)
         else:
             raise NonQuadraticExpressionError(f"Unsupported binary operator: {node.op!r}")
-
-        for res in (res2, res1, res0):
-            if res.numerator.bit_length() > max_bits or res.denominator.bit_length() > max_bits:
-                raise NonQuadraticExpressionError("Integer bit length exceeded after binary operation.")
 
         return (res2, res1, res0)
 
@@ -430,12 +483,9 @@ def extract_quadratic_coefficients_host(
             if not b2.is_zero:
                 raise NonQuadraticExpressionError("Power of quadratic expression with exponent 2 yields degree 4.")
             # (b1*x + b0)^2 = b1^2 * x^2 + 2*b1*b0 * x + b0^2
-            res2 = b1 * b1
-            res1 = Rational(2) * b1 * b0
-            res0 = b0 * b0
-            for res in (res2, res1, res0):
-                if res.numerator.bit_length() > max_bits or res.denominator.bit_length() > max_bits:
-                    raise NonQuadraticExpressionError("Integer bit length exceeded after power operation.")
+            res2 = _host_mul(b1, b1, max_bits)
+            res1 = _host_mul(_host_mul(Rational(2), b1, max_bits), b0, max_bits)
+            res0 = _host_mul(b0, b0, max_bits)
             return (res2, res1, res0)
         else:
             b2, b1, b0 = extract_quadratic_coefficients_host(
@@ -449,20 +499,25 @@ def extract_quadratic_coefficients_host(
                 b0.numerator.bit_length() * exp_val > max_bits
                 or b0.denominator.bit_length() * exp_val > max_bits
             ):
-                raise NonQuadraticExpressionError("Integer bit length exceeded during constant power evaluation.")
-            return (Rational(0), Rational(0), Rational(b0.numerator ** exp_val, b0.denominator ** exp_val))
+                raise HostQuadraticResourceLimitError("Integer bit length exceeded during constant power evaluation.")
+            res0 = Rational(b0.numerator ** exp_val, b0.denominator ** exp_val)
+            _host_check_rational_bounds(res0, max_bits)
+            return (Rational(0), Rational(0), res0)
 
     else:
         raise NonQuadraticExpressionError(f"Unsupported AST node type: {type(node).__name__}")
 
 
 def reduce_equation_quadratic(
-    eq_ast: Equation, target_var: str = "x"
+    eq_ast: Equation, target_var: str = "x", max_bits: int = 256
 ) -> Tuple[Rational, Rational, Rational]:
     """Reduce Equation(LHS, RHS) to A*x^2 + B*x + C = 0 where A = l2 - r2, B = l1 - r1, C = l0 - r0."""
-    l2, l1, l0 = extract_quadratic_coefficients_host(eq_ast.left, target_var)
-    r2, r1, r0 = extract_quadratic_coefficients_host(eq_ast.right, target_var)
-    return (l2 - r2, l1 - r1, l0 - r0)
+    l2, l1, l0 = extract_quadratic_coefficients_host(eq_ast.left, target_var, max_bits=max_bits)
+    r2, r1, r0 = extract_quadratic_coefficients_host(eq_ast.right, target_var, max_bits=max_bits)
+    A = _host_sub(l2, r2, max_bits)
+    B = _host_sub(l1, r1, max_bits)
+    C = _host_sub(l0, r0, max_bits)
+    return (A, B, C)
 
 
 def _parse_wire_rational(val: Any) -> Optional[Rational]:
@@ -496,6 +551,20 @@ def _parse_wire_rational(val: Any) -> Optional[Rational]:
         return rat
     except Exception:
         return None
+
+
+WORKER_INFRASTRUCTURE_ERRORS: Dict[str, Tuple[ExecutionStatus, str]] = {
+    "WORKER_TIMEOUT": (ExecutionStatus.TIMEOUT, "ERR_TIMEOUT"),
+    "WORKER_RESOURCE_EXHAUSTED": (ExecutionStatus.ENGINE_ERROR, "ERR_RESOURCE_EXHAUSTED"),
+    "WORKER_STARTUP_FAILURE": (ExecutionStatus.ENGINE_ERROR, "ERR_WORKER_STARTUP_FAILURE"),
+    "WORKER_ASSIGNMENT_FAILURE": (ExecutionStatus.ENGINE_ERROR, "ERR_WORKER_ASSIGNMENT_FAILURE"),
+    "WORKER_EXIT_FAILURE": (ExecutionStatus.ENGINE_ERROR, "ERR_WORKER_EXIT_FAILURE"),
+    "WORKER_PROTOCOL_FAILURE": (ExecutionStatus.ENGINE_ERROR, "ERR_WORKER_PROTOCOL_FAILURE"),
+    "ERR_RESOURCE_EXHAUSTED": (ExecutionStatus.ENGINE_ERROR, "ERR_RESOURCE_EXHAUSTED"),
+    "ERR_PAYLOAD_TOO_LARGE": (ExecutionStatus.ENGINE_ERROR, "ERR_PAYLOAD_TOO_LARGE"),
+    "ERR_RESPONSE_LIMIT_EXCEEDED": (ExecutionStatus.ENGINE_ERROR, "ERR_RESPONSE_LIMIT_EXCEEDED"),
+    "PROTOCOL_ERROR": (ExecutionStatus.ENGINE_ERROR, "ERR_PROTOCOL_ERROR"),
+}
 
 
 class ControlledDispatchBridge:
@@ -656,9 +725,32 @@ class ControlledDispatchBridge:
         host_delta: Optional[Rational] = None
 
         if not is_affine:
-            # Check quadratic capability
+            # Check quadratic capability with strict host-bounded arithmetic
             try:
                 host_A_quad, host_B_quad, host_C_quad = reduce_equation_quadratic(eq_ast, "x")
+                if host_A_quad.is_zero:
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.REJECTED_SCOPE,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.NOT_DISPATCHED,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code="ERR_OUT_OF_SCOPE",
+                    )
+
+                b_sq = _host_mul(host_B_quad, host_B_quad)
+                four_a = _host_mul(Rational(4), host_A_quad)
+                four_ac = _host_mul(four_a, host_C_quad)
+                host_delta = _host_sub(b_sq, four_ac)
+            except HostQuadraticResourceLimitError:
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.NOT_DISPATCHED,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code="ERR_RESOURCE_EXHAUSTED_HOST_PROOF",
+                )
             except NonQuadraticExpressionError:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.REJECTED_SCOPE,
@@ -668,33 +760,6 @@ class ControlledDispatchBridge:
                     is_verified=False,
                     error_code="ERR_OUT_OF_SCOPE",
                 )
-            except Exception:
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.REJECTED_SCOPE,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.NOT_DISPATCHED,
-                    verification_status=VerificationStatus.NOT_APPLICABLE,
-                    is_verified=False,
-                    error_code="ERR_OUT_OF_SCOPE",
-                )
-
-            # Degenerate quadratic with A == 0 (e.g. 0*x^2 + x = 1, x^2 - x^2 = 0)
-            # Since it was not affine in AST, it must fail closed as REJECTED_SCOPE.
-            if host_A_quad.is_zero:
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.REJECTED_SCOPE,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.NOT_DISPATCHED,
-                    verification_status=VerificationStatus.NOT_APPLICABLE,
-                    is_verified=False,
-                    error_code="ERR_OUT_OF_SCOPE",
-                )
-
-            # True quadratic equation (A != 0). Compute discriminant.
-            try:
-                b_sq = host_B_quad * host_B_quad
-                four_ac = Rational(4) * host_A_quad * host_C_quad
-                host_delta = b_sq - four_ac
             except Exception:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.REJECTED_SCOPE,
@@ -765,15 +830,59 @@ class ControlledDispatchBridge:
 
             solve_res = controller.execute_request(solve_req, timeout_sec=remaining_budget)
 
-            # Step 7: Validate SOLVE Response Envelope & Wire Contract
+            # Step 7: Handle Infrastructure Failures before validation
             if not isinstance(solve_res, dict):
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
                     is_verified=False,
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                )
+
+            solve_outcome = solve_res.get("outcome")
+            solve_status = solve_res.get("status")
+
+            if solve_status == "WORKER_TIMEOUT":
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.TIMEOUT,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code="ERR_TIMEOUT",
+                )
+
+            if solve_outcome == "RESOURCE_EXHAUSTED" or solve_status in ("WORKER_RESOURCE_EXHAUSTED", "ERR_RESOURCE_EXHAUSTED"):
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code="ERR_RESOURCE_EXHAUSTED",
+                )
+
+            if solve_status in WORKER_INFRASTRUCTURE_ERRORS:
+                exec_st, err_c = WORKER_INFRASTRUCTURE_ERRORS[solve_status]
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=exec_st,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code=err_c,
+                )
+
+            if solve_outcome == "OUT_OF_SCOPE":
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code="ERR_OUT_OF_SCOPE",
                 )
 
             if solve_res.get("schema_version") != SCHEMA_VERSION_V1 or solve_res.get("operation") != OPERATION_SOLVE:
@@ -786,31 +895,9 @@ class ControlledDispatchBridge:
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
 
-            solve_outcome = solve_res.get("outcome")
-            solve_status = solve_res.get("status")
             solve_classification = solve_res.get("classification")
             solve_definedness = solve_res.get("definedness")
             raw_root = solve_res.get("root")
-
-            if solve_outcome == "RESOURCE_EXHAUSTED" or solve_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.VALIDATED,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.TIMEOUT,
-                    verification_status=VerificationStatus.NOT_APPLICABLE,
-                    is_verified=False,
-                    error_code="ERR_TIMEOUT",
-                )
-
-            if solve_outcome == "OUT_OF_SCOPE":
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.VALIDATED,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.NOT_APPLICABLE,
-                    is_verified=False,
-                    error_code="ERR_OUT_OF_SCOPE",
-                )
 
             if solve_outcome != "SUCCESS":
                 return ControlledDispatchResult(
@@ -832,8 +919,7 @@ class ControlledDispatchBridge:
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
 
-            # Classification must strictly match status for successful SOLVE
-            if solve_classification != solve_status:
+            if solve_classification != solve_status or solve_definedness is not True:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -843,18 +929,7 @@ class ControlledDispatchBridge:
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
 
-            # Definedness must be True for SUCCESS
-            if solve_definedness is not True:
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.VALIDATED,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
-                    is_verified=False,
-                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
-                )
-
-            # Step 8: Verification Gate by Outcome Type
+            # Step 8: Verification Gate for Affine
             if solve_status == "UNIQUE_ROOT":
                 worker_root = _parse_wire_rational(raw_root)
                 if worker_root is None:
@@ -867,7 +942,6 @@ class ControlledDispatchBridge:
                         error_code="ERR_MALFORMED_WORKER_RESPONSE",
                     )
 
-                # Mathematical contradiction guard:
                 if host_A.is_zero:
                     return ControlledDispatchResult(
                         intake_status=IntakeStatus.VALIDATED,
@@ -878,7 +952,6 @@ class ControlledDispatchBridge:
                         error_code="ERR_VERIFICATION_MISMATCH",
                     )
 
-                # Check expected root against host reduction
                 host_root = -host_B / host_A
                 if host_root != worker_root:
                     return ControlledDispatchResult(
@@ -890,7 +963,7 @@ class ControlledDispatchBridge:
                         error_code="ERR_VERIFICATION_MISMATCH",
                     )
 
-                # Step 8a: Candidate Membership Proof via CHECK_CANDIDATE
+                # Step 8a: Candidate Check via CHECK_CANDIDATE
                 elapsed = time.monotonic() - start_time
                 remaining_budget = max(0.0, _budget_sec - elapsed)
                 if remaining_budget <= 0.05:
@@ -918,9 +991,43 @@ class ControlledDispatchBridge:
                         intake_status=IntakeStatus.VALIDATED,
                         intake_diagnostic=diagnostic,
                         execution_status=ExecutionStatus.ENGINE_ERROR,
-                        verification_status=VerificationStatus.VERIFICATION_FAILED,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
                         is_verified=False,
                         error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                    )
+
+                check_status = check_res.get("status")
+                check_outcome = check_res.get("outcome")
+
+                if check_status == "WORKER_TIMEOUT":
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.TIMEOUT,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code="ERR_TIMEOUT",
+                    )
+
+                if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_RESOURCE_EXHAUSTED", "ERR_RESOURCE_EXHAUSTED"):
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.ENGINE_ERROR,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code="ERR_RESOURCE_EXHAUSTED",
+                    )
+
+                if check_status in WORKER_INFRASTRUCTURE_ERRORS:
+                    exec_st, err_c = WORKER_INFRASTRUCTURE_ERRORS[check_status]
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=exec_st,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code=err_c,
                     )
 
                 if check_res.get("schema_version") != SCHEMA_VERSION_V1 or check_res.get("operation") != OPERATION_CHECK_CANDIDATE:
@@ -933,25 +1040,11 @@ class ControlledDispatchBridge:
                         error_code="ERR_MALFORMED_WORKER_RESPONSE",
                     )
 
-                check_outcome = check_res.get("outcome")
-                check_status = check_res.get("status")
-
-                if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.TIMEOUT,
-                        verification_status=VerificationStatus.NOT_APPLICABLE,
-                        is_verified=False,
-                        error_code="ERR_TIMEOUT",
-                    )
-
                 exact_eq = check_res.get("exact_equality")
                 defined = check_res.get("definedness")
                 wire_residual = _parse_wire_rational(check_res.get("residual"))
                 wire_cand = _parse_wire_rational(check_res.get("candidate"))
 
-                # Contradictory evidence or invalid candidate
                 if (
                     check_outcome != "SUCCESS"
                     or check_status != "VALID"
@@ -970,7 +1063,6 @@ class ControlledDispatchBridge:
                         error_code="ERR_VERIFICATION_MISMATCH",
                     )
 
-                # Verified unique root with complete mathematical proof
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -1045,7 +1137,6 @@ class ControlledDispatchBridge:
                         error_code="ERR_UNVERIFIED_CONTRADICTION",
                     )
 
-            # Fallback
             return ControlledDispatchResult(
                 intake_status=IntakeStatus.VALIDATED,
                 intake_diagnostic=diagnostic,
@@ -1081,12 +1172,13 @@ class ControlledDispatchBridge:
             }
             solve_res = controller.execute_request(solve_req, timeout_sec=remaining_budget)
 
+            # Step 7: Handle Infrastructure Failures before v2 validation
             if not isinstance(solve_res, dict):
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
                     is_verified=False,
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
@@ -1094,7 +1186,7 @@ class ControlledDispatchBridge:
             solve_outcome = solve_res.get("outcome")
             solve_status = solve_res.get("status")
 
-            if solve_outcome == "RESOURCE_EXHAUSTED" or solve_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
+            if solve_status == "WORKER_TIMEOUT":
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -1104,14 +1196,25 @@ class ControlledDispatchBridge:
                     error_code="ERR_TIMEOUT",
                 )
 
-            if solve_status in ("WORKER_EXIT_FAILURE", "ERR_PAYLOAD_TOO_LARGE", "ERR_RESPONSE_LIMIT_EXCEEDED", "PROTOCOL_ERROR"):
+            if solve_outcome == "RESOURCE_EXHAUSTED" or solve_status in ("WORKER_RESOURCE_EXHAUSTED", "ERR_RESOURCE_EXHAUSTED"):
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
                     is_verified=False,
-                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                    error_code="ERR_RESOURCE_EXHAUSTED",
+                )
+
+            if solve_status in WORKER_INFRASTRUCTURE_ERRORS:
+                exec_st, err_c = WORKER_INFRASTRUCTURE_ERRORS[solve_status]
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=exec_st,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code=err_c,
                 )
 
             if solve_outcome == "OUT_OF_SCOPE":
@@ -1124,7 +1227,19 @@ class ControlledDispatchBridge:
                     error_code="ERR_OUT_OF_SCOPE",
                 )
 
-            if solve_res.get("schema_version") != SCHEMA_VERSION_V2 or solve_res.get("operation") != OPERATION_SOLVE_QUADRATIC:
+            # Strict v2 response envelope allowlist check
+            ALLOWED_V2_RESPONSE_FIELDS = {
+                "schema_version",
+                "operation",
+                "outcome",
+                "status",
+                "roots",
+                "discriminant",
+                "definedness",
+                "error",
+                "is_provisional_evidence",
+            }
+            if set(solve_res.keys()) - ALLOWED_V2_RESPONSE_FIELDS:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -1134,27 +1249,14 @@ class ControlledDispatchBridge:
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
 
-            if solve_outcome != "SUCCESS":
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.VALIDATED,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
-                    is_verified=False,
-                    error_code="ERR_SOLVER_FAILURE",
-                )
-
-            if solve_res.get("definedness") is not True:
-                return ControlledDispatchResult(
-                    intake_status=IntakeStatus.VALIDATED,
-                    intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.ENGINE_ERROR,
-                    verification_status=VerificationStatus.VERIFICATION_FAILED,
-                    is_verified=False,
-                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
-                )
-
-            if solve_status not in ("NO_REAL_ROOT", "UNIQUE_REAL_ROOT", "TWO_DISTINCT_REAL_ROOTS"):
+            if (
+                solve_res.get("schema_version") != SCHEMA_VERSION_V2
+                or solve_res.get("operation") != OPERATION_SOLVE_QUADRATIC
+                or solve_outcome != "SUCCESS"
+                or solve_res.get("definedness") is not True
+                or solve_res.get("error") is not None
+                or solve_status not in ("NO_REAL_ROOT", "UNIQUE_REAL_ROOT", "TWO_DISTINCT_REAL_ROOTS")
+            ):
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -1214,7 +1316,7 @@ class ControlledDispatchBridge:
                         is_verified=False,
                         error_code="ERR_VERIFICATION_MISMATCH",
                     )
-                return ControlledDispatchResult(
+                return QuadraticControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.SUCCESS,
@@ -1241,26 +1343,44 @@ class ControlledDispatchBridge:
                     )
 
                 w_root = worker_roots[0]
-                expected_root = -host_B / (Rational(2) * host_A)
-                if w_root != expected_root:
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.SUCCESS,
-                        verification_status=VerificationStatus.VERIFICATION_FAILED,
-                        is_verified=False,
-                        error_code="ERR_VERIFICATION_MISMATCH",
-                    )
+                try:
+                    two_a = _host_mul(Rational(2), host_A)
+                    neg_b = _host_neg(host_B)
+                    expected_root = _host_div(neg_b, two_a)
 
-                # Vieta check
-                if (Rational(2) * w_root != -host_B / host_A) or (w_root * w_root != host_C / host_A):
+                    if w_root != expected_root:
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.SUCCESS,
+                            verification_status=VerificationStatus.VERIFICATION_FAILED,
+                            is_verified=False,
+                            error_code="ERR_VERIFICATION_MISMATCH",
+                        )
+
+                    # Vieta checks: 2*w == -B/A, w^2 == C/A
+                    two_w = _host_mul(Rational(2), w_root)
+                    neg_b_over_a = _host_div(neg_b, host_A)
+                    w_sq = _host_mul(w_root, w_root)
+                    c_over_a = _host_div(host_C, host_A)
+
+                    if two_w != neg_b_over_a or w_sq != c_over_a:
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.SUCCESS,
+                            verification_status=VerificationStatus.VERIFICATION_FAILED,
+                            is_verified=False,
+                            error_code="ERR_VERIFICATION_MISMATCH",
+                        )
+                except HostQuadraticResourceLimitError:
                     return ControlledDispatchResult(
                         intake_status=IntakeStatus.VALIDATED,
                         intake_diagnostic=diagnostic,
                         execution_status=ExecutionStatus.SUCCESS,
                         verification_status=VerificationStatus.VERIFICATION_FAILED,
                         is_verified=False,
-                        error_code="ERR_VERIFICATION_MISMATCH",
+                        error_code="ERR_RESOURCE_EXHAUSTED_HOST_PROOF",
                     )
 
                 # Candidate check via v1 CHECK_CANDIDATE
@@ -1290,9 +1410,43 @@ class ControlledDispatchBridge:
                         intake_status=IntakeStatus.VALIDATED,
                         intake_diagnostic=diagnostic,
                         execution_status=ExecutionStatus.ENGINE_ERROR,
-                        verification_status=VerificationStatus.VERIFICATION_FAILED,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
                         is_verified=False,
                         error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                    )
+
+                check_status = check_res.get("status")
+                check_outcome = check_res.get("outcome")
+
+                if check_status == "WORKER_TIMEOUT":
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.TIMEOUT,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code="ERR_TIMEOUT",
+                    )
+
+                if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_RESOURCE_EXHAUSTED", "ERR_RESOURCE_EXHAUSTED"):
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.ENGINE_ERROR,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code="ERR_RESOURCE_EXHAUSTED",
+                    )
+
+                if check_status in WORKER_INFRASTRUCTURE_ERRORS:
+                    exec_st, err_c = WORKER_INFRASTRUCTURE_ERRORS[check_status]
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=exec_st,
+                        verification_status=VerificationStatus.NOT_APPLICABLE,
+                        is_verified=False,
+                        error_code=err_c,
                     )
 
                 if check_res.get("schema_version") != SCHEMA_VERSION_V1 or check_res.get("operation") != OPERATION_CHECK_CANDIDATE:
@@ -1303,19 +1457,6 @@ class ControlledDispatchBridge:
                         verification_status=VerificationStatus.VERIFICATION_FAILED,
                         is_verified=False,
                         error_code="ERR_MALFORMED_WORKER_RESPONSE",
-                    )
-
-                check_outcome = check_res.get("outcome")
-                check_status = check_res.get("status")
-
-                if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.TIMEOUT,
-                        verification_status=VerificationStatus.NOT_APPLICABLE,
-                        is_verified=False,
-                        error_code="ERR_TIMEOUT",
                     )
 
                 exact_eq = check_res.get("exact_equality")
@@ -1342,7 +1483,7 @@ class ControlledDispatchBridge:
                     )
 
                 root_obj = RationalRoot(numerator=w_root.numerator, denominator=w_root.denominator)
-                return ControlledDispatchResult(
+                return QuadraticControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.SUCCESS,
@@ -1382,33 +1523,54 @@ class ControlledDispatchBridge:
                         error_code="ERR_VERIFICATION_MISMATCH",
                     )
 
-                import math
-                sp = math.isqrt(host_delta.numerator)
-                sq = math.isqrt(host_delta.denominator)
-                k = Rational(sp, sq)
-                r1 = (-host_B - k) / (Rational(2) * host_A)
-                r2 = (-host_B + k) / (Rational(2) * host_A)
-                exp_low, exp_high = (r1, r2) if r1 < r2 else (r2, r1)
+                try:
+                    import math
+                    sp = math.isqrt(host_delta.numerator)
+                    sq = math.isqrt(host_delta.denominator)
+                    k = _host_check_rational_bounds(Rational(sp, sq))
+                    neg_b = _host_neg(host_B)
+                    two_a = _host_mul(Rational(2), host_A)
 
-                if w1 != exp_low or w2 != exp_high:
+                    neg_b_minus_k = _host_sub(neg_b, k)
+                    neg_b_plus_k = _host_add(neg_b, k)
+
+                    r1 = _host_div(neg_b_minus_k, two_a)
+                    r2 = _host_div(neg_b_plus_k, two_a)
+                    exp_low, exp_high = (r1, r2) if r1 < r2 else (r2, r1)
+
+                    if w1 != exp_low or w2 != exp_high:
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.SUCCESS,
+                            verification_status=VerificationStatus.VERIFICATION_FAILED,
+                            is_verified=False,
+                            error_code="ERR_VERIFICATION_MISMATCH",
+                        )
+
+                    # Vieta checks: w1 + w2 == -B/A, w1 * w2 == C/A
+                    w_sum = _host_add(w1, w2)
+                    w_prod = _host_mul(w1, w2)
+                    neg_b_over_a = _host_div(neg_b, host_A)
+                    c_over_a = _host_div(host_C, host_A)
+
+                    if w_sum != neg_b_over_a or w_prod != c_over_a:
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.SUCCESS,
+                            verification_status=VerificationStatus.VERIFICATION_FAILED,
+                            is_verified=False,
+                            error_code="ERR_VERIFICATION_MISMATCH",
+                        )
+                except HostQuadraticResourceLimitError:
                     return ControlledDispatchResult(
                         intake_status=IntakeStatus.VALIDATED,
                         intake_diagnostic=diagnostic,
                         execution_status=ExecutionStatus.SUCCESS,
                         verification_status=VerificationStatus.VERIFICATION_FAILED,
                         is_verified=False,
-                        error_code="ERR_VERIFICATION_MISMATCH",
-                    )
-
-                # Vieta checks
-                if (w1 + w2 != -host_B / host_A) or (w1 * w2 != host_C / host_A):
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.SUCCESS,
-                        verification_status=VerificationStatus.VERIFICATION_FAILED,
-                        is_verified=False,
-                        error_code="ERR_VERIFICATION_MISMATCH",
+                        error_code="ERR_RESOURCE_EXHAUSTED_HOST_PROOF",
                     )
 
                 # Candidate checks for both roots
@@ -1439,9 +1601,43 @@ class ControlledDispatchBridge:
                             intake_status=IntakeStatus.VALIDATED,
                             intake_diagnostic=diagnostic,
                             execution_status=ExecutionStatus.ENGINE_ERROR,
-                            verification_status=VerificationStatus.VERIFICATION_FAILED,
+                            verification_status=VerificationStatus.NOT_APPLICABLE,
                             is_verified=False,
                             error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                        )
+
+                    check_status = check_res.get("status")
+                    check_outcome = check_res.get("outcome")
+
+                    if check_status == "WORKER_TIMEOUT":
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.TIMEOUT,
+                            verification_status=VerificationStatus.NOT_APPLICABLE,
+                            is_verified=False,
+                            error_code="ERR_TIMEOUT",
+                        )
+
+                    if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_RESOURCE_EXHAUSTED", "ERR_RESOURCE_EXHAUSTED"):
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=ExecutionStatus.ENGINE_ERROR,
+                            verification_status=VerificationStatus.NOT_APPLICABLE,
+                            is_verified=False,
+                            error_code="ERR_RESOURCE_EXHAUSTED",
+                        )
+
+                    if check_status in WORKER_INFRASTRUCTURE_ERRORS:
+                        exec_st, err_c = WORKER_INFRASTRUCTURE_ERRORS[check_status]
+                        return ControlledDispatchResult(
+                            intake_status=IntakeStatus.VALIDATED,
+                            intake_diagnostic=diagnostic,
+                            execution_status=exec_st,
+                            verification_status=VerificationStatus.NOT_APPLICABLE,
+                            is_verified=False,
+                            error_code=err_c,
                         )
 
                     if check_res.get("schema_version") != SCHEMA_VERSION_V1 or check_res.get("operation") != OPERATION_CHECK_CANDIDATE:
@@ -1452,19 +1648,6 @@ class ControlledDispatchBridge:
                             verification_status=VerificationStatus.VERIFICATION_FAILED,
                             is_verified=False,
                             error_code="ERR_MALFORMED_WORKER_RESPONSE",
-                        )
-
-                    check_outcome = check_res.get("outcome")
-                    check_status = check_res.get("status")
-
-                    if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
-                        return ControlledDispatchResult(
-                            intake_status=IntakeStatus.VALIDATED,
-                            intake_diagnostic=diagnostic,
-                            execution_status=ExecutionStatus.TIMEOUT,
-                            verification_status=VerificationStatus.NOT_APPLICABLE,
-                            is_verified=False,
-                            error_code="ERR_TIMEOUT",
                         )
 
                     exact_eq = check_res.get("exact_equality")
@@ -1494,7 +1677,7 @@ class ControlledDispatchBridge:
                     RationalRoot(numerator=w1.numerator, denominator=w1.denominator),
                     RationalRoot(numerator=w2.numerator, denominator=w2.denominator),
                 ]
-                return ControlledDispatchResult(
+                return QuadraticControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.SUCCESS,
