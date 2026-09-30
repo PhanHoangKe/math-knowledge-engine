@@ -23,8 +23,10 @@ from mke_product.protocol.schema import (
     OPERATION_CHECK_CANDIDATE,
     OPERATION_SOLVE,
     OPERATION_SOLVE_QUADRATIC,
+    OPERATION_SOLVE_QUADRATIC_SURD,
     SCHEMA_VERSION_V1,
     SCHEMA_VERSION_V2,
+    SCHEMA_VERSION_V3,
 )
 from mke_product.protocol.validator import validate_request_dict
 from mke_product.solver.quadratic import (
@@ -380,6 +382,32 @@ class MockBridgeWorkerController:
                 "error": None,
                 "is_provisional_evidence": False,
             }
+        elif op == OPERATION_SOLVE_QUADRATIC_SURD:
+            if self.solve_res is not None:
+                return self.solve_res
+            return {
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "-1", "denominator": "2"},
+                        "radicand": "2",
+                    },
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "1", "denominator": "2"},
+                        "radicand": "2",
+                    },
+                ],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
         elif op == OPERATION_CHECK_CANDIDATE:
             if self.check_res_list:
                 return self.check_res_list.pop(0)
@@ -545,29 +573,40 @@ class TestControlledDispatchBridgeQuadratic:
         assert res.completeness_proven is True
         assert len(mock.call_history) == 1  # 1 SOLVE_QUADRATIC only (no candidate check for EmptySet)
 
-    def test_adv04_irrational_roots_fail_closed_pre_dispatch(self):
+    def test_adv04_uncertified_large_remainder_surd_fails_closed_pre_dispatch(self):
         from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
+        p = 65537
+        c_val = p * p
+        expr = f"2*x^2 - {c_val} = 0"
+        ir = make_test_ir(expr)
         mock = MockBridgeWorkerController()
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
         assert res.intake_status == IntakeStatus.VALIDATED
         assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
         assert res.verification_status == VerificationStatus.NOT_APPLICABLE
         assert res.is_verified is False
-        assert res.error_code == "ERR_UNSUPPORTED_EXACT_ROOT_REPRESENTATION"
+        assert res.error_code == "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT"
         assert len(mock.call_history) == 0  # Zero worker spawn
 
-    def test_adv05_positive_non_square_fractional_discriminant_fail_closed(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+    def test_adv05_positive_non_square_discriminant_dispatches_surd(self):
+        from mke_product.cas.bridge import (
+            ControlledDispatchBridge,
+            ExecutionStatus,
+            IntakeStatus,
+            VerificationStatus,
+            QuadraticSurdControlledDispatchResult,
+        )
         ir = make_test_ir("2*x^2 - 1 = 0")
         mock = MockBridgeWorkerController()
         res = ControlledDispatchBridge._dispatch_internal(raw_query="2*x^2 - 1 = 0", ir_payload=ir, _controller=mock)
+        assert isinstance(res, QuadraticSurdControlledDispatchResult)
         assert res.intake_status == IntakeStatus.VALIDATED
-        assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
-        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
-        assert res.is_verified is False
-        assert res.error_code == "ERR_UNSUPPORTED_EXACT_ROOT_REPRESENTATION"
-        assert len(mock.call_history) == 0
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFIED_COMPLETE
+        assert res.is_verified is True
+        assert res.solution_type == "TWO_DISTINCT_REAL_ROOTS"
+        assert res.radicand == 2
+        assert len(mock.call_history) == 1
 
     def test_adv06_degree_3_rejected_scope(self):
         from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
