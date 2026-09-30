@@ -427,10 +427,12 @@ def extract_quadratic_coefficients_host(
             res1 = _host_sub(l1, r1, max_bits)
             res0 = _host_sub(l0, r0, max_bits)
         elif node.op == "*":
-            # Check Cauchy product terms for degree > 2
-            deg4 = l2 * r2
-            deg3 = l2 * r1 + l1 * r2
-            if not deg4.is_zero or not deg3.is_zero:
+            # Check Cauchy product terms for degree > 2 using structural degree checks
+            if not l2.is_zero and not r2.is_zero:
+                raise NonQuadraticExpressionError("Polynomial degree exceeds 2 in multiplication.")
+            if not l2.is_zero and not r1.is_zero:
+                raise NonQuadraticExpressionError("Polynomial degree exceeds 2 in multiplication.")
+            if not l1.is_zero and not r2.is_zero:
                 raise NonQuadraticExpressionError("Polynomial degree exceeds 2 in multiplication.")
 
             # res2 = l2 * r0 + l1 * r1 + l0 * r2
@@ -523,7 +525,7 @@ def reduce_equation_quadratic(
 def _parse_wire_rational(val: Any) -> Optional[Rational]:
     """Parse and validate wire rational dictionary {"numerator": "<str>", "denominator": "<str>"}.
 
-    Rejects non-string digits, booleans, floats, negative denominators, and uncanonical representations.
+    Rejects non-string digits, booleans, floats, negative denominators, values >256 bits, and uncanonical representations.
     """
     if not isinstance(val, dict):
         return None
@@ -543,6 +545,8 @@ def _parse_wire_rational(val: Any) -> Optional[Rational]:
         num = int(num_str)
         den = int(den_str)
         if den <= 0:
+            return None
+        if abs(num).bit_length() > 256 or den.bit_length() > 256:
             return None
         rat = Rational(num, den)
         # Canonical wire check: string must match reduced form
@@ -1227,8 +1231,8 @@ class ControlledDispatchBridge:
                     error_code="ERR_OUT_OF_SCOPE",
                 )
 
-            # Strict v2 response envelope allowlist check
-            ALLOWED_V2_RESPONSE_FIELDS = {
+            # Strict v2 success response envelope exact field set check
+            EXACT_V2_SUCCESS_RESPONSE_FIELDS = {
                 "schema_version",
                 "operation",
                 "outcome",
@@ -1239,7 +1243,7 @@ class ControlledDispatchBridge:
                 "error",
                 "is_provisional_evidence",
             }
-            if set(solve_res.keys()) - ALLOWED_V2_RESPONSE_FIELDS:
+            if set(solve_res.keys()) != EXACT_V2_SUCCESS_RESPONSE_FIELDS:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -1255,6 +1259,7 @@ class ControlledDispatchBridge:
                 or solve_outcome != "SUCCESS"
                 or solve_res.get("definedness") is not True
                 or solve_res.get("error") is not None
+                or type(solve_res.get("is_provisional_evidence")) is not bool
                 or solve_status not in ("NO_REAL_ROOT", "UNIQUE_REAL_ROOT", "TWO_DISTINCT_REAL_ROOTS")
             ):
                 return ControlledDispatchResult(

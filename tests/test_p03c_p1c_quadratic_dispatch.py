@@ -967,8 +967,268 @@ class TestB0SerializationAndFieldCompatibility:
         assert len(dumped) == 11
 
 
+class TestWireRational256BitLimit:
+    """Verify exact 256-bit limit on wire rational parsing."""
+
+    def test_wire_rational_exact_256_bit_accepted(self):
+        from mke_product.cas.bridge import _parse_wire_rational
+        val_256 = (1 << 256) - 1
+        assert val_256.bit_length() == 256
+        wire = {"numerator": str(val_256), "denominator": "1"}
+        rat = _parse_wire_rational(wire)
+        assert rat is not None
+        assert rat.numerator == val_256
+        assert rat.denominator == 1
+
+    def test_wire_rational_257_bit_numerator_rejected(self):
+        from mke_product.cas.bridge import _parse_wire_rational
+        val_257 = 1 << 256
+        assert val_257.bit_length() == 257
+        wire = {"numerator": str(val_257), "denominator": "1"}
+        assert _parse_wire_rational(wire) is None
+
+    def test_wire_rational_257_bit_denominator_rejected(self):
+        from mke_product.cas.bridge import _parse_wire_rational
+        val_257 = 1 << 256
+        wire = {"numerator": "1", "denominator": str(val_257)}
+        assert _parse_wire_rational(wire) is None
+
+    def test_wire_rational_huge_negative_numerator_rejected(self):
+        from mke_product.cas.bridge import _parse_wire_rational
+        val_neg_257 = -(1 << 256)
+        wire = {"numerator": str(val_neg_257), "denominator": "1"}
+        assert _parse_wire_rational(wire) is None
+
+    def test_wire_rational_80_digit_exceeding_256_bits_rejected(self):
+        from mke_product.cas.bridge import _parse_wire_rational
+        val_80_digits = int("9" * 80)
+        assert val_80_digits.bit_length() > 256
+        wire = {"numerator": str(val_80_digits), "denominator": "1"}
+        assert _parse_wire_rational(wire) is None
+
+
+class TestStrictV2SuccessEnvelopeAdversarial:
+    """Verify strict exact-equality field set validation on v2 success responses."""
+
+    def test_v2_success_missing_error_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "is_provisional_evidence": False,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_missing_is_provisional_evidence_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_missing_discriminant_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": False,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_missing_roots_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": False,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_unexpected_extra_field_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": False,
+                "unexpected_sidecar_payload": 12345,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_is_provisional_evidence_null_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": None,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_is_provisional_evidence_string_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": "false",
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_v2_success_non_null_error_fails_closed(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+        ir = make_test_ir("x^2 - 4 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V2,
+                "operation": OPERATION_SOLVE_QUADRATIC,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [{"numerator": "-2", "denominator": "1"}, {"numerator": "2", "denominator": "1"}],
+                "discriminant": {"numerator": "16", "denominator": "1"},
+                "definedness": True,
+                "error": "ERR_SOMETHING",
+                "is_provisional_evidence": False,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.is_verified is False
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+
 class TestHostArithmeticResourceLimits:
     """Verify host proof bounded arithmetic overflow triggers ERR_RESOURCE_EXHAUSTED_HOST_PROOF."""
+
+    def test_host_helpers_valid_256_bit_arithmetic(self):
+        from mke_product.cas.bridge import (
+            _host_add,
+            _host_sub,
+            _host_mul,
+            _host_div,
+            _host_neg,
+            _host_check_rational_bounds,
+        )
+        r1 = Rational(100, 3)
+        r2 = Rational(50, 7)
+        assert _host_add(r1, r2) == Rational(850, 21)
+        assert _host_sub(r1, r2) == Rational(550, 21)
+        assert _host_mul(r1, r2) == Rational(5000, 21)
+        assert _host_div(r1, r2) == Rational(14, 3)
+        assert _host_neg(r1) == Rational(-100, 3)
+        assert _host_check_rational_bounds(r1) == r1
+
+    def test_host_helpers_overflow_raises_limit_error(self):
+        from mke_product.cas.bridge import (
+            _host_add,
+            _host_sub,
+            _host_mul,
+            _host_div,
+            _host_neg,
+            _host_check_rational_bounds,
+            HostQuadraticResourceLimitError,
+        )
+        huge = 1 << 257
+        r_huge = Rational(huge, 1)
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_check_rational_bounds(r_huge)
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_neg(r_huge)
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_add(Rational(1 << 255, 1), Rational(1 << 255, 1))
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_sub(Rational(-(1 << 255), 1), Rational(1 << 255, 1))
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_mul(Rational(1 << 130, 1), Rational(1 << 130, 1))
+        with pytest.raises(HostQuadraticResourceLimitError):
+            _host_div(Rational(1 << 255, 1), Rational(1, 1 << 10))
 
     def test_host_overflow_intake_large_coefficient(self):
         from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
@@ -984,10 +1244,41 @@ class TestHostArithmeticResourceLimits:
         assert res.error_code == "ERR_RESOURCE_EXHAUSTED_HOST_PROOF"
         assert len(mock.call_history) == 0
 
-    def test_host_overflow_discriminant_calculation(self):
+    def test_host_overflow_b_squared(self):
         from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
-        b = 2**130
+        b = 1 << 130
         expr = f"x^2 + {b}*x + 1 = 0"
+        ir = make_test_ir(expr)
+        mock = MockBridgeWorkerController()
+        res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == "ERR_RESOURCE_EXHAUSTED_HOST_PROOF"
+        assert len(mock.call_history) == 0
+
+    def test_host_overflow_four_a_c(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        a = 1 << 130
+        c = 1 << 130
+        expr = f"{a}*x^2 + x + {c} = 0"
+        ir = make_test_ir(expr)
+        mock = MockBridgeWorkerController()
+        res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
+        assert res.intake_status == IntakeStatus.VALIDATED
+        assert res.execution_status == ExecutionStatus.NOT_DISPATCHED
+        assert res.verification_status == VerificationStatus.NOT_APPLICABLE
+        assert res.is_verified is False
+        assert res.error_code == "ERR_RESOURCE_EXHAUSTED_HOST_PROOF"
+        assert len(mock.call_history) == 0
+
+    def test_host_overflow_delta_computation(self):
+        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
+        b = 1 << 127
+        a = 1 << 127
+        c = -(1 << 127)
+        expr = f"{a}*x^2 + {b}*x + ({c}) = 0"
         ir = make_test_ir(expr)
         mock = MockBridgeWorkerController()
         res = ControlledDispatchBridge._dispatch_internal(raw_query=expr, ir_payload=ir, _controller=mock)
@@ -1099,7 +1390,7 @@ class TestCumulativeDeadlineStrictBudget:
     def test_cumulative_deadline_3_calls(self):
         from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
         ir = make_test_ir("x^2 - 4 = 0")
-        mock = MockBridgeWorkerController(solve_delay_sec=0.01)
+        mock = MockBridgeWorkerController(solve_delay_sec=0.05)
         res = ControlledDispatchBridge._dispatch_internal(
             raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock, _budget_sec=5.0
         )
