@@ -5,10 +5,11 @@
 - **Independent Auditor:** ChatGPT
 - **Owner:** Kế Phan Hoàng
 - **Repository:** `PhanHoangKe/math-knowledge-engine`
-- **Active Branch:** `product/p03c-p1c-04-b0-r3-taxonomy-fix`
+- **Active Branch:** `product/p03c-p1c-04-b0-r3-final-closeout`
 - **Baseline Release Tag:** `v0.3.3-p03c-p1c-03-accepted-limited` (`ec9e7085d17b13ab6496a52e2f4809c318939bbd`)
 - **Tested Source Commit:** `bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf`
-- **Status:** `DELIVERY CANDIDATE — PENDING INDEPENDENT AUDIT`
+- **Clean Evidence Commit:** `b6c282877a5e2314beb507618fc76792d15daaf0`
+- **Status:** `DELIVERY CANDIDATE — PENDING FINAL AUDIT CLOSEOUT`
 - **Date:** 2026-09-30
 
 ---
@@ -17,9 +18,9 @@
 
 | Stage | Commit SHA | Type | Description |
 | :--- | :--- | :--- | :--- |
-| **Stage 0** | `21ba4465494d4d142d76ea295055bdf9c64aa8a9` | Docs only | Align `docs/architecture/P1C_04_A_CONTROLLED_DISPATCH_PREFLIGHT.md` with frozen worker contracts: outcome vs status, wire rational strings, `to_public_diagnostic()`, and correlation without wire echo. |
+| **Stage 0** | `21ba446810ac0f29ed81f4ed62209b41fd2535bb` | Docs only | Align `docs/architecture/P1C_04_A_CONTROLLED_DISPATCH_PREFLIGHT.md` with frozen worker contracts: outcome vs status, wire rational strings, `to_public_diagnostic()`, and correlation without wire echo. |
 | **Stage 1** | `bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf` | Source + Tests | Correct final intake taxonomy (`SYNTAX_ISSUE_CODES`, `SOURCE_INTEGRITY_ISSUE_CODES`, scope rejection fallback) in `src/mke_product/cas/bridge.py` and expand unit/integration test suite in `tests/test_p03c_p1c_controlled_dispatch.py` to 41 comprehensive tests. Zero edits to frozen baseline files. |
-| **Stage 2** | *Current Commit* | Evidence only | Full execution logs in `evidence/p1c_04_b0/raw_logs/`, checksums `SHA256SUMS.txt`, manifest `MANIFEST.json`, and this release record. |
+| **Stage 2** | `b6c282877a5e2314beb507618fc76792d15daaf0` | Evidence only | Full execution logs in `evidence/p1c_04_b0/raw_logs/`, checksums `SHA256SUMS.txt`, manifest `MANIFEST.json`, and this release record. |
 
 ---
 
@@ -28,7 +29,7 @@
 1. **Intake Validation Precondition Gate & Granular Taxonomy:**
    - Every dispatch request is processed through `MKEIntakeValidator.validate()` prior to any CAS worker execution.
    - If intake validation fails (`is_cas_ready` is `False` or status is not `VALID`), dispatch is immediately rejected without spawning or interacting with the worker process.
-   - Granular intake classification ensures syntax issues map to `IntakeStatus.INVALID_SYNTAX`, provenance/source issues map to `IntakeStatus.INVALID_SOURCE_INTEGRITY`, and scope/semantic issues map to `IntakeStatus.REJECTED_SCOPE` (`ERR_INTAKE_SCOPE_UNSUPPORTED`).
+   - Granular intake classification ensures syntax issues map to `IntakeStatus.REJECTED_SYNTAX` (`ERR_INTAKE_SYNTAX_INVALID`), provenance/source-integrity issues map to `IntakeStatus.REJECTED_NON_EXHAUSTIVE` (`ERR_INTAKE_NON_EXHAUSTIVE`), and scope/semantic issues map to `IntakeStatus.REJECTED_SCOPE` (`ERR_INTAKE_SCOPE_UNSUPPORTED`).
 
 2. **Strict Affine Expression Reduction & Independent Proof Check:**
    - Implements deterministic AST inspection (`extract_affine_coefficients`, `reduce_equation_affine`) deriving canonical polynomial coefficients $(A, B)$ representing $A x + B = 0$ over exact rationals ($\mathbb{Q}$) directly from the intake AST without invoking uncontained symbolic solvers.
@@ -42,7 +43,10 @@
 4. **IPC Wire Protocol Conformance (`mke.p02a.v1`):**
    - Strictly conforms to the frozen worker wire schema: operations `SOLVE` and `CHECK_CANDIDATE`.
    - Wire candidate values and residuals use exact rational string dicts `{"numerator": "<signed int>", "denominator": "<positive int>"}`.
-   - Request correlation IDs are managed securely in the bridge telemetry without expecting the worker to echo arbitrary custom payload fields.
+   - Single-request host lifecycle preserves the exact equation sent across the dispatch transaction.
+   - Response `operation` echo is validated against the requested operation.
+   - `CHECK_CANDIDATE` candidate is required to equal the exact candidate sent.
+   - No request-id echo is assumed from `mke.p02a.v1`.
 
 5. **Strict Deadline & Timeout Budgeting:**
    - Implements a shared monotonic 5.0-second wall-clock deadline budget.
@@ -67,7 +71,7 @@ Execution evidence generated on Windows 10/11 x64 with Python `3.10.11`:
 | 4 | `04_p1b_transcendental_solver_tests` | `tests/test_p03c_p1b_transcendental_solver.py` | **PASS** | **44 / 44 passed** | [`04_p1b_transcendental_solver_tests.log`](p1c_04_b0/raw_logs/04_p1b_transcendental_solver_tests.log) |
 | 5 | `05_windows_containment_tests` | `tests/test_worker_windows.py` | **PASS** | **80 / 80 passed** | [`05_windows_containment_tests.log`](p1c_04_b0/raw_logs/05_windows_containment_tests.log) |
 | 6 | `06_browser_ui_regression_tests` | `tests/test_browser_canonical_ui.py` | **PASS** | **21 / 21 passed** | [`06_browser_ui_regression_tests.log`](p1c_04_b0/raw_logs/06_browser_ui_regression_tests.log) |
-| 7 | `07_full_repository_pytest` | Full Pytest Suite | **PASS** | **692 / 692 passed** | [`07_full_repository_pytest.log`](p1c_04_b0/raw_logs/07_full_repository_pytest.log) |
+| 7 | `07_full_repository_pytest` | Full Pytest Suite | **PASS** | **692 passed, 18 subtests passed** | [`07_full_repository_pytest.log`](p1c_04_b0/raw_logs/07_full_repository_pytest.log) |
 
 ---
 
@@ -81,3 +85,4 @@ Execution evidence generated on Windows 10/11 x64 with Python `3.10.11`:
    - P1C-03 MKE-IR validator, P1B transcendental solver, and P02A Windows worker implementations remain strictly unmodified.
 4. **No Premature Tagging or Merging:**
    - This milestone is submitted for independent audit review. No tags or branch merges are executed.
+
