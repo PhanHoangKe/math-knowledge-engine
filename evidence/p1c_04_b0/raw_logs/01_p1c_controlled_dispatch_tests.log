@@ -1,7 +1,13 @@
+Tested Source SHA: bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_controlled_dispatch.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:25:13.874509+00:00
-End: 2026-09-30T01:25:18.888696+00:00
+Start: 2026-09-30T04:45:18.605700+00:00
+End: 2026-09-30T04:45:24.913420+00:00
 Exit Code: 0
 
 STDOUT:
@@ -11,35 +17,50 @@ cachedir: .pytest_cache
 rootdir: D:\mke-product-ui-r4
 plugins: anyio-3.7.1, asyncio-1.4.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 24 items
+collecting ... collected 41 items
 
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_01_canonical_linear_equation PASSED [  4%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_02_affine_identity_all_reals PASSED [  8%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_03_affine_contradiction_empty_set PASSED [ 12%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04_semantic_exhaustiveness_rejection_clause PASSED [ 16%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04b_semantic_exhaustiveness_rejection_second_equation PASSED [ 20%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_05_nonlinear_quadratic_equation_pre_dispatch PASSED [ 25%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_06_protocol_length_overflow PASSED [ 29%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_07_non_ascii_mathematical_notation PASSED [ 33%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_08_fabricated_intake_bypass_attempt PASSED [ 37%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_09_contradictory_forged_worker_evidence PASSED [ 41%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_10_cumulative_budget_timeout PASSED [ 45%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_11_non_windows_platform_fail_closed PASSED [ 50%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_bracketed_complex_linear PASSED [ 54%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_division_by_variable_rejected PASSED [ 58%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_linear_reductions PASSED [ 62%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_nonlinear_quadratic_rejected PASSED [ 66%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_power_two_rejected PASSED [ 70%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_rejected_wire_rationals PASSED [ 75%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_valid_wire_rationals PASSED [ 79%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_dispatch_signature_is_locked PASSED [ 83%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_result_does_not_leak_ast_or_raw_traceback PASSED [ 87%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_contradiction PASSED [ 91%]
-tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_identity PASSED [ 95%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_01_canonical_linear_equation PASSED [  2%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_02_affine_identity_all_reals PASSED [  4%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_03_affine_contradiction_empty_set PASSED [  7%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04_semantic_exhaustiveness_rejection_clause PASSED [  9%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04b_semantic_exhaustiveness_rejection_second_equation PASSED [ 12%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_05_nonlinear_quadratic_equation_pre_dispatch PASSED [ 14%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_06_protocol_length_overflow PASSED [ 17%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_07_non_ascii_mathematical_notation PASSED [ 19%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_08_fabricated_intake_bypass_attempt PASSED [ 21%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_09_contradictory_forged_worker_evidence PASSED [ 24%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_10_cumulative_budget_timeout PASSED [ 26%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_11_non_windows_platform_fail_closed PASSED [ 29%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_check_candidate_wrong_operation_echo PASSED [ 31%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_check_candidate_wrong_schema_version PASSED [ 34%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_colluding_forged_solve_and_check_unique_root_on_contradiction PASSED [ 36%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_colluding_forged_solve_and_check_unique_root_on_identity PASSED [ 39%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_domainset_r_with_unexpected_root_or_wrong_classification PASSED [ 41%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_emptyset_with_unexpected_root_or_wrong_classification PASSED [ 43%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_real_cumulative_budget_consumption PASSED [ 46%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_solve_status_classification_mismatch PASSED [ 48%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAdversarialWireIntegrityAndEnvelopeValidation::test_unique_root_definedness_false_or_missing_root PASSED [ 51%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_bounded_bit_length_overflow_guard PASSED [ 53%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_constant_non_zero_power_zero_accepted PASSED [ 56%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_constant_power_two_accepted_with_bit_bounds PASSED [ 58%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_forged_domainset_for_x_pow_zero_fails_closed PASSED [ 60%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_variable_dependent_exponent_zero_rejected PASSED [ 63%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_variable_power_two_rejected PASSED [ 65%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestDomainSafeHostProofChecker::test_zero_power_zero_rejected PASSED [ 68%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_rejected_wire_rationals PASSED [ 70%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_valid_wire_rationals PASSED [ 73%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_dispatch_signature_is_locked PASSED [ 75%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_result_does_not_leak_ast_or_raw_traceback PASSED [ 78%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_canonical_equation_verified_complete PASSED [ 80%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_malformed_math_syntax_rejected_syntax PASSED [ 82%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_missing_target_variable_rejected_scope PASSED [ 85%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_raw_query_mismatch_fails_closed_non_exhaustive PASSED [ 87%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_source_fragment_mismatch_fails_closed_non_exhaustive PASSED [ 90%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestRealIntakeTaxonomyClassification::test_real_validator_unsupported_category_rejected_scope PASSED [ 92%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_contradiction PASSED [ 95%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_identity PASSED [ 97%]
 tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_linear PASSED [100%]
 
-============================= 24 passed in 4.13s ==============================
-
+============================= 41 passed in 5.03s ==============================
 
 STDERR:
-

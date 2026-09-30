@@ -1,7 +1,13 @@
+Tested Source SHA: bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mke_ir_validator.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:25:18.912748+00:00
-End: 2026-09-30T01:25:20.591348+00:00
+Start: 2026-09-30T04:45:25.381402+00:00
+End: 2026-09-30T04:45:26.962701+00:00
 Exit Code: 0
 
 STDOUT:
@@ -66,8 +72,6 @@ tests/test_p03c_p1c_mke_ir_validator.py::test_final_closeout_case1_invalid_or_ab
 tests/test_p03c_p1c_mke_ir_validator.py::test_final_closeout_case2_authoritative_issue_fatality_overrides_caller PASSED [ 98%]
 tests/test_p03c_p1c_mke_ir_validator.py::test_final_closeout_case4_canonical_valid_outcome_passes PASSED [100%]
 
-============================= 52 passed in 0.85s ==============================
-
+============================= 52 passed in 0.81s ==============================
 
 STDERR:
-

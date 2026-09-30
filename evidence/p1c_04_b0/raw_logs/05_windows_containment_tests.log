@@ -1,7 +1,13 @@
+Tested Source SHA: bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:26:08.978135+00:00
-End: 2026-09-30T01:26:46.714521+00:00
+Start: 2026-09-30T04:46:19.577754+00:00
+End: 2026-09-30T04:47:11.049013+00:00
 Exit Code: 0
 
 STDOUT:
@@ -94,8 +100,6 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 98%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============================= 80 passed in 36.91s =============================
-
+============================= 80 passed in 50.30s =============================
 
 STDERR:
-
