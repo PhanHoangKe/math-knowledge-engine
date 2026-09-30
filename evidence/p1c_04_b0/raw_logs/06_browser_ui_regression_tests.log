@@ -1,7 +1,25 @@
+Git HEAD: f321fb03e91b39ac14c62b55285654f1d35d44d8
+Git Clean Tree: False
+Git Status: M evidence/p03b/screenshots/01_homepage_initial.png
+ M evidence/p03b/screenshots/08_english_localization.png
+ M evidence/p03b/screenshots/09_charcoal_dark_theme.png
+ M evidence/p03c_p1c_04_b0_acceptance_record.md
+ M evidence/p1c_04_b0/MANIFEST.json
+ M evidence/p1c_04_b0/SHA256SUMS.txt
+ M evidence/p1c_04_b0/raw_logs/01_p1c_controlled_dispatch_tests.log
+ M evidence/p1c_04_b0/raw_logs/02_p1c_ir_validator_tests.log
+ M evidence/p1c_04_b0/raw_logs/03_p1c_mock_adapter_tests.log
+ M evidence/p1c_04_b0/raw_logs/04_p1b_transcendental_solver_tests.log
+ M evidence/p1c_04_b0/raw_logs/05_windows_containment_tests.log
+ M evidence/p1c_04_b0/raw_logs/06_browser_ui_regression_tests.log
+ M evidence/p1c_04_b0/raw_logs/07_full_repository_pytest.log
+?? regenerate_evidence.py
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:26:46.730673+00:00
-End: 2026-09-30T01:27:27.498210+00:00
+Start: 2026-09-30T02:01:57.844086+00:00
+End: 2026-09-30T02:02:40.066635+00:00
 Exit Code: 0
 
 STDOUT:
@@ -35,8 +53,6 @@ tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_21_honest_
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_22_solve_linear_system_browser_ui PASSED [ 95%]
 tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_23_solve_inequality_browser_ui PASSED [100%]
 
-============================= 21 passed in 40.13s =============================
-
+============================= 21 passed in 41.42s =============================
 
 STDERR:
-

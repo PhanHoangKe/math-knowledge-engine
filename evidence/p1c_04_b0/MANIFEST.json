@@ -1,8 +1,11 @@
 {
-  "milestone": "PRODUCT-03C-P1C-04-B0",
-  "timestamp": "2026-09-30T01:28:48.403500+00:00",
-  "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "milestone": "PRODUCT-03C-P1C-04-B0-R1",
+  "timestamp": "2026-09-30T02:05:46.888614+00:00",
+  "tested_source_sha": "f321fb03e91b39ac14c62b55285654f1d35d44d8",
+  "source_branch": "product/p03c-p1c-04-b0-r1-audit-fix",
+  "clean_worktree": true,
   "platform": "win32",
+  "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
   "suites": [
     {
       "file": "raw_logs/01_p1c_controlled_dispatch_tests.log",
@@ -16,9 +19,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:23:37.579042+00:00",
-      "end": "2026-09-30T01:23:42.945784+00:00",
-      "sha256": "7f2fb4815894059cce46aa6aecd74450ac3e1a50beb8da35cec154560d1da2b2",
+      "start": "2026-09-30T02:00:24.020224+00:00",
+      "end": "2026-09-30T02:00:29.821793+00:00",
+      "sha256": "960ad70363acb9af3b85939718773dfd70470c211a6bc205f77b3e0a7ee5ecac",
       "passed": true
     },
     {
@@ -33,9 +36,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:23:42.967798+00:00",
-      "end": "2026-09-30T01:23:44.696766+00:00",
-      "sha256": "9346098f308feff1530b72efba9c1bfc3b3ff7c7dc88bdb3206c854b51acc899",
+      "start": "2026-09-30T02:00:29.841838+00:00",
+      "end": "2026-09-30T02:00:31.587520+00:00",
+      "sha256": "8652d26bb6989d36d2c93898fb14a388aa6edba13e554e470c96fcff8adeec5a",
       "passed": true
     },
     {
@@ -50,9 +53,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:23:44.715232+00:00",
-      "end": "2026-09-30T01:23:46.574489+00:00",
-      "sha256": "c6dd683864646764fa8cd9dec86f173179189ceba5c7edc591df5323e2e4d908",
+      "start": "2026-09-30T02:00:31.611172+00:00",
+      "end": "2026-09-30T02:00:33.528635+00:00",
+      "sha256": "bbc7c43686364ce387567354476bfc5e35ce122da667fab33f2812eaa2a2347e",
       "passed": true
     },
     {
@@ -67,9 +70,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:23:46.592648+00:00",
-      "end": "2026-09-30T01:24:33.388157+00:00",
-      "sha256": "6bcee41cfaef9e846e8013ff9231b1819238f52be8a23abe61231b889fed93c4",
+      "start": "2026-09-30T02:00:33.554040+00:00",
+      "end": "2026-09-30T02:01:20.818731+00:00",
+      "sha256": "1648643f23349ae73e658a7cf50e2c8c0c187d98cf4a48be582b2957b65d2239",
       "passed": true
     },
     {
@@ -84,9 +87,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:24:33.416125+00:00",
-      "end": "2026-09-30T01:25:10.639167+00:00",
-      "sha256": "e049bb36d305c26446130bf3cee7912b9110c3d3fbb859d811edc83cef5c0617",
+      "start": "2026-09-30T02:01:20.830292+00:00",
+      "end": "2026-09-30T02:01:57.823789+00:00",
+      "sha256": "89b06f71a59fcda29d67fd7573d94467fe79bba08ed0dd3df5dfe03639e0ecdb",
       "passed": true
     },
     {
@@ -101,9 +104,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:25:10.654168+00:00",
-      "end": "2026-09-30T01:25:52.039666+00:00",
-      "sha256": "bca2200d7ba0a27f3650d4609f53db845e361044ad48667385e9e318b93b4dec",
+      "start": "2026-09-30T02:01:57.844086+00:00",
+      "end": "2026-09-30T02:02:40.066635+00:00",
+      "sha256": "1327f875c54a358c71c315593aa2c3306dcedcf525358ba835a7aa6d4c557d3b",
       "passed": true
     },
     {
@@ -117,9 +120,9 @@
         "pythonpath=src"
       ],
       "exit_code": 0,
-      "start": "2026-09-30T01:25:52.059929+00:00",
-      "end": "2026-09-30T01:28:48.385229+00:00",
-      "sha256": "443520de7e1da54a3787b9d55f797fc2959ceb482cc373e080b5f060d43944c3",
+      "start": "2026-09-30T02:02:40.089015+00:00",
+      "end": "2026-09-30T02:05:46.863670+00:00",
+      "sha256": "018d1ea5edcc937ef8b98dc714542d97788f85362d439da24656a624e0c0c27c",
       "passed": true
     }
   ]
