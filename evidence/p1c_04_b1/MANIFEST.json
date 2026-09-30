@@ -1,0 +1,39 @@
+{
+  "milestone": "PRODUCT-03C-P1C-04-B1",
+  "tested_source_sha": "0248d963063ee57dd4e1b57561124472d25f14bd",
+  "evidence_type": "source_bound_clean_worktree",
+  "files": {
+    "raw_logs/01_p1c_quadratic_dispatch_tests.log": {
+      "sha256": "b6e078ee3d7d25c43366b5661aaa00d6050846d85366addc5b5ec92e05e1c05e",
+      "bytes": 7640
+    },
+    "raw_logs/02_p1c_controlled_dispatch_tests.log": {
+      "sha256": "ede8f9c652e503c6bf52a24c839b603062654926a282acf5608c435c41d19d2d",
+      "bytes": 6504
+    },
+    "raw_logs/03_p1c_ir_validator_tests.log": {
+      "sha256": "5743720997732f2f2523bd1708817c62f2e3350a5f3b673d93f8f69c037c9c78",
+      "bytes": 6107
+    },
+    "raw_logs/04_p1c_mock_adapter_tests.log": {
+      "sha256": "d5831e2ea3e2a3ccd3b0c65c90195c29585565eeb85aa12c5b45a796b3d2fc0a",
+      "bytes": 2791
+    },
+    "raw_logs/05_p1b_transcendental_solver_tests.log": {
+      "sha256": "37264fca2679c5fe6f7f9d70707c99c216c62aebf6d963d175dc11642bfe1625",
+      "bytes": 5146
+    },
+    "raw_logs/06_windows_containment_tests.log": {
+      "sha256": "f1225cdbda572b97546f6908c396afb0b4ec96ea9dc271b41076f630b208201e",
+      "bytes": 11053
+    },
+    "raw_logs/07_browser_ui_regression_tests.log": {
+      "sha256": "971f5f91d79bf38e86c4179bdd1c3cb87b090f24541cffdcb0c297e6252339a0",
+      "bytes": 2942
+    },
+    "raw_logs/08_full_repository_pytest.log": {
+      "sha256": "46fc116f8d4f747790c50f3be0370ac0c50dec257ad7c3f34127d9743089abfe",
+      "bytes": 88999
+    }
+  }
+}
