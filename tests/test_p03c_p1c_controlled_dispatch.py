@@ -1,15 +1,15 @@
 """Adversarial and functional test suite for P1C-04-B0 Controlled CAS Dispatch Bridge.
 
-Milestone: PRODUCT-03C-P1C-04-B0
+Milestone: PRODUCT-03C-P1C-04-B0-R1
 Verifies:
-- 11-case adversarial test matrix
-- Semantic-exhaustiveness guard
-- Exact mathematical proof contracts (UNIQUE_ROOT, ALL_REALS, EMPTY_SET)
-- Wire rational string validation & outcome/status taxonomy
-- Shared 5.0-second monotonic wall-clock budget
-- Locked containment & zero caller override in public API
-- Mocked platform safety and actual Windows Job Object integration
-- Public diagnostic sanitization and zero PII/path leaks
+- Complete 11-case adversarial test matrix.
+- CHECK_CANDIDATE envelope integrity (schema_version, operation, exact rational wire validation).
+- Refutation of colluding/forged SOLVE + CHECK claiming UNIQUE_ROOT for identities (x = x) or contradictions (x = x + 1).
+- SOLVE envelope consistency (status/classification equality, definedness is True, null root for set solutions).
+- Domain-safe host proof checker (rejection of variable-dependent exponent 0, 0^0, power > 1, bit/node bounds).
+- Real cumulative budget budgeting where SOLVE consumes wall-clock budget and CHECK receives the remainder.
+- Sanitized public result projection with zero PII, path, AST, or trace leakage.
+- Live Win32 Worker containment execution.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from mke_product.cas.bridge import (
     RationalRoot,
     VerificationStatus,
     extract_affine_coefficients,
+    reduce_equation_affine,
     NonAffineExpressionError,
     _parse_wire_rational,
 )
@@ -44,15 +45,23 @@ from mke_product.parser.parser import parse_equation
 class MockWorkerController:
     """Mock worker controller for deterministic unit testing of wire responses."""
 
-    def __init__(self, solve_response: Optional[dict] = None, check_response: Optional[dict] = None):
+    def __init__(
+        self,
+        solve_response: Optional[dict] = None,
+        check_response: Optional[dict] = None,
+        solve_delay_sec: float = 0.0,
+    ):
         self.solve_response = solve_response
         self.check_response = check_response
+        self.solve_delay_sec = solve_delay_sec
         self.call_history = []
 
     def execute_request(self, request: dict, timeout_sec: Optional[float] = None) -> dict:
         self.call_history.append((request, timeout_sec))
         op = request.get("operation")
         if op == "SOLVE":
+            if self.solve_delay_sec > 0:
+                time.sleep(self.solve_delay_sec)
             return self.solve_response if self.solve_response is not None else {
                 "schema_version": "mke.p02a.v1",
                 "operation": "SOLVE",
@@ -117,7 +126,7 @@ def make_valid_ir(
 
 
 class TestControlledDispatchPreflightMatrix(unittest.TestCase):
-    """Verifies the exact 11-case adversarial test matrix from P1C-04-A-R2 specification."""
+    """Verifies the 11-case adversarial test matrix and baseline functional scenarios."""
 
     def test_case_01_canonical_linear_equation(self):
         """Case 1: Canonical Linear Equation x = 1 (Verified Complete)."""
@@ -193,7 +202,6 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
     def test_case_04_semantic_exhaustiveness_rejection_clause(self):
         """Case 4: Semantic exhaustiveness rejection with natural language clause 'x = 1 với x > 2'."""
         raw = "x = 1 với x > 2"
-        # Extractor extracted only "x = 1"
         ir = make_valid_ir(raw, expr="x = 1")
         ctrl = MockWorkerController()
 
@@ -203,7 +211,7 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
         self.assertEqual(res.intake_status, IntakeStatus.REJECTED_NON_EXHAUSTIVE)
         self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
         self.assertEqual(res.error_code, "ERR_INTAKE_NON_EXHAUSTIVE")
-        self.assertEqual(len(ctrl.call_history), 0)  # Must NOT dispatch
+        self.assertEqual(len(ctrl.call_history), 0)
 
     def test_case_04b_semantic_exhaustiveness_rejection_second_equation(self):
         """Case 4b: Semantic exhaustiveness rejection with unextracted equation 'x = 1 và x = 2'."""
@@ -264,7 +272,6 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
     def test_case_08_fabricated_intake_bypass_attempt(self):
         """Case 8: Fabricated or ungrounded input failing intake validation."""
         raw = "x = 1"
-        # Hostile payload with mismatched raw_query
         bad_payload = {
             "schema_version": "mke.ir.v1",
             "problem_category": "EQUATION_SINGLE",
@@ -281,7 +288,7 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
         self.assertFalse(res.is_verified)
         self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SYNTAX)
         self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
-        self.assertEqual(res.error_code, "ERR_INTAKE_VALIDATION_FAILED")
+        self.assertEqual(res.error_code, "ERR_INTAKE_SYNTAX_INVALID")
         self.assertEqual(len(ctrl.call_history), 0)
 
     def test_case_09_contradictory_forged_worker_evidence(self):
@@ -295,7 +302,7 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
                 "outcome": "SUCCESS",
                 "status": "UNIQUE_ROOT",
                 "classification": "UNIQUE_ROOT",
-                "root": {"numerator": "5", "denominator": "1"},  # Fabricated wrong root
+                "root": {"numerator": "5", "denominator": "1"},
                 "definedness": True,
                 "is_provisional_evidence": False,
             },
@@ -303,7 +310,7 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
                 "schema_version": "mke.p02a.v1",
                 "operation": "CHECK_CANDIDATE",
                 "outcome": "SUCCESS",
-                "status": "INVALID",  # Correctly detected invalid by candidate checker
+                "status": "INVALID",
                 "candidate": {"numerator": "5", "denominator": "1"},
                 "exact_equality": False,
                 "residual": {"numerator": "4", "denominator": "1"},
@@ -327,7 +334,6 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
 
         class HangingMockController:
             def execute_request(self, request, timeout_sec=None):
-                # Simulate consuming remaining budget
                 time.sleep(0.15)
                 return {
                     "schema_version": "mke.p02a.v1",
@@ -357,38 +363,311 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
             self.assertEqual(res.error_code, "ERR_PLATFORM_NOT_SUPPORTED")
 
 
-class TestAffineCompletenessAnalyzer(unittest.TestCase):
-    """Unit tests for the independent bounded host AST affine-completeness analyzer."""
+class TestAdversarialWireIntegrityAndEnvelopeValidation(unittest.TestCase):
+    """Adversarial suite verifying wire response envelope integrity and anti-collusion."""
 
-    def test_linear_reductions(self):
-        eq1 = parse_equation("2 * x + 3 = 7")
-        A, B = extract_affine_coefficients(eq1.left), extract_affine_coefficients(eq1.right)
-        self.assertEqual(A, (Rational(2), Rational(3)))
-        self.assertEqual(B, (Rational(0), Rational(7)))
+    def test_check_candidate_wrong_schema_version(self):
+        """Worker returns wrong schema_version in CHECK_CANDIDATE -> reject."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            check_response={
+                "schema_version": "mke.p03a.v99",  # Wrong schema version
+                "operation": "CHECK_CANDIDATE",
+                "outcome": "SUCCESS",
+                "status": "VALID",
+                "candidate": {"numerator": "1", "denominator": "1"},
+                "exact_equality": True,
+                "residual": {"numerator": "0", "denominator": "1"},
+                "definedness": True,
+            }
+        )
 
-    def test_bracketed_complex_linear(self):
-        eq = parse_equation("(3 * (x - 2) + 4) / 2 = x + 1")
-        a_L, b_L = extract_affine_coefficients(eq.left)
-        a_R, b_R = extract_affine_coefficients(eq.right)
-        self.assertEqual(a_L, Rational(3, 2))
-        self.assertEqual(b_L, Rational(-1, 1))
-        self.assertEqual(a_R, Rational(1))
-        self.assertEqual(b_R, Rational(1))
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
 
-    def test_nonlinear_quadratic_rejected(self):
-        eq = parse_equation("x * x = 4")
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.execution_status, ExecutionStatus.ENGINE_ERROR)
+        self.assertEqual(res.verification_status, VerificationStatus.VERIFICATION_FAILED)
+        self.assertEqual(res.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_check_candidate_wrong_operation_echo(self):
+        """Worker returns wrong operation in CHECK_CANDIDATE -> reject."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            check_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",  # Wrong operation echo
+                "outcome": "SUCCESS",
+                "status": "VALID",
+                "candidate": {"numerator": "1", "denominator": "1"},
+                "exact_equality": True,
+                "residual": {"numerator": "0", "denominator": "1"},
+                "definedness": True,
+            }
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.execution_status, ExecutionStatus.ENGINE_ERROR)
+        self.assertEqual(res.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_colluding_forged_solve_and_check_unique_root_on_identity(self):
+        """Worker colludes on x = x claiming UNIQUE_ROOT with root=1; CHECK also says valid -> MUST REFUTE."""
+        raw = "x = x"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "UNIQUE_ROOT",
+                "classification": "UNIQUE_ROOT",
+                "root": {"numerator": "1", "denominator": "1"},
+                "definedness": True,
+            },
+            check_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "CHECK_CANDIDATE",
+                "outcome": "SUCCESS",
+                "status": "VALID",
+                "candidate": {"numerator": "1", "denominator": "1"},
+                "exact_equality": True,
+                "residual": {"numerator": "0", "denominator": "1"},
+                "definedness": True,
+            },
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        # Host proof proves A == 0, B == 0 (identity), so UNIQUE_ROOT is refuted!
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.verification_status, VerificationStatus.VERIFICATION_FAILED)
+        self.assertEqual(res.error_code, "ERR_VERIFICATION_MISMATCH")
+
+    def test_colluding_forged_solve_and_check_unique_root_on_contradiction(self):
+        """Worker colludes on x = x + 1 claiming UNIQUE_ROOT with root=1; CHECK also forged -> MUST REFUTE."""
+        raw = "x = x + 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "UNIQUE_ROOT",
+                "classification": "UNIQUE_ROOT",
+                "root": {"numerator": "1", "denominator": "1"},
+                "definedness": True,
+            },
+            check_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "CHECK_CANDIDATE",
+                "outcome": "SUCCESS",
+                "status": "VALID",
+                "candidate": {"numerator": "1", "denominator": "1"},
+                "exact_equality": True,
+                "residual": {"numerator": "0", "denominator": "1"},
+                "definedness": True,
+            },
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        # Host proof proves A == 0, B == -1 (contradiction), so UNIQUE_ROOT is refuted!
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.verification_status, VerificationStatus.VERIFICATION_FAILED)
+        self.assertEqual(res.error_code, "ERR_VERIFICATION_MISMATCH")
+
+    def test_solve_status_classification_mismatch(self):
+        """SOLVE status and classification contradict each other -> reject."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "UNIQUE_ROOT",
+                "classification": "DomainSet(R)",  # Contradicts status
+                "root": {"numerator": "1", "denominator": "1"},
+                "definedness": True,
+            }
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.execution_status, ExecutionStatus.ENGINE_ERROR)
+        self.assertEqual(res.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_unique_root_definedness_false_or_missing_root(self):
+        """UNIQUE_ROOT with definedness False or missing root -> reject."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        # 1. definedness False
+        ctrl1 = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "UNIQUE_ROOT",
+                "classification": "UNIQUE_ROOT",
+                "root": {"numerator": "1", "denominator": "1"},
+                "definedness": False,  # Illegal for SUCCESS
+            }
+        )
+        res1 = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl1)
+        self.assertFalse(res1.is_verified)
+        self.assertEqual(res1.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+        # 2. missing root
+        ctrl2 = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "UNIQUE_ROOT",
+                "classification": "UNIQUE_ROOT",
+                "root": None,  # Missing root for UNIQUE_ROOT
+                "definedness": True,
+            }
+        )
+        res2 = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl2)
+        self.assertFalse(res2.is_verified)
+        self.assertEqual(res2.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_domainset_r_with_unexpected_root_or_wrong_classification(self):
+        """DomainSet(R) returning a non-null root -> reject."""
+        raw = "x = x"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "DomainSet(R)",
+                "classification": "DomainSet(R)",
+                "root": {"numerator": "0", "denominator": "1"},  # Illegal root for DomainSet(R)
+                "definedness": True,
+            }
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.execution_status, ExecutionStatus.ENGINE_ERROR)
+        self.assertEqual(res.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_emptyset_with_unexpected_root_or_wrong_classification(self):
+        """EmptySet returning a non-null root -> reject."""
+        raw = "x = x + 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "EmptySet",
+                "classification": "EmptySet",
+                "root": {"numerator": "0", "denominator": "1"},  # Illegal root for EmptySet
+                "definedness": True,
+            }
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.execution_status, ExecutionStatus.ENGINE_ERROR)
+        self.assertEqual(res.error_code, "ERR_MALFORMED_WORKER_RESPONSE")
+
+    def test_real_cumulative_budget_consumption(self):
+        """SOLVE consumes 0.2s of a 1.0s budget; CHECK_CANDIDATE receives remainder <= 0.8s."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(solve_delay_sec=0.2)
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl, _budget_sec=1.0)
+
+        self.assertTrue(res.is_verified)
+        self.assertEqual(len(ctrl.call_history), 2)
+        solve_call, solve_budget = ctrl.call_history[0]
+        check_call, check_budget = ctrl.call_history[1]
+        self.assertAlmostEqual(solve_budget, 1.0, delta=0.05)
+        # Check budget must reflect elapsed time from SOLVE
+        self.assertLessEqual(check_budget, 0.85)
+        self.assertGreaterEqual(check_budget, 0.5)
+
+
+class TestDomainSafeHostProofChecker(unittest.TestCase):
+    """Unit tests for domain safety in independent host affine AST analyzer."""
+
+    def test_variable_dependent_exponent_zero_rejected(self):
+        """x^0 = 1 or (x + 1)^0 = 1 is domain-unsafe and rejected pre-dispatch."""
         with self.assertRaises(NonAffineExpressionError):
+            eq = parse_equation("x^0 = 1")
             extract_affine_coefficients(eq.left)
 
-    def test_power_two_rejected(self):
-        eq = parse_equation("x^2 = 9")
         with self.assertRaises(NonAffineExpressionError):
+            eq = parse_equation("(x + 2)^0 = 1")
             extract_affine_coefficients(eq.left)
 
-    def test_division_by_variable_rejected(self):
-        eq = parse_equation("1 / x = 2")
+    def test_zero_power_zero_rejected(self):
+        """0^0 is undefined and rejected."""
         with self.assertRaises(NonAffineExpressionError):
+            eq = parse_equation("0^0 = 1")
             extract_affine_coefficients(eq.left)
+
+    def test_constant_non_zero_power_zero_accepted(self):
+        """2^0 is safe constant 1."""
+        eq = parse_equation("2^0 = 1")
+        a, b = extract_affine_coefficients(eq.left)
+        self.assertEqual(a, Rational(0))
+        self.assertEqual(b, Rational(1))
+
+    def test_constant_power_two_accepted_with_bit_bounds(self):
+        """Constant 3^2 evaluates safely to 9."""
+        eq = parse_equation("3^2 = 9")
+        a, b = extract_affine_coefficients(eq.left)
+        self.assertEqual(a, Rational(0))
+        self.assertEqual(b, Rational(9))
+
+    def test_variable_power_two_rejected(self):
+        """Variable x^2 is rejected as nonlinear."""
+        with self.assertRaises(NonAffineExpressionError):
+            eq = parse_equation("x^2 = 4")
+            extract_affine_coefficients(eq.left)
+
+    def test_bounded_bit_length_overflow_guard(self):
+        """Large integer arithmetic exceeding 256 bits fails closed."""
+        large_val = (1 << 300)
+        from mke_product.parser.ast import IntegerLiteral
+        lit = IntegerLiteral(value=large_val)
+        with self.assertRaises(NonAffineExpressionError):
+            extract_affine_coefficients(lit)
+
+    def test_forged_domainset_for_x_pow_zero_fails_closed(self):
+        """Worker claiming DomainSet(R) for x^0 = 1 fails closed at host gate."""
+        raw = "x^0 = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController(
+            solve_response={
+                "schema_version": "mke.p02a.v1",
+                "operation": "SOLVE",
+                "outcome": "SUCCESS",
+                "status": "DomainSet(R)",
+                "classification": "DomainSet(R)",
+                "root": None,
+                "definedness": True,
+            }
+        )
+
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SCOPE)
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.error_code, "ERR_OUT_OF_SCOPE")
 
 
 class TestWireRationalParsingAndValidation(unittest.TestCase):

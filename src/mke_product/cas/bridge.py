@@ -1,12 +1,14 @@
 """Controlled CAS Dispatch Bridge & Independent Verification Gate.
 
-Milestone: PRODUCT-03C-P1C-04-B0
+Milestone: PRODUCT-03C-P1C-04-B0-R1
 Conforms strictly to:
 - Mandatory fresh intake validation via MKEIntakeValidator.validate().
 - Standalone literal equation exhaustiveness guard.
 - Strict Win32 Job Object containment (256MB process / 512MB job / breakaway denied).
 - Shared 5.0-second monotonic wall-clock execution budget.
 - Independent bounded host AST affine-completeness verification.
+- Domain-safe host proof checker (fails closed on variable-dependent exponent 0, 0^0, and undefined constants).
+- Rigorous envelope, classification, definedness, and wire rational verification for SOLVE and CHECK_CANDIDATE.
 - Exact rational arithmetic over Q.
 - Lazy-loading for fail-closed non-Windows platform safety.
 - Sanitized public result projection.
@@ -110,16 +112,18 @@ def extract_affine_coefficients(
     target_var: str = "x",
     max_nodes: int = 100,
     max_depth: int = 20,
+    max_bits: int = 256,
     _current_depth: int = 0,
     _node_counter: Optional[list] = None,
 ) -> Tuple[Rational, Rational]:
     """Reduce an AST node to canonical affine coefficients (a, b) representing a*x + b over Q.
 
     Guarantees:
-    - Bounded recursion depth and node count.
+    - Bounded recursion depth, node count, and integer bit width.
     - Zero in-process CAS or SymPy execution.
     - Exact rational arithmetic via Rational.
-    - Strict fail-closed on nonlinear terms, powers > 1, function calls, divisions by variable expressions.
+    - Domain safety: fail closed on variable-dependent exponent 0, 0^0, and constant division by zero.
+    - Strict fail-closed on nonlinear terms, powers > 1 of variable, function calls, divisions by variable expressions.
     """
     if _node_counter is None:
         _node_counter = [0]
@@ -132,6 +136,8 @@ def extract_affine_coefficients(
         raise NonAffineExpressionError("AST recursion depth exceeded during affine analysis.")
 
     if isinstance(node, IntegerLiteral):
+        if node.value.bit_length() > max_bits:
+            raise NonAffineExpressionError("Integer bit length exceeded in literal.")
         return (Rational(0), Rational(node.value))
 
     elif isinstance(node, Variable):
@@ -141,71 +147,111 @@ def extract_affine_coefficients(
 
     elif isinstance(node, Group):
         return extract_affine_coefficients(
-            node.inner, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            node.inner, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
         )
 
     elif isinstance(node, UnaryOp):
         a, b = extract_affine_coefficients(
-            node.operand, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            node.operand, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
         )
         if node.op == "+":
             return (a, b)
         elif node.op == "-":
+            if a.numerator.bit_length() > max_bits or b.numerator.bit_length() > max_bits:
+                raise NonAffineExpressionError("Integer bit length exceeded in unary negation.")
             return (-a, -b)
         raise NonAffineExpressionError(f"Unsupported unary operator: {node.op!r}")
 
     elif isinstance(node, BinaryOp):
         a1, b1 = extract_affine_coefficients(
-            node.left, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            node.left, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
         )
         a2, b2 = extract_affine_coefficients(
-            node.right, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            node.right, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
         )
 
+        if (
+            a1.numerator.bit_length() > max_bits
+            or b1.numerator.bit_length() > max_bits
+            or a2.numerator.bit_length() > max_bits
+            or b2.numerator.bit_length() > max_bits
+        ):
+            raise NonAffineExpressionError("Integer bit length exceeded before binary operation.")
+
         if node.op == "+":
-            return (a1 + a2, b1 + b2)
+            res_a = a1 + a2
+            res_b = b1 + b2
         elif node.op == "-":
-            return (a1 - a2, b1 - b2)
+            res_a = a1 - a2
+            res_b = b1 - b2
         elif node.op == "*":
             if not a1.is_zero and not a2.is_zero:
                 # Quadratic term a1*a2*x^2
                 raise NonAffineExpressionError("Nonlinear quadratic term detected in multiplication.")
             if a1.is_zero:
                 # Left is constant b1
-                return (b1 * a2, b1 * b2)
+                res_a = b1 * a2
+                res_b = b1 * b2
             else:
                 # Right is constant b2
-                return (b2 * a1, b2 * b1)
+                res_a = b2 * a1
+                res_b = b2 * b1
         elif node.op == "/":
             if not a2.is_zero:
                 # Division by variable expression
                 raise NonAffineExpressionError("Division by expression containing variable is nonlinear.")
             if b2.is_zero:
                 raise NonAffineExpressionError("Division by zero constant in expression.")
-            return (a1 / b2, b1 / b2)
-        raise NonAffineExpressionError(f"Unsupported binary operator: {node.op!r}")
+            res_a = a1 / b2
+            res_b = b1 / b2
+        else:
+            raise NonAffineExpressionError(f"Unsupported binary operator: {node.op!r}")
+
+        if (
+            res_a.numerator.bit_length() > max_bits
+            or res_a.denominator.bit_length() > max_bits
+            or res_b.numerator.bit_length() > max_bits
+            or res_b.denominator.bit_length() > max_bits
+        ):
+            raise NonAffineExpressionError("Integer bit length exceeded after binary operation.")
+
+        return (res_a, res_b)
 
     elif isinstance(node, Power):
         exp_val = node.exponent.value
-        if exp_val == 0:
+        if exp_val < 0:
+            raise NonAffineExpressionError("Negative exponent is not supported in affine scope.")
+        elif exp_val == 0:
             # Check base
-            extract_affine_coefficients(
-                node.base, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            a_base, b_base = extract_affine_coefficients(
+                node.base, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
             )
+            if not a_base.is_zero:
+                # Variable-dependent base raised to power 0 is domain-unsafe (undefined at root of base)
+                raise NonAffineExpressionError("Variable-dependent base raised to power 0 is domain-unsafe.")
+            if b_base.is_zero:
+                # 0^0 is undefined
+                raise NonAffineExpressionError("Undefined constant expression 0^0 detected.")
             return (Rational(0), Rational(1))
         elif exp_val == 1:
             return extract_affine_coefficients(
-                node.base, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+                node.base, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
             )
         else:
             # Exponent >= 2
-            a, b = extract_affine_coefficients(
-                node.base, target_var, max_nodes, max_depth, _current_depth + 1, _node_counter
+            a_base, b_base = extract_affine_coefficients(
+                node.base, target_var, max_nodes, max_depth, max_bits, _current_depth + 1, _node_counter
             )
-            if not a.is_zero:
-                raise NonAffineExpressionError("Power of variable expression with exponent >= 2 is nonlinear.")
-            # Constant power
-            return (Rational(0), Rational(b.numerator ** exp_val, b.denominator ** exp_val))
+            if not a_base.is_zero:
+                raise NonAffineExpressionError(f"Power of variable expression with exponent {exp_val} is nonlinear.")
+            if exp_val > 10:
+                raise NonAffineExpressionError(f"Constant exponent {exp_val} exceeds allowable maximum of 10.")
+            if (
+                b_base.numerator.bit_length() * exp_val > max_bits
+                or b_base.denominator.bit_length() * exp_val > max_bits
+            ):
+                raise NonAffineExpressionError("Integer bit length exceeded during constant power evaluation.")
+            return (Rational(0), Rational(b_base.numerator ** exp_val, b_base.denominator ** exp_val))
 
     else:
         raise NonAffineExpressionError(f"Unsupported AST node type for affine analysis: {type(node).__name__}")
@@ -223,7 +269,7 @@ def reduce_equation_affine(
 def _parse_wire_rational(val: Any) -> Optional[Rational]:
     """Parse and validate wire rational dictionary {"numerator": "<str>", "denominator": "<str>"}.
 
-    Rejects non-string digits, booleans, floats, negative denominators, and oversized representations.
+    Rejects non-string digits, booleans, floats, negative denominators, and uncanonical representations.
     """
     if not isinstance(val, dict):
         return None
@@ -289,13 +335,26 @@ class ControlledDispatchBridge:
         diagnostic = validation.to_public_diagnostic()
 
         if not validation.is_cas_ready:
+            syntax_issue_codes = {
+                "SYNTAX_ERROR",
+                "INVALID_CHARSET",
+                "NESTING_DEPTH_EXCEEDED",
+                "INVALID_PRIMARY_EXPRESSION",
+                "BRACKET_MISMATCH",
+                "UNBALANCED_PARENTHESES",
+                "RAW_QUERY_MISMATCH",
+            }
+            is_syntax = (
+                validation.status == "INVALID"
+                or any(iss.code in syntax_issue_codes for iss in validation.issues)
+            )
             return ControlledDispatchResult(
-                intake_status=IntakeStatus.REJECTED_SYNTAX if validation.issues else IntakeStatus.REJECTED_SCOPE,
+                intake_status=IntakeStatus.REJECTED_SYNTAX if is_syntax else IntakeStatus.REJECTED_SCOPE,
                 intake_diagnostic=diagnostic,
                 execution_status=ExecutionStatus.NOT_DISPATCHED,
                 verification_status=VerificationStatus.NOT_APPLICABLE,
                 is_verified=False,
-                error_code="ERR_INTAKE_VALIDATION_FAILED",
+                error_code="ERR_INTAKE_SYNTAX_INVALID" if is_syntax else "ERR_INTAKE_SCOPE_UNSUPPORTED",
             )
 
         ir = validation.validated_ir
@@ -306,7 +365,7 @@ class ControlledDispatchBridge:
                 execution_status=ExecutionStatus.NOT_DISPATCHED,
                 verification_status=VerificationStatus.NOT_APPLICABLE,
                 is_verified=False,
-                error_code="ERR_INTAKE_VALIDATION_FAILED",
+                error_code="ERR_INTAKE_SYNTAX_INVALID",
             )
 
         # Step 2: Semantic-Exhaustiveness & Scope Guard
@@ -370,7 +429,7 @@ class ControlledDispatchBridge:
                 error_code="ERR_PROTOCOL_BOUNDS_EXCEEDED",
             )
 
-        # Step 4: Host AST Syntax & Pre-Dispatch Structural Check
+        # Step 4: Host AST Syntax & Pre-Dispatch Affine Linearity Check
         try:
             eq_ast = parse_equation(expr_str)
         except MKEParserError:
@@ -383,11 +442,18 @@ class ControlledDispatchBridge:
                 error_code="ERR_SYNTAX_ERROR",
             )
 
-        # Pre-check affine linearity on host AST
         try:
             host_A, host_B = reduce_equation_affine(eq_ast, "x")
-            is_host_affine = True
         except NonAffineExpressionError:
+            return ControlledDispatchResult(
+                intake_status=IntakeStatus.REJECTED_SCOPE,
+                intake_diagnostic=diagnostic,
+                execution_status=ExecutionStatus.NOT_DISPATCHED,
+                verification_status=VerificationStatus.NOT_APPLICABLE,
+                is_verified=False,
+                error_code="ERR_OUT_OF_SCOPE",
+            )
+        except Exception:
             return ControlledDispatchResult(
                 intake_status=IntakeStatus.REJECTED_SCOPE,
                 intake_diagnostic=diagnostic,
@@ -416,7 +482,7 @@ class ControlledDispatchBridge:
         # Step 6: Step 1 Solver Dispatch (SOLVE) with Remaining Wall-Clock Budget
         elapsed = time.monotonic() - start_time
         remaining_budget = max(0.0, _budget_sec - elapsed)
-        if remaining_budget <= 0.1:
+        if remaining_budget <= 0.05:
             return ControlledDispatchResult(
                 intake_status=IntakeStatus.VALIDATED,
                 intake_diagnostic=diagnostic,
@@ -457,6 +523,9 @@ class ControlledDispatchBridge:
 
         solve_outcome = solve_res.get("outcome")
         solve_status = solve_res.get("status")
+        solve_classification = solve_res.get("classification")
+        solve_definedness = solve_res.get("definedness")
+        raw_root = solve_res.get("root")
 
         if solve_outcome == "RESOURCE_EXHAUSTED" or solve_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
             return ControlledDispatchResult(
@@ -498,24 +567,69 @@ class ControlledDispatchBridge:
                 error_code="ERR_MALFORMED_WORKER_RESPONSE",
             )
 
+        # Classification must strictly match status for successful SOLVE
+        if solve_classification != solve_status:
+            return ControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diagnostic,
+                execution_status=ExecutionStatus.ENGINE_ERROR,
+                verification_status=VerificationStatus.VERIFICATION_FAILED,
+                is_verified=False,
+                error_code="ERR_MALFORMED_WORKER_RESPONSE",
+            )
+
+        # Definedness must be True for SUCCESS
+        if solve_definedness is not True:
+            return ControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diagnostic,
+                execution_status=ExecutionStatus.ENGINE_ERROR,
+                verification_status=VerificationStatus.VERIFICATION_FAILED,
+                is_verified=False,
+                error_code="ERR_MALFORMED_WORKER_RESPONSE",
+            )
+
         # Step 8: Verification Gate by Outcome Type
         if solve_status == "UNIQUE_ROOT":
-            raw_root = solve_res.get("root")
             worker_root = _parse_wire_rational(raw_root)
             if worker_root is None:
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    is_verified=False,
+                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                )
+
+            # Mathematical contradiction guard:
+            # If host proof reduced A == 0, claiming UNIQUE_ROOT contradicts the host proof!
+            if host_A.is_zero:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
                     execution_status=ExecutionStatus.SUCCESS,
                     verification_status=VerificationStatus.VERIFICATION_FAILED,
                     is_verified=False,
-                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                    error_code="ERR_VERIFICATION_MISMATCH",
+                )
+
+            # Check expected root against host reduction
+            host_root = -host_B / host_A
+            if host_root != worker_root:
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.SUCCESS,
+                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    is_verified=False,
+                    error_code="ERR_VERIFICATION_MISMATCH",
                 )
 
             # Step 8a: Candidate Membership Proof via CHECK_CANDIDATE
             elapsed = time.monotonic() - start_time
             remaining_budget = max(0.0, _budget_sec - elapsed)
-            if remaining_budget <= 0.1:
+            if remaining_budget <= 0.05:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -545,8 +659,29 @@ class ControlledDispatchBridge:
                     error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
 
+            if check_res.get("schema_version") != SCHEMA_VERSION or check_res.get("operation") != OPERATION_CHECK_CANDIDATE:
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    is_verified=False,
+                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                )
+
             check_outcome = check_res.get("outcome")
             check_status = check_res.get("status")
+
+            if check_outcome == "RESOURCE_EXHAUSTED" or check_status in ("WORKER_TIMEOUT", "ERR_RESOURCE_EXHAUSTED"):
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.TIMEOUT,
+                    verification_status=VerificationStatus.NOT_APPLICABLE,
+                    is_verified=False,
+                    error_code="ERR_TIMEOUT",
+                )
+
             exact_eq = check_res.get("exact_equality")
             defined = check_res.get("definedness")
             wire_residual = _parse_wire_rational(check_res.get("residual"))
@@ -558,9 +693,9 @@ class ControlledDispatchBridge:
                 or check_status != "VALID"
                 or exact_eq is not True
                 or defined is not True
+                or wire_cand != worker_root
                 or wire_residual is None
                 or not wire_residual.is_zero
-                or wire_cand != worker_root
             ):
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
@@ -571,50 +706,32 @@ class ControlledDispatchBridge:
                     error_code="ERR_VERIFICATION_MISMATCH",
                 )
 
-            # Step 8b: Independent Host AST Completeness Proof
-            if is_host_affine and not host_A.is_zero:
-                host_root = -host_B / host_A
-                if host_root == worker_root:
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.SUCCESS,
-                        verification_status=VerificationStatus.VERIFIED_COMPLETE,
-                        is_verified=True,
-                        solution_type="UNIQUE_ROOT",
-                        verified_root=RationalRoot(
-                            numerator=worker_root.numerator,
-                            denominator=worker_root.denominator,
-                        ),
-                        completeness_proven=True,
-                    )
-                else:
-                    return ControlledDispatchResult(
-                        intake_status=IntakeStatus.VALIDATED,
-                        intake_diagnostic=diagnostic,
-                        execution_status=ExecutionStatus.SUCCESS,
-                        verification_status=VerificationStatus.VERIFICATION_FAILED,
-                        is_verified=False,
-                        error_code="ERR_VERIFICATION_MISMATCH",
-                    )
-            else:
-                # Candidate verified, but uniqueness not proven by host AST
+            # Verified unique root with complete mathematical proof
+            return ControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diagnostic,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                solution_type="UNIQUE_ROOT",
+                verified_root=RationalRoot(
+                    numerator=worker_root.numerator,
+                    denominator=worker_root.denominator,
+                ),
+                completeness_proven=True,
+            )
+
+        elif solve_status == "DomainSet(R)":
+            if raw_root is not None:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
-                    execution_status=ExecutionStatus.SUCCESS,
-                    verification_status=VerificationStatus.CANDIDATE_ONLY,
-                    is_verified=True,
-                    solution_type="UNIQUE_ROOT",
-                    verified_root=RationalRoot(
-                        numerator=worker_root.numerator,
-                        denominator=worker_root.denominator,
-                    ),
-                    completeness_proven=False,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    is_verified=False,
+                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
                 )
-
-        elif solve_status == "DomainSet(R)":
-            if is_host_affine and host_A.is_zero and host_B.is_zero:
+            if host_A.is_zero and host_B.is_zero:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
@@ -635,7 +752,16 @@ class ControlledDispatchBridge:
                 )
 
         elif solve_status == "EmptySet":
-            if is_host_affine and host_A.is_zero and not host_B.is_zero:
+            if raw_root is not None:
+                return ControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diagnostic,
+                    execution_status=ExecutionStatus.ENGINE_ERROR,
+                    verification_status=VerificationStatus.VERIFICATION_FAILED,
+                    is_verified=False,
+                    error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                )
+            if host_A.is_zero and not host_B.is_zero:
                 return ControlledDispatchResult(
                     intake_status=IntakeStatus.VALIDATED,
                     intake_diagnostic=diagnostic,
