@@ -1,0 +1,45 @@
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_controlled_dispatch.py -v -o pythonpath=src
+CWD: D:\mke-product-ui-r4
+Start: 2026-09-30T01:25:13.874509+00:00
+End: 2026-09-30T01:25:18.888696+00:00
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 24 items
+
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_01_canonical_linear_equation PASSED [  4%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_02_affine_identity_all_reals PASSED [  8%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_03_affine_contradiction_empty_set PASSED [ 12%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04_semantic_exhaustiveness_rejection_clause PASSED [ 16%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_04b_semantic_exhaustiveness_rejection_second_equation PASSED [ 20%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_05_nonlinear_quadratic_equation_pre_dispatch PASSED [ 25%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_06_protocol_length_overflow PASSED [ 29%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_07_non_ascii_mathematical_notation PASSED [ 33%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_08_fabricated_intake_bypass_attempt PASSED [ 37%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_09_contradictory_forged_worker_evidence PASSED [ 41%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_10_cumulative_budget_timeout PASSED [ 45%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestControlledDispatchPreflightMatrix::test_case_11_non_windows_platform_fail_closed PASSED [ 50%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_bracketed_complex_linear PASSED [ 54%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_division_by_variable_rejected PASSED [ 58%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_linear_reductions PASSED [ 62%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_nonlinear_quadratic_rejected PASSED [ 66%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestAffineCompletenessAnalyzer::test_power_two_rejected PASSED [ 70%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_rejected_wire_rationals PASSED [ 75%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestWireRationalParsingAndValidation::test_valid_wire_rationals PASSED [ 79%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_dispatch_signature_is_locked PASSED [ 83%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestPublicSignatureLockAndDiagnosticSanitization::test_public_result_does_not_leak_ast_or_raw_traceback PASSED [ 87%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_contradiction PASSED [ 91%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_identity PASSED [ 95%]
+tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_linear PASSED [100%]
+
+============================= 24 passed in 4.13s ==============================
+
+
+STDERR:
+
