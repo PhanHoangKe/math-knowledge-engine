@@ -1,0 +1,47 @@
+Tested Source SHA: 56d4eb5a09e751304182492d38087c5a468beff6
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T08:46:39.683409+00:00
+End Timestamp (UTC): 2026-09-30T08:46:41.505504+00:00
+Duration: 0:00:01.822095
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 22 items
+
+tests/test_p03c_p1c_mock_adapter.py::test_exact_mock_fixture_mapping_2_pow_x_eq_8 PASSED [  4%]
+tests/test_p03c_p1c_mock_adapter.py::test_unmatched_query_fails_explicitly_without_guessing PASSED [  9%]
+tests/test_p03c_p1c_mock_adapter.py::test_unmatched_query_with_sensitive_student_data_fails_safely PASSED [ 13%]
+tests/test_p03c_p1c_mock_adapter.py::test_custom_fixture_override_takes_precedence PASSED [ 18%]
+tests/test_p03c_p1c_mock_adapter.py::test_positive_structural_validation PASSED [ 22%]
+tests/test_p03c_p1c_mock_adapter.py::test_negative_structural_validation_non_dict_payload PASSED [ 27%]
+tests/test_p03c_p1c_mock_adapter.py::test_negative_structural_validation_primary_expressions_as_string PASSED [ 31%]
+tests/test_p03c_p1c_mock_adapter.py::test_negative_structural_validation_empty_primary_expressions PASSED [ 36%]
+tests/test_p03c_p1c_mock_adapter.py::test_negative_structural_validation_invalid_target_variables_type PASSED [ 40%]
+tests/test_p03c_p1c_mock_adapter.py::test_malicious_math_string_remains_inert PASSED [ 45%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_illustrative_mock_banner_present PASSED [ 50%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_missing_status_fails_safely PASSED [ 54%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_unexpected_or_unsupported_status PASSED [ 59%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_success_without_verification_evidence PASSED [ 63%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_success_with_completeness_certified_false PASSED [ 68%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_success_with_missing_symbolic_result PASSED [ 72%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_success_certified_equation PASSED [ 77%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_non_equation_operation_does_not_infer_completeness PASSED [ 81%]
+tests/test_p03c_p1c_mock_adapter.py::test_explanation_adversarial_statuses PASSED [ 86%]
+tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanly PASSED [ 90%]
+tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
+tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
+
+============================= 22 passed in 0.97s ==============================
+

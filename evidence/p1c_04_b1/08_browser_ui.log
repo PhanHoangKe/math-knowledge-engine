@@ -1,0 +1,48 @@
+Tested Source SHA: 56d4eb5a09e751304182492d38087c5a468beff6
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: M evidence/p03b/screenshots/01_homepage_initial.png
+ M evidence/p03b/screenshots/08_english_localization.png
+ M evidence/p03b/screenshots/09_charcoal_dark_theme.png
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T08:48:12.138408+00:00
+End Timestamp (UTC): 2026-09-30T08:48:56.554909+00:00
+Duration: 0:00:44.416501
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_01_load_homepage PASSED [  4%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_02_solve_linear_equation PASSED [  9%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_03_solve_quadratic_equation PASSED [ 14%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_04_differentiate_polynomial PASSED [ 19%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_05_integrate_polynomial PASSED [ 23%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_06_render_2d_graph PASSED [ 28%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_07_domain_exclusion PASSED [ 33%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_08_bilingual_localization PASSED [ 38%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_09_theme_transitions PASSED [ 42%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_10_disconnection_fail_closed_zero_fake_results PASSED [ 47%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_13_katex_typography PASSED [ 52%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_14_verification_label_honesty PASSED [ 57%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_15_input_vs_output_separation PASSED [ 61%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_16_http_400_preserves_online_connection PASSED [ 66%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_17_http_403_preserves_online_connection PASSED [ 71%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_18_immediate_disconnection_banner_update PASSED [ 76%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_19_strict_verification_contract_fallback PASSED [ 80%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_20_explicit_domain_certainty_rendering PASSED [ 85%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_21_honest_presentation_non_success_statuses PASSED [ 90%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_22_solve_linear_system_browser_ui PASSED [ 95%]
+tests/test_browser_canonical_ui.py::TestCanonicalUIBrowserSuite::test_23_solve_inequality_browser_ui PASSED [100%]
+
+============================= 21 passed in 43.46s =============================
+
