@@ -1,0 +1,43 @@
+Tested Source SHA: 0921bd5e2dcf9e659aeaf953acda8e33f5c4e92a
+Pre-run Git Clean Tree: False
+Pre-run Git Status: M evidence/p03b/screenshots/01_homepage_initial.png
+ M evidence/p03b/screenshots/08_english_localization.png
+ M evidence/p03b/screenshots/09_charcoal_dark_theme.png
+?? evidence/p1c_04_b1/
+?? scripts/generate_evidence_p1c_04_b1.py
+Post-run Git Status: <clean>
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_quadratic_dispatch.py -k Adversarial or WorkerInfrastructure or Collusive or Bounded or HostArithmetic -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T08:22:12.856560+00:00
+End Timestamp (UTC): 2026-09-30T08:22:14.521726+00:00
+Duration: 0:00:01.665166
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 74 items / 60 deselected / 14 selected
+
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostArithmeticResourceLimits::test_host_overflow_intake_large_coefficient PASSED [  7%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostArithmeticResourceLimits::test_host_overflow_discriminant_calculation PASSED [ 14%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_TIMEOUT-TIMEOUT-ERR_TIMEOUT] PASSED [ 21%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_RESOURCE_EXHAUSTED-ENGINE_ERROR-ERR_RESOURCE_EXHAUSTED] PASSED [ 28%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_STARTUP_FAILURE-ENGINE_ERROR-ERR_WORKER_STARTUP_FAILURE] PASSED [ 35%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_ASSIGNMENT_FAILURE-ENGINE_ERROR-ERR_WORKER_ASSIGNMENT_FAILURE] PASSED [ 42%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_EXIT_FAILURE-ENGINE_ERROR-ERR_WORKER_EXIT_FAILURE] PASSED [ 50%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[WORKER_PROTOCOL_FAILURE-ENGINE_ERROR-ERR_WORKER_PROTOCOL_FAILURE] PASSED [ 57%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[ERR_RESOURCE_EXHAUSTED-ENGINE_ERROR-ERR_RESOURCE_EXHAUSTED] PASSED [ 64%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[ERR_PAYLOAD_TOO_LARGE-ENGINE_ERROR-ERR_PAYLOAD_TOO_LARGE] PASSED [ 71%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[ERR_RESPONSE_LIMIT_EXCEEDED-ENGINE_ERROR-ERR_RESPONSE_LIMIT_EXCEEDED] PASSED [ 78%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_infrastructure_errors_solve_quadratic[PROTOCOL_ERROR-ENGINE_ERROR-ERR_PROTOCOL_ERROR] PASSED [ 85%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestWorkerInfrastructureTaxonomy::test_worker_direct_v2_resource_exhaustion_outcome PASSED [ 92%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestCollusiveWorkerVerificationDefeat::test_collusive_wrong_root_with_fake_check_success PASSED [100%]
+
+====================== 14 passed, 60 deselected in 0.89s ======================
+

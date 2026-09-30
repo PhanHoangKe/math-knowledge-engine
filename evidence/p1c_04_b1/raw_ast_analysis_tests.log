@@ -1,0 +1,43 @@
+Tested Source SHA: 0921bd5e2dcf9e659aeaf953acda8e33f5c4e92a
+Pre-run Git Clean Tree: False
+Pre-run Git Status: M evidence/p03b/screenshots/01_homepage_initial.png
+ M evidence/p03b/screenshots/08_english_localization.png
+ M evidence/p03b/screenshots/09_charcoal_dark_theme.png
+?? evidence/p1c_04_b1/
+?? scripts/generate_evidence_p1c_04_b1.py
+Post-run Git Status: <clean>
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_quadratic_dispatch.py -k HostQuadratic or ProtocolVersion -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T08:22:10.984200+00:00
+End Timestamp (UTC): 2026-09-30T08:22:12.753093+00:00
+Duration: 0:00:01.768893
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 74 items / 60 deselected / 14 selected
+
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v1_solve_allowed PASSED [  7%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v1_check_candidate_allowed PASSED [ 14%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v1_solve_quadratic_rejected PASSED [ 21%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_solve_quadratic_allowed PASSED [ 28%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_solve_rejected PASSED [ 35%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_check_candidate_rejected PASSED [ 42%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_unknown_schema_version_rejected PASSED [ 50%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_extra_field_rejected PASSED [ 57%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_non_ascii_equation_rejected PASSED [ 64%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestProtocolVersionOperationMatrix::test_v2_oversized_equation_rejected PASSED [ 71%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostQuadraticExtractorAndReducer::test_host_extract_simple PASSED [ 78%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostQuadraticExtractorAndReducer::test_host_reduce_quadratic PASSED [ 85%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostQuadraticExtractorAndReducer::test_host_rejects_degree_3 PASSED [ 92%]
+tests/test_p03c_p1c_quadratic_dispatch.py::TestHostQuadraticExtractorAndReducer::test_host_rejects_variable_denominator PASSED [100%]
+
+====================== 14 passed, 60 deselected in 0.89s ======================
+

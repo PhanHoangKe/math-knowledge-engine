@@ -1,0 +1,121 @@
+Tested Source SHA: 0921bd5e2dcf9e659aeaf953acda8e33f5c4e92a
+Pre-run Git Clean Tree: False
+Pre-run Git Status: M evidence/p03b/screenshots/01_homepage_initial.png
+ M evidence/p03b/screenshots/08_english_localization.png
+ M evidence/p03b/screenshots/09_charcoal_dark_theme.png
+?? evidence/p1c_04_b1/
+?? scripts/generate_evidence_p1c_04_b1.py
+Post-run Git Status: <clean>
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_cas_product03a.py tests/test_cas_product03b_expansion.py -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T08:21:35.439821+00:00
+End Timestamp (UTC): 2026-09-30T08:22:10.859934+00:00
+Duration: 0:00:35.420113
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 89 items
+
+tests/test_cas_product03a.py::TestCASProduct03A::test_composite_constant_zero_denominator_rejected 
+tests/test_cas_product03a.py::TestCASProduct03A::test_composite_constant_zero_denominator_rejected PASSED [  1%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_composite_zero_power_zero_detection PASSED [  2%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_differentiate_higher_order PASSED [  3%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_differentiate_polynomial PASSED [  4%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_division_by_zero_detection PASSED [  5%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_domain_certainty_polynomial_proven_reals PASSED [  6%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_domain_certainty_rational_explicit_exclusions PASSED [  7%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_domain_certainty_rejection_not_applicable PASSED [  8%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_domain_preservation_removable_singularity PASSED [ 10%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_engine_registry_listing PASSED [ 11%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_exact_realness_no_complex_roots PASSED [ 12%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_execution_response_to_dict_contract_fields PASSED [ 13%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_forced_native_engine PASSED [ 14%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_integrate_definite PASSED [ 15%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_integrate_definite_fractional_bounds PASSED [ 16%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_integrate_indefinite PASSED [ 17%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_multiple_excluded_points PASSED [ 19%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_native_adapter_verification_status_with_evidence PASSED [ 20%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_native_routing_linear_equation PASSED [ 21%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_nonlinear_falls_to_sympy PASSED [ 22%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_plot_2d_asymptote_detection PASSED [ 23%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_plot_2d_smooth_curve PASSED [ 24%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_excessive_nesting_depth PASSED [ 25%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_huge_integer_literal PASSED [ 26%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_input_length_exceeded PASSED [ 28%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_invalid_token_characters PASSED [ 29%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_malicious_options 
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_malicious_options PASSED [ 30%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_python_dunder_and_builtins 
+tests/test_cas_product03a.py::TestCASProduct03A::test_reject_python_dunder_and_builtins PASSED [ 31%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_simplify_polynomial_expansion PASSED [ 32%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_simplify_rational PASSED [ 33%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_solve_cubic PASSED [ 34%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_solve_quadratic_exact_roots PASSED [ 35%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_solve_quadratic_expression_only PASSED [ 37%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_supervised_process_terminates_on_timeout PASSED [ 38%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_sympy_adapter_verification_status_computed PASSED [ 39%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_variable_exponent_zero_domain_restriction PASSED [ 40%]
+tests/test_cas_product03a.py::TestCASProduct03A::test_zero_power_zero_detection PASSED [ 41%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_unique_integer_solution PASSED [ 42%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_unique_rational_solution PASSED [ 43%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_inconsistent_empty_solution PASSED [ 44%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_dependent_infinitely_many_solutions PASSED [ 46%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_reject_nonlinear_quadratic PASSED [ 47%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_reject_three_variables PASSED [ 48%]
+tests/test_cas_product03b_expansion.py::TestProduct03BLinearSystem::test_solve_system_with_negative_coefficients_and_fractions PASSED [ 49%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_linear_inequality_less_equal PASSED [ 50%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_linear_inequality_strict_greater PASSED [ 51%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_quadratic_inequality_two_intervals_union PASSED [ 52%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_quadratic_inequality_closed_interval PASSED [ 53%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_quadratic_inequality_always_true PASSED [ 55%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_quadratic_inequality_always_false_empty_set PASSED [ 56%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_inequality_unicode_operators PASSED [ 57%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_inequality_reject_cubic_degree_three PASSED [ 58%]
+tests/test_cas_product03b_expansion.py::TestProduct03BInequality::test_solve_inequality_reject_multivariate PASSED [ 59%]
+tests/test_cas_product03b_expansion.py::TestProduct03BSupervisedWorker::test_supervised_system_solve PASSED [ 60%]
+tests/test_cas_product03b_expansion.py::TestProduct03BSupervisedWorker::test_supervised_inequality_solve PASSED [ 61%]
+tests/test_cas_product03b_expansion.py::TestProduct03BSecurityAndIntegrity::test_reject_forbidden_python_patterns PASSED [ 62%]
+tests/test_cas_product03b_expansion.py::TestProduct03BSecurityAndIntegrity::test_reject_eval_in_inequality PASSED [ 64%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_counterexample_a_strict_inequality_variable_denominator PASSED [ 65%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_counterexample_b_nonstrict_inequality_variable_denominator PASSED [ 66%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_counterexample_c_system_variable_denominator PASSED [ 67%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_counterexample_d_linear_system_success PASSED [ 68%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_counterexample_e_quadratic_inequality_success PASSED [ 69%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_univariate_rational_point_exclusions PASSED [ 70%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_multivariate_denominator_not_fully_determined PASSED [ 71%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_none_ast_not_fully_determined PASSED [ 73%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_solve_system_reject_original_ast_variable_bypass PASSED [ 74%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_solve_inequality_reject_original_ast_variable_bypass PASSED [ 75%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_reducible_quadratic_denominator PASSED [ 76%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_irreducible_quadratic_denominator_proven_reals PASSED [ 77%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_irrational_quadratic_roots_not_fully_determined PASSED [ 78%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_domain_certainty_cubic_denominator_not_fully_determined PASSED [ 79%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_zero_power_composite_linear_base_explicit_exclusions PASSED [ 80%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_zero_power_identically_zero_base_domain_error PASSED [ 82%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_zero_power_variable_base_explicit_exclusions PASSED [ 83%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_zero_power_irreducible_quadratic_base_proven_reals PASSED [ 84%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_division_by_identically_zero_expression_domain_error PASSED [ 85%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_supervised_zero_power_composite_linear_base_explicit_exclusions PASSED [ 86%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_supervised_zero_power_identically_zero_base_domain_error PASSED [ 87%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_supervised_division_by_identically_zero_domain_error PASSED [ 88%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_supervised_zero_power_irreducible_quadratic_base_proven_reals PASSED [ 89%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_pre_dispatch_inspect_ast_safety_zero_symbolic_evaluations PASSED [ 91%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_supervisor_hard_timeout_evasion_prevention PASSED [ 92%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_giant_constant_power_zero_exponent_pre_dispatch_fast PASSED [ 93%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_giant_constant_power_division_pre_dispatch_fast PASSED [ 94%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_giant_constant_structural_cancellation_zero_power PASSED [ 95%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_small_safe_constant_powers_correctness PASSED [ 96%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_constant_evaluation_resource_limits PASSED [ 97%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_undecidable_constant_base_domain_certainty_contract PASSED [ 98%]
+tests/test_cas_product03b_expansion.py::TestProduct03BR1SoundnessAndCounterexamples::test_constant_domain_soundness_counterexamples PASSED [100%]
+
+=================== 89 passed, 18 subtests passed in 34.06s ===================
+
