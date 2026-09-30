@@ -20,10 +20,12 @@ from .schema import (
     SCHEMA_VERSION,
     SCHEMA_VERSION_V1,
     SCHEMA_VERSION_V2,
+    SCHEMA_VERSION_V3,
     SUPPORTED_SCHEMA_VERSIONS,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
     OPERATION_SOLVE_QUADRATIC,
+    OPERATION_SOLVE_QUADRATIC_SURD,
     SUPPORTED_OPERATIONS,
     MAX_PAYLOAD_BYTES,
     MAX_EQUATION_CHARS,
@@ -345,18 +347,24 @@ def validate_request_dict(req: Dict[str, Any]) -> Dict[str, Any]:
     if sv == SCHEMA_VERSION_V1:
         if op not in (OPERATION_SOLVE, OPERATION_CHECK_CANDIDATE):
             raise ProtocolUnknownOperationError(
-                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V1!r}; use {SCHEMA_VERSION_V2!r}.",
+                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V1!r}; use {SCHEMA_VERSION_V2!r} or {SCHEMA_VERSION_V3!r}.",
                 operation=op,
             )
     elif sv == SCHEMA_VERSION_V2:
         if op != OPERATION_SOLVE_QUADRATIC:
             raise ProtocolUnknownOperationError(
-                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V2!r}; use {SCHEMA_VERSION_V1!r}.",
+                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V2!r}; use {SCHEMA_VERSION_V1!r} or {SCHEMA_VERSION_V3!r}.",
+                operation=op,
+            )
+    elif sv == SCHEMA_VERSION_V3:
+        if op != OPERATION_SOLVE_QUADRATIC_SURD:
+            raise ProtocolUnknownOperationError(
+                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V3!r}; use {SCHEMA_VERSION_V1!r} or {SCHEMA_VERSION_V2!r}.",
                 operation=op,
             )
 
     # 4. Operation-specific field validation
-    if op in (OPERATION_SOLVE, OPERATION_SOLVE_QUADRATIC):
+    if op in (OPERATION_SOLVE, OPERATION_SOLVE_QUADRATIC, OPERATION_SOLVE_QUADRATIC_SURD):
         allowed_keys = {"schema_version", "operation", "equation"}
         extra_keys = set(req.keys()) - allowed_keys
         if extra_keys:

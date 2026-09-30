@@ -13,12 +13,18 @@ from mke_product.parser.parser import parse_equation
 from mke_product.evaluator.budget import EvaluationBudget
 from mke_product.evaluator.evaluator import check_candidate
 from mke_product.solver.solver import solve_equation
+from mke_product.solver.quadratic_surd import solve_quadratic_surd_equation
 from mke_product.protocol import (
     dispatch_request,
     dispatch_json,
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V1,
+    SCHEMA_VERSION_V2,
+    SCHEMA_VERSION_V3,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
+    OPERATION_SOLVE_QUADRATIC,
+    OPERATION_SOLVE_QUADRATIC_SURD,
     MAX_RESPONSE_BYTES,
     MIN_RESPONSE_BYTES,
     MAX_JSON_NESTING_DEPTH,
@@ -1086,6 +1092,205 @@ class TestProtocolRemediationS4AR3(unittest.TestCase):
         self.assertEqual(res_pi["status"], "ERR_PROTOCOL_INPUT_LIMIT")
         self.assertEqual(res_pi["error"]["code"], "ERR_PROTOCOL_INPUT_LIMIT")
         self.assertIn("ASCII", res_pi["error"]["message"])
+
+
+class TestProtocolV3SolveQuadraticSurdDispatch(unittest.TestCase):
+    """Protocol v3 SOLVE_QUADRATIC_SURD validation, matrix enforcement, and mathematical dispatch."""
+
+    def test_v3_solve_quadratic_surd_standard(self):
+        """x^2 - 2 = 0 -> SUCCESS, TWO_DISTINCT_REAL_ROOTS, radicand=2, roots=[-sqrt(2), +sqrt(2)]."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 2 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["schema_version"], SCHEMA_VERSION_V3)
+        self.assertEqual(res["operation"], OPERATION_SOLVE_QUADRATIC_SURD)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        self.assertEqual(res["status"], "TWO_DISTINCT_REAL_ROOTS")
+        self.assertEqual(res["discriminant"], {"numerator": "8", "denominator": "1"})
+        self.assertEqual(res["radicand"], "2")
+        self.assertTrue(res["definedness"])
+        self.assertIsNone(res["error"])
+        self.assertTrue(res["is_provisional_evidence"])
+        self.assertEqual(len(res["roots"]), 2)
+        # r1: 0 - 1*sqrt(2)
+        self.assertEqual(res["roots"][0]["rational_part"], {"numerator": "0", "denominator": "1"})
+        self.assertEqual(res["roots"][0]["sqrt_coefficient"], {"numerator": "-1", "denominator": "1"})
+        self.assertEqual(res["roots"][0]["radicand"], "2")
+        # r2: 0 + 1*sqrt(2)
+        self.assertEqual(res["roots"][1]["rational_part"], {"numerator": "0", "denominator": "1"})
+        self.assertEqual(res["roots"][1]["sqrt_coefficient"], {"numerator": "1", "denominator": "1"})
+        self.assertEqual(res["roots"][1]["radicand"], "2")
+
+    def test_v3_solve_quadratic_surd_fractional(self):
+        """2*x^2 - 1 = 0 -> roots = [-sqrt(2)/2, +sqrt(2)/2]."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "2*x^2 - 1 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        self.assertEqual(res["status"], "TWO_DISTINCT_REAL_ROOTS")
+        self.assertEqual(res["radicand"], "2")
+        self.assertEqual(res["roots"][0]["sqrt_coefficient"], {"numerator": "-1", "denominator": "2"})
+        self.assertEqual(res["roots"][1]["sqrt_coefficient"], {"numerator": "1", "denominator": "2"})
+
+    def test_v3_solve_quadratic_surd_linear_term(self):
+        """x^2 + x - 1 = 0 -> roots = [(-1-sqrt(5))/2, (-1+sqrt(5))/2]."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 + x - 1 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        self.assertEqual(res["status"], "TWO_DISTINCT_REAL_ROOTS")
+        self.assertEqual(res["discriminant"], {"numerator": "5", "denominator": "1"})
+        self.assertEqual(res["radicand"], "5")
+        self.assertEqual(res["roots"][0]["rational_part"], {"numerator": "-1", "denominator": "2"})
+        self.assertEqual(res["roots"][0]["sqrt_coefficient"], {"numerator": "-1", "denominator": "2"})
+        self.assertEqual(res["roots"][1]["rational_part"], {"numerator": "-1", "denominator": "2"})
+        self.assertEqual(res["roots"][1]["sqrt_coefficient"], {"numerator": "1", "denominator": "2"})
+
+    def test_v3_solve_quadratic_surd_large_reducible_square(self):
+        """Reducible large square factor: x^2 - 200 = 0 -> roots = [-10*sqrt(2), +10*sqrt(2)]."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 200 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "SUCCESS")
+        self.assertEqual(res["status"], "TWO_DISTINCT_REAL_ROOTS")
+        self.assertEqual(res["radicand"], "2")
+        self.assertEqual(res["roots"][0]["sqrt_coefficient"], {"numerator": "-10", "denominator": "1"})
+        self.assertEqual(res["roots"][1]["sqrt_coefficient"], {"numerator": "10", "denominator": "1"})
+
+    def test_v3_counterexample_untested_prime_square_65537_fails_closed(self):
+        """Counterexample M = 2 * 65537^2 (34 bits) fails closed with ERR_SURD_NORMALIZATION_RESOURCE_LIMIT."""
+        # 65537^2 = 4295098369. Delta = 8 * 65537^2 = 34360786952 -> x^2 - 2*65537^2 = 0 -> x^2 - 8590196738 = 0
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 8590196738 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res["status"], "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT")
+        self.assertEqual(res["error"]["code"], "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT")
+
+    def test_v3_counterexample_3_and_5_times_65537_squared_fails_closed(self):
+        """M = 3 * 65537^2 and 5 * 65537^2 fail closed with ERR_SURD_NORMALIZATION_RESOURCE_LIMIT."""
+        # 3 * 65537^2 = 12885295107
+        res3 = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 12885295107 = 0",
+        })
+        self.assertEqual(res3["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res3["status"], "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT")
+
+        # 5 * 65537^2 = 21475491845
+        res5 = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 21475491845 = 0",
+        })
+        self.assertEqual(res5["outcome"], "RESOURCE_EXHAUSTED")
+        self.assertEqual(res5["status"], "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT")
+
+    def test_v3_rational_square_rejected_out_of_scope(self):
+        """x^2 - 4 = 0 has rational roots and belongs to v2, rejected by v3 surd solver."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 4 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "OUT_OF_SCOPE")
+        self.assertEqual(res["status"], "ERR_RATIONAL_QUADRATIC_IN_SURD_SOLVER")
+
+    def test_v3_negative_discriminant_rejected_out_of_scope(self):
+        """x^2 + 1 = 0 has Delta < 0, rejected by v3 surd solver."""
+        req = {
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 + 1 = 0",
+        }
+        res = dispatch_request(req)
+        self.assertEqual(res["outcome"], "OUT_OF_SCOPE")
+
+    def test_v3_matrix_mismatch_rejections(self):
+        """Cross-version operation mismatches rejected by validator."""
+        # v1 + SOLVE_QUADRATIC_SURD
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V1,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 2 = 0",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNKNOWN_OPERATION")
+
+        # v2 + SOLVE_QUADRATIC_SURD
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V2,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 2 = 0",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNKNOWN_OPERATION")
+
+        # v3 + SOLVE
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE,
+            "equation": "x = 1",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNKNOWN_OPERATION")
+
+        # v3 + SOLVE_QUADRATIC
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC,
+            "equation": "x^2 - 4 = 0",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNKNOWN_OPERATION")
+
+        # v3 + CHECK_CANDIDATE
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_CHECK_CANDIDATE,
+            "equation": "x^2 - 2 = 0",
+            "candidate": "2",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNKNOWN_OPERATION")
+
+    def test_v3_extra_field_rejected(self):
+        """v3 request with extra options rejected."""
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x^2 - 2 = 0",
+            "extra_field": 123,
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_UNEXPECTED_FIELD")
+
+    def test_v3_non_ascii_rejected(self):
+        """v3 non-ASCII equation rejected."""
+        res = dispatch_request({
+            "schema_version": SCHEMA_VERSION_V3,
+            "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+            "equation": "x² - 2 = 0",
+        })
+        self.assertEqual(res["outcome"], "PROTOCOL_ERROR")
+        self.assertEqual(res["status"], "ERR_PROTOCOL_INPUT_LIMIT")
 
 
 if __name__ == "__main__":
