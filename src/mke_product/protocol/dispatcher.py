@@ -12,12 +12,16 @@ from ..evaluator.evaluator import check_candidate
 from ..evaluator.result import CandidateCheckStatus
 from ..evaluator.errors import InvalidCandidateError
 from ..solver.solver import solve_equation
+from ..solver.quadratic import solve_quadratic_equation
 from ..solver.result import SolverScopeStatus
 from .errors import ProtocolError
 from .schema import (
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V1,
+    SCHEMA_VERSION_V2,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
+    OPERATION_SOLVE_QUADRATIC,
     MAX_RESPONSE_BYTES,
     MIN_RESPONSE_BYTES,
     serialize_rational,
@@ -48,8 +52,11 @@ def _build_bounded_response(
         pass
 
     op = res_dict.get("operation")
+    sv = res_dict.get("schema_version")
+    if sv not in (SCHEMA_VERSION_V1, SCHEMA_VERSION_V2):
+        sv = SCHEMA_VERSION_V1
     fallback = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": sv,
         "operation": op,
         "outcome": "RESOURCE_EXHAUSTED",
         "status": "ERR_RESPONSE_LIMIT_EXCEEDED",
@@ -113,8 +120,11 @@ def dispatch_request(
         eq_ast = parse_equation(eq_str)
     except MKEParserError as err:
         err_code = getattr(err, "code", f"ERR_SYNTAX_{type(err).__name__}")
+        sv = req.get("schema_version", SCHEMA_VERSION)
+        if sv not in (SCHEMA_VERSION_V1, SCHEMA_VERSION_V2):
+            sv = SCHEMA_VERSION_V1
         return _build_bounded_response({
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": sv,
             "operation": op,
             "outcome": "SYNTAX_ERROR",
             "status": err_code,
@@ -278,6 +288,62 @@ def dispatch_request(
             "error": error_payload,
             "is_provisional_evidence": True,
             "diagnostics": dict(cand_res.diagnostics),
+        }, max_bytes=max_response_bytes)
+
+    elif op == OPERATION_SOLVE_QUADRATIC:
+        res = solve_quadratic_equation(eq_ast, budget=budget)
+
+        if res.status == "SUCCESS":
+            outcome = "SUCCESS"
+            status_str = res.classification or "UNKNOWN"
+            definedness = True
+            error_payload = None
+            roots_payload = [serialize_rational(r) for r in res.roots]
+            discriminant_payload = serialize_rational(res.discriminant)
+        elif res.status == "DOMAIN_ERROR":
+            outcome = "DOMAIN_ERROR"
+            status_str = res.error_code or "ERR_DOMAIN_ERROR"
+            definedness = False
+            roots_payload = None
+            discriminant_payload = None
+            error_payload = {
+                "code": res.error_code or "ERR_DOMAIN_ERROR",
+                "message": res.error_message or "Domain error during quadratic solving.",
+                "span": serialize_span(res.error_span),
+            }
+        elif res.status == "OUT_OF_SCOPE":
+            outcome = "OUT_OF_SCOPE"
+            status_str = res.error_code or "ERR_OUT_OF_SCOPE"
+            definedness = None
+            roots_payload = None
+            discriminant_payload = serialize_rational(res.discriminant) if res.discriminant is not None else None
+            error_payload = {
+                "code": res.error_code or "ERR_OUT_OF_SCOPE",
+                "message": res.error_message or "Equation is out of scope for quadratic solver.",
+                "span": serialize_span(res.error_span),
+            }
+        else:  # RESOURCE_EXHAUSTED
+            outcome = "RESOURCE_EXHAUSTED"
+            status_str = res.error_code or "ERR_RESOURCE_EXHAUSTED"
+            definedness = None
+            roots_payload = None
+            discriminant_payload = None
+            error_payload = {
+                "code": res.error_code or "ERR_RESOURCE_EXHAUSTED",
+                "message": res.error_message or "Resource budget exhausted during quadratic solving.",
+                "span": serialize_span(res.error_span),
+            }
+
+        return _build_bounded_response({
+            "schema_version": SCHEMA_VERSION_V2,
+            "operation": OPERATION_SOLVE_QUADRATIC,
+            "outcome": outcome,
+            "status": status_str,
+            "roots": roots_payload,
+            "discriminant": discriminant_payload,
+            "definedness": definedness,
+            "error": error_payload,
+            "is_provisional_evidence": True,
         }, max_bytes=max_response_bytes)
 
     else:

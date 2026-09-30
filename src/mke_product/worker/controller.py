@@ -89,7 +89,7 @@ def _sanitize_error_text(text: str) -> str:
     return sanitized.strip()
 
 
-ALLOWED_OPERATIONS = {"SOLVE", "CHECK_CANDIDATE"}
+ALLOWED_OPERATIONS = {"SOLVE", "CHECK_CANDIDATE", "SOLVE_QUADRATIC"}
 
 
 def _normalize_operation(op: Any) -> str:

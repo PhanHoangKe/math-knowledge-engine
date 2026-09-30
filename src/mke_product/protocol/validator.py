@@ -18,8 +18,12 @@ from .errors import (
 )
 from .schema import (
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V1,
+    SCHEMA_VERSION_V2,
+    SUPPORTED_SCHEMA_VERSIONS,
     OPERATION_SOLVE,
     OPERATION_CHECK_CANDIDATE,
+    OPERATION_SOLVE_QUADRATIC,
     SUPPORTED_OPERATIONS,
     MAX_PAYLOAD_BYTES,
     MAX_EQUATION_CHARS,
@@ -319,9 +323,9 @@ def validate_request_dict(req: Dict[str, Any]) -> Dict[str, Any]:
         raise ProtocolInvalidTypeError(
             f"Field 'schema_version' must be a string, got {type(sv).__name__}."
         )
-    if sv != SCHEMA_VERSION:
+    if sv not in SUPPORTED_SCHEMA_VERSIONS:
         raise ProtocolUnsupportedVersionError(
-            f"Unsupported schema_version: {sv!r}; expected {SCHEMA_VERSION!r}."
+            f"Unsupported schema_version: {sv!r}; supported versions are {list(SUPPORTED_SCHEMA_VERSIONS)}."
         )
 
     # 2. operation check
@@ -337,18 +341,32 @@ def validate_request_dict(req: Dict[str, Any]) -> Dict[str, Any]:
             f"Unknown operation: {op!r}; supported operations are {list(SUPPORTED_OPERATIONS)}."
         )
 
-    # 3. Operation-specific field validation
-    if op == OPERATION_SOLVE:
+    # 3. Version-Operation matrix enforcement
+    if sv == SCHEMA_VERSION_V1:
+        if op not in (OPERATION_SOLVE, OPERATION_CHECK_CANDIDATE):
+            raise ProtocolUnknownOperationError(
+                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V1!r}; use {SCHEMA_VERSION_V2!r}.",
+                operation=op,
+            )
+    elif sv == SCHEMA_VERSION_V2:
+        if op != OPERATION_SOLVE_QUADRATIC:
+            raise ProtocolUnknownOperationError(
+                f"Operation {op!r} is not supported in schema version {SCHEMA_VERSION_V2!r}; use {SCHEMA_VERSION_V1!r}.",
+                operation=op,
+            )
+
+    # 4. Operation-specific field validation
+    if op in (OPERATION_SOLVE, OPERATION_SOLVE_QUADRATIC):
         allowed_keys = {"schema_version", "operation", "equation"}
         extra_keys = set(req.keys()) - allowed_keys
         if extra_keys:
             raise ProtocolUnexpectedFieldError(
-                f"Unexpected field(s) for SOLVE operation: {sorted(extra_keys)}.",
+                f"Unexpected field(s) for {op} operation: {sorted(extra_keys)}.",
                 operation=op,
             )
 
         if "equation" not in req:
-            raise ProtocolMissingFieldError("Field 'equation' is required for SOLVE.", operation=op)
+            raise ProtocolMissingFieldError(f"Field 'equation' is required for {op}.", operation=op)
         eq_val = req["equation"]
         if type(eq_val) is not str:
             raise ProtocolInvalidTypeError(
