@@ -1,12 +1,12 @@
 # ARCHITECTURE DESIGN & PREFLIGHT SPECIFICATION: P1C-04-A CONTROLLED CAS DISPATCH & VERIFICATION GATE
 
-- **Milestone:** `PRODUCT-03C-P1C-04-A-R2`
-- **Document Version:** `1.2.0-R2-PREFLIGHT-FINAL`
+- **Milestone:** `PRODUCT-03C-P1C-04-B0`
+- **Document Version:** `1.3.0-B0-ERRATA-CORRECTED`
 - **Author:** Antigravity (Implementation Engineer)
 - **Coordinator & Independent Auditor:** ChatGPT
 - **Project Owner:** Kế Phan Hoàng
 - **Repository:** `PhanHoangKe/math-knowledge-engine`
-- **Working Branch:** `product/p03c-p1c-04-preflight`
+- **Working Branch:** `product/p03c-p1c-04-b0-controlled-dispatch`
 - **Frozen CAS Baseline:** `v0.3.3-p03c-p1c-03-accepted-limited` (`ec9e7085d17b13ab6496a52e2f4809c318939bbd`)
 - **Date:** 2026-09-30
 
@@ -16,12 +16,12 @@
 
 The objective of milestone **P1C-04** is to construct a **deterministic, locked-containment dispatch bridge and independent verification gate** connecting validated mathematical intermediate representations (MKE-IR) to the frozen, sandboxed mathematical engine (`v0.3.3-p03c-p1c-03-accepted-limited`).
 
-This document constitutes the **P1C-04-A-R2 Controlled Dispatch Preflight Specification**. It addresses and closes all architectural, mathematical, and containment gaps identified during independent preflight audits:
+This document constitutes the **P1C-04-A-R2 / B0 Controlled Dispatch Preflight Specification**. It reflects all foundational invariants and concrete code-backed wire contracts:
 
 1. **Semantic-Exhaustiveness Guard:** Enforces strict literal equality (`raw_query.strip() == primary_expressions[0].strip()`) for the initial prototype, eliminating natural language wrapper ambiguities and unextracted mathematical constraints.
 2. **Exact Mathematical Proof & Threat Model:** Formalizes the distinction between *candidate root membership* and *mathematical completeness*, defining explicit verification mechanisms and trust assumptions for `UNIQUE_ROOT`, `ALL_REALS`, and `EMPTY_SET`.
 3. **Locked Containment Policy & Shared Total Deadline:** Locks the public dispatch signature against caller injection of controllers or resource limits, lazy-loads Windows-specific dependencies for fail-closed non-Windows execution, and enforces a shared 5.0-second wall-clock budget across multi-step solver/verifier calls.
-4. **Typed Public Contract & Response Integrity:** Establishes distinct lifecycle outcomes (Intake, Execution, Verification), correlates worker responses to sent requests, sanitizes internal diagnostics, and enforces fail-closed handling of contradictory or forged worker evidence.
+4. **Typed Public Contract & Wire Response Integrity:** Accurately models the `mke.p02a.v1` wire protocol (string-encoded rationals, outcome vs status taxonomy, no wire request_id/equation echo), separates intake/execution/verification lifecycle statuses, converts validation results via `validation.to_public_diagnostic()`, and enforces fail-closed handling of contradictory or forged worker evidence.
 
 ```mermaid
 flowchart TD
@@ -33,7 +33,7 @@ flowchart TD
     subgraph IntakeBoundary["Authoritative Intake Validation Boundary"]
         C["MKEIntakeValidator.validate(raw_query, ir_payload)<br/>- Schema & Complexity Limits (depth <= 20, len <= 1000)<br/>- Per-Expression Source Fidelity & Substring Spans<br/>- AST Syntax Parsing (No Execution)"]
         D{"Fresh Validation Outcome"}
-        E["Public Intake Diagnostic Rejection<br/>(Fail-Closed / UNSUPPORTED / INVALID)"]
+        E["Public Intake Diagnostic Rejection<br/>validation.to_public_diagnostic()<br/>(Fail-Closed / UNSUPPORTED / INVALID)"]
     end
 
     subgraph SemanticAndProtocolGate["P1C-04 Semantic Exhaustiveness & Protocol Gate"]
@@ -41,12 +41,12 @@ flowchart TD
     end
 
     subgraph SandboxedWorker["Sandboxed Worker Confinement (Win32 Job Object)"]
-        G["Locked Windows WorkerController<br/>- Suspended Process Startup (CREATE_SUSPENDED)<br/>- Memory Limits: 256 MiB Process / 512 MiB Job<br/>- Breakaway Denied (CREATE_BREAKAWAY_FROM_JOB)<br/>- IPC Request Framing (mke.p02a.v1: Max 4KB req, 16KB resp)<br/>- Remaining Wall-Clock Timeout Budget Passed"]
+        G["Locked Windows WorkerController<br/>- Suspended Process Startup (CREATE_SUSPENDED)<br/>- Memory Limits: 256 MiB Process / 512 MiB Job<br/>- Breakaway Denied (CREATE_BREAKAWAY_FROM_JOB)<br/>- IPC Request Framing (mke.p02a.v1: Max 4KB req, 16KB resp)<br/>- Single-Request Lifecycle (Host maintains context)"]
         H["Contained Worker S0-S3 Affine Kernel<br/>(Single variable x, exact rational arithmetic)"]
     end
 
     subgraph VerificationGate["Independent Verification & Certification Gate"]
-        I["Independent Verification Gate<br/>- Step 1: Exact Rational Candidate Root Check (CHECK_CANDIDATE)<br/>- Step 2: Independent AST Affine-Completeness Analysis<br/>- Correlates Sent Equation & Candidate<br/>- Validates Response Schema, Op, Status & Rational Shape<br/>- Rejects Provisional Transport Flags as Proof"]
+        I["Independent Verification Gate<br/>- Step 1: Exact Rational Candidate Root Check (CHECK_CANDIDATE)<br/>- Step 2: Independent Host AST Affine-Completeness Analysis<br/>- Verifies Wire Outcome vs Status Taxonomy & Rational String Shapes<br/>- Rejects Provisional Transport Flags as Proof"]
         J["Certified Public Result<br/>(ControlledDispatchResult: is_verified=True)"]
         K["Fail-Closed Execution / Verification Rejection<br/>(ControlledDispatchResult: is_verified=False, sanitized error_code)"]
     end
@@ -79,6 +79,7 @@ An empirical audit of the actual frozen repository code establishes the followin
   - Parses expression syntax via frozen `parse_cas_equation`, `parse_cas_expression`, etc., **without mathematical execution**.
 - **`PublicValidationDiagnostic` (`src/mke_product/ai/ir.py`):**
   - Sanitized student-facing projection isolating all raw queries, caller metadata, and internal AST details.
+  - **Conversion Method:** Callers invoke `validation.to_public_diagnostic()` on the internal `ValidationResult` instance.
   - **Public Semantics Invariant:** `PublicValidationDiagnostic.is_valid` and `is_cas_ready` signify **syntactic validity and CAS intake readiness only**, NOT proof of mathematical solution correctness.
 
 ### 2.2 Process Confinement & Worker Layer (`src/mke_product/worker/`)
@@ -102,9 +103,19 @@ An empirical audit of the actual frozen repository code establishes the followin
   - `MAX_EQUATION_CHARS = 256` (**256 ASCII characters maximum**).
   - `MAX_PAYLOAD_BYTES = 4096` (**4096 bytes maximum total request**).
   - `MAX_RESPONSE_BYTES = 16384` (**16384 bytes maximum response ceiling**).
-  - `CHECK_CANDIDATE` requires an exact ASCII rational candidate string (e.g. `"3/4"`, `"-5"`).
-- **Pre-Dispatch Protocol Gate Invariant:**
-  - MKE-IR payloads containing non-ASCII mathematical notation, characters $> 256$, or unsupported operations are rejected at the Pre-Dispatch Gate before any IPC transmission.
+- **Wire Rational Serialization:**
+  - The `mke.p02a.v1` wire protocol serializes exact rationals as **dictionaries of decimal strings**, NOT JSON integers:
+    `{"numerator": "<signed decimal digits>", "denominator": "<positive decimal digits>"}` (e.g. `{"numerator": "1", "denominator": "1"}`).
+  - Parsing must strictly validate decimal integer digit strings, enforce positive denominator, and reject booleans, floats, `NaN`, `Infinity`, non-canonical signs, and oversized representations.
+- **Wire Outcome vs. Status Taxonomy:**
+  - Worker response separates `outcome` from `status`:
+    - For `SOLVE` success: `outcome == "SUCCESS"` and `status in {"UNIQUE_ROOT", "DomainSet(R)", "EmptySet"}`.
+    - For `CHECK_CANDIDATE` success: `outcome == "SUCCESS"`, `status == "VALID"`, `exact_equality is True`, `definedness is True`, and exact rational `residual == {"numerator": "0", "denominator": "1"}`.
+    - **Requirement Rule:** It is incorrect to check `response.status == "SUCCESS"`.
+- **Single-Request Lifecycle & Correlation:**
+  - `mke.p02a.v1` does not include request IDs or echo the equation string in responses.
+  - Request correlation is maintained via immutable host-side request context across the single-request worker execution. The bridge validates wire `operation` echo and correlates candidate strings for `CHECK_CANDIDATE`.
+  - The independent verifier strictly evaluates the **original literal equation from intake**, never relying on worker-attached text or provisional evidence.
 
 ### 2.4 Mathematical Solver Engine in Contained Worker (`src/mke_product/solver/`)
 - **S0-S3 Affine Linear Solver:**
@@ -164,8 +175,8 @@ $$\text{raw\_query.strip()} == \text{primary\_expressions}[0]\text{.strip()}$$
 | **Intake Validation** | Raw student text & AI JSON payload | **UNTRUSTED** | `MKEIntakeValidator.validate()` checks schema, AST syntax, nesting depth ($\le 20$), identifier syntax, substring spans. |
 | **Dispatch Bridge Entry** | Raw query & MKE-IR payload | **UNTRUSTED** | Bridge **never accepts pre-constructed `ValidationResult`**; executes fresh authoritative validation on every call. |
 | **Semantic & Protocol Gate** | Validated MKE-IR | **RESTRICTED** | Verifies literal equality `raw_query.strip() == expr.strip()`, single variable `x`, no constraints/subparts, length $\le 256$ ASCII chars. |
-| **Worker Process IPC** | Length-prefixed JSON request | **SANDBOXED** | Win32 Job Object: 256MB process limit, 512MB job limit, breakaway denied, shared 5.0s budget. |
-| **Verification Gate** | Raw worker response envelope | **UNVERIFIED OUTPUT** | Validates schema, operation, status, rational shape; correlates equation/candidate; performs independent AST/candidate check. |
+| **Worker Process IPC** | Length-prefixed JSON request | **SANDBOXED** | Win32 Job Object: 256MB process limit, 512MB job limit, breakaway denied, shared 5.0s budget. Single-request context maintained. |
+| **Verification Gate** | Raw worker response envelope | **UNVERIFIED OUTPUT** | Validates wire schema, operation, outcome vs status taxonomy, rational string shapes; performs independent AST/candidate check. |
 | **Public Egress** | `ControlledDispatchResult` | **SANITIZED PUBLIC** | Whitelisted public fields only. Strips raw queries, internal AST trees, filesystem paths, and debug stack traces. |
 
 ---
@@ -234,61 +245,63 @@ flowchart LR
 ### 5.1 Root Membership vs. Mathematical Completeness
 
 A fundamental principle of the MKE verification architecture is that **root checking does not equal proof of completeness**:
-- **Candidate Verification (`CHECK_CANDIDATE`):** Proves *membership*—i.e., that substituting candidate $r$ into $LHS(x) - RHS(x)$ yields exact rational $0$. It does NOT prove that $r$ is the unique solution or that no other solutions exist.
+- **Candidate Verification (`CHECK_CANDIDATE`):** Proves *membership*—i.e., that substituting candidate $r$ into $LHS(x) - RHS(x)$ yields exact rational residual $0$. It does NOT prove that $r$ is the unique solution or that no other solutions exist.
 - **Worker Solving (`SOLVE`):** Returns a classification (`UNIQUE_ROOT`, `DomainSet(R)`, `EmptySet`) and provisional step trace. Because worker outputs are untrusted IPC data, they cannot independently certify their own claims.
 
 ### 5.2 Concrete Verification Mechanisms & Trust Assumptions per Outcome
 
 ```mermaid
 flowchart TD
-    WOut["Worker Response Envelope<br/>(status, classification, solution, provisional_evidence)"]
+    WOut["Worker Response Envelope<br/>(outcome, status, classification, root, is_provisional_evidence)"]
     
-    WOut --> C1{"Classification"}
+    WOut --> C1{"Classification / Status"}
     
-    C1 -->|"UNIQUE_ROOT"| VR["Candidate Root r"]
-    VR --> VR1["Step 1: Membership Proof<br/>Independent CHECK_CANDIDATE dispatch<br/>LHS(r) - RHS(r) == 0"]
-    VR1 -->|"Residue != 0"| Rej1["REJECT: CONTRADICTORY_EVIDENCE"]
+    C1 -->|"UNIQUE_ROOT"| VR["Candidate Root r (from Wire Strings)"]
+    VR --> VR1["Step 1: Membership Proof<br/>Independent CHECK_CANDIDATE dispatch<br/>outcome=='SUCCESS', status=='VALID', residual==0"]
+    VR1 -->|"Residue != 0 / Invalid"| Rej1["REJECT: CONTRADICTORY_EVIDENCE"]
     VR1 -->|"Residue == 0"| VR2["Step 2: Completeness Proof<br/>Independent Host AST Affine Degree-1 Check<br/>deg(LHS - RHS) == 1 and coeff(x) != 0"]
-    VR2 -->|"AST Confirms Degree 1"| Cert1["CERTIFIED: VERIFIED_COMPLETE_UNIQUE_ROOT<br/>(is_verified=True)"]
-    VR2 -->|"AST Check Deferred / Unavailable"| Cert2["CANDIDATE_ROOT_VERIFIED<br/>(is_verified=True, completeness_proven=False)"]
+    VR2 -->|"AST Confirms Degree 1"| Cert1["CERTIFIED: VERIFIED_COMPLETE<br/>(is_verified=True, completeness_proven=True)"]
+    VR2 -->|"AST Check Deferred / Unavailable"| Cert2["CANDIDATE_ONLY<br/>(is_verified=True, completeness_proven=False)"]
     
     C1 -->|"DomainSet(R)"| AR["Identity Claim"]
     AR --> AR1["Independent Host AST Affine Equivalence<br/>a_left == a_right and b_left == b_right"]
-    AR1 -->|"Equivalence Proven"| Cert3["CERTIFIED: VERIFIED_ALL_REALS<br/>(is_verified=True)"]
-    AR1 -->|"AST Check Deferred / Unavailable"| Cert4["UNVERIFIED_CLAIM: PROVISIONAL_ALL_REALS<br/>(is_verified=False)"]
+    AR1 -->|"Equivalence Proven"| Cert3["CERTIFIED: VERIFIED_COMPLETE (ALL_REALS)<br/>(is_verified=True, completeness_proven=True)"]
+    AR1 -->|"AST Check Deferred / Unavailable"| Cert4["UNVERIFIED_CLAIM: ALL_REALS<br/>(is_verified=False, completeness_proven=False)"]
     
     C1 -->|"EmptySet"| ES["Contradiction Claim"]
     ES --> ES1["Independent Host AST Affine Contradiction<br/>a_left == a_right and b_left != b_right"]
-    ES1 -->|"Contradiction Proven"| Cert5["CERTIFIED: VERIFIED_EMPTY_SET<br/>(is_verified=True)"]
-    ES1 -->|"AST Check Deferred / Unavailable"| Cert6["UNVERIFIED_CLAIM: PROVISIONAL_EMPTY_SET<br/>(is_verified=False)"]
+    ES1 -->|"Contradiction Proven"| Cert5["CERTIFIED: VERIFIED_COMPLETE (EMPTY_SET)<br/>(is_verified=True, completeness_proven=True)"]
+    ES1 -->|"AST Check Deferred / Unavailable"| Cert6["UNVERIFIED_CLAIM: EMPTY_SET<br/>(is_verified=False, completeness_proven=False)"]
 ```
 
 1. **Unique Rational Root (`UNIQUE_ROOT`):**
-   - *Membership Proof:* Candidate $r = p/q$ ($q \neq 0$) is verified via independent `CHECK_CANDIDATE` execution in the contained worker. Residue must equal exact integer $0$.
+   - *Membership Proof:* Candidate $r = p/q$ ($q > 0$) parsed from wire string dictionary is verified via independent `CHECK_CANDIDATE` execution in the contained worker. Response must satisfy `outcome == "SUCCESS"`, `status == "VALID"`, `exact_equality is True`, `definedness is True`, and exact rational `residual == {"numerator": "0", "denominator": "1"}`.
    - *Completeness Proof:* The original validated expression AST is analyzed on the host side using safe, non-evaluating structural decomposition:
      $$LHS(x) - RHS(x) \equiv a x + b = 0 \quad (a \neq 0, a \in \mathbb{Q}, b \in \mathbb{Q})$$
      Confirming degree 1 establishes that no second root exists.
-   - *Certification Outcome:* If membership is proven and degree 1 is verified $\to$ `VERIFIED_COMPLETE_UNIQUE_ROOT` (`is_verified = True`). If degree-1 analysis is deferred $\to$ `CANDIDATE_ROOT_VERIFIED` (`is_verified = True`, `completeness_proven = False`).
+   - *Certification Outcome:* If membership is proven and degree 1 is verified $\to$ `VERIFIED_COMPLETE` with `solution_type = "UNIQUE_ROOT"`, `completeness_proven = True`, `is_verified = True`. If degree-1 analysis is deferred $\to$ `CANDIDATE_ONLY` with `completeness_proven = False`, `is_verified = True`.
    - *Contradiction Handling:* If worker claims `UNIQUE_ROOT` with $r$, but `CHECK_CANDIDATE` fails ($LHS(r) \neq RHS(r)$), result is `CONTRADICTORY_EVIDENCE` $\to$ **Fail Closed** (`is_verified = False`, `error_code = "ERR_VERIFICATION_MISMATCH"`).
 
 2. **All Real Numbers (`DomainSet(R)` / Identity):**
    - *Nature of Claim:* Cannot be proven by point testing (point testing finite values cannot prove universal truth across $\mathbb{R}$).
    - *Verification Mechanism:* Requires independent AST affine reduction proving identical canonical slope and intercept: $a_L = a_R$ and $b_L = b_R$.
-   - *Certification Outcome:* If independent AST reduction confirms identity $\to$ `VERIFIED_ALL_REALS` (`is_verified = True`). If independent reduction is absent/deferred $\to$ `UNVERIFIED_CLAIM` (`is_verified = False`, `error_code = "ERR_UNVERIFIED_IDENTITY"`).
+   - *Certification Outcome:* If independent AST reduction confirms identity $\to$ `VERIFIED_COMPLETE` with `solution_type = "ALL_REALS"`, `completeness_proven = True`, `is_verified = True`. If independent reduction is absent/deferred $\to$ `UNVERIFIED_CLAIM` with `completeness_proven = False`, `is_verified = False`, `error_code = "ERR_UNVERIFIED_IDENTITY"`.
 
 3. **Empty Set (`EmptySet` / Inconsistent Contradiction):**
    - *Nature of Claim:* Cannot be proven by point testing. `EMPTY_SET` is a valid mathematical result (e.g. $x = x + 1$), not a system error.
    - *Verification Mechanism:* Requires independent AST affine reduction proving parallel non-intersecting lines: $a_L = a_R$ and $b_L \neq b_R$.
-   - *Certification Outcome:* If independent AST reduction confirms contradiction $\to$ `VERIFIED_EMPTY_SET` (`is_verified = True`). If independent reduction is absent/deferred $\to$ `UNVERIFIED_CLAIM` (`is_verified = False`, `error_code = "ERR_UNVERIFIED_CONTRADICTION"`).
+   - *Certification Outcome:* If independent AST reduction confirms contradiction $\to$ `VERIFIED_COMPLETE` with `solution_type = "EMPTY_SET"`, `completeness_proven = True`, `is_verified = True`. If independent reduction is absent/deferred $\to$ `UNVERIFIED_CLAIM` with `completeness_proven = False`, `is_verified = False`, `error_code = "ERR_UNVERIFIED_CONTRADICTION"`.
 
-### 5.3 Response Integrity & Protocol Correlation
+### 5.3 Wire Response Integrity & Protocol Correlation
 
 The bridge enforces strict envelope integrity before inspecting any worker payload:
 1. **Schema & Header Conformance:** Validates JSON response structure against `mke.p02a.v1`.
-2. **Operation Correlation:** Validates `response.operation == requested_operation`.
-3. **Status Check:** Validates `response.status == "SUCCESS"`. Non-success statuses map to structured error codes.
-4. **Rational Shape Validation:** Candidate and root payloads must strictly conform to exact rational representation: `{"numerator": int, "denominator": int}` with `denominator > 0`. Floats, strings, `NaN`, `Infinity`, and unreduced decimals fail closed immediately (`ERR_MALFORMED_WORKER_RESPONSE`).
-5. **Request Correlation:** When performing multi-step verification, the bridge validates that the candidate submitted to `CHECK_CANDIDATE` strictly matches the root returned by `SOLVE`.
+2. **Operation Correlation:** Validates `response.get("operation") == requested_operation`.
+3. **Wire Outcome & Status Check:**
+   - For `SOLVE`: `response.get("outcome") == "SUCCESS"` and `response.get("status") in {"UNIQUE_ROOT", "DomainSet(R)", "EmptySet"}`.
+   - For `CHECK_CANDIDATE`: `response.get("outcome") == "SUCCESS"` and `response.get("status") == "VALID"`.
+4. **Rational Shape Validation:** Wire rational fields must strictly conform to string decimal integer dictionaries: `{"numerator": "<signed digits>", "denominator": "<positive digits>"}`. Floats, booleans, integer types, `NaN`, `Infinity`, and unreduced decimals fail closed immediately (`ERR_MALFORMED_WORKER_RESPONSE`).
+5. **Candidate Correlation:** When performing multi-step verification, the bridge validates that the candidate submitted to `CHECK_CANDIDATE` strictly matches the root returned by `SOLVE`.
 
 ---
 
@@ -322,6 +335,7 @@ class VerificationStatus(str, Enum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 class RationalRoot(BaseModel):
+    """Normalized public rational root representation."""
     numerator: int
     denominator: int  # Enforced > 0
 
@@ -374,7 +388,7 @@ class ControlledDispatchBridge:
 
         # Step 1: Fresh Authoritative Intake Validation
         validation = MKEIntakeValidator.validate(raw_query=raw_query, ir_payload=ir_payload)
-        diagnostic = PublicValidationDiagnostic.from_validation_result(validation)
+        diagnostic = validation.to_public_diagnostic()
 
         if not validation.is_cas_ready:
             return ControlledDispatchResult(
@@ -455,15 +469,15 @@ The test suite for P1C-04-B (`tests/test_p03c_p1c_controlled_dispatch.py`) must 
 
 | # | Test Scenario | Input Query & MKE-IR | Expected Intake & Gate Action | Expected Worker & Verification Outcome | Expected Public Result (`ControlledDispatchResult`) |
 |---|---|---|---|---|---|
-| **1** | Canonical Linear Equation | `raw_query="x = 1"`, `expr="x = 1"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `UNIQUE_ROOT` ($1/1$); `CHECK_CANDIDATE` residue $0$; AST confirms degree 1 | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="UNIQUE_ROOT"`, `verified_root={"numerator":1,"denominator":1}` |
-| **2** | Affine Identity (All Reals) | `raw_query="x = x"`, `expr="x = x"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `DomainSet(R)`; Host AST confirms $a_L=a_R \land b_L=b_R$ | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="ALL_REALS"` |
-| **3** | Affine Contradiction (Empty Set) | `raw_query="x = x + 1"`, `expr="x = x + 1"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `EmptySet`; Host AST confirms $a_L=a_R \land b_L \neq b_R$ | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="EMPTY_SET"` (Honest mathematical proof) |
+| **1** | Canonical Linear Equation | `raw_query="x = 1"`, `expr="x = 1"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `outcome="SUCCESS"`, `status="UNIQUE_ROOT"`, root `{"numerator":"1","denominator":"1"}`; `CHECK_CANDIDATE` `outcome="SUCCESS"`, `status="VALID"`, `residual` zero; AST confirms degree 1 | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="UNIQUE_ROOT"`, `verified_root={"numerator":1,"denominator":1}` |
+| **2** | Affine Identity (All Reals) | `raw_query="x = x"`, `expr="x = x"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `outcome="SUCCESS"`, `status="DomainSet(R)"`; Host AST confirms $a_L=a_R \land b_L=b_R$ | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="ALL_REALS"` |
+| **3** | Affine Contradiction (Empty Set) | `raw_query="x = x + 1"`, `expr="x = x + 1"` | `VALIDATED` (Standalone literal, in scope) | Worker `SOLVE` $\to$ `outcome="SUCCESS"`, `status="EmptySet"`; Host AST confirms $a_L=a_R \land b_L \neq b_R$ | `is_verified=True`, `verification_status="VERIFIED_COMPLETE"`, `solution_type="EMPTY_SET"` (Honest mathematical proof) |
 | **4** | Semantic Exhaustiveness Defect (Constraint in Text) | `raw_query="x = 1 với x > 2"`, `expr="x = 1"` | `REJECTED_NON_EXHAUSTIVE` (`raw_query != expr`) | **Not Dispatched** | `is_verified=False`, `intake_status="REJECTED_NON_EXHAUSTIVE"`, `error_code="ERR_INTAKE_NON_EXHAUSTIVE"` |
 | **5** | Nonlinear Quadratic Equation | `raw_query="x^2 - 4 = 0"`, `expr="x^2 - 4 = 0"` | `REJECTED_SCOPE` (Quadratic detected pre-dispatch) | **Not Dispatched** | `is_verified=False`, `intake_status="REJECTED_SCOPE"`, `error_code="ERR_OUT_OF_SCOPE"` |
 | **6** | Protocol Length Overflow | Equation $> 256$ ASCII characters | `REJECTED_SCOPE` (Exceeds protocol limit) | **Not Dispatched** | `is_verified=False`, `intake_status="REJECTED_SCOPE"`, `error_code="ERR_PROTOCOL_BOUNDS_EXCEEDED"` |
 | **7** | Non-ASCII Mathematical Character | `raw_query="x − 1 = 0"` (Unicode minus `\u2212`) | `REJECTED_SCOPE` (Non-ASCII notation) | **Not Dispatched** | `is_verified=False`, `intake_status="REJECTED_SCOPE"`, `error_code="ERR_PROTOCOL_BOUNDS_EXCEEDED"` |
 | **8** | Fabricated Intake Bypass Attempt | Direct call to bridge with mutated/pre-made result | `REJECTED_SYNTAX` (Mandatory fresh intake validation) | **Not Dispatched** | `is_verified=False`, `intake_status="REJECTED_SYNTAX"`, `error_code="ERR_INTAKE_VALIDATION_FAILED"` |
-| **9** | Contradictory / Forged Worker Evidence | Worker reports `UNIQUE_ROOT` $x=5$ for `x = 1` | `VALIDATED` pre-dispatch | Worker `CHECK_CANDIDATE` residue $\neq 0$ (Refuted) | `is_verified=False`, `verification_status="VERIFICATION_FAILED"`, `error_code="ERR_VERIFICATION_MISMATCH"` |
+| **9** | Contradictory / Forged Worker Evidence | Worker reports `UNIQUE_ROOT` $x=5$ for `x = 1` | `VALIDATED` pre-dispatch | Worker `CHECK_CANDIDATE` `status="INVALID"` (Refuted) | `is_verified=False`, `verification_status="VERIFICATION_FAILED"`, `error_code="ERR_VERIFICATION_MISMATCH"` |
 | **10** | Worker Total Timeout / Resource Exhaustion | Infinite loop / memory leak exceeding 5.0s budget | `VALIDATED` pre-dispatch | Job Object kills worker / Budget expired | `is_verified=False`, `execution_status="TIMEOUT"`, `error_code="ERR_TIMEOUT"` |
 | **11** | Non-Windows Environment Execution | Platform != `win32` | `VALIDATED` intake | Lazy worker load blocks uncontained run | `is_verified=False`, `execution_status="PLATFORM_UNAVAILABLE"`, `error_code="ERR_PLATFORM_NOT_SUPPORTED"` |
 
@@ -472,10 +486,10 @@ The test suite for P1C-04-B (`tests/test_p03c_p1c_controlled_dispatch.py`) must 
 ## 8. Acceptance & Rejection Criteria for P1C-04-B
 
 ### 8.1 Acceptance Criteria
-1. **Mandatory Fresh Validation:** 100% of dispatch requests execute fresh intake validation.
+1. **Mandatory Fresh Validation:** 100% of dispatch requests execute fresh intake validation via `MKEIntakeValidator.validate()` and project via `validation.to_public_diagnostic()`.
 2. **Strict Semantic Exhaustiveness:** Rejects any input where `raw_query.strip() != primary_expressions[0].strip()` without worker dispatch.
 3. **Locked Containment:** 100% of solver executions run inside a Windows Job Object process (256MB process / 512MB job / breakaway denied) with a shared 5.0s total wall-clock budget.
-4. **Exact Mathematical Verification:** Independent verification gate validates candidate roots via rational evaluation and AST affine degree-1 analysis before certifying `is_verified=True`.
+4. **Exact Mathematical Verification:** Independent verification gate validates candidate roots via rational string evaluation and AST affine degree-1 analysis before certifying `is_verified=True`.
 5. **Fail-Closed Platform Safety:** Importing or running bridge on non-Windows cleanly returns `ERR_PLATFORM_NOT_SUPPORTED` without unhandled import errors.
 6. **Zero Regression:** All existing test suites (651 tests, 18 subtests) maintain 100% passing status.
 
@@ -499,4 +513,4 @@ The test suite for P1C-04-B (`tests/test_p03c_p1c_controlled_dispatch.py`) must 
 1. Implement `ControlledDispatchBridge`, `ControlledDispatchResult`, and `IndependentVerificationGate` in `src/mke_product/cas/bridge.py`.
 2. Implement the 11-case adversarial test suite in `tests/test_p03c_p1c_controlled_dispatch.py`.
 3. Execute full verification and benchmark runs.
-4. Publish separate source and evidence commits on `product/p03c-p1c-04-preflight`.
+4. Publish separate source and evidence commits on `product/p03c-p1c-04-b0-controlled-dispatch`.
