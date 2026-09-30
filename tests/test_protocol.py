@@ -322,7 +322,7 @@ class TestProtocolValidationAndSecurity(unittest.TestCase):
     def test_unsupported_protocol_version(self):
         """Unsupported schema_version is rejected deterministically."""
         req = {
-            "schema_version": "mke.p02a.v2",
+            "schema_version": "mke.p02a.v99",
             "operation": OPERATION_SOLVE,
             "equation": "x=1",
         }

@@ -228,8 +228,8 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
         self.assertEqual(len(ctrl.call_history), 0)
 
     def test_case_05_nonlinear_quadratic_equation_pre_dispatch(self):
-        """Case 5: Nonlinear Quadratic Equation x^2 - 4 = 0 rejected pre-dispatch."""
-        raw = "x^2 - 4 = 0"
+        """Case 5: Nonlinear degree >= 3 equation x*x*x = 1 rejected pre-dispatch."""
+        raw = "x*x*x = 1"
         ir = make_valid_ir(raw)
         ctrl = MockWorkerController()
 
