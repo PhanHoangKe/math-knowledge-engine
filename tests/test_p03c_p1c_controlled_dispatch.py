@@ -286,9 +286,9 @@ class TestControlledDispatchPreflightMatrix(unittest.TestCase):
         res = ControlledDispatchBridge._dispatch_internal(raw, bad_payload, _controller=ctrl)
 
         self.assertFalse(res.is_verified)
-        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SYNTAX)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_NON_EXHAUSTIVE)
         self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
-        self.assertEqual(res.error_code, "ERR_INTAKE_SYNTAX_INVALID")
+        self.assertEqual(res.error_code, "ERR_INTAKE_NON_EXHAUSTIVE")
         self.assertEqual(len(ctrl.call_history), 0)
 
     def test_case_09_contradictory_forged_worker_evidence(self):
@@ -719,6 +719,89 @@ class TestPublicSignatureLockAndDiagnosticSanitization(unittest.TestCase):
         self.assertNotIn("raw_traceback", res_dict)
         self.assertNotIn("C:\\", str(res_dict))
         self.assertNotIn("D:\\", str(res_dict))
+
+
+class TestRealIntakeTaxonomyClassification(unittest.TestCase):
+    """Targeted tests using REAL MKEIntakeValidator outcomes verifying precise public intake taxonomy."""
+
+    def test_real_validator_malformed_math_syntax_rejected_syntax(self):
+        """Malformed mathematical syntax (e.g. invalid operator sequences) -> REJECTED_SYNTAX."""
+        raw = "x ++ 1 = 0"
+        ir = make_valid_ir(raw)
+        res = ControlledDispatchBridge.dispatch(raw, ir)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SYNTAX)
+        self.assertEqual(res.error_code, "ERR_INTAKE_SYNTAX_INVALID")
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.verification_status, VerificationStatus.NOT_APPLICABLE)
+
+    def test_real_validator_missing_target_variable_rejected_scope(self):
+        """Missing target variable is a capability/scope failure -> REJECTED_SCOPE."""
+        raw = "x = 1"
+        ir_dict = make_valid_ir(raw).model_dump()
+        ir_dict["target_variables"] = []
+        res = ControlledDispatchBridge.dispatch(raw, ir_dict)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SCOPE)
+        self.assertEqual(res.error_code, "ERR_INTAKE_SCOPE_UNSUPPORTED")
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.verification_status, VerificationStatus.NOT_APPLICABLE)
+
+    def test_real_validator_unsupported_category_rejected_scope(self):
+        """Unsupported problem category is a capability/scope failure -> REJECTED_SCOPE."""
+        raw = "x = 1"
+        ir_dict = make_valid_ir(raw).model_dump()
+        ir_dict["problem_category"] = "GEOMETRY_ANALYTIC"
+        res = ControlledDispatchBridge.dispatch(raw, ir_dict)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_SCOPE)
+        self.assertEqual(res.error_code, "ERR_INTAKE_SCOPE_UNSUPPORTED")
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.verification_status, VerificationStatus.NOT_APPLICABLE)
+
+    def test_real_validator_raw_query_mismatch_fails_closed_non_exhaustive(self):
+        """Source integrity failure (raw query mismatch) fails closed as REJECTED_NON_EXHAUSTIVE without dispatch."""
+        raw = "x = 1"
+        ir_dict = make_valid_ir(raw).model_dump()
+        ir_dict["raw_query"] = "y = 100"
+        res = ControlledDispatchBridge.dispatch(raw, ir_dict)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_NON_EXHAUSTIVE)
+        self.assertEqual(res.error_code, "ERR_INTAKE_NON_EXHAUSTIVE")
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.verification_status, VerificationStatus.NOT_APPLICABLE)
+
+    def test_real_validator_source_fragment_mismatch_fails_closed_non_exhaustive(self):
+        """Source span mismatch against raw query fails closed as REJECTED_NON_EXHAUSTIVE."""
+        raw = "x = 1"
+        ir_dict = make_valid_ir(raw).model_dump()
+        ir_dict["source_spans"][0]["source_fragment"] = "x = 2"
+        res = ControlledDispatchBridge.dispatch(raw, ir_dict)
+
+        self.assertFalse(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.REJECTED_NON_EXHAUSTIVE)
+        self.assertEqual(res.error_code, "ERR_INTAKE_NON_EXHAUSTIVE")
+        self.assertEqual(res.execution_status, ExecutionStatus.NOT_DISPATCHED)
+        self.assertEqual(res.verification_status, VerificationStatus.NOT_APPLICABLE)
+
+    def test_real_validator_canonical_equation_verified_complete(self):
+        """Canonical equation x = 1 passes all intake gates and reaches VERIFIED_COMPLETE."""
+        raw = "x = 1"
+        ir = make_valid_ir(raw)
+        ctrl = MockWorkerController()
+        res = ControlledDispatchBridge._dispatch_internal(raw, ir, _controller=ctrl)
+
+        self.assertTrue(res.is_verified)
+        self.assertEqual(res.intake_status, IntakeStatus.VALIDATED)
+        self.assertEqual(res.execution_status, ExecutionStatus.SUCCESS)
+        self.assertEqual(res.verification_status, VerificationStatus.VERIFIED_COMPLETE)
+        self.assertEqual(res.solution_type, "UNIQUE_ROOT")
+        self.assertEqual(res.verified_root, RationalRoot(numerator=1, denominator=1))
+        self.assertTrue(res.completeness_proven)
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows Job Object integration requires native Win32 runtime")

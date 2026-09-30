@@ -20,7 +20,7 @@ import re
 import sys
 import time
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Set, Tuple, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 from mke_product.ai.ir import (
@@ -49,6 +49,30 @@ from mke_product.protocol.schema import (
     OPERATION_SOLVE,
     SCHEMA_VERSION,
 )
+
+
+SYNTAX_ISSUE_CODES: Set[str] = {
+    "MATH_SYNTAX_ERROR",
+    "EMPTY_PRIMARY_EXPRESSION",
+    "EXCESSIVE_NESTING_DEPTH",
+    "SUBPART_SYNTAX_ERROR",
+    "SUBPART_EXCESSIVE_NESTING_DEPTH",
+    "INVALID_CONSTRAINT_SYNTAX",
+    "EMPTY_RAW_QUERY",
+    "OVERSIZED_INPUT",
+    "EXPRESSION_TOO_LONG",
+    "SUBPART_EXPRESSION_TOO_LONG",
+}
+
+SOURCE_INTEGRITY_ISSUE_CODES: Set[str] = {
+    "RAW_QUERY_MISMATCH",
+    "SOURCE_SPAN_OUT_OF_BOUNDS",
+    "SOURCE_FRAGMENT_MISMATCH",
+    "MISSING_EXPRESSION_PROVENANCE",
+    "UNLINKED_EXPRESSION_PROVENANCE",
+    "MISSING_CONSTRAINT_PROVENANCE",
+    "CONSTRAINT_SOURCE_MISMATCH",
+}
 
 
 class IntakeStatus(str, Enum):
@@ -335,26 +359,25 @@ class ControlledDispatchBridge:
         diagnostic = validation.to_public_diagnostic()
 
         if not validation.is_cas_ready:
-            syntax_issue_codes = {
-                "SYNTAX_ERROR",
-                "INVALID_CHARSET",
-                "NESTING_DEPTH_EXCEEDED",
-                "INVALID_PRIMARY_EXPRESSION",
-                "BRACKET_MISMATCH",
-                "UNBALANCED_PARENTHESES",
-                "RAW_QUERY_MISMATCH",
-            }
-            is_syntax = (
-                validation.status == "INVALID"
-                or any(iss.code in syntax_issue_codes for iss in validation.issues)
-            )
+            issue_codes = {iss.code for iss in validation.issues}
+
+            if any(c in SYNTAX_ISSUE_CODES for c in issue_codes):
+                intake_status = IntakeStatus.REJECTED_SYNTAX
+                error_code = "ERR_INTAKE_SYNTAX_INVALID"
+            elif any(c in SOURCE_INTEGRITY_ISSUE_CODES for c in issue_codes) or validation.status in ("UNVERIFIED_SEMANTICS", "AMBIGUOUS"):
+                intake_status = IntakeStatus.REJECTED_NON_EXHAUSTIVE
+                error_code = "ERR_INTAKE_NON_EXHAUSTIVE"
+            else:
+                intake_status = IntakeStatus.REJECTED_SCOPE
+                error_code = "ERR_INTAKE_SCOPE_UNSUPPORTED"
+
             return ControlledDispatchResult(
-                intake_status=IntakeStatus.REJECTED_SYNTAX if is_syntax else IntakeStatus.REJECTED_SCOPE,
+                intake_status=intake_status,
                 intake_diagnostic=diagnostic,
                 execution_status=ExecutionStatus.NOT_DISPATCHED,
                 verification_status=VerificationStatus.NOT_APPLICABLE,
                 is_verified=False,
-                error_code="ERR_INTAKE_SYNTAX_INVALID" if is_syntax else "ERR_INTAKE_SCOPE_UNSUPPORTED",
+                error_code=error_code,
             )
 
         ir = validation.validated_ir
