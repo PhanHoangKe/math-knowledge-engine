@@ -1,7 +1,13 @@
+Tested Source SHA: f321fb03e91b39ac14c62b55285654f1d35d44d8
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:25:22.268443+00:00
-End: 2026-09-30T01:26:08.959135+00:00
+Start: 2026-09-30T02:37:34.373276+00:00
+End: 2026-09-30T02:38:20.983768+00:00
 Exit Code: 0
 
 STDOUT:
@@ -58,8 +64,6 @@ tests/test_p03c_p1b_transcendental_solver.py::test_algebraic_radical_and_rationa
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_2_pow_x_plus_1_eq_2_pow_x_plus_1 PASSED [ 97%]
 tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_polynomial_multiplicity_distinct_root_sets PASSED [100%]
 
-============================= 44 passed in 45.98s =============================
-
+============================= 44 passed in 45.85s =============================
 
 STDERR:
-

@@ -1,7 +1,13 @@
+Tested Source SHA: f321fb03e91b39ac14c62b55285654f1d35d44d8
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+Post-run Git Status: <clean>
+Platform: win32
+Python Version: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
 Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src
 CWD: D:\mke-product-ui-r4
-Start: 2026-09-30T01:25:20.611339+00:00
-End: 2026-09-30T01:25:22.251961+00:00
+Start: 2026-09-30T02:37:32.145556+00:00
+End: 2026-09-30T02:37:34.025998+00:00
 Exit Code: 0
 
 STDOUT:
@@ -36,8 +42,6 @@ tests/test_p03c_p1c_mock_adapter.py::test_asyncio_cancellation_propagates_cleanl
 tests/test_p03c_p1c_mock_adapter.py::test_retry_policy_retries_transient_and_stops_on_permanent PASSED [ 95%]
 tests/test_p03c_p1c_mock_adapter.py::test_pii_and_credential_sanitization PASSED [100%]
 
-============================= 22 passed in 0.96s ==============================
-
+============================= 22 passed in 1.00s ==============================
 
 STDERR:
-
