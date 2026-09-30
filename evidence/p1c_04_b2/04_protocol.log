@@ -1,0 +1,97 @@
+Tested Source SHA: 8e890b4b162bc38f47841444b62611f237325873
+Pre-run Git Clean Tree: False
+Pre-run Git Status: ?? evidence/p1c_04_b2/
+Post-run Git Status: ?? evidence/p1c_04_b2/
+Platform: win32 (Windows-10-10.0.26200-SP0)
+Python Version: 3.10.11 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+Command: C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe -m pytest tests/test_protocol.py -v -o pythonpath=src
+Working Directory: D:\mke-product-ui-r4
+Start Timestamp (UTC): 2026-09-30T15:52:18.223523+00:00
+End Timestamp (UTC): 2026-09-30T15:52:19.077933+00:00
+Duration: 0:00:00.859000
+Exit Code: 0
+
+STDOUT:
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 73 items
+
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_domain_set_r PASSED [  1%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_domain_set_r_constant_identity PASSED [  2%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_empty_set_constant_contradiction PASSED [  4%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_empty_set_zero_times_x_equals_constant PASSED [  5%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_fractional_coefficients PASSED [  6%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_mixed_hazard_owner_ruling_a PASSED [  8%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_nonlinear_scope_abstention PASSED [  9%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_resource_exhausted PASSED [ 10%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_syntax_error PASSED [ 12%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_unique_root PASSED [ 13%]
+tests/test_protocol.py::TestProtocolSolveDispatch::test_solve_variable_exponent_zero_abstention PASSED [ 15%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_domain_error_division_by_zero PASSED [ 16%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_domain_error_zero_to_zero PASSED [ 17%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_invalid PASSED [ 19%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_resource_exhausted PASSED [ 20%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_tiny_nonzero_rational_residual PASSED [ 21%]
+tests/test_protocol.py::TestProtocolCheckCandidateDispatch::test_candidate_valid PASSED [ 23%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_exact_rational_decimal_string_serialization PASSED [ 24%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_invalid_types_on_solve PASSED [ 26%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_json_bool_candidate_rejected PASSED [ 27%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_json_float_candidate_rejected PASSED [ 28%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_json_null_candidate_rejected PASSED [ 30%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_json_roundtrip_bytes_and_str PASSED [ 31%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_malformed_candidate_string_rejected PASSED [ 32%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_missing_required_fields PASSED [ 34%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_non_ascii_equation_rejected PASSED [ 35%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_oversized_equation_rejected PASSED [ 36%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_oversized_payload_rejected PASSED [ 38%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_provisional_evidence_flag_consistency PASSED [ 39%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_unexpected_extra_fields PASSED [ 41%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_unsupported_operation PASSED [ 42%]
+tests/test_protocol.py::TestProtocolValidationAndSecurity::test_unsupported_protocol_version PASSED [ 43%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_candidate_whitespace_rejected_at_protocol_boundary PASSED [ 45%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_dict_input_size_limit_enforced PASSED [ 46%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_duplicate_json_keys_rejected PASSED [ 47%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_excessive_json_nesting_rejected PASSED [ 49%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_excessive_parenthesis_nesting_check_candidate_caught_cleanly PASSED [ 50%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_excessive_parenthesis_nesting_solve_caught_cleanly PASSED [ 52%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_excessive_tokens_check_candidate_caught_cleanly PASSED [ 53%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_excessive_tokens_solve_caught_cleanly PASSED [ 54%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_non_string_dict_key_rejected PASSED [ 56%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_response_size_limit_fails_closed PASSED [ 57%]
+tests/test_protocol.py::TestProtocolRemediationS4AR1::test_syntax_error_definedness_null PASSED [ 58%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_dict_multibyte_unicode_oversized_in_unexpected_field PASSED [ 60%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_dict_rejects_unsupported_value_types PASSED [ 61%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_invalid_unicode_isolated_surrogates_in_dict PASSED [ 63%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_invalid_unicode_isolated_surrogates_in_string PASSED [ 64%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_invalid_unicode_malformed_utf8_bytes PASSED [ 65%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_json_error_classification_duplicate_keys PASSED [ 67%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_json_error_classification_incorrect_root_structure PASSED [ 68%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_json_error_classification_malformed_syntax PASSED [ 69%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_json_nesting_ceiling_deep_arrays PASSED [ 71%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_json_nesting_ceiling_enforced_on_otherwise_valid_request PASSED [ 72%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_response_limit_default_max_response_bytes PASSED [ 73%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_response_limit_rejects_invalid_configuration PASSED [ 75%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_response_limit_valid_smaller_ceiling PASSED [ 76%]
+tests/test_protocol.py::TestProtocolRemediationS4AR2::test_valid_ordinary_request_within_nesting_ceiling PASSED [ 78%]
+tests/test_protocol.py::TestProtocolRemediationS4AR3::test_dict_escaped_control_chars_quotes_and_backslashes PASSED [ 79%]
+tests/test_protocol.py::TestProtocolRemediationS4AR3::test_dict_multibyte_utf8_byte_accounting PASSED [ 80%]
+tests/test_protocol.py::TestProtocolRemediationS4AR3::test_dict_u0000_700_repetitions_rejected_as_payload_too_large PASSED [ 82%]
+tests/test_protocol.py::TestProtocolRemediationS4AR3::test_raw_json_escaped_isolated_surrogate_rejected PASSED [ 83%]
+tests/test_protocol.py::TestProtocolRemediationS4AR3::test_raw_json_ordinary_escaped_unicode_handled_correctly PASSED [ 84%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_counterexample_3_and_5_times_65537_squared_fails_closed PASSED [ 86%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_counterexample_untested_prime_square_65537_fails_closed PASSED [ 87%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_extra_field_rejected PASSED [ 89%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_matrix_mismatch_rejections PASSED [ 90%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_negative_discriminant_rejected_out_of_scope PASSED [ 91%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_non_ascii_rejected PASSED [ 93%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_rational_square_rejected_out_of_scope PASSED [ 94%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_solve_quadratic_surd_fractional PASSED [ 95%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_solve_quadratic_surd_large_reducible_square PASSED [ 97%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_solve_quadratic_surd_linear_term PASSED [ 98%]
+tests/test_protocol.py::TestProtocolV3SolveQuadraticSurdDispatch::test_v3_solve_quadratic_surd_standard PASSED [100%]
+
+============================= 73 passed in 0.20s ==============================
