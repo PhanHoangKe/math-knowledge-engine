@@ -30,7 +30,7 @@ export const HeaderBar: React.FC = () => {
           </div>
           <div className={styles.brandText}>
             <span className={styles.brandTitle}>
-              MKE<span className={styles.brandTitleAccent}>Alpha</span>
+              MKE<span className={styles.brandTitleAccent}>{t('brand_alpha')}</span>
             </span>
             <span className={styles.brandSub}>{t('app_subtitle')}</span>
           </div>
@@ -41,7 +41,7 @@ export const HeaderBar: React.FC = () => {
 
         {/* Navigation & Controls */}
         <div className={styles.headerRightGroup}>
-          <nav className={styles.navLinks} aria-label="Main Navigation">
+          <nav className={styles.navLinks} aria-label={t('nav_main_aria')}>
             <button type="button" className={`${styles.navBtn} ${styles.navBtnActive}`}>
               {t('nav_home')}
             </button>

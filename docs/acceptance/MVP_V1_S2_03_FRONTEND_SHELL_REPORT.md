@@ -131,43 +131,75 @@ npx openapi-typescript openapi/mke.openapi.json -o src/types/api.generated.ts
 🚀 openapi/mke.openapi.json → src/types/api.generated.ts [98.4ms]
 ```
 
-### 3. API Drift Check
-```bash
-npm run check:api
-🔍 Checking OpenAPI and TypeScript type drift...
-✅ OpenAPI schema and generated TypeScript types are 100% in sync. Zero drift.
-```
+### 3. API Drift Check & Cleanup Assurance (S2-03-R1)
+`scripts/check-api-drift.mjs` was refactored in S2-03-R1 to replace `process.exit(1)` within the `try` block with `throw new Error(...)`, ensuring that `finally { cleanTemp(); }` is guaranteed to execute and clean `.drift-temp/` under both success and failure conditions:
+- **PASS Validation:**
+  ```text
+  npm run check:api
+  > mke-frontend@1.0.0 check:api
+  > node scripts/check-api-drift.mjs
+
+  🔍 Checking OpenAPI and TypeScript type drift...
+  ✅ OpenAPI schema and generated TypeScript types are 100% in sync. Zero drift.
+  ```
+  `Test-Path .drift-temp` ➔ `False` (exit code 0).
+- **Controlled Drift Failure Validation:**
+  Sentinel appended to `src/frontend/src/types/api.generated.ts`:
+  ```text
+  npm run check:api
+  > mke-frontend@1.0.0 check:api
+  > node scripts/check-api-drift.mjs
+
+  🔍 Checking OpenAPI and TypeScript type drift...
+  ❌ Type Drift Detected: src/types/api.generated.ts is stale relative to OpenAPI.
+  👉 Run "npm run generate:api" and commit the updated types.
+  [Exit Code: 1]
+  ```
+  `Test-Path .drift-temp` ➔ `False` (temporary directory cleaned up on failure).
+  `git checkout -- src/types/api.generated.ts` restored clean file state, and subsequent `npm run check:api` passed with exit code 0.
 
 ---
 
 ## 5. Test Execution & Build Evidence
 
-### 1. Frontend Strict Typecheck
+### 1. Frontend Strict Typecheck (App + Node Configs)
 ```text
 npm run typecheck
-> tsc --noEmit
-[Exit Code: 0, Zero Type Errors]
+> mke-frontend@1.0.0 typecheck
+> npm run typecheck:app && npm run typecheck:node
+
+> mke-frontend@1.0.0 typecheck:app
+> tsc -p tsconfig.app.json --noEmit
+
+> mke-frontend@1.0.0 typecheck:node
+> tsc -p tsconfig.node.json --noEmit
+
+[Exit Code: 0, Zero Type Errors across App and Node configs]
 ```
 
 ### 2. Frontend Unit Test Suite (Vitest + React Testing Library)
 ```text
 npm run test
+> mke-frontend@1.0.0 test
 > vitest run
 
- ✓ src/test/apiContract.test.ts (3 tests) 15ms
- ✓ src/test/i18n.test.ts (4 tests) 17ms
- ✓ src/test/preferences.test.tsx (5 tests) 44ms
- ✓ src/test/App.test.tsx (5 tests) 425ms
+ RUN  v3.0.7 D:/Math Knowledge Engine/src/frontend
+
+ ✓ src/test/apiContract.test.ts (3 tests) 14ms
+ ✓ src/test/i18n.test.ts (4 tests) 23ms
+ ✓ src/test/preferences.test.tsx (8 tests) 70ms
+ ✓ src/test/App.test.tsx (5 tests) 305ms
 
  Test Files  4 passed (4)
-      Tests  17 passed (17)
-   Start at  23:41:24
-   Duration  2.10s
+      Tests  20 passed (20)
+   Start at  23:52:32
+   Duration  2.41s
 ```
 
 ### 3. Production Vite Bundle Build
 ```text
 npm run build
+> mke-frontend@1.0.0 build
 > tsc -b && vite build
 
 vite v6.2.0 building for production...
@@ -177,8 +209,8 @@ rendering chunks...
 computing gzip size...
 dist/index.html                   0.73 kB │ gzip:  0.43 kB
 dist/assets/index-Cxw60kWi.css   14.46 kB │ gzip:  3.52 kB
-dist/assets/index-D-Ok2UuS.js   162.47 kB │ gzip: 52.27 kB
-✓ built in 1.02s
+dist/assets/index-C9ij-N9E.js   162.54 kB │ gzip: 52.29 kB
+✓ built in 1.15s
 ```
 
 ---
@@ -186,19 +218,28 @@ dist/assets/index-D-Ok2UuS.js   162.47 kB │ gzip: 52.27 kB
 ## 6. Regression & Isolation Evidence
 
 ### 1. Legacy Browser UI Suite (`ui/ui00/`)
-- Browser test suite: `tests/test_browser_canonical_ui.py`.
-- Result: 20 passed. Isolated transient Selenium tab switch timing characteristic noted on `test_04_differentiate_polynomial` (passes consistently on isolated execution in 8.16s). Legacy `ui/ui00/` source code is completely unmodified.
+```text
+pytest -q tests/test_browser_canonical_ui.py
+.....................                                                    [100%]
+21 passed in 41.31s
+```
+- Browser test suite: `tests/test_browser_canonical_ui.py` (21 tests).
+- Result: 21 passed (100%). Legacy `ui/ui00/` source code is completely unmodified.
 
-### 2. Accepted S2 Transport Acceptance & Smoke Suites
+### 2. KaTeX Vendored Asset Integrity
+- Path: `src/frontend/public/vendor/katex/` vs `ui/ui00/vendor/katex/`.
+- File-by-file SHA-256 hash comparison confirms 100% byte-for-byte exact equality across all CSS, JS, license, and font files.
+
+### 3. Accepted S2 Transport Acceptance & Smoke Suites
 ```text
 pytest -q tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py
-149 passed, 5 warnings in 3.13s
+149 passed, 5 warnings in 3.24s
 ```
 
-### 3. Accepted S1 & S0 Regression Suites
+### 4. Accepted S1 & S0 Regression Suites
 ```text
 pytest -q tests/test_application_s1_acceptance.py tests/test_application_orchestrator_s1.py tests/test_application_traces_s1.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_domain_core_s0.py
-278 passed in 0.83s
+278 passed in 0.98s
 ```
 
 ---
@@ -213,7 +254,7 @@ A comprehensive code scan of all production frontend files (`src/frontend/src/co
 
 ## 8. Unresolved Issues
 
-- **None.** All frontend shell requirements, OpenAPI generation pipelines, drift checkers, unit tests, responsive styling, and backend regression suites passed without defect.
+- **None.** All frontend shell requirements, OpenAPI generation pipelines, drift checkers, unit tests, responsive styling, KaTeX vendored asset parity, and backend regression suites passed without defect.
 
 ---
 

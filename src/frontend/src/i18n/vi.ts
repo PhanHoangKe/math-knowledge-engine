@@ -11,6 +11,7 @@ export const vi = {
   nav_home: 'Trang chủ',
   nav_workspace: 'Đại số',
   nav_syntax: 'Cú pháp',
+  nav_main_aria: 'Điều hướng chính',
   header_signin: 'Đăng nhập',
 
   settings_trigger_aria: 'Tùy chọn chủ đề & ngôn ngữ',
@@ -25,7 +26,7 @@ export const vi = {
 
   hero_super: 'HỆ THỐNG SUY LUẬN KÝ HIỆU HÌNH THỨC & TOÁN HỌC CHUẨN XÁC',
   hero_title: 'Math Knowledge Engine',
-  hero_tagline: '"Suy luận ký hiệu tất định trên miền số thực \\(\\mathbb{R}\\) với số học hữu tỉ chuẩn xác trên \\(\\mathbb{Q}\\"',
+  hero_tagline: '"Suy luận ký hiệu tất định trên miền số thực \\(\\mathbb{R}\\) với số học hữu tỉ chuẩn xác trên \\(\\mathbb{Q}\\)"',
 
   input_placeholder: 'Nhập phương trình đại số (ví dụ: x^2 - 5*x + 6 = 0)...',
   input_aria: 'Nhập phương trình đại số',

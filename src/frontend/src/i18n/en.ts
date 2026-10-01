@@ -13,6 +13,7 @@ export const en: Translations = {
   nav_home: 'Home',
   nav_workspace: 'Algebra',
   nav_syntax: 'Syntax',
+  nav_main_aria: 'Main navigation',
   header_signin: 'Sign In',
 
   settings_trigger_aria: 'Theme & Language settings',
@@ -27,7 +28,7 @@ export const en: Translations = {
 
   hero_super: 'FORMAL SYMBOLIC REASONING & EXACT MATHEMATICS SYSTEM',
   hero_title: 'Math Knowledge Engine',
-  hero_tagline: '"Deterministic symbolic reasoning over \\(\\mathbb{R}\\) with exact rational arithmetic over \\(\\mathbb{Q}\\"',
+  hero_tagline: '"Deterministic symbolic reasoning over \\(\\mathbb{R}\\) with exact rational arithmetic over \\(\\mathbb{Q}\\)"',
 
   input_placeholder: 'Enter algebraic equation (e.g., x^2 - 5*x + 6 = 0)...',
   input_aria: 'Enter algebraic equation',

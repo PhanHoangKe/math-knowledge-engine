@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck:app": "tsc -p tsconfig.app.json --noEmit",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
+    "typecheck": "npm run typecheck:app && npm run typecheck:node",
     "test": "vitest run",
     "generate:api": "python ../../scripts/export_openapi.py && openapi-typescript openapi/mke.openapi.json -o src/types/api.generated.ts",
     "check:api": "node scripts/check-api-drift.mjs"

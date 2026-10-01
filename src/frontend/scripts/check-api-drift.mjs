@@ -56,30 +56,24 @@ async function main() {
 
     // 3. Verify committed OpenAPI JSON against fresh export
     if (!fs.existsSync(COMMITTED_OPENAPI)) {
-      console.error(`❌ Missing committed OpenAPI file: ${COMMITTED_OPENAPI}`);
-      process.exit(1);
+      throw new Error(`Missing committed OpenAPI file: ${COMMITTED_OPENAPI}`);
     }
     const committedOpenApiContent = normalizeLineEndings(fs.readFileSync(COMMITTED_OPENAPI, 'utf-8'));
     const freshOpenApiContent = normalizeLineEndings(fs.readFileSync(tempOpenAPI, 'utf-8'));
 
     if (committedOpenApiContent !== freshOpenApiContent) {
-      console.error('❌ API Drift Detected: openapi/mke.openapi.json is stale relative to FastAPI.');
-      console.error('👉 Run "npm run generate:api" and commit the updated schema.');
-      process.exit(1);
+      throw new Error('API Drift Detected: openapi/mke.openapi.json is stale relative to FastAPI.\n👉 Run "npm run generate:api" and commit the updated schema.');
     }
 
     // 4. Verify committed TypeScript types against fresh generation
     if (!fs.existsSync(COMMITTED_TS)) {
-      console.error(`❌ Missing committed TypeScript definitions: ${COMMITTED_TS}`);
-      process.exit(1);
+      throw new Error(`Missing committed TypeScript definitions: ${COMMITTED_TS}`);
     }
     const committedTsContent = normalizeLineEndings(fs.readFileSync(COMMITTED_TS, 'utf-8'));
     const freshTsContent = normalizeLineEndings(fs.readFileSync(tempTS, 'utf-8'));
 
     if (committedTsContent !== freshTsContent) {
-      console.error('❌ Type Drift Detected: src/types/api.generated.ts is stale relative to OpenAPI.');
-      console.error('👉 Run "npm run generate:api" and commit the updated types.');
-      process.exit(1);
+      throw new Error('Type Drift Detected: src/types/api.generated.ts is stale relative to OpenAPI.\n👉 Run "npm run generate:api" and commit the updated types.');
     }
 
     console.log('✅ OpenAPI schema and generated TypeScript types are 100% in sync. Zero drift.');
@@ -89,7 +83,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('❌ Drift check failed with error:', err);
+  console.error(`❌ ${err.message || err}`);
   cleanTemp();
   process.exit(1);
 });
