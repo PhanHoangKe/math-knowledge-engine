@@ -100,6 +100,18 @@ class ReducedQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                 )
             )
         else:  # delta_prime.is_positive
+            # Reduced formula branch assignment accounting for denominator a sign:
+            # Minus branch: (-b' - sqrt(Delta')) / a
+            # Plus branch:  (-b' + sqrt(Delta')) / a
+            # When a > 0: minus branch is smaller (kernel_roots[0]), plus branch is larger (kernel_roots[1])
+            # When a < 0: negative denominator flips inequality; minus branch is larger (kernel_roots[1]), plus branch is smaller (kernel_roots[0])
+            if a.is_positive:
+                r_minus_lat = kernel_roots[0].latex_str
+                r_plus_lat = kernel_roots[1].latex_str
+            else:
+                r_minus_lat = kernel_roots[1].latex_str
+                r_plus_lat = kernel_roots[0].latex_str
+
             if disc.is_rational_square:
                 assert disc.square_root_rational is not None
                 sqrt_delta_prime_rat = disc.square_root_rational.to_rational() / Rational(2, 1)
@@ -113,12 +125,10 @@ class ReducedQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                         why_this_step_vi="Delta' là số chính phương hữu tỉ nên căn bậc hai là một số hữu tỉ chính xác.",
                     )
                 )
-                r1_lat = kernel_roots[0].latex_str
-                r2_lat = kernel_roots[1].latex_str
                 steps.append(
                     SolutionStep(
                         step_number=4,
-                        latex_expression=f"x_1 = \\frac{{-b' - \\sqrt{{\\Delta'}}}}{{a}} = {r1_lat}, \\quad x_2 = \\frac{{-b' + \\sqrt{{\\Delta'}}}}{{a}} = {r2_lat}",
+                        latex_expression=f"x_1 = \\frac{{-b' - \\sqrt{{\\Delta'}}}}{{a}} = {r_minus_lat}, \\quad x_2 = \\frac{{-b' + \\sqrt{{\\Delta'}}}}{{a}} = {r_plus_lat}",
                         explanation_vi="Vì Delta' > 0 nên phương trình có hai nghiệm phân biệt.",
                         rule_or_theorem_used=RULE_REDUCED_QUADRATIC_FORMULA,
                         why_this_step_vi="Áp dụng công thức nghiệm thu gọn để tính hai nghiệm phân biệt.",
@@ -139,12 +149,10 @@ class ReducedQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                         why_this_step_vi="Khai căn phần chính phương của Delta' để rút gọn biểu thức nghiệm vô tỉ.",
                     )
                 )
-                r1_lat = kernel_roots[0].latex_str
-                r2_lat = kernel_roots[1].latex_str
                 steps.append(
                     SolutionStep(
                         step_number=4,
-                        latex_expression=f"x_1 = \\frac{{-b' - \\sqrt{{\\Delta'}}}}{{a}} = {r1_lat}, \\quad x_2 = \\frac{{-b' + \\sqrt{{\\Delta'}}}}{{a}} = {r2_lat}",
+                        latex_expression=f"x_1 = \\frac{{-b' - \\sqrt{{\\Delta'}}}}{{a}} = {r_minus_lat}, \\quad x_2 = \\frac{{-b' + \\sqrt{{\\Delta'}}}}{{a}} = {r_plus_lat}",
                         explanation_vi="Vì Delta' > 0 nên phương trình có hai nghiệm phân biệt.",
                         rule_or_theorem_used=RULE_REDUCED_QUADRATIC_FORMULA,
                         why_this_step_vi="Áp dụng công thức nghiệm thu gọn cho phương trình có nghiệm vô tỉ.",

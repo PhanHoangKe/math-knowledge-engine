@@ -2,12 +2,13 @@
 
 Verifies:
 1. QUAD_FORMULA_STANDARD deterministic step generation and exact kernel parity.
-2. QUAD_FORMULA_REDUCED deterministic step generation and exact kernel parity across even, odd, fractional b.
-3. QUAD_VIETE_SPECIAL_SUM deterministic step generation, repeated root handling, and strict fail-closed non-applicability.
-4. QUAD_VIETE_SPECIAL_DIF deterministic step generation, repeated root handling, and strict fail-closed non-applicability.
-5. TRACE_GENERATORS registry matching exact S1 execution availability in MethodRegistry.
-6. Adversarial runtime type rejection (TypeError for float/str/int) and a == 0 rejection (TraceInvalidInputError).
-7. Complete end-to-end cross-verification with HostIndependentVerifier.verify_quadratic_solution.
+2. QUAD_FORMULA_STANDARD exact pedagogical branch-to-root evaluation for both a > 0 and a < 0.
+3. QUAD_FORMULA_REDUCED deterministic step generation and exact kernel parity across even, odd, fractional, and negative a.
+4. QUAD_VIETE_SPECIAL_SUM deterministic step generation, repeated root handling, stable x1/x2 labels, and strict fail-closed non-applicability.
+5. QUAD_VIETE_SPECIAL_DIF deterministic step generation, repeated root handling, stable x1/x2 labels, and strict fail-closed non-applicability.
+6. TRACE_GENERATORS registry matching exact S1 execution availability in MethodRegistry (SUPPORTED & AVAILABLE).
+7. Adversarial runtime type rejection (TypeError for float/str/int) and a == 0 rejection (TraceInvalidInputError).
+8. Complete end-to-end cross-verification with HostIndependentVerifier.verify_quadratic_solution.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from mke_product.domain.models import (
     SolutionOutcome,
     SolutionRootType,
     SolutionTrace,
+    SupportStatus,
     VerificationOutcome,
 )
 from mke_product.domain.registry import MethodRegistry
@@ -151,6 +153,56 @@ class TestStandardQuadraticFormulaTrace(unittest.TestCase):
         self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(3, 2))
         self._verify_trace_contract(trace, a, b, c)
 
+    def test_standard_formula_negative_a_rational_branch_identity(self):
+        # -x^2 + 3*x - 2 = 0 -> a = -1, b = 3, c = -2, Delta = 1, sqrt(Delta) = 1
+        # (-b - sqrt(Delta))/(2a) = (-3 - 1)/(-2) = 2
+        # (-b + sqrt(Delta))/(2a) = (-3 + 1)/(-2) = 1
+        # Canonical roots: [1, 2]
+        a = Rational(-1, 1)
+        b = Rational(3, 1)
+        c = Rational(-2, 1)
+        trace = self.generator.generate_trace(a, b, c)
+
+        self.assertEqual(trace.solution_outcome, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS)
+        self.assertEqual(trace.roots[0].rational_value.to_rational(), Rational(1, 1))
+        self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(2, 1))
+
+        # Check step 4 displays mathematically true branch values: minus branch = 2, plus branch = 1
+        step4 = trace.steps[3]
+        self.assertIn(r"-b - \sqrt{\Delta}", step4.latex_expression)
+        self.assertIn(r"-b + \sqrt{\Delta}", step4.latex_expression)
+        self.assertTrue("= 2" in step4.latex_expression and "= 1" in step4.latex_expression)
+        # Must NOT claim minus branch = 1
+        self.assertFalse(r"-b-\sqrt{\Delta}}{2a}=1" in step4.latex_expression.replace(" ", ""))
+
+        self.assertEqual(trace.final_answer_latex, "S = \\left\\{ 1, 2 \\right\\}")
+        self._verify_trace_contract(trace, a, b, c)
+
+    def test_standard_formula_negative_a_surd_branch_identity(self):
+        # -x^2 + 2 = 0 -> a = -1, b = 0, c = 2, Delta = 8 = 4*2, sqrt(Delta) = 2*sqrt(2)
+        # (-b - sqrt(Delta))/(2a) = (0 - 2*sqrt(2))/(-2) = sqrt(2)
+        # (-b + sqrt(Delta))/(2a) = (0 + 2*sqrt(2))/(-2) = -sqrt(2)
+        # Canonical roots: [-sqrt(2), sqrt(2)]
+        a = Rational(-1, 1)
+        b = Rational(0, 1)
+        c = Rational(2, 1)
+        trace = self.generator.generate_trace(a, b, c)
+
+        self.assertEqual(trace.solution_outcome, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS)
+        self.assertEqual(trace.roots[0].latex_str, "-\\sqrt{2}")
+        self.assertEqual(trace.roots[1].latex_str, "\\sqrt{2}")
+
+        step4 = trace.steps[3]
+        # Minus branch must equal \sqrt{2}
+        self.assertTrue(r"-b-\sqrt{\Delta}}{2a}=\sqrt{2}" in step4.latex_expression.replace(" ", "") or
+                        r"-b - \sqrt{\Delta}}{2a} = \sqrt{2}" in step4.latex_expression)
+        # Plus branch must equal -\sqrt{2}
+        self.assertTrue(r"-b+\sqrt{\Delta}}{2a}=-\sqrt{2}" in step4.latex_expression.replace(" ", "") or
+                        r"-b + \sqrt{\Delta}}{2a} = -\\sqrt{2}" in step4.latex_expression)
+
+        self.assertEqual(trace.final_answer_latex, "S = \\left\\{ -\\sqrt{2}, \\sqrt{2} \\right\\}")
+        self._verify_trace_contract(trace, a, b, c)
+
 
 class TestReducedQuadraticFormulaTrace(unittest.TestCase):
     """Tests for Reduced Quadratic Formula trace generator (QUAD_FORMULA_REDUCED)."""
@@ -260,6 +312,51 @@ class TestReducedQuadraticFormulaTrace(unittest.TestCase):
         self.assertEqual(trace.roots[1].radicand, 2)
         self._verify_trace_contract(trace, a, b, c)
 
+    def test_reduced_formula_negative_a_rational_branch_identity(self):
+        # -x^2 + 3*x - 2 = 0 -> a = -1, b' = 3/2, c = -2, Delta' = 1/4, sqrt(Delta') = 1/2
+        # (-b' - sqrt(Delta'))/a = (-3/2 - 1/2)/(-1) = 2
+        # (-b' + sqrt(Delta'))/a = (-3/2 + 1/2)/(-1) = 1
+        # Canonical roots: [1, 2]
+        a = Rational(-1, 1)
+        b = Rational(3, 1)
+        c = Rational(-2, 1)
+        trace = self.generator.generate_trace(a, b, c)
+
+        self.assertEqual(trace.solution_outcome, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS)
+        self.assertEqual(trace.roots[0].rational_value.to_rational(), Rational(1, 1))
+        self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(2, 1))
+
+        step4 = trace.steps[3]
+        self.assertIn(r"-b' - \sqrt{\Delta'}", step4.latex_expression)
+        self.assertIn(r"-b' + \sqrt{\Delta'}", step4.latex_expression)
+        self.assertTrue("= 2" in step4.latex_expression and "= 1" in step4.latex_expression)
+        self.assertFalse(r"-b'-\sqrt{\Delta'}}{a}=1" in step4.latex_expression.replace(" ", ""))
+
+        self.assertEqual(trace.final_answer_latex, "S = \\left\\{ 1, 2 \\right\\}")
+        self._verify_trace_contract(trace, a, b, c)
+
+    def test_reduced_formula_negative_a_surd_branch_identity(self):
+        # -x^2 + 2 = 0 -> a = -1, b' = 0, c = 2, Delta' = 2, sqrt(Delta') = sqrt(2)
+        # (-b' - sqrt(Delta'))/a = -sqrt(2)/(-1) = sqrt(2)
+        # (-b' + sqrt(Delta'))/a = sqrt(2)/(-1) = -sqrt(2)
+        a = Rational(-1, 1)
+        b = Rational(0, 1)
+        c = Rational(2, 1)
+        trace = self.generator.generate_trace(a, b, c)
+
+        self.assertEqual(trace.solution_outcome, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS)
+        self.assertEqual(trace.roots[0].latex_str, "-\\sqrt{2}")
+        self.assertEqual(trace.roots[1].latex_str, "\\sqrt{2}")
+
+        step4 = trace.steps[3]
+        self.assertTrue(r"-b'-\sqrt{\Delta'}}{a}=\sqrt{2}" in step4.latex_expression.replace(" ", "") or
+                        r"-b' - \sqrt{\Delta'}}{a} = \sqrt{2}" in step4.latex_expression)
+        self.assertTrue(r"-b'+\sqrt{\Delta'}}{a}=-\sqrt{2}" in step4.latex_expression.replace(" ", "") or
+                        r"-b' + \sqrt{\Delta'}}{a} = -\sqrt{2}" in step4.latex_expression)
+
+        self.assertEqual(trace.final_answer_latex, "S = \\left\\{ -\\sqrt{2}, \\sqrt{2} \\right\\}")
+        self._verify_trace_contract(trace, a, b, c)
+
 
 class TestVieteSpecialSumTrace(unittest.TestCase):
     """Tests for Viète Special Sum trace generator (QUAD_VIETE_SPECIAL_SUM)."""
@@ -282,25 +379,41 @@ class TestVieteSpecialSumTrace(unittest.TestCase):
         self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(2, 1))
         self.assertEqual(trace.final_answer_latex, "S = \\left\\{ 1, 2 \\right\\}")
 
+        # Semantic label stability check
+        self.assertEqual(trace.steps[1].latex_expression, "x_1 = 1")
+        self.assertIn("x_2 = 2", trace.steps[2].latex_expression)
+        self.assertIn("x_1 = 1", trace.steps[3].explanation_vi)
+        self.assertIn("x_2 = 2", trace.steps[3].explanation_vi)
+
         cert = self.verifier.verify_quadratic_solution(
             a, b, c, trace.solution_outcome, trace.roots, problem_hash="test_viete_sum_1"
         )
         self.assertEqual(cert.outcome, VerificationOutcome.VERIFIED_COMPLETE)
 
-    def test_viete_sum_applicable_non_monic(self):
-        # 2*x^2 - 5*x + 3 = 0 -> a+b+c = 2 - 5 + 3 = 0 -> roots {1, 3/2}
+    def test_viete_sum_applicable_non_monic_label_order_reversal(self):
+        # 2*x^2 - 3*x + 1 = 0 -> a+b+c = 2 - 3 + 1 = 0
+        # Derived labels: x1 = 1, x2 = c/a = 1/2
+        # Canonical roots: [1/2, 1]
         a = Rational(2, 1)
-        b = Rational(-5, 1)
-        c = Rational(3, 1)
+        b = Rational(-3, 1)
+        c = Rational(1, 1)
         trace = self.generator.generate_trace(a, b, c)
 
         self.assertEqual(trace.solution_outcome, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS)
         self.assertEqual(len(trace.roots), 2)
-        self.assertEqual(trace.roots[0].rational_value.to_rational(), Rational(1, 1))
-        self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(3, 2))
+        self.assertEqual(trace.roots[0].rational_value.to_rational(), Rational(1, 2))
+        self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(1, 1))
+
+        # Check semantic labels: x1 must remain 1, x2 must remain 1/2
+        self.assertEqual(trace.steps[1].latex_expression, "x_1 = 1")
+        self.assertIn(r"x_2 = \frac{1}{2}", trace.steps[2].latex_expression)
+        # Step 4 must present canonical set S = {1/2, 1} without swapping x1/x2 definitions
+        self.assertIn(r"S = \left\{ \frac{1}{2}, 1 \right\}", trace.steps[3].latex_expression)
+        self.assertIn("x_1 = 1", trace.steps[3].explanation_vi)
+        self.assertIn(r"x_2 = \frac{1}{2}", trace.steps[3].explanation_vi)
 
         cert = self.verifier.verify_quadratic_solution(
-            a, b, c, trace.solution_outcome, trace.roots, problem_hash="test_viete_sum_2"
+            a, b, c, trace.solution_outcome, trace.roots, problem_hash="test_viete_sum_rev"
         )
         self.assertEqual(cert.outcome, VerificationOutcome.VERIFIED_COMPLETE)
 
@@ -338,8 +451,10 @@ class TestVieteSpecialDifTrace(unittest.TestCase):
         self.generator = VieteSpecialDifTraceGenerator()
         self.verifier = HostIndependentVerifier()
 
-    def test_viete_dif_applicable_monic(self):
-        # x^2 + 3*x + 2 = 0 -> a - b + c = 1 - 3 + 2 = 0 -> roots {-2, -1}
+    def test_viete_dif_applicable_monic_label_order_reversal(self):
+        # x^2 + 3*x + 2 = 0 -> a - b + c = 1 - 3 + 2 = 0
+        # Derived labels: x1 = -1, x2 = -c/a = -2
+        # Canonical roots: [-2, -1]
         a = Rational(1, 1)
         b = Rational(3, 1)
         c = Rational(2, 1)
@@ -352,13 +467,22 @@ class TestVieteSpecialDifTrace(unittest.TestCase):
         self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(-1, 1))
         self.assertEqual(trace.final_answer_latex, "S = \\left\\{ -2, -1 \\right\\}")
 
+        # Semantic label stability check
+        self.assertEqual(trace.steps[1].latex_expression, "x_1 = -1")
+        self.assertTrue(trace.steps[2].latex_expression.endswith("= -2"))
+        self.assertIn("x_1 = -1", trace.steps[3].explanation_vi)
+        self.assertIn("x_2 = -2", trace.steps[3].explanation_vi)
+        self.assertIn(r"S = \left\{ -2, -1 \right\}", trace.steps[3].latex_expression)
+
         cert = self.verifier.verify_quadratic_solution(
             a, b, c, trace.solution_outcome, trace.roots, problem_hash="test_viete_dif_1"
         )
         self.assertEqual(cert.outcome, VerificationOutcome.VERIFIED_COMPLETE)
 
     def test_viete_dif_applicable_non_monic(self):
-        # 2*x^2 + 5*x + 3 = 0 -> a - b + c = 2 - 5 + 3 = 0 -> roots {-3/2, -1}
+        # 2*x^2 + 5*x + 3 = 0 -> a - b + c = 2 - 5 + 3 = 0
+        # Derived labels: x1 = -1, x2 = -c/a = -3/2
+        # Canonical roots: [-3/2, -1]
         a = Rational(2, 1)
         b = Rational(5, 1)
         c = Rational(3, 1)
@@ -368,6 +492,11 @@ class TestVieteSpecialDifTrace(unittest.TestCase):
         self.assertEqual(len(trace.roots), 2)
         self.assertEqual(trace.roots[0].rational_value.to_rational(), Rational(-3, 2))
         self.assertEqual(trace.roots[1].rational_value.to_rational(), Rational(-1, 1))
+
+        self.assertEqual(trace.steps[1].latex_expression, "x_1 = -1")
+        self.assertIn(r"x_2 = -\frac{3}{2}", trace.steps[2].latex_expression)
+        self.assertIn("x_1 = -1", trace.steps[3].explanation_vi)
+        self.assertIn(r"x_2 = -\frac{3}{2}", trace.steps[3].explanation_vi)
 
         cert = self.verifier.verify_quadratic_solution(
             a, b, c, trace.solution_outcome, trace.roots, problem_hash="test_viete_dif_2"
@@ -412,6 +541,14 @@ class TestTraceRegistryAndCapabilityConsistency(unittest.TestCase):
         }
         self.assertEqual(set(TRACE_GENERATORS.keys()), available_methods)
 
+    def test_registered_generators_are_supported_and_available(self):
+        """Verify that every registered trace generator in S1 has SUPPORTED and AVAILABLE status."""
+        for method_id in TRACE_GENERATORS:
+            caps = MethodRegistry.S0_CAPABILITY_MATRIX.get(method_id)
+            self.assertIsNotNone(caps, f"Method {method_id} missing from S0 capability matrix")
+            self.assertEqual(caps["support_status"], SupportStatus.SUPPORTED)
+            self.assertEqual(caps["execution_availability"], ExecutionAvailability.AVAILABLE)
+
     def test_unavailable_methods_raise_error(self):
         unavailable_ids = [
             "QUAD_FACTORIZATION_Q",
@@ -421,6 +558,9 @@ class TestTraceRegistryAndCapabilityConsistency(unittest.TestCase):
             "QUAD_GRAPHICAL_ANALYSIS",
         ]
         for m_id in unavailable_ids:
+            caps = MethodRegistry.S0_CAPABILITY_MATRIX.get(m_id)
+            self.assertIsNotNone(caps)
+            self.assertEqual(caps["execution_availability"], ExecutionAvailability.UNAVAILABLE)
             with self.assertRaises(TraceMethodUnavailableError):
                 get_trace_generator(m_id)
 

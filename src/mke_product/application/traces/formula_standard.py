@@ -95,6 +95,18 @@ class StandardQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                 )
             )
         else:  # disc.is_positive
+            # Formula branch assignment accounting for denominator 2a sign:
+            # Minus branch: (-b - sqrt(Delta))/(2a)
+            # Plus branch:  (-b + sqrt(Delta))/(2a)
+            # When a > 0: minus branch is smaller (kernel_roots[0]), plus branch is larger (kernel_roots[1])
+            # When a < 0: 2a < 0 flips inequality; minus branch is larger (kernel_roots[1]), plus branch is smaller (kernel_roots[0])
+            if a.is_positive:
+                r_minus_lat = kernel_roots[0].latex_str
+                r_plus_lat = kernel_roots[1].latex_str
+            else:
+                r_minus_lat = kernel_roots[1].latex_str
+                r_plus_lat = kernel_roots[0].latex_str
+
             if disc.is_rational_square:
                 assert disc.square_root_rational is not None
                 sqrt_delta_lat = disc.square_root_rational.to_latex()
@@ -107,12 +119,10 @@ class StandardQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                         why_this_step_vi="Delta là số chính phương hữu tỉ nên căn bậc hai là một số hữu tỉ chính xác.",
                     )
                 )
-                r1_lat = kernel_roots[0].latex_str
-                r2_lat = kernel_roots[1].latex_str
                 steps.append(
                     SolutionStep(
                         step_number=4,
-                        latex_expression=f"x_1 = \\frac{{-b - \\sqrt{{\\Delta}}}}{{2a}} = {r1_lat}, \\quad x_2 = \\frac{{-b + \\sqrt{{\\Delta}}}}{{2a}} = {r2_lat}",
+                        latex_expression=f"x_1 = \\frac{{-b - \\sqrt{{\\Delta}}}}{{2a}} = {r_minus_lat}, \\quad x_2 = \\frac{{-b + \\sqrt{{\\Delta}}}}{{2a}} = {r_plus_lat}",
                         explanation_vi="Vì Delta > 0 nên phương trình có hai nghiệm phân biệt.",
                         rule_or_theorem_used=RULE_QUADRATIC_FORMULA,
                         why_this_step_vi="Áp dụng công thức nghiệm tổng quát để tính chính xác hai nghiệm phân biệt.",
@@ -133,12 +143,10 @@ class StandardQuadraticFormulaTraceGenerator(BaseTraceGenerator):
                         why_this_step_vi="Khai căn phần chính phương giúp đơn giản hóa biểu thức nghiệm vô tỉ.",
                     )
                 )
-                r1_lat = kernel_roots[0].latex_str
-                r2_lat = kernel_roots[1].latex_str
                 steps.append(
                     SolutionStep(
                         step_number=4,
-                        latex_expression=f"x_1 = \\frac{{-b - \\sqrt{{\\Delta}}}}{{2a}} = {r1_lat}, \\quad x_2 = \\frac{{-b + \\sqrt{{\\Delta}}}}{{2a}} = {r2_lat}",
+                        latex_expression=f"x_1 = \\frac{{-b - \\sqrt{{\\Delta}}}}{{2a}} = {r_minus_lat}, \\quad x_2 = \\frac{{-b + \\sqrt{{\\Delta}}}}{{2a}} = {r_plus_lat}",
                         explanation_vi="Vì Delta > 0 nên phương trình có hai nghiệm phân biệt.",
                         rule_or_theorem_used=RULE_QUADRATIC_FORMULA,
                         why_this_step_vi="Áp dụng công thức nghiệm tổng quát cho phương trình có nghiệm vô tỉ.",

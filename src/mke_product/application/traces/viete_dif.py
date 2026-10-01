@@ -88,7 +88,7 @@ class VieteSpecialDifTraceGenerator(BaseTraceGenerator):
             )
         )
 
-        # Step 4: Conclusion matching canonical kernel outcome
+        # Step 4: Conclusion with stable semantic labels
         if kernel_outcome == SolutionOutcome.ONE_REPEATED_REAL_ROOT:
             steps.append(
                 SolutionStep(
@@ -100,15 +100,14 @@ class VieteSpecialDifTraceGenerator(BaseTraceGenerator):
                 )
             )
         else:
-            r1_lat = kernel_roots[0].latex_str
-            r2_lat = kernel_roots[1].latex_str
+            # Maintain semantic derivation labels x1 = -1, x2 = -c/a and present canonical solution set S
             steps.append(
                 SolutionStep(
                     step_number=4,
-                    latex_expression=f"x_1 = {r1_lat}, \\quad x_2 = {r2_lat}",
-                    explanation_vi="Kết luận hai nghiệm phân biệt của phương trình.",
+                    latex_expression=f"S = \\left\\{{ {kernel_roots[0].latex_str}, {kernel_roots[1].latex_str} \\right\\}}",
+                    explanation_vi=f"Vậy phương trình có hai nghiệm x_1 = -1, x_2 = {r2_lat}, tập nghiệm là S.",
                     rule_or_theorem_used=RULE_CONCLUSION,
-                    why_this_step_vi="Trình bày tập nghiệm theo thứ tự chuẩn hóa.",
+                    why_this_step_vi="Kết luận tập nghiệm của phương trình theo thứ tự chuẩn hóa.",
                 )
             )
 

@@ -57,7 +57,7 @@ def get_trace_generator(method_id: str) -> BaseTraceGenerator:
 def generate_solution_trace(
     method_id: str, a: Rational, b: Rational, c: Rational
 ) -> SolutionTrace:
-    """Convenience gateway to generate a verified deterministic SolutionTrace."""
+    """Generate deterministic exact-kernel-backed SolutionTrace."""
     generator = get_trace_generator(method_id)
     return generator.generate_trace(a, b, c)
 
