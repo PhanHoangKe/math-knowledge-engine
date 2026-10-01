@@ -1,14 +1,15 @@
-# MKE Product 03C-P1C-04-B3 Preflight: Exact Quadratic Complex Roots Architecture
+# MKE Product 03C-P1C-04-B3 Preflight: Exact Quadratic Complex Roots Architecture (R1 Revision)
 
 - **Milestone:** MKE Product 03C-P1C-04-B3
-- **Document Version:** 1.0.0 (B3 Technical Preflight Specification)
+- **Document Version:** 1.1.0 (B3 Technical Preflight Specification — R1 Remediation)
 - **Implementer:** Antigravity (Implementation Engineer)
 - **Coordinator / Independent Auditor:** ChatGPT
 - **Project Owner:** Kế Phan Hoàng
 - **Repository:** `PhanHoangKe/math-knowledge-engine`
 - **Active Branch:** `product/p03c-p1c-04-b3-exact-complex-preflight`
+- **Parent Preflight Commit:** `3749fe499aa8059a3cc747295214cf76d492fd70`
 - **Predecessor Baseline:** P1C-04-B2 Accepted / Closed (`dfa6d6626fdaf99e9d51b6f7321ed0342860355a`, Tag: `p03c-p1c-04-b2-accepted`)
-- **Status:** PREFLIGHT SPECIFICATION — PENDING AUDITOR GO/NO-GO REVIEW
+- **Status:** PREFLIGHT SPECIFICATION R1 — PENDING AUDITOR GO/NO-GO REVIEW
 - **Date:** 2026-10-01
 
 ---
@@ -18,17 +19,14 @@
 ### 1.1 Recommendation: GO BOUNDED
 We recommend **GO BOUNDED** for the implementation of milestone **PRODUCT-03C-P1C-04-B3** under the following mathematical, architectural, and security invariants:
 
-1. **Exact Symbolic Complex Representation:** Exact quadratic complex roots are represented in the field $\mathbb{Q}(i\sqrt{d})$ as $a \pm c \cdot i\sqrt{d}$, where $a \in \mathbb{Q}$ is the exact rational real part, $c \in \mathbb{Q}^+$ is the exact positive rational imaginary magnitude, and $d \in \mathbb{Z}^+$ is a certified squarefree integer ($d = 1$ for purely rational imaginary roots, $2 \le d < 2^{32}$ for imaginary surd roots).
-2. **Zero Floating-Point & Zero Native Python `complex`:** All solving, reduction, protocol serialization, and independent host verification are performed exclusively using exact integer and rational arithmetic (`Rational`). No floating-point approximations, `complex` primitives, or third-party CAS engines (e.g., SymPy) are permitted anywhere in the pipeline.
-3. **Dedicated Protocol Version `mke.p02a.v4`:** To preserve the frozen contracts of `mke.p02a.v1` (affine / B0), `mke.p02a.v2` (rational quadratic / B1), and `mke.p02a.v3` (quadratic surd / B2), complex solving is introduced via dedicated schema `mke.p02a.v4` and operation `SOLVE_QUADRATIC_COMPLEX`.
-4. **Certified Squarefree Normalization of $|\Delta|$ ($-\Delta$):** Deterministic extraction of small prime squares ($p_i \le 65536$) with a strict 32-bit ceiling on the unfactored remainder ($R < 2^{32}$). If $R \ge 2^{32}$, execution fails closed pre-dispatch with `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT` without spawning worker processes.
-5. **Independent Host Verification over $\mathbb{Q}(i\sqrt{d})$:** Host independently derives expected canonical roots and verifies worker candidates using exact rational algebraic identities:
-   - Vieta sum: $2Aa + B = 0$
-   - Vieta product: $A(a^2 + c^2 d) - C = 0$
-   - Real polynomial residual: $A(a^2 - c^2 d) + Ba + C = 0$
-   - Imaginary polynomial residual: $c(2Aa + B) = 0$
-6. **Strict Operation Separation (Preserving B1 Real-Domain Semantics):** Legacy operations (`SOLVE`, `SOLVE_QUADRATIC`) continue to return `NO_REAL_ROOT` (`solution_type="EMPTY_SET"`) when $\Delta < 0$ in the real domain, preserving GDPT 2018 Grade 9-10 real algebra compatibility. Complex roots are dispatched strictly when requested via the v4 complex path.
-7. **Containment Preservation:** Win32 Job Object and Windows AppContainer containment remain 100% active, with worker entrypoint and baseline files completely frozen.
+1. **Exact Symbolic Complex Representation (Option B):** Exact quadratic complex roots are represented in the field $\mathbb{Q}(i\sqrt{d})$ as $a \pm c \cdot i\sqrt{d}$, where $a \in \mathbb{Q}$ is the exact rational real part, $c \in \mathbb{Q}^+$ is the unique positive rational imaginary magnitude, and $d \in \mathbb{Z}^+$ is a certified squarefree integer ($d = 1$ for purely rational imaginary roots, $2 \le d < 2^{32}$ for imaginary surd roots).
+2. **Explicit Product-Level Complex Entry Path (`dispatch_complex`):** To preserve the locked signature and real-domain semantics of `ControlledDispatchBridge.dispatch(raw_query, ir_payload)`, complex solving is invoked via a dedicated new bridge entry point: `ControlledDispatchBridge.dispatch_complex(raw_query, ir_payload)`. Legacy `dispatch()` continues to return `solution_type="NO_REAL_ROOT"` for $\Delta < 0$.
+3. **Exact C1 Perfect-Square Fast Path:** For $D = -\Delta = p/q > 0$, host and worker independently perform exact integer square-root checks ($s_p^2 == p$ and $s_q^2 == q$). If both numerator and denominator are perfect squares, the root is classified as Case C1 ($d = 1$) and solved immediately in $\mathbb{Q}(i)$ without running the bounded small-prime factorization loop (e.g. supporting $D = 65537^2$ and large rational squares).
+4. **Bounded C2 Squarefree Normalization ($R < 2^{32}$ via $P \le 65536$ Prime Trial Division):** For non-square $-\Delta$, trial division extracts small prime squares ($p_i \le 65536$). The engine certifies squarefreeness if and only if the unfactored remainder $R < 2^{32}$. If $R \ge 2^{32}$, execution fails closed with `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`.
+5. **Zero Floating-Point & Zero Native Python `complex`:** All solving, reduction, protocol serialization, and independent host verification are performed exclusively using exact integer and rational arithmetic (`Rational`). No floating-point approximations, `complex` primitives, or third-party CAS engines (e.g., SymPy) are permitted anywhere in the pipeline.
+6. **Dedicated Protocol Version `mke.p02a.v4`:** Complex solving is introduced via dedicated schema `mke.p02a.v4` and operation `SOLVE_QUADRATIC_COMPLEX`.
+7. **Independent Host Verification over $\mathbb{Q}(i\sqrt{d})$:** Host independently derives expected canonical roots and verifies worker candidates using exact rational algebraic identities (Vieta sum, Vieta product, and real/imaginary polynomial residuals).
+8. **Containment Preservation & Surface Inventory:** Win32 Job Object and Windows AppContainer containment remain 100% active. `entrypoint.py` remains frozen, while `worker/controller.py` is updated to include `SOLVE_QUADRATIC_COMPLEX` in `ALLOWED_OPERATIONS`.
 
 ---
 
@@ -39,104 +37,117 @@ We recommend **GO BOUNDED** for the implementation of milestone **PRODUCT-03C-P1
 | **B0 Baseline (Affine)** | `bba90b868272ef93769b2b0c0ad2a8d8d4e2c9bf` | `147f561a883c6d5ea75febe7857e00291107b6da` | ACCEPTED / FROZEN |
 | **B1 Baseline (Rational Quadratic)** | `56d4eb5a09e751304182492d38087c5a468beff6` | `0da7ac5157e3f92b7934535b45d38d64a6f0b625` | ACCEPTED / FROZEN |
 | **B2 Baseline (Quadratic Surd)** | `e7265539634919bdbc7c276553033b8e9fda2659` | `dfa6d6626fdaf99e9d51b6f7321ed0342860355a` | ACCEPTED / FROZEN (Tag: `p03c-p1c-04-b2-accepted`) |
-| **B3 Preflight (Exact Complex)** | N/A (Docs only) | *Pending Preflight Commit* | UNDER AUDIT |
+| **B3 Preflight R1 (Exact Complex)** | N/A (Docs only) | *Pending R1 Commit* | UNDER AUDIT |
 
 All historical source, tests, protocol semantics, containment bounds, and evidence records remain strictly immutable.
 
 ---
 
-## 3. Existing B0/B1/B2 Behavior & The Routing Conflict
+## 3. Product-Level Entry Path & Routing Architecture
 
-### 3.1 Current B0/B1/B2 Execution Architecture
+### 3.1 Dual-Routing Architecture Diagram
 
 ```
-[User Query / IR Payload]
-        │
-        ▼
-[MKEIntakeValidator.validate()] ──(Invalid / Non-Exhaustive / Scope)──► Fail Closed (NOT_DISPATCHED)
-        │
-        ▼
-[B0 Affine Reduction Check] ──(Degree <= 1)──► Dispatch mke.p02a.v1 / SOLVE
-        │
-        ▼ (Degree == 2)
-[Host Quadratic Reduction] ──► Extracts host (A, B, C) via bounded helpers (max 256 bits)
-        │
-        ▼
-[Host Discriminant] ──► Δ = B^2 - 4*A*C
-        │
-        ├─► If Δ > 0 AND Δ is Rational Square:
-        │     Dispatch mke.p02a.v2 / SOLVE_QUADRATIC ──► Host Verifies TWO_DISTINCT_REAL_ROOTS (Q)
-        │
-        ├─► If Δ == 0:
-        │     Dispatch mke.p02a.v2 / SOLVE_QUADRATIC ──► Host Verifies UNIQUE_REAL_ROOT (Q)
-        │
-        ├─► If Δ > 0 AND Δ is NOT a Rational Square:
-        │     Dispatch mke.p02a.v3 / SOLVE_QUADRATIC_SURD ──► Host Verifies TWO_DISTINCT_REAL_ROOTS (Q(√d))
-        │
-        └─► If Δ < 0:
-              Current B1 Behavior (mke.p02a.v2 / SOLVE_QUADRATIC):
-              ──► Verifies NO_REAL_ROOT ──► Returns solution_type="EMPTY_SET", is_verified=True
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              STUDENT / CALLER INTAKE                                   │
+└───────────────────┬────────────────────────────────────────────────┬───────────────────┘
+                    │                                                │
+       [Legacy Real-Domain Intent]                      [Explicit Complex-Domain Intent]
+                    │                                                │
+                    ▼                                                ▼
+     ControlledDispatchBridge.dispatch()             ControlledDispatchBridge.dispatch_complex()
+                    │                                                │
+                    ▼                                                ▼
+        [MKEIntakeValidator.validate()]                  [MKEIntakeValidator.validate()]
+                    │                                                │
+                    ▼                                                ▼
+         [Host Quadratic Reduction]                       [Host Quadratic Reduction]
+        Extracts (A, B, C) over Q                        Extracts (A, B, C) over Q
+                    │                                                │
+                    ▼                                                ▼
+        Δ = B^2 - 4*A*C                                  Δ = B^2 - 4*A*C
+                    │                                                │
+        ┌───────────┴───────────┐                        ┌───────────┴───────────┐
+        │ (Legacy Real Domain)  │                        │   (Complex Domain)    │
+        ▼                       ▼                        ▼                       ▼
+     If Δ >= 0:              If Δ < 0:                If Δ >= 0:              If Δ < 0:
+  Route v1/v2/v3         Route v2 (mke.p02a.v2)   REJECT_SCOPE             Route v4 (mke.p02a.v4)
+  SOLVE / QUADRATIC      SOLVE_QUADRATIC          Fail Closed              SOLVE_QUADRATIC_COMPLEX
+  Returns real roots     Returns:                 ERR_QUADRATIC_COMPLEX_   Host Verifies & Returns:
+                         solution_type=           EXPECTED_NEGATIVE_DISC   TWO_COMPLEX_CONJUGATE_ROOTS
+                         "NO_REAL_ROOT"           (NOT_DISPATCHED)         in Q(i√d)
+                         verified_roots=[]
 ```
 
-### 3.2 The Semantic Routing Conflict & Resolution
+### 3.2 Product-Level Bridge Entry Contracts
 
-#### Conflict Analysis
-In high-school mathematics (GDPT 2018):
-- **Grade 9 & 10 (Real Domain $\mathbb{R}$):** The equation $x^2 + 1 = 0$ has **no real solution** ($S = \emptyset$). Returning complex roots for a standard Grade 9 real equation would constitute a pedagogical and semantic regression.
-- **Grade 12 & Advanced Algebra (Complex Domain $\mathbb{C}$):** The equation $x^2 + 1 = 0$ has **two complex conjugate roots** $x = \pm i$.
-
-#### Resolution Strategy: Explicit Protocol & Intake Separation
-1. **Legacy Real Routing Preserved:** When requests target standard real-domain solving (e.g. `SOLVE` or `SOLVE_QUADRATIC`), $\Delta < 0$ continues to return `solution_type="EMPTY_SET"` with `is_verified=True` and `verified_roots=[]`.
-2. **Dedicated Complex Operation:** Complex quadratic solving is explicitly bound to `OPERATION_SOLVE_QUADRATIC_COMPLEX` (`"SOLVE_QUADRATIC_COMPLEX"`) under protocol version `SCHEMA_VERSION_V4` (`"mke.p02a.v4"`).
-3. **No Silent Mutation:** Zero legacy tests or existing API consumers will observe changed semantics for $\Delta < 0$ on v1/v2/v3 endpoints.
+1. **`ControlledDispatchBridge.dispatch(raw_query, ir_payload)` (Legacy Real Domain):**
+   - Signature remains strictly locked: accepts only `raw_query` and `ir_payload`.
+   - Preserves 100% backward compatibility for all GDPT 2018 Grade 9-10 real equations.
+   - When $\Delta < 0$, executes `mke.p02a.v2 / SOLVE_QUADRATIC` and returns `ControlledDispatchResult` (or `QuadraticControlledDispatchResult`) with:
+     - `solution_type = "NO_REAL_ROOT"`
+     - `verified_roots = []`
+     - `is_verified = True`
+     - `verification_status = VERIFIED_COMPLETE`
+2. **`ControlledDispatchBridge.dispatch_complex(raw_query, ir_payload)` (New Complex Domain):**
+   - Explicit domain-intent entry point for Grade 12 / advanced complex quadratic solving.
+   - Prohibits inferring complex intent merely because $\Delta < 0$ in `dispatch()`.
+   - Prohibits heuristic string parsing (such as searching for "over C" or "phức") in B3.
+   - Requires:
+     - Input parses cleanly as a single quadratic equation in variable $x$.
+     - Leading coefficient $A \neq 0$.
+     - Discriminant $\Delta = B^2 - 4AC < 0$.
+   - If $\Delta \ge 0$: fails closed pre-dispatch with:
+     - `intake_status = IntakeStatus.REJECTED_SCOPE`
+     - `execution_status = ExecutionStatus.NOT_DISPATCHED`
+     - `verification_status = VerificationStatus.NOT_APPLICABLE`
+     - `is_verified = False`
+     - `error_code = "ERR_QUADRATIC_COMPLEX_EXPECTED_NEGATIVE_DISCRIMINANT"`
 
 ---
 
-## 4. B3 Target Mathematical Scope
+## 4. Mathematical Scope & Exact Subcases
 
-### 4.1 Authorized Problem Class
+### 4.1 Input Scope
 - **Equation:** $A x^2 + B x + C = 0$
 - **Target Variable:** Single variable $x \in \mathbb{C}$
 - **Coefficients:** Exact rational numbers $A, B, C \in \mathbb{Q}$ with $A \neq 0$
-- **Discriminant Condition:** $\Delta = B^2 - 4AC < 0$ (strictly negative)
-- **Positive Absolute Discriminant:** $|\Delta| = -\Delta = 4AC - B^2 > 0$
-- **Squarefree Remainder Condition:** Normalization of $|\Delta| = s^2 \cdot d$ yields squarefree $d$ with $d < 2^{32}$.
+- **Discriminant Condition:** $\Delta = B^2 - 4AC < 0$
+- **Positive Absolute Discriminant:** $D = -\Delta = |\Delta| = 4AC - B^2 > 0$
 
-### 4.2 Mathematical Subcases
+### 4.2 Exact Subcases: Case C1 vs Case C2
 
 #### Case C1 — Rational Imaginary Magnitude ($d = 1$)
-If $-\Delta$ is an exact rational square ($-\Delta \in \mathbb{Q}^2$):
+Occurs when $D = -\Delta = p/q$ is an exact rational square ($\text{isqrt}(p)^2 == p$ and $\text{isqrt}(q)^2 == q$).
 $$x = a \pm b \cdot i$$
 where:
 - $a = \frac{-B}{2A} \in \mathbb{Q}$ (real part)
-- $b = \frac{\sqrt{-\Delta}}{2|A|} \in \mathbb{Q}^+$ (positive rational imaginary coefficient)
-- $d = 1$
+- $b = \frac{\sqrt{-\Delta}}{2|A|} \in \mathbb{Q}^+$ (positive rational imaginary magnitude)
+- $d = 1$ (fixed canonical radicand)
 
-*Example:* $x^2 + 1 = 0 \implies \Delta = -4 \implies -\Delta = 4 = 2^2 \implies x = 0 \pm 1 \cdot i$.
+*Canonical Examples:*
+- $x^2 + 1 = 0 \implies \Delta = -4, -\Delta = 4 = 2^2 \implies \text{roots } [ -1i, +1i ] \implies (0, -1, 1), (0, +1, 1)$.
+- $x^2 + 4 = 0 \implies \Delta = -16, -\Delta = 16 = 4^2 \implies \text{roots } [ -2i, +2i ] \implies (0, -2, 1), (0, +2, 1)$.
+- $25x^2 + 9 = 0 \implies \Delta = -900, -\Delta = 900 = 30^2 \implies \text{roots } [ -(3/5)i, +(3/5)i ] \implies (0, -3/5, 1), (0, +3/5, 1)$.
+- $x^2 + 65537^2 = 0 \implies -\Delta = (2 \cdot 65537)^2 \implies \text{roots } [ -65537i, +65537i ]$ (supported via exact C1 integer-square fast path).
 
 #### Case C2 — Irrational Imaginary Magnitude ($d \ge 2$)
-If $-\Delta$ is not an exact rational square ($-\Delta \notin \mathbb{Q}^2$):
+Occurs when $D = -\Delta$ is not an exact rational square.
 $$x = a \pm b \cdot i\sqrt{d}$$
 where:
 - $a = \frac{-B}{2A} \in \mathbb{Q}$ (real part)
 - $b = \frac{s}{2|A|} \in \mathbb{Q}^+$ (positive rational imaginary coefficient multiplier)
 - $d \in \mathbb{Z}^+$ is certified squarefree with $2 \le d < 2^{32}$ ($-\Delta = s^2 \cdot d$).
 
-*Example:* $x^2 + 2 = 0 \implies \Delta = -8 \implies -\Delta = 8 = 2^2 \cdot 2 \implies x = 0 \pm 1 \cdot i\sqrt{2}$.
+*Canonical Examples:*
+- $x^2 + 2 = 0 \implies \Delta = -8, -\Delta = 8 = 2^2 \cdot 2 \implies \text{roots } [ -1i\sqrt{2}, +1i\sqrt{2} ] \implies (0, -1, 2), (0, +1, 2)$.
+- $x^2 + 2x + 3 = 0 \implies \Delta = -8, -\Delta = 8 = 2^2 \cdot 2 \implies \text{roots } [ -1 - 1i\sqrt{2}, -1 + 1i\sqrt{2} ]$.
 
 ---
 
 ## 5. Canonical Exact Complex Representation
 
-### 5.1 Representation Options Analysis
-
-| Option | Schema Structure | Uniqueness | Complexity | Decision |
-| :--- | :--- | :--- | :--- | :--- |
-| **Option A (Disjoint Models)** | Two separate models: `ComplexRationalRoot(a, b)` and `ComplexSurdRoot(a, b, d)` | High, but creates polymorphic return types | Callers must handle union types `Union[ComplexRationalRoot, ComplexSurdRoot]` | Rejected |
-| **Option B (Unified Canonical Surd Model)** | Single model: `ComplexQuadraticRoot(real_part, imaginary_coefficient, radicand)` with canonical $d=1$ convention | **Proven Unique** | Uniform, clean, zero polymorphism, directly extends B2 patterns | **SELECTED** |
-| **Option C (Free-Form Symbolic AST)** | Arbitrary AST expressions | Low (multiple equivalent AST trees) | High verification and parsing overhead | Rejected |
-
-### 5.2 Selected Canonical Representation: Option B
+### 5.1 Representation Model (Option B)
 Every exact quadratic complex root $z \in \mathbb{C}$ is uniquely represented by the tuple:
 $$\text{Root}(a, c, d) \iff a + c \cdot i\sqrt{d}$$
 where:
@@ -146,98 +157,82 @@ where:
    - When $d = 1$: Represents rational imaginary magnitude $c \cdot i\sqrt{1} = c \cdot i$.
    - When $d \ge 2$: Represents irrational imaginary magnitude $c \cdot i\sqrt{d}$.
 
-### 5.3 Ambiguity Elimination Proofs
-
-| Prohibited Ambiguity | Canonical Enforcement Mechanism |
-| :--- | :--- |
-| $i$ vs $1 \cdot i$ vs $i\sqrt{1}$ | All rational imaginary roots enforce $c = 1/1, d = 1$. |
-| $\sqrt{-2}$ vs $i\sqrt{2}$ | Negative radicands are strictly forbidden ($d \ge 1$); imaginary unit $i$ is factored out. |
-| $2i\sqrt{2}$ vs $i\sqrt{8}$ | Radicand $d$ must be squarefree. $\sqrt{8}$ factors into $s=2, d=2$, forcing $c = \pm 2, d = 2$. |
-| $a + 0 \cdot i$ (Real degenerate root) | $c.numerator \neq 0$ is strictly required on `ComplexQuadraticRoot`. Real roots cannot be represented in B3 complex models. |
-| Unreduced fractions $2/4 \cdot i$ | Rational components enforce $\gcd(|p|, q) = 1$. |
+### 5.2 Canonical Uniqueness Invariants
+- **Squarefree Radicand:** No square factors $> 1$ permitted in $d$. For rational imaginary roots, $d$ is strictly $1$. For surd roots, $d \ge 2$ is squarefree.
+- **Non-Zero Imaginary Part:** $c.numerator \neq 0$ is strictly required. Real degenerate roots ($c = 0$) are rejected.
+- **Sign Invariant for Negative Leading Coefficient ($A < 0$):** Since $b = s / (2|A|) > 0$, the unordered set of roots $\{ \frac{-B}{2A} - b \cdot i\sqrt{d}, \frac{-B}{2A} + b \cdot i\sqrt{d} \}$ is invariant under the sign of $A$. Canonical serialization always places the root with negative imaginary coefficient first.
 
 ---
 
-## 6. Proof of Representation Completeness & Canonical Uniqueness
+## 6. Mathematical Representability vs. Bounded Engine Coverage
 
-### 6.1 Theorem: Completeness of Representation
-**Statement:** Let $P(x) = Ax^2 + Bx + C = 0$ with $A, B, C \in \mathbb{Q}$, $A \neq 0$, and $\Delta = B^2 - 4AC < 0$. Then both roots of $P(x)$ in $\mathbb{C}$ are expressible in the form $a \pm b \cdot i\sqrt{d}$ with $a \in \mathbb{Q}, b \in \mathbb{Q}^+, d \in \mathbb{Z}^+_{\text{sqf}}$.
+To ensure mathematical precision, B3 distinguishes between theoretical mathematical completeness and deterministic bounded execution coverage.
 
-**Proof:**
-1. Since $A, B, C \in \mathbb{Q}$, $\Delta = B^2 - 4AC \in \mathbb{Q}$.
-2. Since $\Delta < 0$, $-\Delta > 0$ is a strictly positive rational number $p/q$ ($p, q \in \mathbb{Z}^+, \gcd(p, q) = 1$).
-3. The product $M = p \cdot q \in \mathbb{Z}^+$ has a unique prime factorization $M = \prod_{k} p_k^{e_k}$.
-4. Let $s_0 = \prod_k p_k^{\lfloor e_k/2 \rfloor}$ and $d = \prod_{k, e_k \text{ odd}} p_k$. Then $M = s_0^2 \cdot d$, where $d$ is squarefree and $d \ge 1$.
-5. Then $-\Delta = \frac{p}{q} = \frac{p q}{q^2} = \frac{M}{q^2} = \left(\frac{s_0}{q}\right)^2 \cdot d = s^2 \cdot d$, where $s = s_0/q \in \mathbb{Q}^+$.
-6. By the quadratic formula, the roots are:
-   $$x = \frac{-B \pm \sqrt{\Delta}}{2A} = \frac{-B \pm i\sqrt{-\Delta}}{2A} = \frac{-B}{2A} \pm \frac{s\sqrt{d}}{2|A|} i = a \pm b \cdot i\sqrt{d}$$
-   where $a = \frac{-B}{2A} \in \mathbb{Q}$ and $b = \frac{s}{2|A|} \in \mathbb{Q}^+$.
-7. Therefore, every quadratic equation over $\mathbb{Q}$ with $\Delta < 0$ has roots covered by the representation $(a, -b, d)$ and $(a, +b, d)$, subject only to the computational 32-bit certification bound on $d$. $\blacksquare$
+### 6.1 Definition A: Mathematical Representability
+**Theorem:** Every quadratic equation $Ax^2 + Bx + C = 0$ with $A, B, C \in \mathbb{Q}$, $A \neq 0$, and $\Delta = B^2 - 4AC < 0$ has two roots in $\mathbb{C}$ that admit an exact mathematical representation $a \pm b \cdot i\sqrt{d}$ with $a \in \mathbb{Q}, b \in \mathbb{Q}^+$, and squarefree integer $d \ge 1$.
 
-### 6.2 Theorem: Uniqueness of Canonical Representation
-**Statement:** For any given quadratic equation $Ax^2 + Bx + C = 0$ ($\Delta < 0$), the representation of the ordered root pair $[(a, -b, d), (a, +b, d)]$ is unique.
+### 6.2 Definition B: Bounded Engine Executable Coverage
+The B3 engine can deterministically solve and certify exact roots if and only if:
+1. **C1 Path:** $-\Delta$ is an exact rational square ($d = 1$ certified via integer square root, regardless of prime magnitude, provided component bit lengths $\le 256$).
+2. **C2 Path:** $-\Delta$ is not an exact rational square, and after stripping all prime-square factors $p_i^2$ for primes $p_i \le 65536$, the remaining unfactored integer $R$ satisfies $R < 2^{32}$.
 
-**Proof:**
-1. The real part $a = -B/(2A)$ is uniquely determined as the quotient of two rationals in $\mathbb{Q}$.
-2. By the Fundamental Theorem of Arithmetic, the squarefree decomposition of $-\Delta = s^2 d$ with $s \in \mathbb{Q}^+$ and squarefree integer $d \ge 1$ is unique.
-3. The imaginary magnitude $b = s/(2|A|)$ is uniquely determined in $\mathbb{Q}^+$.
-4. Lowest-terms reduction of $a = p_a/q_a$ and $b = p_b/q_b$ with $q_a, q_b > 0$ and $\gcd(|p_a|, q_a) = \gcd(p_b, q_b) = 1$ is unique.
-5. The ordering constraint requiring negative imaginary coefficient first ($c_1 = -b < 0$) and positive second ($c_2 = +b > 0$) induces a strict, unique bijection between the unordered root set $\{z_1, z_2\}$ and the ordered sequence $[(a, -b, d), (a, +b, d)]$. $\blacksquare$
+### 6.3 Canonical Counterexample: $-\Delta = 2 \cdot 65537^2$
+- **Mathematical Reality:** $-\Delta = 2 \cdot 65537^2 \implies s = 65537, d = 2$.
+- **Bounded Engine Execution:** Since $65537 > 65536$, the prime trial division loop cannot extract $65537^2$. The remainder $R = 2 \cdot 65537^2 = 8,590,196,738 \approx 2^{32.9999} \ge 2^{32}$.
+- **Engine Behavior:** Fails closed pre-dispatch with `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`.
+- **Integrity Rule:** The engine NEVER claims completeness outside its bounded certification contract.
 
 ---
 
-## 7. Deterministic Root Serialization Ordering
+## 7. Exact C1 Perfect-Square Fast Path
 
-To ensure $100\%$ deterministic transport and avoid floating-point / complex sorting issues:
+To ensure large rational squares (such as $D = 65537^2$ or fractional squares) do not fail due to the small-prime factorization bound, host and worker implement an independent C1 fast path:
 
-1. **Conjugate Pair Structure:** Every complex quadratic solution set contains exactly two distinct conjugate roots:
-   - Root 1: $z_1 = a - b \cdot i\sqrt{d}$ (negative imaginary coefficient $c_1 = -b < 0$)
-   - Root 2: $z_2 = a + b \cdot i\sqrt{d}$ (positive imaginary coefficient $c_2 = +b > 0$)
-2. **Canonical List Order:**
-   $$\text{verified\_complex\_roots} = [z_1, z_2]$$
-3. **Ordering Invariants:**
-   - $z_1.\text{real\_part} == z_2.\text{real\_part} == a$
-   - $z_1.\text{radicand} == z_2.\text{radicand} == d$
-   - $z_1.\text{imaginary\_coefficient.numerator} < 0$
-   - $z_2.\text{imaginary\_coefficient.numerator} > 0$
-   - $|z_1.\text{imaginary\_coefficient}| == z_2.\text{imaginary\_coefficient} == b$
-4. Any response with positive imaginary first, missing root, extra root, or unequal magnitudes is strictly rejected as malformed.
+```python
+# Host / Worker Independent C1 Check
+p = D.numerator
+q = D.denominator
+sp = math.isqrt(p)
+sq = math.isqrt(q)
 
----
+if sp * sp == p and sq * sq == q:
+    # Exact C1 Rational Imaginary Root
+    s = Rational(sp, sq)
+    d = 1
+    # Solves immediately in Q(i) without small-prime sieve loop
+else:
+    # C2 Path: Proceed to small-prime squarefree factorization
+    s, d = _host_normalize_complex_discriminant_squarefree(D)
+```
 
-## 8. Squarefree Certification for $|\Delta|$
-
-### 8.1 The Factoring Challenge & Bounded Contract
-For $-\Delta = p/q \in \mathbb{Q}^+$, let $M = p \cdot q$. To compute $-\Delta = s^2 d$:
-1. **Prime Sieve & Trial Division:** The engine checks all prime squares $p_i^2$ for $p_i \le 65536$ ($2^{16}$, total 6,542 primes).
-2. **Certification Ceiling:** After trial division, $M = s_0^2 \cdot R$.
-   - If $R = 1$: Fully factored rational square ($d = 1$).
-   - If $R < 2^{32}$: $R$ is mathematically certified squarefree.
-     *Proof:* If $R$ contained a composite square factor $q^2 > 1$, then prime factor $q \ge 65537 > 2^{16} \implies q^2 > (2^{16})^2 = 2^{32} > R$, which contradicts $q^2 \mid R$. Thus, $R$ cannot contain any square factor $> 1$ and is certified squarefree ($d = R$).
-   - If $R \ge 2^{32}$: Squarefreeness cannot be certified in $O(1)$ small-prime bounds. The engine **fails closed** with `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`.
+### Mandatory Adversarial Distinction:
+1. $D = 65537^2 \implies C1$ success, $d = 1$, root pair $[ -65537i, +65537i ]$.
+2. $D = (65537/65539)^2 \implies C1$ success, $d = 1$, root pair $[ -(65537/65539)i, +(65537/65539)i ]$.
+3. $D = 2 \cdot 65537^2 \implies C2$ bounded certification failure, `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`.
 
 ---
 
-## 9. Resource Bounds & Containment Philosophy
+## 8. Independent Host Verification over $\mathbb{Q}(i\sqrt{d})$
 
-| Resource Dimension | Bound / Ceiling | Enforcement Point | Fail-Closed Action |
-| :--- | :--- | :--- | :--- |
-| **Rational Component Bit Length** | 256 bits ($p, q < 2^{256}$) | Host & Worker AST / Rational checks | `ERR_RESOURCE_EXHAUSTED` |
-| **Normalization Product $M = p \cdot q$** | 512 bits ($M < 2^{512}$) | Host & Worker Normalizer | `ERR_RESOURCE_EXHAUSTED` |
-| **Squarefree Trial Primes** | $p_i \le 65536$ (6,542 primes) | Host & Worker Factorization Loop | Strict loop bound |
-| **Squarefree Remainder Bound** | $R < 2^{32}$ (32 bits) | Host & Worker Post-Factorization | `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT` |
-| **AST Node Budget** | Max 100 nodes | Host AST Coefficient Extractor | `ERR_AST_TOO_COMPLEX` |
-| **AST Depth Budget** | Max 20 recursive depth | Host AST Coefficient Extractor | `ERR_AST_TOO_DEEP` |
-| **Wall-Clock Budget** | 5.0 seconds aggregate | Host Monotonic Timer | `ERR_TIMEOUT` |
-| **Process Memory** | 256 MB per worker | Win32 Job Object | `ERR_RESOURCE_EXHAUSTED` |
-| **Job Memory** | 512 MB job limit | Win32 Job Object | `ERR_RESOURCE_EXHAUSTED` |
-| **Breakaway Processes** | Denied (`JOB_OBJECT_LIMIT_BREAKAWAY_OK` omitted) | Win32 Job Object | Process termination |
+The trusted host verifier never trusts worker calculations. It independently validates candidate roots $z_1 = a - b \cdot i\sqrt{d}$ and $z_2 = a + b \cdot i\sqrt{d}$ using exact rational arithmetic (`Rational`):
+
+### 8.1 Proof Identities
+1. **Vieta Sum:**
+   $$z_1 + z_2 = 2a == -\frac{B}{A} \iff 2Aa + B == 0 \text{ in } \mathbb{Q}$$
+2. **Vieta Product:**
+   $$z_1 \cdot z_2 = a^2 + b^2 d == \frac{C}{A} \iff A(a^2 + b^2 d) - C == 0 \text{ in } \mathbb{Q}$$
+3. **Exact Polynomial Residual Real Component:**
+   $$\text{Re}(P(z)) = A(a^2 - b^2 d) + Ba + C == 0 \text{ in } \mathbb{Q}$$
+4. **Exact Polynomial Residual Imaginary Component:**
+   $$\text{Im}(P(z)) = b(2Aa + B) == 0 \text{ in } \mathbb{Q}$$
+
+Host evaluates all four identities strictly in $\mathbb{Q}$. Zero floating-point and zero `complex` numbers are used.
 
 ---
 
-## 10. Dedicated Protocol Version 4 (`mke.p02a.v4`)
+## 9. Protocol Version 4 (`mke.p02a.v4`) Envelopes
 
-### 10.1 Request Envelope
+### 9.1 Request Envelope
 ```json
 {
   "schema_version": "mke.p02a.v4",
@@ -246,7 +241,7 @@ For $-\Delta = p/q \in \mathbb{Q}^+$, let $M = p \cdot q$. To compute $-\Delta =
 }
 ```
 
-### 10.2 Success Response Envelope
+### 9.2 Success Response Envelope (Exact Key Set)
 ```json
 {
   "schema_version": "mke.p02a.v4",
@@ -255,32 +250,17 @@ For $-\Delta = p/q \in \mathbb{Q}^+$, let $M = p \cdot q$. To compute $-\Delta =
   "status": "TWO_COMPLEX_CONJUGATE_ROOTS",
   "roots": [
     {
-      "real_part": {
-        "numerator": "-1",
-        "denominator": "1"
-      },
-      "imaginary_coefficient": {
-        "numerator": "-2",
-        "denominator": "1"
-      },
+      "real_part": {"numerator": "-1", "denominator": "1"},
+      "imaginary_coefficient": {"numerator": "-2", "denominator": "1"},
       "radicand": "1"
     },
     {
-      "real_part": {
-        "numerator": "-1",
-        "denominator": "1"
-      },
-      "imaginary_coefficient": {
-        "numerator": "2",
-        "denominator": "1"
-      },
+      "real_part": {"numerator": "-1", "denominator": "1"},
+      "imaginary_coefficient": {"numerator": "2", "denominator": "1"},
       "radicand": "1"
     }
   ],
-  "discriminant": {
-    "numerator": "-16",
-    "denominator": "1"
-  },
+  "discriminant": {"numerator": "-16", "denominator": "1"},
   "radicand": "1",
   "definedness": true,
   "error": null,
@@ -288,60 +268,54 @@ For $-\Delta = p/q \in \mathbb{Q}^+$, let $M = p \cdot q$. To compute $-\Delta =
 }
 ```
 
-### 10.3 Protocol Invariants & Rejection Rules
-- Exact field set match: any unexpected or missing keys produce `ERR_PROTOCOL_ERROR`.
-- `schema_version` must be strictly `"mke.p02a.v4"`.
-- `operation` must be strictly `"SOLVE_QUADRATIC_COMPLEX"`.
-- `roots` must be a 2-element list of exact wire dictionaries.
-- `discriminant` must have negative numerator (`numerator < 0`).
-- `radicand` must be a string decimal integer $1 \le d < 2^{32}$.
-- Cross-version dispatch (e.g. sending `SOLVE` on v4 or `SOLVE_QUADRATIC_COMPLEX` on v1/v2/v3) is strictly rejected at the protocol layer.
+### 9.3 Out-Of-Scope Response Envelope ($\Delta \ge 0$)
+```json
+{
+  "schema_version": "mke.p02a.v4",
+  "operation": "SOLVE_QUADRATIC_COMPLEX",
+  "outcome": "OUT_OF_SCOPE",
+  "status": "OUT_OF_SCOPE",
+  "roots": [],
+  "discriminant": {"numerator": "0", "denominator": "1"},
+  "radicand": null,
+  "definedness": true,
+  "error": {
+    "code": "ERR_QUADRATIC_COMPLEX_EXPECTED_NEGATIVE_DISCRIMINANT",
+    "message": "Discriminant is non-negative; complex solver requires strictly negative discriminant."
+  },
+  "is_provisional_evidence": false
+}
+```
+
+### 9.4 Resource-Exhausted Response Envelope
+```json
+{
+  "schema_version": "mke.p02a.v4",
+  "operation": "SOLVE_QUADRATIC_COMPLEX",
+  "outcome": "RESOURCE_EXHAUSTED",
+  "status": "RESOURCE_EXHAUSTED",
+  "roots": [],
+  "discriminant": null,
+  "radicand": null,
+  "definedness": true,
+  "error": {
+    "code": "ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT",
+    "message": "Unfactored discriminant remainder exceeds 32-bit certification bound."
+  },
+  "is_provisional_evidence": false
+}
+```
+
+### 9.5 Protocol & Infrastructure Error Envelopes
+- Protocol syntax errors emit `outcome="PROTOCOL_ERROR"`, `status="PROTOCOL_ERROR"`, `error={"code": "ERR_PROTOCOL_ERROR", ...}`.
+- Worker timeout emits `outcome="TIMEOUT"`, `status="WORKER_TIMEOUT"`, `error={"code": "ERR_TIMEOUT", ...}`.
+- AppContainer startup failure emits `outcome="ENGINE_ERROR"`, `status="WORKER_STARTUP_FAILURE"`.
 
 ---
 
-## 11. Worker Solver Architecture
+## 10. Strict B3 Public Models Contract
 
-### 11.1 Pure-Python Isolated Kernel
-Located in `src/mke_product/solver/quadratic_complex.py`:
-- Extracts coefficients $A, B, C \in \mathbb{Q}$ from parsed AST.
-- Computes $\Delta = B^2 - 4AC$.
-- If $\Delta \ge 0$: returns `status="OUT_OF_SCOPE"`, `error_code="ERR_QUADRATIC_COMPLEX_EXPECTED_NEGATIVE_DISCRIMINANT"`.
-- Computes $-\Delta = |\Delta|$.
-- Normalizes $-\Delta = s^2 \cdot d$ using worker-local prime trial division.
-- If $R \ge 2^{32}$: returns `status="RESOURCE_EXHAUSTED"`, `error_code="ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT"`.
-- Computes:
-  $$a = \frac{-B}{2A}, \quad b = \frac{s}{2|A|}$$
-- Returns `QuadraticComplexSolverResult` with status `"TWO_COMPLEX_CONJUGATE_ROOTS"`, roots $[(a, -b, d), (a, +b, d)]$, `discriminant`, and `radicand`.
-
----
-
-## 12. Independent Host Algebraic Verification Gate
-
-### 12.1 Host Verification Invariant
-The host verifier **never trusts worker output**. The worker output is treated strictly as provisional evidence (`is_provisional_evidence: true`).
-
-### 12.2 Exact Algebraic Proof over $\mathbb{Q}(i\sqrt{d})$
-The host independently:
-1. Re-extracts $A, B, C \in \mathbb{Q}$ from the original validated AST.
-2. Computes host discriminant $\Delta_{\text{host}} = B^2 - 4AC$.
-3. Verifies $\Delta_{\text{host}} < 0$.
-4. Independently normalizes $-\Delta_{\text{host}} = s_{\text{host}}^2 \cdot d_{\text{host}}$ using the host's independent prime sieve.
-5. Proves the algebraic identities in $\mathbb{Q}$ using exact rational arithmetic:
-   - **Identity 1 (Vieta Sum):**
-     $$z_1 + z_2 = 2a \iff 2Aa + B = 0$$
-   - **Identity 2 (Vieta Product):**
-     $$z_1 \cdot z_2 = a^2 + b^2 d \iff A(a^2 + b^2 d) - C = 0$$
-   - **Identity 3 (Real Polynomial Residual):**
-     $$A(a^2 - b^2 d) + Ba + C = 0$$
-   - **Identity 4 (Imaginary Polynomial Residual):**
-     $$b(2Aa + B) = 0$$
-6. Validates that wire response roots match $[(a, -b, d), (a, +b, d)]$ with exact canonical signs and lowest-terms rationals.
-
----
-
-## 13. Public Pydantic Models Contract
-
-### 13.1 Root Model: `ComplexQuadraticRoot`
+### 10.1 `ComplexQuadraticRoot`
 ```python
 class ComplexQuadraticRoot(BaseModel):
     """Exact quadratic complex root in public result: real_part + imaginary_coefficient * i * sqrt(radicand)."""
@@ -362,14 +336,14 @@ class ComplexQuadraticRoot(BaseModel):
         return self
 ```
 
-### 13.2 Result Model: `ComplexControlledDispatchResult`
+### 10.2 `ComplexControlledDispatchResult`
 ```python
 class ComplexControlledDispatchResult(ControlledDispatchResult):
-    """B3-specific outcome model carrying exact complex conjugate roots and discriminant."""
+    """B3-specific outcome model carrying exact complex conjugate roots and strict discriminant."""
     model_config = ConfigDict(extra="forbid")
 
     verified_complex_roots: List[ComplexQuadraticRoot] = Field(..., description="Exact complex conjugate roots pair [z_minus, z_plus]")
-    discriminant: RationalRoot = Field(..., description="Exact negative rational discriminant")
+    discriminant: SurdRationalComponent = Field(..., strict=True, description="Strict negative rational discriminant")
     radicand: int = Field(..., strict=True, description="Certified squarefree radicand d in [1, 2^32 - 1]")
     representation: Literal["QUADRATIC_COMPLEX"] = Field(default="QUADRATIC_COMPLEX", description="Representation tag")
 
@@ -397,52 +371,106 @@ class ComplexControlledDispatchResult(ControlledDispatchResult):
 
 ---
 
-## 14. Backward Compatibility Matrix
+## 11. Resource Bounds & Product Constants Reconciled
 
-| API / Endpoint | Target Domain | Input Equation | Pre-B3 Result | B3 Result | Compatibility Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `v1 / SOLVE` | Real $\mathbb{R}$ | `2*x + 4 = 0` | $x = -2$ | $x = -2$ | 100% Identical |
-| `v2 / SOLVE_QUADRATIC` | Real $\mathbb{R}$ | `x^2 - 4 = 0` | $x = \pm 2$ | $x = \pm 2$ | 100% Identical |
-| `v2 / SOLVE_QUADRATIC` | Real $\mathbb{R}$ | `x^2 + 1 = 0` | `NO_REAL_ROOT` (`EMPTY_SET`) | `NO_REAL_ROOT` (`EMPTY_SET`) | 100% Identical |
-| `v3 / SOLVE_QUADRATIC_SURD` | Real $\mathbb{R}$ | `x^2 - 2 = 0` | $x = \pm \sqrt{2}$ | $x = \pm \sqrt{2}$ | 100% Identical |
-| `v4 / SOLVE_QUADRATIC_COMPLEX` | Complex $\mathbb{C}$ | `x^2 + 1 = 0` | Unsupported (v4 didn't exist) | $x = \pm i$ | NEW Capability |
-| `v4 / SOLVE_QUADRATIC_COMPLEX` | Complex $\mathbb{C}$ | `x^2 + 2 = 0` | Unsupported (v4 didn't exist) | $x = \pm i\sqrt{2}$ | NEW Capability |
+The B3 implementation reuses accepted repository constants unchanged from B2:
 
----
-
-## 15. Error Taxonomy & Standardized Codes
-
-| Error Code | Layer | Trigger Condition |
+| Constant Name | Value | Purpose / Reused From |
 | :--- | :--- | :--- |
-| `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT` | Host / Worker | Discriminant remainder $R \ge 2^{32}$ |
-| `ERR_QUADRATIC_COMPLEX_EXPECTED_NEGATIVE_DISCRIMINANT` | Worker | $\Delta \ge 0$ passed to complex solver |
-| `ERR_COMPLEX_VERIFICATION_MISMATCH` | Host | Worker roots fail algebraic Vieta / residual proof |
-| `ERR_MALFORMED_WORKER_RESPONSE` | Host | Non-conforming wire schema, unexpected fields, or invalid types |
-| `ERR_UNSUPPORTED_VERSION` | Protocol | Unknown or mismatched schema version |
-| `ERR_UNKNOWN_OPERATION` | Protocol | Unknown operation string |
-| `ERR_TIMEOUT` | Host Bridge | Cumulative 5.0s monotonic deadline exceeded |
-| `ERR_RESOURCE_EXHAUSTED` | Job Object / Host | Memory or integer bit length limits exceeded |
+| `MAX_PAYLOAD_BYTES` | `65536` (64 KB) | Framing limit (reused from B0/B1/B2) |
+| `MAX_RESPONSE_BYTES` | `65536` (64 KB) | Framing limit (reused from B0/B1/B2) |
+| `MAX_PROTOCOL_CHARS` | `256` | Wire string bounds (reused from B0/B1/B2) |
+| `MAX_JSON_DEPTH` | `10` | JSON framing recursion limit |
+| `MAX_RATIONAL_BITS` | `256` | Rational numerator / denominator bound |
+| `MAX_NORMALIZATION_BITS` | `512` | Working product $M = p \cdot q$ ceiling |
+| `MAX_SQUAREFREE_CERTIFICATION_BITS` | `32` ($R < 2^{32}$) | Squarefree certification ceiling |
+| `MAX_AST_NODES` | `100` | AST coefficient reduction budget |
+| `MAX_AST_DEPTH` | `20` | AST recursion limit |
+| `BRIDGE_TOTAL_BUDGET_SEC` | `5.0` s | Aggregate monotonic wall-clock budget |
+| `DEFAULT_WORKER_TIMEOUT_SEC` | `10.0` s | WorkerController default timeout |
+| `JOB_OBJECT_MAX_PROCESS_MEMORY` | `268,435,456` (256 MB) | Process Job Object limit |
+| `JOB_OBJECT_MAX_JOB_MEMORY` | `536,870,912` (512 MB) | Job Object memory limit |
 
 ---
 
-## 16. Adversarial Threat & Wire Matrix
+## 12. Full Mandatory Adversarial Test Matrix
 
-The B3 test suite must explicitly assert fail-closed rejection for:
-1. **Root Count Violations:** 0 roots, 1 root, 3 roots, empty root list.
-2. **Conjugate Symmetry Violations:** Mismatched real parts ($a_1 \neq a_2$), unequal imaginary magnitudes ($|c_1| \neq c_2$), identical signs (both positive or both negative).
-3. **Canonical Ordering Violations:** Positive imaginary root first, negative second.
-4. **Radicand Edge Cases:** $d = 0$, negative $d$, non-squarefree $d$ ($d=4, 8, 12$), out-of-bounds $d \ge 2^{32}$, mismatched root and top-level radicands.
-5. **Rational Wire Violations:** Denominator $\le 0$, unreduced fractions ($\gcd \neq 1$), noncanonical zero ($0/2$), leading plus signs (`"+1"`), redundant leading zeros (`"01"`), values exceeding 256 bits.
-6. **Type & Coercion Violations:** String radicand (`radicand="1"`), float radicand (`radicand=1.0`), boolean radicand (`radicand=True`), float coefficients (`1.5`).
-7. **Cross-Version Attacks:** Sending `SOLVE_QUADRATIC_COMPLEX` under `mke.p02a.v1`, `v2`, or `v3`; sending legacy operations under `v4`.
-8. **Worker Spoofing:** Worker returning `outcome="SUCCESS"` with mathematically incorrect roots. Host proof fails closed with `ERR_COMPLEX_VERIFICATION_MISMATCH`.
+| # | Test Case Description | Injected Attack / Condition | Expected Result | Layer |
+|---|---|---|---|---|
+| 1 | Zero roots list | `"roots": []` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 2 | Single root returned | `"roots": [z1]` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 3 | Three roots returned | `"roots": [z1, z2, z2]` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 4 | Duplicate roots | `"roots": [z1, z1]` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 5 | Reversed root order | Positive imaginary first, negative second | Fail Closed (`ERR_SURD_VERIFICATION_MISMATCH` / `ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 6 | Both imaginary positive | $c_1 > 0, c_2 > 0$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 7 | Both imaginary negative | $c_1 < 0, c_2 < 0$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 8 | Mismatched real parts | $a_1 \neq a_2$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 9 | Mismatched imaginary magnitudes | $\|c_1\| \neq c_2$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 10 | Wrong discriminant | Discriminant wire value $\neq \Delta_{\text{host}}$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 11 | Wrong top-level radicand | Top-level radicand $\neq d_{\text{host}}$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 12 | Root vs top-level radicand mismatch | Root $d \neq$ top-level $d$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 13 | Radicand $d = 0$ | `"radicand": "0"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 14 | Negative radicand | `"radicand": "-1"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 15 | Radicand $d \ge 2^{32}$ | `"radicand": str(1 << 32)` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 16 | Non-squarefree radicand ($d=4,8,12$) | Radical with square factors | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 17 | C1 canonical $d=1$ case | $x^2 + 1 = 0 \implies d=1, c=\pm 1$ | Pass (`SUCCESS`, `VERIFIED_COMPLETE`) | End-to-End |
+| 18 | Misuse of $d=1$ for C2 equation | Injected $d=1$ for $x^2 + 2 = 0$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 19 | Unreduced rational wire value | `"numerator": "2", "denominator": "4"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 20 | Noncanonical zero | `"numerator": "0", "denominator": "2"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 21 | Denominator $\le 0$ | `"denominator": "-1"` or `"0"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 22 | Leading plus sign | `"numerator": "+1"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 23 | Redundant leading zero | `"numerator": "01"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 24 | 257-bit wire integer | $2^{256}$ in numerator/denominator | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Host Verification |
+| 25 | Boolean input in public model | `radicand=True`, `numerator=True` | `ValidationError` raised | Public Model |
+| 26 | Float input in public model | `radicand=1.0`, `numerator=1.5` | `ValidationError` raised | Public Model |
+| 27 | Missing success field | Omitted `"radicand"` key | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 28 | Extra success field | Injected `"extra": 123` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 29 | Malformed error envelope | Error missing `"code"` | Fail Closed (`ERR_MALFORMED_WORKER_RESPONSE`) | Protocol / Host |
+| 30 | Wrong schema version | `"schema_version": "mke.p02a.v99"` | `ProtocolUnsupportedVersionError` | Protocol |
+| 31 | Wrong operation string | `"operation": "UNKNOWN"` | `ProtocolUnknownOperationError` | Protocol |
+| 32 | v4 operation under v1/v2/v3 | `SOLVE_QUADRATIC_COMPLEX` on v2 | `ProtocolUnknownOperationError` | Protocol |
+| 33 | Legacy operation under v4 | `SOLVE` on v4 | `ProtocolUnknownOperationError` | Protocol |
+| 34 | Plausible but incorrect pair | Symmetrical pair with wrong values | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 35 | Fake worker success | Worker returns `SUCCESS` for $\Delta > 0$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 36 | Discriminant disagreement | Worker $\Delta \neq$ Host $\Delta$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 37 | Root value disagreement | Worker $z \neq$ Host $z$ | Fail Closed (`ERR_COMPLEX_VERIFICATION_MISMATCH`) | Host Verification |
+| 38 | $D = 65537^2$ C1 success | Large rational square root | Pass (`SUCCESS`, $d=1$) | C1 Fast Path |
+| 39 | $D = 2 \cdot 65537^2$ bounded failure | Remainder $R \ge 2^{32}$ | Fail Closed (`ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`) | Bounded Normalizer |
+| 40 | True 512-bit working product | $p = 2^{256}-1, q = 2^{256}-3$ | Pass 512-bit check, fails on 32-bit $R$ | Normalizer Bound |
+| 41 | 257-bit component rejection | $p = 2^{256}$ | Fail Closed (`HostQuadraticSurdResourceLimitError`) | Host Normalizer |
+| 42 | Worker hang / timeout | Worker sleeps $> 5.0$s | Fail Closed (`ERR_TIMEOUT`) | Containment |
+| 43 | Oversized worker response | Worker emits $> 64$ KB | Fail Closed (`ERR_RESPONSE_LIMIT_EXCEEDED`) | Containment |
+| 44 | Windows handle leak check | Repeated worker executions | Zero handle leaks (`handles_end <= handles_start`) | Windows Job Object |
 
 ---
 
-## 17. Frozen Surface Inventory
+## 13. Implementation Staging & Surface Inventory
 
-The following files remain strictly frozen and byte-identical to `0da7ac5157e3f92b7934535b45d38d64a6f0b625`:
-- `src/mke_product/worker/entrypoint.py`
+### 13.1 Staging Plan
+
+```
+dfa6d662 (B2-R2 Accepted Closeout)
+   │
+   ▼
+[Stage 1: Protocol v4, Controller Update & Worker Kernel]
+   ├── src/mke_product/protocol/schema.py (Defines SCHEMA_VERSION_V4, OPERATION_SOLVE_QUADRATIC_COMPLEX)
+   ├── src/mke_product/protocol/validator.py (v4 schema validation)
+   ├── src/mke_product/protocol/dispatcher.py (v4 operation routing)
+   ├── src/mke_product/protocol/__init__.py
+   ├── src/mke_product/worker/controller.py (Add SOLVE_QUADRATIC_COMPLEX to ALLOWED_OPERATIONS)
+   ├── src/mke_product/solver/quadratic_complex.py (Pure-Python worker complex solver kernel)
+   ├── tests/test_protocol.py (v4 schema matrix)
+   └── tests/test_p03c_p1c_quadratic_complex_solver.py (Worker unit tests)
+   │
+   ▼
+[Stage 2: Host Bridge Verification Gate, Public Models & Adversarial Matrix]
+   ├── src/mke_product/cas/bridge.py (dispatch_complex, C1 fast path, host proof, ComplexControlledDispatchResult)
+   └── tests/test_p03c_p1c_quadratic_complex_dispatch.py (Full 44-test adversarial suite & AppContainer integration)
+```
+
+### 13.2 Frozen File Invariants
+The following files remain 100% frozen and byte-identical to `0da7ac5157e3f92b7934535b45d38d64a6f0b625`:
+- `src/mke_product/worker/entrypoint.py` (Unchanged: routes framed payloads via `protocol/dispatcher.py`)
 - `src/mke_product/solver/quadratic.py`
 - `src/mke_product/solver/affine.py`
 - `src/mke_product/solver/solver.py`
@@ -453,52 +481,40 @@ The following files remain strictly frozen and byte-identical to `0da7ac5157e3f9
 
 ---
 
-## 18. Proposed Implementation Staging Plan
-
-If GO is approved, implementation will proceed across two disciplined commits:
-
-### Stage 1: Protocol v4 & Isolated Worker Kernel
-- Files: `src/mke_product/protocol/schema.py`, `src/mke_product/protocol/validator.py`, `src/mke_product/protocol/dispatcher.py`, `src/mke_product/solver/quadratic_complex.py`, `tests/test_protocol.py`, `tests/test_p03c_p1c_quadratic_complex_solver.py`.
-- Deliverables: Wire schema `mke.p02a.v4`, operation `SOLVE_QUADRATIC_COMPLEX`, pure-Python worker solver kernel, protocol matrix tests.
-
-### Stage 2: Host Bridge Verification Gate & Adversarial Test Suite
-- Files: `src/mke_product/cas/bridge.py`, `tests/test_p03c_p1c_quadratic_complex_dispatch.py`.
-- Deliverables: Host independent verification over $\mathbb{Q}(i\sqrt{d})$, public Pydantic models (`ComplexQuadraticRoot`, `ComplexControlledDispatchResult`), end-to-end bridge tests, adversarial wire tests, Windows AppContainer live worker integration tests.
-
----
-
-## 19. Preflight Acceptance Gates Evaluation
+## 14. Preflight Acceptance Gates Evaluation
 
 | Gate | Criterion | Status | Evaluation |
 | :--- | :--- | :--- | :--- |
 | **Gate A** | Exact canonical representation | **PASS** | Option B provides proven unique tuple $(a, \pm c, d)$ with $d \ge 1$ squarefree. |
 | **Gate B** | No authoritative floats | **PASS** | 100% exact rational arithmetic (`Rational`). |
-| **Gate C** | No Python `complex` for proof | **PASS** | Host proof decomposes into independent rational real and imaginary equations over $\mathbb{Q}$. |
+| **Gate C** | No Python `complex` for proof | **PASS** | Proof decomposed into pure-rational real and imaginary identities over $\mathbb{Q}$. |
 | **Gate D** | Deterministic bounded arithmetic | **PASS** | 256-bit component and 512-bit product bounds enforced. |
-| **Gate E** | Independent host verification | **PASS** | Host independently derives roots and evaluates Vieta + polynomial residual identities. |
+| **Gate E** | Host verification independent of worker | **PASS** | Host independently derives roots and evaluates Vieta + polynomial residual identities. |
 | **Gate F** | No mutation of v1/v2/v3 contracts | **PASS** | Dedicated schema `mke.p02a.v4` and operation `SOLVE_QUADRATIC_COMPLEX`. |
-| **Gate G** | No silent change to legacy B1 semantics | **PASS** | Real solving continues to return `NO_REAL_ROOT` (`EMPTY_SET`) for $\Delta < 0$. |
+| **Gate G** | No silent change to legacy B1 semantics | **PASS** | `dispatch()` continues to return `solution_type="NO_REAL_ROOT"` for $\Delta < 0$. |
 | **Gate H** | Exact conjugate root verification | **PASS** | Symmetry and sign invariants strictly validated by host and Pydantic models. |
 | **Gate I** | Resource limits remain fail-closed | **PASS** | Remainder $R \ge 2^{32}$ fails closed with `ERR_COMPLEX_NORMALIZATION_RESOURCE_LIMIT`. |
-| **Gate J** | Windows containment unaffected | **PASS** | AppContainer and Job Object limits remain 100% active. |
-| **Gate K** | Adversarial matrix is explicit | **PASS** | Comprehensive wire, symmetry, and type attack matrix specified. |
-| **Gate L** | Staged, auditable commits | **PASS** | Exactly 2 implementation commits specified. |
+| **Gate J** | Windows containment unaffected | **PASS** | AppContainer and Job Object containment 100% active. |
+| **Gate K** | Adversarial matrix is explicit | **PASS** | 44-row comprehensive attack matrix specified. |
+| **Gate L** | Staged, auditable implementation plan | **PASS** | Exactly two auditable implementation commits defined. |
 
 ---
 
-## 20. Explicit Deferred Capabilities
+## 15. Explicit Deferred Capabilities
 
 The following capabilities remain explicitly **OUT OF SCOPE** for B3:
 - Cubic, quartic, or general polynomial solving.
+- Nested radicals.
 - Arbitrary degree algebraic extension fields.
 - Transcendental complex equations ($e^{iz} = 1$, $\sin(z) = 0$).
 - Arbitrary large integer prime factorization.
 - Approximate or numerical complex solving.
+- Branch-cut dependent complex functions.
 
 ---
 
-## 21. Final Recommendation
+## 16. Final Recommendation
 
 **RECOMMENDATION:** **`GO BOUNDED`**
 
-The technical specification for PRODUCT-03C-P1C-04-B3 is complete, mathematically sound, backward-compatible, and ready for Coordinator / Independent Auditor review.
+The remediated technical specification for PRODUCT-03C-P1C-04-B3 is complete, mathematically sound, strictly backward-compatible, and ready for Coordinator / Independent Auditor review.
