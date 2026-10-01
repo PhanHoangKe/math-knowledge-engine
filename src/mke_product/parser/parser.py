@@ -17,7 +17,7 @@ EBNF Reference (PRODUCT-01 rev0.3.1):
 from typing import List
 
 from .tokens import Token, TokenType
-from .errors import Span, ParserError, InputBoundsExceededError
+from .errors import Span, ParserError, UnsupportedExponentError, InputBoundsExceededError
 from .lexer import tokenize
 from .ast import (
     ASTNode,
@@ -141,7 +141,7 @@ class Parser:
 
             exp_tok = self.advance()
             if exp_tok.value not in {"0", "1", "2"}:
-                raise ParserError(
+                raise UnsupportedExponentError(
                     f"Unsupported exponent {exp_tok.value!r}. The frozen grammar strictly permits only literal tokens '0', '1', or '2'.",
                     exp_tok.span,
                 )

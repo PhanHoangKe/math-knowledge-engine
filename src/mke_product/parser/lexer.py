@@ -16,6 +16,8 @@ from .tokens import Token, TokenType
 from .errors import (
     Span,
     LexerError,
+    UnsupportedVariableError,
+    UnsupportedSyntaxError,
     ImplicitMultiplicationError,
     InputBoundsExceededError,
 )
@@ -29,6 +31,8 @@ def tokenize(text: str) -> List[Token]:
 
     Raises:
         InputBoundsExceededError: if input exceeds size or token limits.
+        UnsupportedVariableError: if an unsupported single-character variable is encountered.
+        UnsupportedSyntaxError: if an unsupported function or identifier is encountered.
         LexerError: if invalid characters or malformed tokens are encountered.
         ImplicitMultiplicationError: if implicit multiplication is detected.
     """
@@ -59,11 +63,24 @@ def tokenize(text: str) -> List[Token]:
             tokens.append(Token(TokenType.INTEGER, val, Span(start, i)))
             continue
 
-        # Single variable 'x'
-        if ch == "x":
-            tokens.append(Token(TokenType.VARIABLE, "x", Span(start, start + 1)))
-            i += 1
-            continue
+        # Alphabetic characters: variable 'x', unsupported single variables ('y', 'z', etc.), or multi-char identifiers/functions ('sin', 'cos', etc.)
+        if ("a" <= ch <= "z") or ("A" <= ch <= "Z"):
+            while i < n and (("a" <= text[i] <= "z") or ("A" <= text[i] <= "Z") or ("0" <= text[i] <= "9") or text[i] == "_"):
+                i += 1
+            ident = text[start:i]
+            if ident == "x":
+                tokens.append(Token(TokenType.VARIABLE, "x", Span(start, i)))
+                continue
+            elif len(ident) == 1:
+                raise UnsupportedVariableError(
+                    f"Unsupported variable {ident!r} at position {start}. Illegal character {ident!r}. Only variable 'x' is supported.",
+                    Span(start, i),
+                )
+            else:
+                raise UnsupportedSyntaxError(
+                    f"Unsupported function or identifier {ident!r} at position {start}.",
+                    Span(start, i),
+                )
 
         # Operators and punctuation
         if ch == "+":

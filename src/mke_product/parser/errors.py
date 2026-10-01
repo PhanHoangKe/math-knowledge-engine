@@ -37,8 +37,23 @@ class LexerError(MKEParserError):
     pass
 
 
+class UnsupportedVariableError(LexerError):
+    """Raised when an unsupported single-character variable identifier (e.g., 'y', 'z', 't') is encountered."""
+    pass
+
+
+class UnsupportedSyntaxError(LexerError):
+    """Raised when unsupported multi-character identifiers or function names (e.g., 'sin', 'cos', 'log') are encountered."""
+    pass
+
+
 class ParserError(MKEParserError):
     """Raised on grammatical violations or unexpected tokens."""
+    pass
+
+
+class UnsupportedExponentError(ParserError):
+    """Raised when an exponent outside {0, 1, 2} (e.g., '3', '4') is encountered in AST parsing."""
     pass
 
 
@@ -50,3 +65,4 @@ class ImplicitMultiplicationError(ParserError):
 class InputBoundsExceededError(MKEParserError):
     """Raised when input length, token count, or nesting depth limits are exceeded."""
     pass
+
