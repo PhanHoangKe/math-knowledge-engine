@@ -196,6 +196,10 @@ class VerifiedSolutionView(BaseModel):
             raise ValueError(
                 f"Trace final_answer_latex '{self.trace.final_answer_latex}' does not match VerifiedSolutionView '{self.final_answer_latex}'."
             )
+        if self.trace.roots != self.roots:
+            raise ValueError(
+                "Trace roots do not match VerifiedSolutionView roots."
+            )
         return self
 
 
@@ -267,6 +271,40 @@ class SolvedResponse(BaseModel):
     selected_method_id: str
     solution: VerifiedSolutionView
 
+    @model_validator(mode="after")
+    def _validate_solved_response_invariants(self) -> SolvedResponse:
+        if self.selected_method_id != self.solution.method_id:
+            raise ValueError(
+                f"selected_method_id '{self.selected_method_id}' must equal solution.method_id '{self.solution.method_id}'."
+            )
+        matching = [m for m in self.available_methods if m.method_id == self.selected_method_id]
+        if len(matching) != 1:
+            raise ValueError(
+                f"selected_method_id '{self.selected_method_id}' must appear exactly once in available_methods, found {len(matching)}."
+            )
+        target = matching[0]
+        if target.mathematical_applicability != MathematicalApplicability.APPLICABLE:
+            raise ValueError(
+                f"Selected method '{self.selected_method_id}' must have mathematical_applicability APPLICABLE."
+            )
+        if target.execution_availability != ExecutionAvailability.AVAILABLE:
+            raise ValueError(
+                f"Selected method '{self.selected_method_id}' must have execution_availability AVAILABLE."
+            )
+        if target.support_status != SupportStatus.SUPPORTED:
+            raise ValueError(
+                f"Selected method '{self.selected_method_id}' must have support_status SUPPORTED."
+            )
+        if not target.has_trace_available:
+            raise ValueError(
+                f"Selected method '{self.selected_method_id}' must have has_trace_available=True."
+            )
+        if self.solution.certificate.outcome != VerificationOutcome.VERIFIED_COMPLETE:
+            raise ValueError(
+                "SolvedResponse solution certificate must have outcome VERIFIED_COMPLETE."
+            )
+        return self
+
 
 class AnalyzedNoExecutionResponse(BaseModel):
     """Response state when problem is analyzed but no trace executed (e.g. unavailable method selected or degenerate linear)."""
@@ -280,6 +318,54 @@ class AnalyzedNoExecutionResponse(BaseModel):
     degenerate_solution: Optional[DegenerateSolutionView] = None
     reason_code: NoExecutionReasonCode
     analysis_message_vi: str
+
+    @model_validator(mode="after")
+    def _validate_analyzed_no_execution_invariants(self) -> AnalyzedNoExecutionResponse:
+        if self.reason_code == NoExecutionReasonCode.METHOD_NOT_APPLICABLE:
+            if not isinstance(self.problem, CanonicalQuadraticProblemView):
+                raise ValueError("METHOD_NOT_APPLICABLE requires CanonicalQuadraticProblemView.")
+            if self.selected_method_id is None:
+                raise ValueError("METHOD_NOT_APPLICABLE requires selected_method_id.")
+            if self.degenerate_solution is not None:
+                raise ValueError("METHOD_NOT_APPLICABLE must have degenerate_solution=None.")
+            matching = [m for m in self.available_methods if m.method_id == self.selected_method_id]
+            if len(matching) != 1 or matching[0].mathematical_applicability == MathematicalApplicability.APPLICABLE:
+                raise ValueError(
+                    f"Selected method '{self.selected_method_id}' must exist and have mathematical_applicability != APPLICABLE."
+                )
+
+        elif self.reason_code == NoExecutionReasonCode.METHOD_NOT_EXECUTABLE:
+            if not isinstance(self.problem, CanonicalQuadraticProblemView):
+                raise ValueError("METHOD_NOT_EXECUTABLE requires CanonicalQuadraticProblemView.")
+            if self.selected_method_id is None:
+                raise ValueError("METHOD_NOT_EXECUTABLE requires selected_method_id.")
+            if self.degenerate_solution is not None:
+                raise ValueError("METHOD_NOT_EXECUTABLE must have degenerate_solution=None.")
+            matching = [m for m in self.available_methods if m.method_id == self.selected_method_id]
+            if len(matching) != 1 or matching[0].execution_availability == ExecutionAvailability.AVAILABLE:
+                raise ValueError(
+                    f"Selected method '{self.selected_method_id}' must exist and have execution_availability != AVAILABLE."
+                )
+
+        elif self.reason_code == NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION:
+            if not isinstance(self.problem, CanonicalDegenerateProblemView):
+                raise ValueError("DEGENERATE_EXACT_SOLUTION requires CanonicalDegenerateProblemView.")
+            if self.available_methods:
+                raise ValueError("DEGENERATE_EXACT_SOLUTION requires available_methods to be empty list.")
+            if self.selected_method_id is not None:
+                raise ValueError("DEGENERATE_EXACT_SOLUTION requires selected_method_id=None.")
+            if self.degenerate_solution is None:
+                raise ValueError("DEGENERATE_EXACT_SOLUTION requires degenerate_solution.")
+            if self.degenerate_solution.classification != self.problem.classification:
+                raise ValueError(
+                    f"degenerate_solution.classification '{self.degenerate_solution.classification}' must match problem classification '{self.problem.classification}'."
+                )
+            if self.problem.classification == EquationClassificationType.LINEAR:
+                if self.degenerate_solution.linear_root != self.problem.linear_root:
+                    raise ValueError(
+                        f"degenerate_solution.linear_root '{self.degenerate_solution.linear_root}' must match problem linear_root '{self.problem.linear_root}'."
+                    )
+        return self
 
 
 class ErrorResponse(BaseModel):

@@ -3,16 +3,18 @@
 Implements the end-to-end Pure Python Application Service coordinating:
 1. Deterministic intake dispatch (RAW_TEXT vs COEFFICIENTS).
 2. Exact normalization & bounded polynomial evaluation in Q[x].
-3. Degenerate classification and first-principles exact verification (a == 0).
-4. Multi-method orthogonal assessment catalog (a != 0).
-5. Single-authority method selection resolution.
-6. Deterministic step-by-step solution trace execution.
-7. Host independent verification with tamper-evident certification.
-8. Discriminated response state machine generation (SOLVED, ANALYZED_NO_EXECUTION, ERROR).
+3. Canonical Domain IR authoritative gate (QuadraticProblemIR, DegenerateEquationIR).
+4. Degenerate classification and first-principles exact verification (a == 0).
+5. Multi-method orthogonal assessment catalog (a != 0).
+6. Single-authority method selection resolution.
+7. Deterministic step-by-step solution trace execution with fail-closed contract mapping.
+8. Host independent verification with tamper-evident certification.
+9. Discriminated response state machine generation (SOLVED, ANALYZED_NO_EXECUTION, ERROR).
 
 Guarantees:
 - Zero float, CAS, or LLM authority.
-- Strict fail-closed error handling.
+- Authoritative Domain IR validation before constructing application views.
+- Strict client-facing error message sanitization (zero internal exception leakage).
 - Mandatory semantic identity invariance between RAW_TEXT and COEFFICIENTS.
 """
 
@@ -47,17 +49,29 @@ from mke_product.application.errors import (
     map_parser_exception_to_application_error,
 )
 from mke_product.application.normalizer import normalize_raw_equation
-from mke_product.application.traces import TRACE_GENERATORS, generate_solution_trace
+from mke_product.application.traces import (
+    TRACE_GENERATORS,
+    TraceGenerationError,
+    TraceInvalidInputError,
+    TraceInvariantError,
+    TraceMethodNotApplicableError,
+    TraceMethodUnavailableError,
+    generate_solution_trace,
+)
 from mke_product.core.rational import Rational
 from mke_product.domain.exact import compute_quadratic_discriminant
 from mke_product.domain.identity import compute_semantic_quadratic_identity
 from mke_product.domain.models import (
+    DegenerateEquationIR,
     EquationClassificationType,
     ExecutionAvailability,
     MathematicalApplicability,
     MethodAssessment,
+    ProblemCategory,
+    QuadraticProblemIR,
     RationalFraction,
     SolutionOutcome,
+    SupportStatus,
     VerificationOutcome,
 )
 from mke_product.domain.registry import MethodRegistry
@@ -121,10 +135,85 @@ def format_equation_latex(a_rat: Rational, b_rat: Rational, c_rat: Rational) -> 
 def format_canonical_source_equation(
     a: RationalFraction, b: RationalFraction, c: RationalFraction
 ) -> str:
-    """Construct deterministic canonical source query string from coefficients."""
+    """Construct deterministic clean parseable canonical source query string from coefficients."""
+    parts: List[str] = []
+
+    # Quadratic term
     if a.numerator != 0:
-        return f"{a}*x^2 + {b}*x + {c} = 0"
-    return f"{b}*x + {c} = 0"
+        if a.denominator == 1:
+            if a.numerator == 1:
+                parts.append("x^2")
+            elif a.numerator == -1:
+                parts.append("-x^2")
+            elif a.numerator > 0:
+                parts.append(f"{a.numerator}*x^2")
+            else:
+                parts.append(f"-{abs(a.numerator)}*x^2")
+        else:
+            if a.numerator > 0:
+                parts.append(f"({a.numerator}/{a.denominator})*x^2")
+            else:
+                parts.append(f"-({abs(a.numerator)}/{a.denominator})*x^2")
+
+    # Linear term
+    if b.numerator != 0:
+        if not parts:
+            if b.denominator == 1:
+                if b.numerator == 1:
+                    parts.append("x")
+                elif b.numerator == -1:
+                    parts.append("-x")
+                elif b.numerator > 0:
+                    parts.append(f"{b.numerator}*x")
+                else:
+                    parts.append(f"-{abs(b.numerator)}*x")
+            else:
+                if b.numerator > 0:
+                    parts.append(f"({b.numerator}/{b.denominator})*x")
+                else:
+                    parts.append(f"-({abs(b.numerator)}/{b.denominator})*x")
+        else:
+            if b.denominator == 1:
+                if b.numerator == 1:
+                    parts.append("+ x")
+                elif b.numerator == -1:
+                    parts.append("- x")
+                elif b.numerator > 0:
+                    parts.append(f"+ {b.numerator}*x")
+                else:
+                    parts.append(f"- {abs(b.numerator)}*x")
+            else:
+                if b.numerator > 0:
+                    parts.append(f"+ ({b.numerator}/{b.denominator})*x")
+                else:
+                    parts.append(f"- ({abs(b.numerator)}/{b.denominator})*x")
+
+    # Constant term
+    if c.numerator != 0:
+        if not parts:
+            if c.denominator == 1:
+                parts.append(str(c.numerator))
+            else:
+                if c.numerator > 0:
+                    parts.append(f"{c.numerator}/{c.denominator}")
+                else:
+                    parts.append(f"-{abs(c.numerator)}/{c.denominator}")
+        else:
+            if c.denominator == 1:
+                if c.numerator > 0:
+                    parts.append(f"+ {c.numerator}")
+                else:
+                    parts.append(f"- {abs(c.numerator)}")
+            else:
+                if c.numerator > 0:
+                    parts.append(f"+ {c.numerator}/{c.denominator}")
+                else:
+                    parts.append(f"- {abs(c.numerator)}/{c.denominator}")
+
+    if not parts:
+        return "0 = 0"
+
+    return f"{' '.join(parts)} = 0"
 
 
 def _assess_to_view(m: MethodAssessment, registry: MethodRegistry) -> MethodOptionView:
@@ -149,7 +238,7 @@ def _assess_to_view(m: MethodAssessment, registry: MethodRegistry) -> MethodOpti
 def solve_request(request: SolveRequest) -> SolveResponseUnion:
     """Execute end-to-end application orchestration for a SolveRequest.
 
-    Coordinates intake, normalization, degenerate solving/verification,
+    Coordinates intake, normalization, Domain IR validation, degenerate solving/verification,
     method assessment, method selection policy, trace generation, host verification,
     and returns a discriminated SolveResponseUnion.
     """
@@ -158,6 +247,7 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
     # ------------------------------------------------------------------------
     if isinstance(request.input_payload, RawEquationInput):
         raw_text = request.input_payload.raw_query
+        raw_query_provenance = "USER_TEXT"
         try:
             a_rat, b_rat, c_rat = normalize_raw_equation(raw_text)
         except ApplicationError as exc:
@@ -177,17 +267,18 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
                 span=app_err.span,
                 details=app_err.details,
             )
-        except Exception as exc:
+        except Exception:
             return ErrorResponse(
                 error_code=ApplicationErrorCode.NORMALIZATION_ERROR,
-                message_vi=f"Lỗi không xác định khi chuẩn hóa phương trình: {exc}",
-                message_en=f"Unhandled error during intake normalization: {exc}",
+                message_vi="Không thể chuẩn hóa phương trình do lỗi nội bộ.",
+                message_en="Internal error while normalizing the equation.",
             )
         raw_query_str = raw_text
     elif isinstance(request.input_payload, CanonicalCoefficientInput):
         a_frac = request.input_payload.a
         b_frac = request.input_payload.b
         c_frac = request.input_payload.c
+        raw_query_provenance = "SYSTEM_CANONICAL_COEFFICIENTS"
         a_rat = a_frac.to_rational()
         b_rat = b_frac.to_rational()
         c_rat = c_frac.to_rational()
@@ -200,19 +291,48 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
         )
 
     # ------------------------------------------------------------------------
-    # 2. SEMANTIC IDENTITY & PROBLEM VIEW BASE DATA
+    # 2. SEMANTIC IDENTITY & PROBLEM IDENTIFIERS
     # ------------------------------------------------------------------------
     semantic_hash = compute_semantic_quadratic_identity(
         a_rat, b_rat, c_rat, target_var="x", schema_version=request.schema_version
     )
     problem_id = f"prob_{semantic_hash[:16]}"
     eq_latex = format_equation_latex(a_rat, b_rat, c_rat)
+    canonical_eq_string = format_canonical_source_equation(
+        RationalFraction.from_rational(a_rat),
+        RationalFraction.from_rational(b_rat),
+        RationalFraction.from_rational(c_rat),
+    )
 
     # ------------------------------------------------------------------------
     # 3. BRANCH: DEGENERATE EQUATION (a == 0)
     # ------------------------------------------------------------------------
     if a_rat.is_zero:
         deg_result = solve_exact_degenerate(b_rat, c_rat)
+
+        # Authoritative Domain IR Gate
+        try:
+            deg_ir = DegenerateEquationIR(
+                problem_id=problem_id,
+                raw_query=raw_query_str,
+                raw_query_provenance=raw_query_provenance,
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash=semantic_hash,
+                schema_version=request.schema_version,
+                target_variable="x",
+                a=RationalFraction(numerator=0, denominator=1),
+                b=RationalFraction.from_rational(b_rat),
+                c=RationalFraction.from_rational(c_rat),
+                classification=deg_result.classification,
+                linear_root=deg_result.linear_root,
+            )
+        except Exception:
+            return ErrorResponse(
+                error_code=ApplicationErrorCode.DOMAIN_CONTRACT_ERROR,
+                message_vi="Lỗi vi phạm hợp đồng miền phương trình suy biến.",
+                message_en="Domain contract error while constructing DegenerateEquationIR.",
+            )
+
         cert = verify_degenerate_solution(
             b=b_rat, c=c_rat, candidate=deg_result, problem_hash=semantic_hash
         )
@@ -240,16 +360,17 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
                 "Phương trình vô nghiệm thực do xuất hiện mâu thuẫn toán học."
             )
 
+        # Derive application view directly from validated Domain IR
         deg_problem_view = CanonicalDegenerateProblemView(
-            problem_id=problem_id,
-            raw_query=raw_query_str,
+            problem_id=deg_ir.problem_id,
+            raw_query=deg_ir.raw_query,
             equation_latex=eq_latex,
-            classification=deg_result.classification,
-            a=RationalFraction.from_rational(a_rat),
-            b=RationalFraction.from_rational(b_rat),
-            c=RationalFraction.from_rational(c_rat),
-            linear_root=deg_result.linear_root,
-            semantic_revision_hash=semantic_hash,
+            classification=deg_ir.classification,
+            a=deg_ir.a,
+            b=deg_ir.b,
+            c=deg_ir.c,
+            linear_root=deg_ir.linear_root,
+            semantic_revision_hash=deg_ir.semantic_revision_hash,
         )
 
         deg_solution_view = DegenerateSolutionView(
@@ -264,7 +385,7 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
         return AnalyzedNoExecutionResponse(
             problem=deg_problem_view,
             available_methods=[],
-            selected_method_id=request.selected_method_id,
+            selected_method_id=None,
             degenerate_solution=deg_solution_view,
             reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
             analysis_message_vi=analysis_msg,
@@ -275,15 +396,42 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
     # ------------------------------------------------------------------------
     disc = compute_quadratic_discriminant(a_rat, b_rat, c_rat)
 
+    # Authoritative Domain IR Gate
+    try:
+        quad_ir = QuadraticProblemIR(
+            problem_id=problem_id,
+            raw_query=raw_query_str,
+            raw_query_provenance=raw_query_provenance,
+            category=ProblemCategory.ALGEBRA_QUADRATIC,
+            semantic_revision_hash=semantic_hash,
+            schema_version=request.schema_version,
+            target_variable="x",
+            a=RationalFraction.from_rational(a_rat),
+            b=RationalFraction.from_rational(b_rat),
+            c=RationalFraction.from_rational(c_rat),
+            coefficient_domain="Q",
+            solution_domain="R",
+            equation_string=canonical_eq_string,
+            discriminant=disc,
+            classification=EquationClassificationType.QUADRATIC,
+        )
+    except Exception:
+        return ErrorResponse(
+            error_code=ApplicationErrorCode.DOMAIN_CONTRACT_ERROR,
+            message_vi="Lỗi vi phạm hợp đồng miền đa thức bậc hai.",
+            message_en="Domain contract error while constructing QuadraticProblemIR.",
+        )
+
+    # Derive application view directly from validated Domain IR
     quad_problem_view = CanonicalQuadraticProblemView(
-        problem_id=problem_id,
-        raw_query=raw_query_str,
+        problem_id=quad_ir.problem_id,
+        raw_query=quad_ir.raw_query,
         equation_latex=eq_latex,
-        a=RationalFraction.from_rational(a_rat),
-        b=RationalFraction.from_rational(b_rat),
-        c=RationalFraction.from_rational(c_rat),
-        discriminant=disc,
-        semantic_revision_hash=semantic_hash,
+        a=quad_ir.a,
+        b=quad_ir.b,
+        c=quad_ir.c,
+        discriminant=quad_ir.discriminant,
+        semantic_revision_hash=quad_ir.semantic_revision_hash,
     )
 
     # Multi-method orthogonal assessment catalog
@@ -350,11 +498,30 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
     # ------------------------------------------------------------------------
     try:
         trace = generate_solution_trace(chosen_method_id, a_rat, b_rat, c_rat)
-    except Exception as exc:
+    except (
+        TraceMethodNotApplicableError,
+        TraceMethodUnavailableError,
+        TraceInvalidInputError,
+        TraceInvariantError,
+    ):
+        return ErrorResponse(
+            error_code=ApplicationErrorCode.DOMAIN_CONTRACT_ERROR,
+            message_vi="Lỗi vi phạm tính nhất quán của hệ thống phương pháp giải.",
+            message_en="Domain contract violation in solution trace execution.",
+            details={"method_id": chosen_method_id},
+        )
+    except TraceGenerationError:
         return ErrorResponse(
             error_code=ApplicationErrorCode.METHOD_EXECUTION_FAILED,
-            message_vi=f"Lỗi khi thực thi phương pháp '{chosen_method_id}': {exc}",
-            message_en=f"Execution failed for method '{chosen_method_id}': {exc}",
+            message_vi="Không thể thực thi phương pháp đã chọn.",
+            message_en="Unable to execute the selected method.",
+            details={"method_id": chosen_method_id},
+        )
+    except Exception:
+        return ErrorResponse(
+            error_code=ApplicationErrorCode.INTERNAL_ERROR,
+            message_vi="Lỗi nội bộ khi thực thi phương pháp giải.",
+            message_en="Internal error during method execution.",
             details={"method_id": chosen_method_id},
         )
 
@@ -371,11 +538,11 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
             roots=trace.roots,
             problem_hash=semantic_hash,
         )
-    except Exception as exc:
+    except Exception:
         return ErrorResponse(
             error_code=ApplicationErrorCode.VERIFICATION_FAILED,
-            message_vi=f"Lỗi xác minh độc lập: {exc}",
-            message_en=f"Verification exception: {exc}",
+            message_vi="Xác minh độc lập cho kết quả giải phương trình bậc hai thất bại.",
+            message_en="Host independent verification failed.",
             details={"method_id": chosen_method_id},
         )
 
@@ -384,7 +551,7 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
             error_code=ApplicationErrorCode.VERIFICATION_FAILED,
             message_vi="Xác minh độc lập cho kết quả giải phương trình bậc hai thất bại.",
             message_en="Host independent verification failed for quadratic solution.",
-            details={"method_id": chosen_method_id, "cert_outcome": cert.outcome.value},
+            details={"method_id": chosen_method_id},
         )
 
     # ------------------------------------------------------------------------

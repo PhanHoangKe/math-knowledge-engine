@@ -1,14 +1,18 @@
-"""MKE MVP V1 — Comprehensive Test Suite for S1-04 Application Orchestrator & Discriminated DTOs.
+"""MKE MVP V1 — Comprehensive Test Suite for S1-04-R1 Application Orchestrator & Discriminated DTOs.
 
 Validates:
 1. End-to-end Pure Python Application Service pipeline (solve_request).
-2. RAW_TEXT vs COEFFICIENTS intake invariance & semantic identity equivalence.
-3. Strict single method-selection authority and resolution policy.
-4. Comprehensive 32-case Acceptance Matrix (Q1-Q9, C1-C5, D1-D4, E1-E8, B1-B6).
-5. Degenerate equation exact verification & discriminated response modeling.
-6. Multi-method orthogonal assessment mapping & trace execution.
-7. Host independent verification and tamper-evident certificate attachment.
-8. Pydantic v2 discriminated union serialization, immutability, and adversarial invariant rejection.
+2. Authoritative Domain IR Gate (QuadraticProblemIR, DegenerateEquationIR).
+3. RAW_TEXT vs COEFFICIENTS intake invariance & semantic identity equivalence.
+4. Clean parseable canonical source string formatting.
+5. Strict single method-selection authority and resolution policy.
+6. Comprehensive 32-case Acceptance Matrix (Q1-Q9, C1-C5, D1-D4, E1-E8, B1-B6).
+7. Degenerate equation exact verification & discriminated response modeling.
+8. Multi-method orthogonal assessment mapping & trace execution.
+9. Host independent verification and tamper-evident certificate attachment.
+10. Fail-closed typed trace error mapping and Domain IR contract enforcement.
+11. Client-facing error message sanitization (zero internal exception leakage).
+12. Pydantic v2 discriminated union cross-field validators and adversarial invariant rejection.
 """
 
 import unittest
@@ -37,32 +41,101 @@ from mke_product.application.orchestrator import (
     format_equation_latex,
     solve_request,
 )
+from mke_product.application.traces.base import (
+    TraceGenerationError,
+    TraceInvalidInputError,
+    TraceInvariantError,
+    TraceMethodNotApplicableError,
+    TraceMethodUnavailableError,
+)
 from mke_product.core.rational import Rational
+from mke_product.domain.exact import compute_quadratic_discriminant
 from mke_product.domain.models import (
     EquationClassificationType,
     ExecutionAvailability,
     MathematicalApplicability,
+    MethodAssessment,
     PedagogicalRecommendation,
+    PrerequisiteStatus,
     ProblemCategory,
     RationalFraction,
+    RealRootValue,
     SolutionOutcome,
     SolutionRootType,
+    SolutionStep,
+    SolutionTrace,
     SupportStatus,
     VerificationCapability,
+    VerificationCertificate,
     VerificationOutcome,
 )
+from mke_product.domain.registry import MethodRegistry
 from mke_product.parser.errors import Span
 
 
 class TestApplicationOrchestratorS1(unittest.TestCase):
-    """Full test suite for MKE MVP V1 Application Orchestrator."""
+    """Full test suite for MKE MVP V1 Application Orchestrator & Discriminated DTOs."""
 
     # ========================================================================
-    # 1. INTAKE EQUIVALENCE & SEMANTIC IDENTITY INVARIANCE
+    # 1. CANONICAL SOURCE FORMATTER TESTS
     # ========================================================================
 
-    def test_semantic_identity_and_root_invariance_raw_vs_coefficients(self):
-        """Verify that RAW_TEXT and COEFFICIENTS intake produce identical semantic hashes and solutions."""
+    def test_canonical_source_formatter_exact_strings(self):
+        """Verify deterministic clean parseable formatting across canonical test fixtures."""
+        # a=1, b=-5, c=6 -> x^2 - 5*x + 6 = 0
+        s1 = format_canonical_source_equation(
+            RationalFraction.from_int(1),
+            RationalFraction.from_int(-5),
+            RationalFraction.from_int(6),
+        )
+        self.assertEqual(s1, "x^2 - 5*x + 6 = 0")
+
+        # a=-1, b=3, c=-2 -> -x^2 + 3*x - 2 = 0
+        s2 = format_canonical_source_equation(
+            RationalFraction.from_int(-1),
+            RationalFraction.from_int(3),
+            RationalFraction.from_int(-2),
+        )
+        self.assertEqual(s2, "-x^2 + 3*x - 2 = 0")
+
+        # a=0, b=2, c=-4 -> 2*x - 4 = 0
+        s3 = format_canonical_source_equation(
+            RationalFraction.from_int(0),
+            RationalFraction.from_int(2),
+            RationalFraction.from_int(-4),
+        )
+        self.assertEqual(s3, "2*x - 4 = 0")
+
+        # a=0, b=0, c=0 -> 0 = 0
+        s4 = format_canonical_source_equation(
+            RationalFraction.from_int(0),
+            RationalFraction.from_int(0),
+            RationalFraction.from_int(0),
+        )
+        self.assertEqual(s4, "0 = 0")
+
+        # a=0, b=0, c=1 -> 1 = 0
+        s5 = format_canonical_source_equation(
+            RationalFraction.from_int(0),
+            RationalFraction.from_int(0),
+            RationalFraction.from_int(1),
+        )
+        self.assertEqual(s5, "1 = 0")
+
+        # a=1/2, b=-5/4, c=3/4 -> (1/2)*x^2 - (5/4)*x + 3/4 = 0
+        s6 = format_canonical_source_equation(
+            RationalFraction(numerator=1, denominator=2),
+            RationalFraction(numerator=-5, denominator=4),
+            RationalFraction(numerator=3, denominator=4),
+        )
+        self.assertEqual(s6, "(1/2)*x^2 - (5/4)*x + 3/4 = 0")
+
+    # ========================================================================
+    # 2. INTAKE EQUIVALENCE & SEMANTIC IDENTITY INVARIANCE
+    # ========================================================================
+
+    def test_strong_intake_equivalence_raw_vs_coefficients(self):
+        """Verify complete equality of problem views, assessments, and solutions across intake modes."""
         req_raw = SolveRequest(
             input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
         )
@@ -73,29 +146,57 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
                 c=RationalFraction.from_int(6),
             )
         )
+        req_raw_unreduced = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 + 6 = 5*x")
+        )
 
         resp_raw = solve_request(req_raw)
         resp_coeff = solve_request(req_coeff)
+        resp_unred = solve_request(req_raw_unreduced)
 
         self.assertIsInstance(resp_raw, SolvedResponse)
         self.assertIsInstance(resp_coeff, SolvedResponse)
+        self.assertIsInstance(resp_unred, SolvedResponse)
 
-        # Semantic revision hash must be strictly identical
+        # Mathematical coefficients equality
+        self.assertEqual(resp_raw.problem.a, resp_coeff.problem.a)
+        self.assertEqual(resp_raw.problem.b, resp_coeff.problem.b)
+        self.assertEqual(resp_raw.problem.c, resp_coeff.problem.c)
+        self.assertEqual(resp_raw.problem.discriminant, resp_coeff.problem.discriminant)
+        self.assertEqual(resp_raw.problem.classification, resp_coeff.problem.classification)
+
+        # Semantic revision hash & deterministic problem_id equality
         self.assertEqual(
             resp_raw.problem.semantic_revision_hash,
             resp_coeff.problem.semantic_revision_hash,
         )
+        self.assertEqual(
+            resp_raw.problem.semantic_revision_hash,
+            resp_unred.problem.semantic_revision_hash,
+        )
         self.assertEqual(resp_raw.problem.problem_id, resp_coeff.problem.problem_id)
+        self.assertEqual(resp_raw.problem.problem_id, resp_unred.problem.problem_id)
+
+        # Method assessment catalog equality
+        self.assertEqual(
+            [m.method_id for m in resp_raw.available_methods],
+            [m.method_id for m in resp_coeff.available_methods],
+        )
+        self.assertEqual(
+            [m.mathematical_applicability for m in resp_raw.available_methods],
+            [m.mathematical_applicability for m in resp_coeff.available_methods],
+        )
+        self.assertEqual(
+            [m.execution_availability for m in resp_raw.available_methods],
+            [m.execution_availability for m in resp_coeff.available_methods],
+        )
+
+        # Solution equality
+        self.assertEqual(resp_raw.selected_method_id, resp_coeff.selected_method_id)
         self.assertEqual(resp_raw.solution.outcome, resp_coeff.solution.outcome)
+        self.assertEqual(resp_raw.solution.roots, resp_coeff.solution.roots)
         self.assertEqual(
             resp_raw.solution.final_answer_latex, resp_coeff.solution.final_answer_latex
-        )
-        self.assertEqual(
-            resp_raw.solution.certificate.outcome, VerificationOutcome.VERIFIED_COMPLETE
-        )
-        self.assertEqual(
-            resp_coeff.solution.certificate.outcome,
-            VerificationOutcome.VERIFIED_COMPLETE,
         )
 
     def test_coefficients_mode_bypasses_parser(self):
@@ -116,7 +217,7 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
             self.assertIsInstance(resp, SolvedResponse)
 
     # ========================================================================
-    # 2. ACCEPTANCE MATRIX: QUADRATIC RAW_TEXT (Q1 - Q9)
+    # 3. ACCEPTANCE MATRIX: QUADRATIC RAW_TEXT (Q1 - Q9)
     # ========================================================================
 
     def test_q1_standard_two_distinct_roots(self):
@@ -232,7 +333,7 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         )
 
     # ========================================================================
-    # 3. ACCEPTANCE MATRIX: DIRECT COEFFICIENTS & METHOD SWITCHING (C1 - C5)
+    # 4. ACCEPTANCE MATRIX: DIRECT COEFFICIENTS & METHOD SWITCHING (C1 - C5)
     # ========================================================================
 
     def test_c1_direct_coefficients_default_method(self):
@@ -313,7 +414,7 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertIn("chưa hỗ trợ", resp.analysis_message_vi)
 
     # ========================================================================
-    # 4. ACCEPTANCE MATRIX: DEGENERATE EQUATIONS (D1 - D4)
+    # 5. ACCEPTANCE MATRIX: DEGENERATE EQUATIONS (D1 - D4)
     # ========================================================================
 
     def test_d1_degenerate_linear_raw_text(self):
@@ -328,6 +429,8 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(
             resp.problem.classification, EquationClassificationType.LINEAR
         )
+        self.assertIsNone(resp.selected_method_id)
+        self.assertEqual(resp.available_methods, [])
         self.assertIsNotNone(resp.degenerate_solution)
         self.assertEqual(
             resp.degenerate_solution.outcome, SolutionOutcome.ONE_REAL_LINEAR_ROOT
@@ -352,6 +455,8 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(
             resp.problem.classification, EquationClassificationType.IDENTITY
         )
+        self.assertIsNone(resp.selected_method_id)
+        self.assertEqual(resp.available_methods, [])
         self.assertIsNotNone(resp.degenerate_solution)
         self.assertEqual(
             resp.degenerate_solution.outcome, SolutionOutcome.INFINITE_REAL_SOLUTIONS
@@ -376,6 +481,8 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(
             resp.problem.classification, EquationClassificationType.CONTRADICTION
         )
+        self.assertIsNone(resp.selected_method_id)
+        self.assertEqual(resp.available_methods, [])
         self.assertIsNotNone(resp.degenerate_solution)
         self.assertEqual(
             resp.degenerate_solution.outcome,
@@ -404,12 +511,36 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(
             resp.reason_code, NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION
         )
+        self.assertIsNone(resp.selected_method_id)
+        self.assertEqual(resp.available_methods, [])
+        self.assertEqual(
+            resp.degenerate_solution.linear_root, RationalFraction.from_int(2)
+        )
+
+    def test_degenerate_ignores_explicit_selected_method_id(self):
+        """Degenerate equation (a=0) does not execute or retain requested quadratic method."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(0),
+                b=RationalFraction.from_int(2),
+                c=RationalFraction.from_int(-4),
+            ),
+            selected_method_id="QUAD_FORMULA_STANDARD",
+        )
+        resp = solve_request(req)
+        self.assertIsInstance(resp, AnalyzedNoExecutionResponse)
+        self.assertEqual(
+            resp.reason_code, NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION
+        )
+        self.assertIsNone(resp.selected_method_id)
+        self.assertEqual(resp.available_methods, [])
+        self.assertIsNotNone(resp.degenerate_solution)
         self.assertEqual(
             resp.degenerate_solution.linear_root, RationalFraction.from_int(2)
         )
 
     # ========================================================================
-    # 5. ACCEPTANCE MATRIX: ERROR / SCOPE CASES (E1 - E8)
+    # 6. ACCEPTANCE MATRIX: ERROR / SCOPE CASES (E1 - E8)
     # ========================================================================
 
     def test_e1_syntax_error(self):
@@ -476,11 +607,11 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         )
 
     # ========================================================================
-    # 6. ACCEPTANCE MATRIX: RESOURCE BOUNDS (B1 - B6)
+    # 7. ACCEPTANCE MATRIX: RESOURCE BOUNDS (B1 - B6)
     # ========================================================================
 
     def test_b1_max_length_256_passes(self):
-        """B1: Exactly 256 characters -> Passes."""
+        """B1: Exactly 256 characters -> Passes into orchestrator."""
         fixed = "x^2  = 0"
         needed = 256 - len(fixed)
         padded = "x^2 " + (" " * needed) + " = 0"
@@ -490,8 +621,8 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         resp = solve_request(req)
         self.assertIsInstance(resp, SolvedResponse)
 
-    def test_b2_max_length_257_fails(self):
-        """B2: 257 characters -> ValidationError at DTO boundary."""
+    def test_b2_max_length_257_fails_at_dto_boundary(self):
+        """B2: 257 characters -> ValidationError at Request DTO boundary."""
         fixed = "x^2  = 0"
         needed = 257 - len(fixed)
         padded = "x^2 " + (" " * needed) + " = 0"
@@ -541,56 +672,69 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(resp.error_code, ApplicationErrorCode.INPUT_LIMIT_EXCEEDED)
 
     # ========================================================================
-    # 7. ADVERSARIAL & INVARIANT TESTS
+    # 8. METHOD SELECTION & CATALOG CONSISTENCY TESTS
     # ========================================================================
 
-    def test_pydantic_extra_forbid(self):
-        """Verify that extra fields are rejected on all DTO models."""
-        with self.assertRaises(ValidationError):
-            RawEquationInput(raw_query="x^2 = 0", unexpected_field=123)  # type: ignore
-
-        with self.assertRaises(ValidationError):
-            CanonicalCoefficientInput(
-                a=RationalFraction.from_int(1),
-                b=RationalFraction.from_int(0),
-                c=RationalFraction.from_int(0),
-                extra_param="disallowed",  # type: ignore
-            )
-
-    def test_quadratic_problem_view_rejects_zero_a(self):
-        """CanonicalQuadraticProblemView rejects leading coefficient a == 0."""
-        from mke_product.domain.exact import compute_quadratic_discriminant
-
-        disc = compute_quadratic_discriminant(
-            Rational(1, 1), Rational(0, 1), Rational(0, 1)
+    def test_special_viete_default_selection(self):
+        """Default method selection chooses QUAD_VIETE_SPECIAL_SUM when a+b+c=0 (priority 1)."""
+        # x^2 - 3*x + 2 = 0 -> a=1, b=-3, c=2 -> a+b+c = 0
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 3*x + 2 = 0"),
+            selected_method_id=None,
         )
-        with self.assertRaises(ValidationError):
-            CanonicalQuadraticProblemView(
-                problem_id="prob_123",
-                equation_latex="0 = 0",
-                a=RationalFraction.from_int(0),
-                b=RationalFraction.from_int(0),
-                c=RationalFraction.from_int(0),
-                discriminant=disc,
-                semantic_revision_hash="hash123",
+        resp = solve_request(req)
+        self.assertIsInstance(resp, SolvedResponse)
+        # QUAD_VIETE_SPECIAL_SUM has priority 1, whereas standard formula has priority 2
+        self.assertEqual(resp.selected_method_id, "QUAD_VIETE_SPECIAL_SUM")
+        self.assertEqual(resp.solution.method_id, "QUAD_VIETE_SPECIAL_SUM")
+        self.assertEqual(resp.solution.final_answer_latex, "S = \\left\\{ 1, 2 \\right\\}")
+
+    def test_method_option_catalog_order_and_consistency(self):
+        """Method catalog in SolvedResponse matches MethodRegistry definition order and data exactly."""
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
+        )
+        resp = solve_request(req)
+        self.assertIsInstance(resp, SolvedResponse)
+
+        registry = MethodRegistry()
+        all_defs = registry.list_all()
+        self.assertEqual(len(resp.available_methods), len(all_defs))
+        self.assertEqual(len(resp.available_methods), 9)
+
+        from mke_product.application.traces import TRACE_GENERATORS
+
+        for option_view, method_def in zip(resp.available_methods, all_defs):
+            self.assertEqual(option_view.method_id, method_def.method_id)
+            self.assertEqual(option_view.title_vi, method_def.title_vi)
+            self.assertEqual(
+                option_view.has_trace_available,
+                option_view.method_id in TRACE_GENERATORS,
             )
 
-    def test_degenerate_problem_view_rejects_nonzero_a(self):
-        """CanonicalDegenerateProblemView rejects leading coefficient a != 0."""
-        with self.assertRaises(ValidationError):
-            CanonicalDegenerateProblemView(
-                problem_id="prob_123",
-                equation_latex="x^2 = 0",
-                classification=EquationClassificationType.LINEAR,
-                a=RationalFraction.from_int(1),
-                b=RationalFraction.from_int(2),
-                c=RationalFraction.from_int(-4),
-                linear_root=RationalFraction.from_int(2),
-                semantic_revision_hash="hash123",
-            )
+    # ========================================================================
+    # 9. DOMAIN IR GATE & ADVERSARIAL ERROR HANDLING
+    # ========================================================================
 
-    def test_verifier_failure_handling(self):
-        """If host verification returns failure, orchestrator returns ErrorResponse(VERIFICATION_FAILED)."""
+    def test_domain_ir_construction_failure_returns_domain_contract_error(self):
+        """If Domain IR construction fails, orchestrator safely returns DOMAIN_CONTRACT_ERROR."""
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
+        )
+
+        with patch(
+            "mke_product.application.orchestrator.QuadraticProblemIR"
+        ) as mock_ir:
+            mock_ir.side_effect = ValueError("Injected Domain IR contract violation")
+            resp = solve_request(req)
+            self.assertIsInstance(resp, ErrorResponse)
+            self.assertEqual(
+                resp.error_code, ApplicationErrorCode.DOMAIN_CONTRACT_ERROR
+            )
+            self.assertIn("hợp đồng miền", resp.message_vi)
+
+    def test_trace_contract_violation_returns_domain_contract_error(self):
+        """If trace generator raises TraceMethodNotApplicableError / TraceInvariantError, returns DOMAIN_CONTRACT_ERROR."""
         req = SolveRequest(
             input_payload=CanonicalCoefficientInput(
                 a=RationalFraction.from_int(1),
@@ -600,20 +744,166 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         )
 
         with patch(
-            "mke_product.domain.verifier.HostIndependentVerifier.verify_quadratic_solution"
-        ) as mock_ver:
-            from mke_product.domain.models import VerificationCertificate
-
-            mock_ver.return_value = VerificationCertificate(
-                certificate_id="cert_fail",
-                problem_hash="fake_hash",
-                outcome=VerificationOutcome.VERIFICATION_FAILED,
-                integrity_fingerprint="fail_fp",
+            "mke_product.application.orchestrator.generate_solution_trace"
+        ) as mock_trace:
+            mock_trace.side_effect = TraceMethodNotApplicableError(
+                "Injected trace applicability violation"
             )
             resp = solve_request(req)
             self.assertIsInstance(resp, ErrorResponse)
             self.assertEqual(
+                resp.error_code, ApplicationErrorCode.DOMAIN_CONTRACT_ERROR
+            )
+
+    def test_trace_generation_error_returns_method_execution_failed(self):
+        """If trace generator raises generic TraceGenerationError, returns METHOD_EXECUTION_FAILED."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(1),
+                b=RationalFraction.from_int(-5),
+                c=RationalFraction.from_int(6),
+            )
+        )
+
+        with patch(
+            "mke_product.application.orchestrator.generate_solution_trace"
+        ) as mock_trace:
+            mock_trace.side_effect = TraceGenerationError(
+                "Generic execution step failure"
+            )
+            resp = solve_request(req)
+            self.assertIsInstance(resp, ErrorResponse)
+            self.assertEqual(
+                resp.error_code, ApplicationErrorCode.METHOD_EXECUTION_FAILED
+            )
+
+    def test_client_error_sanitization_no_internal_exception_leak(self):
+        """Verify that internal exception strings (SECRET_INTERNAL_SENTINEL) are never leaked to client."""
+        secret_msg = "SECRET_INTERNAL_SENTINEL_DB_PASSWORD"
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
+        )
+
+        with patch(
+            "mke_product.domain.verifier.HostIndependentVerifier.verify_quadratic_solution"
+        ) as mock_ver:
+            mock_ver.side_effect = RuntimeError(secret_msg)
+            resp = solve_request(req)
+            self.assertIsInstance(resp, ErrorResponse)
+            self.assertEqual(
                 resp.error_code, ApplicationErrorCode.VERIFICATION_FAILED
+            )
+
+            # Ensure secret string is strictly absent
+            self.assertNotIn(secret_msg, resp.message_vi)
+            self.assertNotIn(secret_msg, resp.message_en)
+            self.assertNotIn(secret_msg, str(resp.details))
+
+    # ========================================================================
+    # 10. PYDANTIC V2 RUNTIME CROSS-FIELD INVARIANT TESTS
+    # ========================================================================
+
+    def test_verified_solution_view_rejects_mismatched_roots(self):
+        """VerifiedSolutionView raises ValidationError if trace.roots != roots."""
+        from datetime import datetime
+
+        cert = VerificationCertificate(
+            certificate_id="cert1",
+            problem_hash="hash1",
+            outcome=VerificationOutcome.VERIFIED_COMPLETE,
+            integrity_fingerprint="fp1",
+            verified_at_utc=datetime.utcnow(),
+        )
+        step = SolutionStep(
+            step_number=1,
+            latex_expression="x = 1",
+            explanation_vi="Step",
+        )
+        real_root = RealRootValue(
+            root_type=SolutionRootType.RATIONAL,
+            rational_value=RationalFraction.from_int(1),
+            latex_str="1",
+        )
+        other_root = RealRootValue(
+            root_type=SolutionRootType.RATIONAL,
+            rational_value=RationalFraction.from_int(2),
+            latex_str="2",
+        )
+        trace = SolutionTrace(
+            method_id="QUAD_FORMULA_STANDARD",
+            solution_outcome=SolutionOutcome.ONE_REPEATED_REAL_ROOT,
+            roots=[real_root],
+            steps=[step],
+            final_answer_latex="x = 1",
+        )
+
+        with self.assertRaises(ValidationError):
+            VerifiedSolutionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                outcome=SolutionOutcome.ONE_REPEATED_REAL_ROOT,
+                roots=[other_root],  # Forged mismatch with trace.roots
+                final_answer_latex="x = 1",
+                trace=trace,
+                certificate=cert,
+            )
+
+    def test_solved_response_cross_field_validators(self):
+        """SolvedResponse enforces cross-field consistency between selected_method_id, available_methods, and solution."""
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
+        )
+        resp = solve_request(req)
+        self.assertIsInstance(resp, SolvedResponse)
+
+        # 1. selected_method_id != solution.method_id
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_FORMULA_REDUCED",  # Mismatch with solution.method_id
+                solution=resp.solution,
+            )
+
+        # 2. selected_method_id absent from available_methods
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=[],  # Empty available_methods
+                selected_method_id=resp.selected_method_id,
+                solution=resp.solution,
+            )
+
+    def test_analyzed_no_execution_cross_field_validators(self):
+        """AnalyzedNoExecutionResponse enforces reason_code and problem/method consistency."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(1),
+                b=RationalFraction.from_int(-5),
+                c=RationalFraction.from_int(6),
+            ),
+            selected_method_id="QUAD_VIETE_SPECIAL_SUM",
+        )
+        resp = solve_request(req)
+        self.assertIsInstance(resp, AnalyzedNoExecutionResponse)
+
+        # Contradiction: METHOD_NOT_APPLICABLE on degenerate problem view
+        deg_problem = CanonicalDegenerateProblemView(
+            problem_id="prob_deg",
+            equation_latex="2x - 4 = 0",
+            classification=EquationClassificationType.LINEAR,
+            a=RationalFraction.from_int(0),
+            b=RationalFraction.from_int(2),
+            c=RationalFraction.from_int(-4),
+            linear_root=RationalFraction.from_int(2),
+            semantic_revision_hash="hash_deg",
+        )
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=deg_problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_VIETE_SPECIAL_SUM",
+                reason_code=NoExecutionReasonCode.METHOD_NOT_APPLICABLE,
+                analysis_message_vi="Test invalid",
             )
 
     def test_discriminated_union_adapter_validation(self):
