@@ -44,6 +44,7 @@ from mke_product.parser import (
     ParserError,
     ImplicitMultiplicationError,
     InputBoundsExceededError,
+    MAX_TOKEN_COUNT,
 )
 
 
@@ -452,13 +453,17 @@ class TestParserRemediationS1R1(unittest.TestCase):
         self.assertIsInstance(eq_grouped.left.left.inner, UnaryOp)
 
     def test_token_count_boundaries(self):
-        # 31 'x' + 30 '+' + 1 '=' + 1 '0' = 63 tokens <= 64 limit
-        valid_63 = " + ".join(["x"] * 31) + " = 0"
-        tokens_63 = tokenize(valid_63)
-        self.assertEqual(len(tokens_63), 64)  # 63 tokens + 1 EOF
-        self.assertIsInstance(parse(valid_63), Equation)
+        # Exact 64 non-EOF tokens:
+        # 1 leading unary '+' + 31 'x' + 30 binary '+' + 1 '=' + 1 '0' = 64 non-EOF tokens (65 tokens with EOF)
+        valid_64 = " + ".join(["+x"] + ["x"] * 30) + " = 0"
+        tokens_64 = tokenize(valid_64)
+        self.assertEqual(len(tokens_64) - 1, MAX_TOKEN_COUNT)
+        self.assertEqual(len(tokens_64), 65)  # 64 non-EOF tokens + 1 EOF
+        self.assertEqual(tokens_64[-1].type, TokenType.EOF)
+        self.assertIsInstance(parse(valid_64), Equation)
 
-        # 32 'x' + 31 '+' + 1 '=' + 1 '0' = 65 tokens > 64 limit
+        # Exact 65 non-EOF tokens:
+        # 32 'x' + 31 binary '+' + 1 '=' + 1 '0' = 65 non-EOF tokens > 64 limit
         exceeded_65 = " + ".join(["x"] * 32) + " = 0"
         with self.assertRaises(InputBoundsExceededError) as ctx:
             tokenize(exceeded_65)

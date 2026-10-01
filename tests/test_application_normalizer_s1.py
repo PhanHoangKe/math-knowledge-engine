@@ -35,8 +35,11 @@ from mke_product.parser import (
     ImplicitMultiplicationError,
     InputBoundsExceededError,
     LexerError,
+    MAX_TOKEN_COUNT,
     ParserError,
     Span,
+    Token,
+    TokenType,
     UnsupportedExponentError,
     UnsupportedSyntaxError,
     UnsupportedVariableError,
@@ -279,15 +282,24 @@ class TestResourceBoundaries(unittest.TestCase):
         self.assertEqual(ctx.exception.error_code, ApplicationErrorCode.INPUT_LIMIT_EXCEEDED)
 
     def test_token_count_boundary_64_passes(self):
-        # 31 'x' + 30 '+' + 1 '=' + 1 '0' = 63 tokens (+ EOF = 64)
-        expr = " + ".join(["x"] * 31) + " = 0"
+        # Exact 64 non-EOF tokens:
+        # 1 leading unary '+' + 31 variable 'x' + 30 binary '+' + 1 '=' + 1 integer '0' = 64 non-EOF tokens.
+        terms = ["+x"] + ["x"] * 30
+        expr = " + ".join(terms) + " = 0"
         tokens = tokenize(expr)
-        self.assertEqual(len(tokens), 64)
+        # Token list contains 64 non-EOF tokens + 1 EOF token = 65 tokens total
+        self.assertEqual(len(tokens) - 1, MAX_TOKEN_COUNT)
+        self.assertEqual(len(tokens) - 1, 64)
+        self.assertEqual(tokens[-1].type, TokenType.EOF)
+
         a, b, c = normalize_raw_equation(expr)
+        self.assertEqual(a, Rational(0, 1))
         self.assertEqual(b, Rational(31, 1))
+        self.assertEqual(c, Rational(0, 1))
 
     def test_token_count_boundary_65_fails(self):
-        # 32 'x' + 31 '+' + 1 '=' + 1 '0' = 65 tokens > 64 limit
+        # Exact 65 non-EOF tokens:
+        # 32 'x' + 31 binary '+' + 1 '=' + 1 '0' = 65 non-EOF tokens > 64 limit
         expr = " + ".join(["x"] * 32) + " = 0"
         with self.assertRaises(ApplicationError) as ctx:
             normalize_raw_equation(expr)
