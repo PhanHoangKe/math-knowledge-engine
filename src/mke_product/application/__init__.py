@@ -20,6 +20,21 @@ from .normalizer import (
     normalize_expression,
     normalize_raw_equation,
 )
+from .traces import (
+    BaseTraceGenerator,
+    ReducedQuadraticFormulaTraceGenerator,
+    StandardQuadraticFormulaTraceGenerator,
+    TRACE_GENERATORS,
+    TraceGenerationError,
+    TraceInvalidInputError,
+    TraceInvariantError,
+    TraceMethodNotApplicableError,
+    TraceMethodUnavailableError,
+    VieteSpecialDifTraceGenerator,
+    VieteSpecialSumTraceGenerator,
+    generate_solution_trace,
+    get_trace_generator,
+)
 
 __all__ = [
     "ApplicationError",
@@ -33,4 +48,17 @@ __all__ = [
     "DegenerateSolveResult",
     "solve_exact_degenerate",
     "verify_degenerate_solution",
+    "BaseTraceGenerator",
+    "StandardQuadraticFormulaTraceGenerator",
+    "ReducedQuadraticFormulaTraceGenerator",
+    "VieteSpecialSumTraceGenerator",
+    "VieteSpecialDifTraceGenerator",
+    "TRACE_GENERATORS",
+    "get_trace_generator",
+    "generate_solution_trace",
+    "TraceGenerationError",
+    "TraceMethodNotApplicableError",
+    "TraceInvalidInputError",
+    "TraceInvariantError",
+    "TraceMethodUnavailableError",
 ]
