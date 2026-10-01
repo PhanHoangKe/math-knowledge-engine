@@ -19,12 +19,13 @@
 Stage S2-02 establishes the authoritative acceptance and semantic parity evidence for the MKE FastAPI transport layer (`src/mke_product/transport/`). The HTTP transport wraps the pure-Python S1 application service (`solve_request`) via FastAPI REST routes (`POST /api/v1/algebra/solve` and `GET /api/v1/health`), strictly preserving all mathematical, domain, and DTO contracts while enforcing deterministic HTTP status mapping, bounded ASGI streaming, and strict error sanitization.
 
 ### Core Acceptance Findings:
-1. **Direct-vs-HTTP Parity:** All 32 canonical S1 matrix cases (Q1-Q9, C1-C5, D1-D4, E1-E8, B1-B6) produce 100% identical semantic output over HTTP and direct Python execution (after normalizing only `verified_at_utc`).
+1. **Direct-vs-HTTP Parity:** All 31 parity-capable S1 canonical matrix cases (Q1-Q9, C1-C5, D1-D4, E1-E8, B1, B3-B6) produce exact structural equality of normalized JSON-compatible objects between direct Python execution and HTTP JSON responses (after normalizing only `verified_at_utc`). Case B2 validates the expected DTO intake boundary via HTTP 422. All 32 matrix rows pass acceptance.
 2. **Category-A Domain Policy:** All client mathematical domain errors return **HTTP 200** with the accepted `ErrorResponse` payload intact.
 3. **Category-B Internal Policy:** All internal domain/application failures return **HTTP 500** with unmutated `ErrorResponse` payload preservation.
 4. **Transport Layer Security:** All transport-level rejections (400, 404, 413, 415, 422, 500) emit strictly sanitized `TransportErrorResponse` envelopes with zero leakage of internal class names, tracebacks, raw input sentinels, or raw headers.
 5. **Route Isolation & Invariants:** Bounded payload pre-read (64 KiB) and media-type enforcement (`application/json`) are scoped strictly to `POST /api/v1/algebra/solve`. Unknown routes preserve `API_NOT_FOUND` (404) routing isolation without leaking transport policy oracle behavior.
-6. **Mathematical Authority Purity:** Production transport modules contain zero imports or invocations of execution authority (`CASRouter`, `sympy`, normalizer, trace generators, or verifiers). Read-only metadata counts of `MethodRegistry` and `TRACE_GENERATORS` are restricted to `GET /api/v1/health`.
+6. **Mathematical Authority Purity:** Production transport modules contain zero imports or invocations of execution authority (`CASRouter`, `sympy`, normalizer, trace generators, or verifiers) verified via both AST and static token scans. Read-only metadata counts of `MethodRegistry` and `TRACE_GENERATORS` are restricted to `GET /api/v1/health`.
+7. **OpenAPI Frontend Readiness:** The generated OpenAPI 3.1.0 schema was comprehensively inspected and verified for polymorphic discriminators, schema models, and status codes. Conclusion: **`OPENAPI FRONTEND CONTRACT VERIFIED`**.
 
 ---
 
@@ -65,7 +66,7 @@ Stage S2-02 establishes the authoritative acceptance and semantic parity evidenc
 | **B5** | RAW_TEXT | 64 non-EOF tokens | 200 | ANALYZED_NO_EXECUTION | Identical | VERIFIED_COMPLETE |
 | **B6** | RAW_TEXT | 65 non-EOF tokens | 200 | ERROR (`INPUT_LIMIT_EXCEEDED`) | Identical | N/A |
 
-*Note on B2:* At the Python boundary, direct DTO initialization raises a Pydantic `ValidationError`. At the transport boundary, FastAPI/Pydantic intercepts this before application execution and returns HTTP 422 `TransportErrorResponse(REQUEST_VALIDATION_FAILED)` with sanitized fields.
+*Note on B2:* At the Python boundary, direct DTO initialization raises a Pydantic `ValidationError`. At the transport boundary, FastAPI/Pydantic intercepts this before application execution and returns HTTP 422 `TransportErrorResponse(REQUEST_VALIDATION_FAILED)` with sanitized fields. All 32 rows are fully accepted.
 
 ---
 
@@ -75,8 +76,8 @@ For every valid `SolveRequest`:
 1. `direct_response = solve_request(request)` -> serialized to `direct_json`.
 2. `http_response = client.post("/api/v1/algebra/solve", json=request.model_dump(mode="json"))` -> serialized to `http_json`.
 3. Normalization function `_normalize_snapshot()` strips only the nondeterministic timestamp `verified_at_utc`.
-4. Verification asserts:
-   - `problem_id`, `semantic_revision_hash`, `classification`, `a,b,c`, and `discriminant` are byte-for-byte identical.
+4. Verification asserts **exact structural equality of normalized JSON-compatible objects**:
+   - `problem_id`, `semantic_revision_hash`, `classification`, `a,b,c`, and `discriminant` are structurally identical.
    - All 9 `available_methods` entries match on all 11 metadata fields in exact order.
    - `selected_method_id`, `solution.method_id`, `roots`, and `trace.steps` match identically.
    - `certificate_id` and `integrity_fingerprint` match identically.
@@ -159,6 +160,7 @@ flowchart TD
 Direct ASGI test harnesses confirm:
 - **Bounded In-Memory Cap:** Memory allocation during stream pre-read is strictly capped at `MAX_BODY_BYTES + 1` (65,537 bytes maximum), eliminating unbounded memory buffering risks.
 - **Deceptive `Content-Length: 10` with $>64$ KiB Actual Data:** Authoritative stream counting detects $>65536$ bytes, halts consumption, and returns HTTP 413 without calling downstream app.
+- **`Content-Length: 0` Authority:** Valid small payload with `Content-Length: 0` header passes pre-read size guard and replays completely to downstream; streamed body $>64$ KiB with `Content-Length: 0` header is caught by streaming pre-read and rejected with HTTP 413.
 - **Missing `Content-Length` with $>64$ KiB Streamed Data:** Cumulative chunk counting halts at byte 65,537 and returns HTTP 413.
 - **Exact Boundary (65,536 bytes):** Passes size guard, reassembles chunks, and replays exact 65,536 bytes to downstream handler.
 - **Exactly One Response:** All rejection branches emit strictly one `http.response.start` and one terminal `http.response.body`.
@@ -173,60 +175,89 @@ Direct ASGI test harnesses confirm:
 
 ---
 
-## 8. OpenAPI Contract & Health Observability Audit
+## 8. OpenAPI Contract & Frontend Readiness
 
 ### OpenAPI Schema Audit (`GET /openapi.json`):
 - `POST /api/v1/algebra/solve` documents stable operation ID `solve_algebra_v1` and HTTP response codes: `200`, `400`, `413`, `415`, `422`, `500`.
-- `GET /api/v1/health` documents stable operation ID `health_v1`.
+- **200 Response Discriminator:** The 200 response schema defines a `oneOf` union across `SolvedResponse`, `AnalyzedNoExecutionResponse`, and `ErrorResponse` with OpenAPI 3.1 `discriminator`:
+  ```json
+  "discriminator": {
+    "propertyName": "response_status",
+    "mapping": {
+      "SOLVED": "#/components/schemas/SolvedResponse",
+      "ANALYZED_NO_EXECUTION": "#/components/schemas/AnalyzedNoExecutionResponse",
+      "ERROR": "#/components/schemas/ErrorResponse"
+    }
+  }
+  ```
+- **SolveRequest.input_payload Discriminator:** The request body input payload defines a `oneOf` union across `RawEquationInput` and `CanonicalCoefficientInput` with `discriminator`:
+  ```json
+  "discriminator": {
+    "propertyName": "input_mode",
+    "mapping": {
+      "COEFFICIENTS": "#/components/schemas/CanonicalCoefficientInput",
+      "RAW_TEXT": "#/components/schemas/RawEquationInput"
+    }
+  }
+  ```
+- **Closed Schema Models:** `SolveRequest`, `RawEquationInput`, `CanonicalCoefficientInput`, and `TransportErrorResponse` explicitly specify `additionalProperties: false`.
+- **Error Response Schemas:** Status codes `400`, `413`, `415`, and `422` reference `#/components/schemas/TransportErrorResponse`. Status code `500` defines `anyOf` referencing `#/components/schemas/ErrorResponse` and `#/components/schemas/TransportErrorResponse`.
+- **GET /api/v1/health:** Documents stable operation ID `health_v1` referencing `#/components/schemas/HealthResponse`.
 - `TransportErrorCode` schema enumerates exactly 6 enum values: `MALFORMED_JSON`, `REQUEST_VALIDATION_FAILED`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `API_NOT_FOUND`, `INTERNAL_TRANSPORT_ERROR`.
-- `TransportErrorResponse` schema is frozen with strict model configuration (`extra="forbid"`).
 
-### Health Observability (`GET /api/v1/health`):
+### OpenAPI Frontend Readiness Verdict:
+**`OPENAPI FRONTEND CONTRACT VERIFIED`**
+
+---
+
+## 9. Health Observability Acceptance
+
+### Health Endpoint (`GET /api/v1/health`):
 - Dynamically derives registered method count: `registered_methods_count == len(MethodRegistry().list_all())` (9 methods).
 - Dynamically derives executable method count: `executable_methods_count == len(TRACE_GENERATORS)` (4 methods).
 - Monkeypatch substitution tests prove counts are derived dynamically rather than hard-coded constants.
 
 ---
 
-## 9. Mathematical Authority Purity Audit
+## 10. Mathematical Authority Purity Audit
 
-A static AST and source scan of all files in `src/mke_product/transport/` verifies:
-- **Zero Imports / Invocations of Execution Authority:** No references to `CASRouter`, `execute_cas_operation`, `sympy`, `normalize_raw_equation`, `generate_solution_trace`, `get_trace_generator`, `HostIndependentVerifier`, or `DegenerateHostVerifier`.
+A static AST node scan and source token audit of all files in `src/mke_product/transport/` verifies:
+- **Zero Imports / Invocations of Execution Authority:** No references or imports of `CASRouter`, `execute_cas_operation`, `sympy`, `normalize_raw_equation`, `generate_solution_trace`, `get_trace_generator`, `HostIndependentVerifier`, or `DegenerateHostVerifier`.
+- **AST Import Node Inspection:** All `ast.Import` and `ast.ImportFrom` AST nodes across transport modules are verified to never target `sympy`, `mke_product.domain.verifier`, `mke_product.domain.cas_router`, or `mke_product.application.normalizer`.
 - **Accepted Read-Only Observability:** Restricted to reading metadata counts from `MethodRegistry` and `TRACE_GENERATORS` within `src/mke_product/transport/routers/algebra.py` for `/api/v1/health`.
 - **Zero Domain / Application Mutations:** Pure S1 application source files in `src/mke_product/domain/` and `src/mke_product/application/` are completely unmodified in S2-02.
 
 ---
 
-## 10. Test Execution & Regression Evidence
+## 11. Test Execution & Regression Evidence
 
 ### 1. Dedicated S2 Acceptance Suite
 ```text
-pytest tests/test_transport_fastapi_s2_acceptance.py -v
-======================= 108 passed, 4 warnings in 2.62s =======================
+pytest tests/test_transport_fastapi_s2_acceptance.py -q
+114 passed, 4 warnings in 2.97s
 ```
 
 ### 2. Combined S2 Transport Suite (Smoke + Acceptance)
 ```text
-pytest tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py -v
-======================= 143 passed, 5 warnings in 2.69s =======================
+pytest tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py -q
+149 passed, 5 warnings in 3.22s
 ```
 
 ### 3. Accepted S1 & S0 Regression Suites
 ```text
 pytest -q tests/test_application_s1_acceptance.py tests/test_application_orchestrator_s1.py tests/test_application_traces_s1.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_domain_core_s0.py
-........................................................................................... [100%]
-278 passed in 0.92s
+278 passed in 0.93s
 ```
 
 ### 4. Full Repository Regression Suite
 ```text
 pytest tests/ -q
-1202 passed, 97 skipped, 2 warnings, 18 subtests passed in 216.15s
+1316 passed, 97 skipped, 5 warnings, 18 subtests passed in 195.89s (0:03:15)
 ```
 
 ---
 
-## 11. Environment & Dependency Versions Tested
+## 12. Environment & Dependency Versions Tested
 
 - **OS:** Windows 11 (win32)
 - **Python:** 3.10.11
@@ -240,13 +271,14 @@ pytest tests/ -q
 
 ---
 
-## 12. Unresolved Issues
+## 13. Unresolved Issues
 
 - **None.** All transport requirements, route isolation policies, raw-ASGI invariants, direct-vs-HTTP parity tests, and full repository regressions passed without exception.
 
 ---
 
-## 13. Audit Status
+## 14. Audit Status
 
-**STATUS:** PENDING INDEPENDENT S2-02 AUDIT  
+**STATUS:** PENDING INDEPENDENT S2-02-R1 AUDIT  
 *(Implementation engineer will await authorization before proceeding to Stage S2-03 frontend integration).*
+

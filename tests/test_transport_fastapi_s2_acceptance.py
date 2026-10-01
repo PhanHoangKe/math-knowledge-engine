@@ -8,6 +8,7 @@ audits OpenAPI contracts, and validates raw-ASGI streaming invariants.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 from pathlib import Path
@@ -1035,6 +1036,80 @@ class TestRawASGIBodyLimitAcceptance:
         assert len(start_msgs) == 1
         assert start_msgs[0]["status"] == 413
 
+    @pytest.mark.asyncio
+    async def test_raw_asgi_zero_content_length_with_valid_body_replayed_completely(self):
+        """Raw ASGI: Content-Length: 0 with small actual body passes guard and replays completely."""
+        downstream_called = False
+        replayed_body = b""
+
+        async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+            nonlocal downstream_called, replayed_body
+            downstream_called = True
+            msg = await receive()
+            replayed_body += msg.get("body", b"")
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"OK", "more_body": False})
+
+        middleware = StreamPayloadLimitMiddleware(sentinel_app)
+        small_payload = b'{"input_payload":{"input_mode":"RAW_TEXT","raw_query":"x^2-1=0"}}'
+
+        async def mock_receive() -> Message:
+            return {"type": "http.request", "body": small_payload, "more_body": False}
+
+        sent: List[Message] = []
+        async def mock_send(msg: Message) -> None:
+            sent.append(msg)
+
+        scope: Scope = {
+            "type": "http",
+            "method": "POST",
+            "path": ALGEBRA_SOLVE_PATH,
+            "headers": [(b"content-type", b"application/json"), (b"content-length", b"0")],
+        }
+
+        await middleware(scope, mock_receive, mock_send)
+        assert downstream_called is True
+        assert replayed_body == small_payload
+
+    @pytest.mark.asyncio
+    async def test_raw_asgi_zero_content_length_with_oversized_stream_rejected_413(self):
+        """Raw ASGI: Content-Length: 0 with actual stream > 64 KiB is caught by pre-read and rejected with 413."""
+        downstream_called = False
+
+        async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+            nonlocal downstream_called
+            downstream_called = True
+
+        middleware = StreamPayloadLimitMiddleware(sentinel_app)
+        chunks = [b"z" * 10000 for _ in range(7)]  # 70,000 bytes
+        idx = 0
+
+        async def mock_receive() -> Message:
+            nonlocal idx
+            if idx < len(chunks):
+                body = chunks[idx]
+                idx += 1
+                return {"type": "http.request", "body": body, "more_body": idx < len(chunks)}
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        sent: List[Message] = []
+        async def mock_send(msg: Message) -> None:
+            sent.append(msg)
+
+        scope: Scope = {
+            "type": "http",
+            "method": "POST",
+            "path": ALGEBRA_SOLVE_PATH,
+            "headers": [(b"content-type", b"application/json"), (b"content-length", b"0")],
+        }
+
+        await middleware(scope, mock_receive, mock_send)
+        assert downstream_called is False
+        start_msgs = [m for m in sent if m["type"] == "http.response.start"]
+        assert len(start_msgs) == 1
+        assert start_msgs[0]["status"] == 413
+
+
 
 # ============================================================================
 # 8. SECURITY & ERROR SANITIZATION ACCEPTANCE
@@ -1171,6 +1246,68 @@ class TestOpenAPIContractAudit:
 
         assert "TransportErrorResponse" in schemas
         assert "HealthResponse" in schemas
+
+    def test_openapi_solve_200_polymorphic_discriminator_contract(self, client: TestClient):
+        """POST /api/v1/algebra/solve 200 schema defines oneOf with discriminator property response_status."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        spec = response.json()
+
+        solve_200_schema = spec["paths"][ALGEBRA_SOLVE_PATH]["post"]["responses"]["200"]["content"]["application/json"]["schema"]
+        assert "oneOf" in solve_200_schema
+        assert len(solve_200_schema["oneOf"]) == 3
+
+        discriminator = solve_200_schema.get("discriminator")
+        assert discriminator is not None
+        assert discriminator["propertyName"] == "response_status"
+        mapping = discriminator.get("mapping", {})
+        assert mapping.get("SOLVED") == "#/components/schemas/SolvedResponse"
+        assert mapping.get("ANALYZED_NO_EXECUTION") == "#/components/schemas/AnalyzedNoExecutionResponse"
+        assert mapping.get("ERROR") == "#/components/schemas/ErrorResponse"
+
+    def test_openapi_solve_request_input_payload_discriminator_contract(self, client: TestClient):
+        """SolveRequest.input_payload defines oneOf with discriminator property input_mode."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        spec = response.json()
+        schemas = spec["components"]["schemas"]
+
+        assert "SolveRequest" in schemas
+        solve_req = schemas["SolveRequest"]
+        assert solve_req.get("additionalProperties") is False
+
+        input_payload_schema = solve_req["properties"]["input_payload"]
+        assert "oneOf" in input_payload_schema
+        assert len(input_payload_schema["oneOf"]) == 2
+
+        discriminator = input_payload_schema.get("discriminator")
+        assert discriminator is not None
+        assert discriminator["propertyName"] == "input_mode"
+        mapping = discriminator.get("mapping", {})
+        assert mapping.get("RAW_TEXT") == "#/components/schemas/RawEquationInput"
+        assert mapping.get("COEFFICIENTS") == "#/components/schemas/CanonicalCoefficientInput"
+
+    def test_openapi_error_and_transport_schemas_contract(self, client: TestClient):
+        """Error status codes 400, 413, 415, 422 reference TransportErrorResponse; 500 references ErrorResponse and TransportErrorResponse."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        spec = response.json()
+        schemas = spec["components"]["schemas"]
+
+        assert schemas["TransportErrorResponse"].get("additionalProperties") is False
+        assert schemas["RawEquationInput"].get("additionalProperties") is False
+        assert schemas["CanonicalCoefficientInput"].get("additionalProperties") is False
+
+        responses = spec["paths"][ALGEBRA_SOLVE_PATH]["post"]["responses"]
+        for status in ("400", "413", "415", "422"):
+            schema_ref = responses[status]["content"]["application/json"]["schema"]["$ref"]
+            assert schema_ref == "#/components/schemas/TransportErrorResponse"
+
+        resp_500_schema = responses["500"]["content"]["application/json"]["schema"]
+        assert "anyOf" in resp_500_schema
+        refs = [item["$ref"] for item in resp_500_schema["anyOf"]]
+        assert "#/components/schemas/ErrorResponse" in refs
+        assert "#/components/schemas/TransportErrorResponse" in refs
 
 
 # ============================================================================
@@ -1376,3 +1513,46 @@ class TestStrengthenedPurityAndAuthorityAudit:
                 assert symbol not in file_content, (
                     f"Purity violation: Forbidden execution authority symbol '{symbol}' found in {py_file.name}"
                 )
+
+    def test_transport_source_files_ast_import_purity(self):
+        """Parse all transport source files with Python AST and verify no forbidden modules or symbols are imported."""
+        transport_dir = Path(__file__).resolve().parent.parent / "src" / "mke_product" / "transport"
+        assert transport_dir.is_dir(), f"Transport directory not found at {transport_dir}"
+
+        forbidden_import_modules = {
+            "sympy",
+            "mke_product.domain.verifier",
+            "mke_product.domain.cas_router",
+            "mke_product.application.normalizer",
+        }
+        forbidden_import_names = {
+            "CASRouter",
+            "execute_cas_operation",
+            "normalize_raw_equation",
+            "generate_solution_trace",
+            "get_trace_generator",
+            "HostIndependentVerifier",
+            "DegenerateHostVerifier",
+        }
+
+        transport_py_files = list(transport_dir.rglob("*.py"))
+        for py_file in transport_py_files:
+            tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        for forbidden_mod in forbidden_import_modules:
+                            assert not alias.name.startswith(forbidden_mod), (
+                                f"AST Purity violation: Forbidden import '{alias.name}' found in {py_file.name}"
+                            )
+                elif isinstance(node, ast.ImportFrom):
+                    mod_name = node.module or ""
+                    for forbidden_mod in forbidden_import_modules:
+                        assert not mod_name.startswith(forbidden_mod), (
+                            f"AST Purity violation: Forbidden import from '{mod_name}' found in {py_file.name}"
+                        )
+                    for alias in node.names:
+                        assert alias.name not in forbidden_import_names, (
+                            f"AST Purity violation: Forbidden imported symbol '{alias.name}' from '{mod_name}' found in {py_file.name}"
+                        )
+
