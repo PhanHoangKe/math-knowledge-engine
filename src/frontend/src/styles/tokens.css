@@ -1,0 +1,110 @@
+/* ==========================================================================
+   MKE MVP V1 — Design Tokens & Visual Atmosphere
+   Preserves authoritative UI00 palette: Canvas, Surfaces, Accents,
+   4 Category Domain Colors, and Typography Stacks.
+   ========================================================================== */
+
+:root {
+  /* Canvas & Surface Tokens (Light Theme) */
+  --bg-canvas: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f7f7f9;
+  --border-subtle: #e2e8f0;
+  --border-card: #e5e7eb;
+  --border-card-hover: #cbd5e1;
+
+  /* Accent & Interaction Tokens (Light Theme) */
+  --border-accent: #8e6cd9; /* Iconic Wolfram violet border */
+  --border-focus: #7a54cc;
+  --compute-btn: #8e6cd9;
+  --compute-btn-hover: #7b55ca;
+  --compute-text: #ffffff;
+  --accent-primary: #8e6cd9;
+  --accent-hover: #7a54cc;
+  --accent-subtle: #f3f0fc;
+
+  /* Typography Colors (Light Theme) */
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-italic: #475569;
+
+  /* 4 Column Category Domain Colors (Matches WolframAlpha Baseline) */
+  --col-math: #8e6cd9;       /* Mathematics / Step Solutions (Purple/Violet) */
+  --col-science: #059669;    /* Science / Rational Field (Emerald Green) */
+  --col-society: #e05638;    /* Society / Quadratics (Terracotta Coral) */
+  --col-life: #0284c7;       /* Everyday Life / Classroom (Sky Blue) */
+  --wolfram-orange: #ea580c; /* Signature orange accent */
+
+  /* Badges & Status */
+  --badge-active-bg: #dcfce7;
+  --badge-active-text: #166534;
+  --badge-planned-bg: #f1f5f9;
+  --badge-planned-text: #475569;
+  --badge-demo-bg: #fffbeb;
+  --badge-demo-text: #92400e;
+  --badge-demo-border: #fef3c7;
+
+  /* Shadows */
+  --shadow-input: 0 2px 14px rgba(142, 108, 217, 0.12);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-popover: 0 8px 24px -4px rgba(0, 0, 0, 0.15);
+
+  /* Font Stacks */
+  --font-math: "Cambria Math", "Charter", "Georgia", serif;
+  --font-serif-italic: "Charter", "Georgia", "Cambria", serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", "Courier New", monospace;
+
+  --transition-speed: 0.18s;
+  --radius-capsule: 20px;
+  --radius-card: 8px;
+  --radius-btn: 12px;
+}
+
+/* Charcoal Dark Theme Tokens */
+[data-theme="dark"] {
+  --bg-canvas: #262626;      /* Authentic Wolfram charcoal background */
+  --bg-surface: #2e2e2e;     /* Dark card surface */
+  --bg-surface-elevated: #363636;
+  --bg-subtle: #333333;
+  --border-subtle: #3d3d3d;
+  --border-card: #3d3d3d;
+  --border-card-hover: #525252;
+
+  --border-accent: #9d7fe3;  /* Luminous violet search border */
+  --border-focus: #bca4f5;
+  --compute-btn: #9d7fe3;
+  --compute-btn-hover: #8b66da;
+  --compute-text: #ffffff;
+  --accent-primary: #9d7fe3;
+  --accent-hover: #bca4f5;
+  --accent-subtle: #3a2e54;
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-italic: #d1d5db;
+
+  /* Dark Column Domain Colors */
+  --col-math: #a78bfa;       /* Light purple */
+  --col-science: #34d399;    /* Light emerald */
+  --col-society: #fb7185;    /* Coral pink */
+  --col-life: #38bdf8;       /* Bright sky blue */
+  --wolfram-orange: #f59e0b; /* Vibrant amber for dark background */
+
+  --badge-active-bg: #064e3b;
+  --badge-active-text: #a7f3d0;
+  --badge-planned-bg: #374151;
+  --badge-planned-text: #d1d5db;
+  --badge-demo-bg: #451a03;
+  --badge-demo-text: #fde68a;
+  --badge-demo-border: #78350f;
+
+  --shadow-input: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.6);
+}

@@ -1,0 +1,1340 @@
+{
+  "components": {
+    "schemas": {
+      "AnalyzedNoExecutionResponse": {
+        "additionalProperties": false,
+        "description": "Response state when problem is analyzed but no trace executed (e.g. unavailable method selected or degenerate linear).",
+        "properties": {
+          "analysis_message_vi": {
+            "title": "Analysis Message Vi",
+            "type": "string"
+          },
+          "available_methods": {
+            "items": {
+              "$ref": "#/components/schemas/MethodOptionView"
+            },
+            "title": "Available Methods",
+            "type": "array"
+          },
+          "degenerate_solution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DegenerateSolutionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem": {
+            "discriminator": {
+              "mapping": {
+                "DEGENERATE": "#/components/schemas/CanonicalDegenerateProblemView",
+                "QUADRATIC": "#/components/schemas/CanonicalQuadraticProblemView"
+              },
+              "propertyName": "problem_type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CanonicalQuadraticProblemView"
+              },
+              {
+                "$ref": "#/components/schemas/CanonicalDegenerateProblemView"
+              }
+            ],
+            "title": "Problem"
+          },
+          "reason_code": {
+            "$ref": "#/components/schemas/NoExecutionReasonCode"
+          },
+          "response_status": {
+            "const": "ANALYZED_NO_EXECUTION",
+            "default": "ANALYZED_NO_EXECUTION",
+            "title": "Response Status",
+            "type": "string"
+          },
+          "selected_method_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Method Id"
+          }
+        },
+        "required": [
+          "problem",
+          "reason_code",
+          "analysis_message_vi"
+        ],
+        "title": "AnalyzedNoExecutionResponse",
+        "type": "object"
+      },
+      "ApplicationErrorCode": {
+        "description": "Deterministic machine-readable error codes for the application intake & normalization pipeline.",
+        "enum": [
+          "SYNTAX_ERROR",
+          "INPUT_LIMIT_EXCEEDED",
+          "UNSUPPORTED_SYNTAX",
+          "UNSUPPORTED_VARIABLE",
+          "IMPLICIT_MULTIPLICATION_UNSUPPORTED",
+          "NON_POLYNOMIAL_INPUT",
+          "DEGREE_OUT_OF_SCOPE",
+          "DIVISION_BY_ZERO",
+          "NORMALIZATION_ERROR",
+          "METHOD_NOT_FOUND",
+          "METHOD_NOT_APPLICABLE",
+          "METHOD_NOT_EXECUTABLE",
+          "METHOD_EXECUTION_FAILED",
+          "DOMAIN_CONTRACT_ERROR",
+          "VERIFICATION_FAILED",
+          "INTERNAL_ERROR"
+        ],
+        "title": "ApplicationErrorCode",
+        "type": "string"
+      },
+      "CanonicalCoefficientInput": {
+        "additionalProperties": false,
+        "description": "Direct canonical coefficient parameter input mode for live editing and method switching.",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/RationalFraction",
+            "description": "Leading coefficient a"
+          },
+          "b": {
+            "$ref": "#/components/schemas/RationalFraction",
+            "description": "Linear coefficient b"
+          },
+          "c": {
+            "$ref": "#/components/schemas/RationalFraction",
+            "description": "Constant term c"
+          },
+          "input_mode": {
+            "const": "COEFFICIENTS",
+            "default": "COEFFICIENTS",
+            "title": "Input Mode",
+            "type": "string"
+          },
+          "target_variable": {
+            "const": "x",
+            "default": "x",
+            "title": "Target Variable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "c"
+        ],
+        "title": "CanonicalCoefficientInput",
+        "type": "object"
+      },
+      "CanonicalDegenerateProblemView": {
+        "additionalProperties": false,
+        "description": "Canonical problem representation for degenerate equations (a == 0). Zero discriminant invented.",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "b": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "c": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "category": {
+            "const": "ALGEBRA_QUADRATIC",
+            "default": "ALGEBRA_QUADRATIC",
+            "title": "Category",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "LINEAR",
+              "IDENTITY",
+              "CONTRADICTION"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "equation_latex": {
+            "description": "Canonical LaTeX equation e.g. '2x - 4 = 0'",
+            "title": "Equation Latex",
+            "type": "string"
+          },
+          "linear_root": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "problem_type": {
+            "const": "DEGENERATE",
+            "default": "DEGENERATE",
+            "title": "Problem Type",
+            "type": "string"
+          },
+          "raw_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Query"
+          },
+          "semantic_revision_hash": {
+            "title": "Semantic Revision Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "equation_latex",
+          "classification",
+          "b",
+          "c",
+          "semantic_revision_hash"
+        ],
+        "title": "CanonicalDegenerateProblemView",
+        "type": "object"
+      },
+      "CanonicalQuadraticProblemView": {
+        "additionalProperties": false,
+        "description": "Canonical problem representation for true quadratic equations (a != 0).",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "b": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "c": {
+            "$ref": "#/components/schemas/RationalFraction"
+          },
+          "category": {
+            "const": "ALGEBRA_QUADRATIC",
+            "default": "ALGEBRA_QUADRATIC",
+            "title": "Category",
+            "type": "string"
+          },
+          "classification": {
+            "const": "QUADRATIC",
+            "default": "QUADRATIC",
+            "title": "Classification",
+            "type": "string"
+          },
+          "discriminant": {
+            "$ref": "#/components/schemas/QuadraticDiscriminant"
+          },
+          "equation_latex": {
+            "description": "Canonical LaTeX equation e.g. 'x^2 - 5x + 6 = 0'",
+            "title": "Equation Latex",
+            "type": "string"
+          },
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "problem_type": {
+            "const": "QUADRATIC",
+            "default": "QUADRATIC",
+            "title": "Problem Type",
+            "type": "string"
+          },
+          "raw_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Query"
+          },
+          "semantic_revision_hash": {
+            "title": "Semantic Revision Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "equation_latex",
+          "a",
+          "b",
+          "c",
+          "discriminant",
+          "semantic_revision_hash"
+        ],
+        "title": "CanonicalQuadraticProblemView",
+        "type": "object"
+      },
+      "DegenerateSolutionView": {
+        "additionalProperties": false,
+        "description": "Immutable verified solution presentation for degenerate equations (a == 0).",
+        "properties": {
+          "certificate": {
+            "$ref": "#/components/schemas/VerificationCertificate"
+          },
+          "classification": {
+            "enum": [
+              "LINEAR",
+              "IDENTITY",
+              "CONTRADICTION"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "final_answer_latex": {
+            "description": "Canonical LaTeX representation of the solution set",
+            "title": "Final Answer Latex",
+            "type": "string"
+          },
+          "linear_root": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact rational root -c/b when outcome is ONE_REAL_LINEAR_ROOT"
+          },
+          "outcome": {
+            "enum": [
+              "ONE_REAL_LINEAR_ROOT",
+              "INFINITE_REAL_SOLUTIONS",
+              "NO_REAL_SOLUTIONS_CONTRADICTION"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "verification_scope": {
+            "const": "FINAL_SOLUTION",
+            "default": "FINAL_SOLUTION",
+            "title": "Verification Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "classification",
+          "outcome",
+          "final_answer_latex",
+          "certificate"
+        ],
+        "title": "DegenerateSolutionView",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "description": "Response state when a fatal intake, parse, normalization, or invariant error occurs.",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "error_code": {
+            "$ref": "#/components/schemas/ApplicationErrorCode"
+          },
+          "message_en": {
+            "title": "Message En",
+            "type": "string"
+          },
+          "message_vi": {
+            "title": "Message Vi",
+            "type": "string"
+          },
+          "response_status": {
+            "const": "ERROR",
+            "default": "ERROR",
+            "title": "Response Status",
+            "type": "string"
+          },
+          "span": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Span"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "error_code",
+          "message_vi",
+          "message_en"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "ExecutionAvailability": {
+        "description": "Whether the solver/worker for this method is currently available to execute.",
+        "enum": [
+          "AVAILABLE",
+          "UNAVAILABLE"
+        ],
+        "title": "ExecutionAvailability",
+        "type": "string"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "description": "Observational system health response schema.",
+        "properties": {
+          "algebra_authority": {
+            "title": "Algebra Authority",
+            "type": "string"
+          },
+          "executable_methods_count": {
+            "title": "Executable Methods Count",
+            "type": "integer"
+          },
+          "milestone": {
+            "title": "Milestone",
+            "type": "string"
+          },
+          "registered_methods_count": {
+            "title": "Registered Methods Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supported_input_modes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported Input Modes",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "milestone",
+          "algebra_authority",
+          "supported_input_modes",
+          "registered_methods_count",
+          "executable_methods_count"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "MathematicalApplicability": {
+        "description": "Whether the method is mathematically sound and valid for this problem instance.",
+        "enum": [
+          "APPLICABLE",
+          "NOT_APPLICABLE",
+          "UNKNOWN"
+        ],
+        "title": "MathematicalApplicability",
+        "type": "string"
+      },
+      "MethodOptionView": {
+        "additionalProperties": false,
+        "description": "Orthogonal assessment profile of a single registered mathematical method.",
+        "properties": {
+          "execution_availability": {
+            "$ref": "#/components/schemas/ExecutionAvailability"
+          },
+          "has_trace_available": {
+            "title": "Has Trace Available",
+            "type": "boolean"
+          },
+          "mathematical_applicability": {
+            "$ref": "#/components/schemas/MathematicalApplicability"
+          },
+          "method_id": {
+            "title": "Method Id",
+            "type": "string"
+          },
+          "pedagogical_priority": {
+            "default": 1,
+            "title": "Pedagogical Priority",
+            "type": "integer"
+          },
+          "pedagogical_recommendation": {
+            "$ref": "#/components/schemas/PedagogicalRecommendation"
+          },
+          "prerequisites": {
+            "items": {
+              "$ref": "#/components/schemas/PrerequisiteStatus"
+            },
+            "title": "Prerequisites",
+            "type": "array"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "support_status": {
+            "$ref": "#/components/schemas/SupportStatus"
+          },
+          "title_vi": {
+            "title": "Title Vi",
+            "type": "string"
+          },
+          "verification_capability": {
+            "$ref": "#/components/schemas/VerificationCapability"
+          }
+        },
+        "required": [
+          "method_id",
+          "title_vi",
+          "mathematical_applicability",
+          "support_status",
+          "execution_availability",
+          "pedagogical_recommendation",
+          "verification_capability",
+          "has_trace_available"
+        ],
+        "title": "MethodOptionView",
+        "type": "object"
+      },
+      "NoExecutionReasonCode": {
+        "description": "Machine-readable reason for why no trace execution occurred in analyzed response.",
+        "enum": [
+          "METHOD_NOT_APPLICABLE",
+          "METHOD_NOT_EXECUTABLE",
+          "DEGENERATE_EXACT_SOLUTION"
+        ],
+        "title": "NoExecutionReasonCode",
+        "type": "string"
+      },
+      "PedagogicalRecommendation": {
+        "description": "Pedagogical recommendation level for Vietnamese secondary learners.",
+        "enum": [
+          "RECOMMENDED",
+          "NEUTRAL",
+          "DISCOURAGED"
+        ],
+        "title": "PedagogicalRecommendation",
+        "type": "string"
+      },
+      "PrerequisiteStatus": {
+        "additionalProperties": false,
+        "description": "Evaluation status for a single pedagogical/method prerequisite.",
+        "properties": {
+          "description_vi": {
+            "title": "Description Vi",
+            "type": "string"
+          },
+          "is_satisfied": {
+            "title": "Is Satisfied",
+            "type": "boolean"
+          },
+          "prerequisite_id": {
+            "title": "Prerequisite Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prerequisite_id",
+          "is_satisfied",
+          "description_vi"
+        ],
+        "title": "PrerequisiteStatus",
+        "type": "object"
+      },
+      "QuadraticDiscriminant": {
+        "additionalProperties": false,
+        "description": "Exact discriminant data structure with squarefree kernel analysis.",
+        "properties": {
+          "extracted_factor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rational factor s >= 0 such that sqrt(Delta) = s * sqrt(d)"
+          },
+          "is_negative": {
+            "description": "True if Delta < 0",
+            "title": "Is Negative",
+            "type": "boolean"
+          },
+          "is_positive": {
+            "description": "True if Delta > 0",
+            "title": "Is Positive",
+            "type": "boolean"
+          },
+          "is_rational_square": {
+            "description": "True if Delta is a square in Q",
+            "title": "Is Rational Square",
+            "type": "boolean"
+          },
+          "is_zero": {
+            "description": "True if Delta == 0",
+            "title": "Is Zero",
+            "type": "boolean"
+          },
+          "square_root_rational": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact rational sqrt(Delta) when is_rational_square is True"
+          },
+          "squarefree_kernel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Squarefree integer d >= 1 such that Delta = s^2 * d (d=1 if rational square)",
+            "title": "Squarefree Kernel"
+          },
+          "value": {
+            "$ref": "#/components/schemas/RationalFraction",
+            "description": "Exact rational value of Delta = b^2 - 4ac"
+          }
+        },
+        "required": [
+          "value",
+          "is_positive",
+          "is_zero",
+          "is_negative",
+          "is_rational_square"
+        ],
+        "title": "QuadraticDiscriminant",
+        "type": "object"
+      },
+      "RationalFraction": {
+        "additionalProperties": false,
+        "description": "Canonical serializable representation of an exact rational number p/q.",
+        "properties": {
+          "denominator": {
+            "default": 1,
+            "description": "Canonical integer denominator > 0",
+            "exclusiveMinimum": 0.0,
+            "title": "Denominator",
+            "type": "integer"
+          },
+          "numerator": {
+            "description": "Canonical integer numerator",
+            "title": "Numerator",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "numerator"
+        ],
+        "title": "RationalFraction",
+        "type": "object"
+      },
+      "RawEquationInput": {
+        "additionalProperties": false,
+        "description": "Raw mathematical text equation input mode.",
+        "properties": {
+          "input_mode": {
+            "const": "RAW_TEXT",
+            "default": "RAW_TEXT",
+            "title": "Input Mode",
+            "type": "string"
+          },
+          "raw_query": {
+            "description": "Raw equation string e.g. 'x^2 - 5*x + 6 = 0'",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Raw Query",
+            "type": "string"
+          },
+          "target_variable": {
+            "const": "x",
+            "default": "x",
+            "title": "Target Variable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_query"
+        ],
+        "title": "RawEquationInput",
+        "type": "object"
+      },
+      "RealRootValue": {
+        "additionalProperties": false,
+        "description": "Exact representation of a real root in Q or Q(sqrt(d)).",
+        "properties": {
+          "approximate_float": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Floating-point approximation for visualization only",
+            "title": "Approximate Float"
+          },
+          "latex_str": {
+            "description": "Canonical LaTeX representation of the root",
+            "title": "Latex Str",
+            "type": "string"
+          },
+          "radicand": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Squarefree radicand d > 1",
+            "title": "Radicand"
+          },
+          "rational_value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "root_type": {
+            "$ref": "#/components/schemas/SolutionRootType"
+          },
+          "surd_base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rational base u in u + v*sqrt(d)"
+          },
+          "surd_factor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RationalFraction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rational coefficient v in u + v*sqrt(d)"
+          }
+        },
+        "required": [
+          "root_type",
+          "latex_str"
+        ],
+        "title": "RealRootValue",
+        "type": "object"
+      },
+      "SolutionOutcome": {
+        "description": "Mathematical outcome category for equation solving.",
+        "enum": [
+          "TWO_DISTINCT_REAL_ROOTS",
+          "ONE_REPEATED_REAL_ROOT",
+          "NO_REAL_ROOTS",
+          "ONE_REAL_LINEAR_ROOT",
+          "INFINITE_REAL_SOLUTIONS",
+          "NO_REAL_SOLUTIONS_CONTRADICTION"
+        ],
+        "title": "SolutionOutcome",
+        "type": "string"
+      },
+      "SolutionRootType": {
+        "description": "Representation type of a real root.",
+        "enum": [
+          "RATIONAL",
+          "REAL_SURD",
+          "NO_REAL_ROOT"
+        ],
+        "title": "SolutionRootType",
+        "type": "string"
+      },
+      "SolutionStep": {
+        "additionalProperties": false,
+        "description": "Step in a verified solution trace.",
+        "properties": {
+          "explanation_vi": {
+            "title": "Explanation Vi",
+            "type": "string"
+          },
+          "latex_expression": {
+            "title": "Latex Expression",
+            "type": "string"
+          },
+          "rule_or_theorem_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Or Theorem Used"
+          },
+          "step_number": {
+            "minimum": 1.0,
+            "title": "Step Number",
+            "type": "integer"
+          },
+          "sub_steps": {
+            "items": {
+              "$ref": "#/components/schemas/SolutionStep"
+            },
+            "title": "Sub Steps",
+            "type": "array"
+          },
+          "why_this_step_vi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why This Step Vi"
+          }
+        },
+        "required": [
+          "step_number",
+          "latex_expression",
+          "explanation_vi"
+        ],
+        "title": "SolutionStep",
+        "type": "object"
+      },
+      "SolutionTrace": {
+        "additionalProperties": false,
+        "description": "Complete structured solution trace for an algebraic problem.",
+        "properties": {
+          "final_answer_latex": {
+            "title": "Final Answer Latex",
+            "type": "string"
+          },
+          "is_complete": {
+            "default": true,
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "method_id": {
+            "title": "Method Id",
+            "type": "string"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/RealRootValue"
+            },
+            "title": "Roots",
+            "type": "array"
+          },
+          "solution_outcome": {
+            "$ref": "#/components/schemas/SolutionOutcome"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/SolutionStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "method_id",
+          "solution_outcome",
+          "final_answer_latex"
+        ],
+        "title": "SolutionTrace",
+        "type": "object"
+      },
+      "SolveRequest": {
+        "additionalProperties": false,
+        "description": "Application intake request container for equation analysis and solving.",
+        "properties": {
+          "input_payload": {
+            "discriminator": {
+              "mapping": {
+                "COEFFICIENTS": "#/components/schemas/CanonicalCoefficientInput",
+                "RAW_TEXT": "#/components/schemas/RawEquationInput"
+              },
+              "propertyName": "input_mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RawEquationInput"
+              },
+              {
+                "$ref": "#/components/schemas/CanonicalCoefficientInput"
+              }
+            ],
+            "title": "Input Payload"
+          },
+          "schema_version": {
+            "const": "1.0.0",
+            "default": "1.0.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selected_method_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicit method selection ID. If None, highest-priority applicable method is executed.",
+            "title": "Selected Method Id"
+          }
+        },
+        "required": [
+          "input_payload"
+        ],
+        "title": "SolveRequest",
+        "type": "object"
+      },
+      "SolvedResponse": {
+        "additionalProperties": false,
+        "description": "Response state when problem is analyzed AND an applicable/available method is verified.",
+        "properties": {
+          "available_methods": {
+            "items": {
+              "$ref": "#/components/schemas/MethodOptionView"
+            },
+            "title": "Available Methods",
+            "type": "array"
+          },
+          "problem": {
+            "$ref": "#/components/schemas/CanonicalQuadraticProblemView"
+          },
+          "response_status": {
+            "const": "SOLVED",
+            "default": "SOLVED",
+            "title": "Response Status",
+            "type": "string"
+          },
+          "selected_method_id": {
+            "title": "Selected Method Id",
+            "type": "string"
+          },
+          "solution": {
+            "$ref": "#/components/schemas/VerifiedSolutionView"
+          }
+        },
+        "required": [
+          "problem",
+          "available_methods",
+          "selected_method_id",
+          "solution"
+        ],
+        "title": "SolvedResponse",
+        "type": "object"
+      },
+      "Span": {
+        "description": "Immutable character span [start, end) within source text.",
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "Span",
+        "type": "object"
+      },
+      "SupportStatus": {
+        "description": "Whether the method is implemented and supported in the MKE solver engine.",
+        "enum": [
+          "SUPPORTED",
+          "UNSUPPORTED"
+        ],
+        "title": "SupportStatus",
+        "type": "string"
+      },
+      "TransportErrorCode": {
+        "description": "Specific error codes for transport/HTTP failures occurring prior to or around application execution.",
+        "enum": [
+          "MALFORMED_JSON",
+          "REQUEST_VALIDATION_FAILED",
+          "PAYLOAD_TOO_LARGE",
+          "UNSUPPORTED_MEDIA_TYPE",
+          "API_NOT_FOUND",
+          "INTERNAL_TRANSPORT_ERROR"
+        ],
+        "title": "TransportErrorCode",
+        "type": "string"
+      },
+      "TransportErrorResponse": {
+        "additionalProperties": false,
+        "description": "Strict, immutable transport error envelope.",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message_en": {
+            "title": "Message En",
+            "type": "string"
+          },
+          "message_vi": {
+            "title": "Message Vi",
+            "type": "string"
+          },
+          "transport_error_code": {
+            "$ref": "#/components/schemas/TransportErrorCode"
+          },
+          "transport_status": {
+            "const": "ERROR",
+            "default": "ERROR",
+            "title": "Transport Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport_error_code",
+          "message_vi",
+          "message_en"
+        ],
+        "title": "TransportErrorResponse",
+        "type": "object"
+      },
+      "VerificationCapability": {
+        "description": "Capability of independent verification for this method's trace.",
+        "enum": [
+          "HOST_VERIFIABLE",
+          "UNVERIFIED",
+          "NOT_APPLICABLE"
+        ],
+        "title": "VerificationCapability",
+        "type": "string"
+      },
+      "VerificationCertificate": {
+        "additionalProperties": false,
+        "description": "Tamper-evident token certifying independent host mathematical verification.",
+        "properties": {
+          "algebraic_identities_passed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Algebraic Identities Passed",
+            "type": "array"
+          },
+          "certificate_id": {
+            "title": "Certificate Id",
+            "type": "string"
+          },
+          "certificate_signature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated alias for integrity_fingerprint. Note: this is an unkeyed SHA-256 digest, NOT a cryptographic signature.",
+            "title": "Certificate Signature"
+          },
+          "integrity_fingerprint": {
+            "description": "Deterministic unkeyed SHA-256 digest of canonical certificate verification payload (content identifier, not a digital signature)",
+            "title": "Integrity Fingerprint",
+            "type": "string"
+          },
+          "multiplicity_verified": {
+            "default": false,
+            "title": "Multiplicity Verified",
+            "type": "boolean"
+          },
+          "no_real_roots_verified": {
+            "default": false,
+            "title": "No Real Roots Verified",
+            "type": "boolean"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/VerificationOutcome"
+          },
+          "problem_hash": {
+            "title": "Problem Hash",
+            "type": "string"
+          },
+          "residual_checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Residual Checks",
+            "type": "array"
+          },
+          "verified_at_utc": {
+            "format": "date-time",
+            "title": "Verified At Utc",
+            "type": "string"
+          },
+          "verifier_name": {
+            "default": "MKE_HOST_INDEPENDENT_VERIFIER_V1",
+            "title": "Verifier Name",
+            "type": "string"
+          },
+          "verifier_version": {
+            "default": "1.0.0",
+            "title": "Verifier Version",
+            "type": "string"
+          },
+          "vieta_relations_checked": {
+            "default": false,
+            "title": "Vieta Relations Checked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "certificate_id",
+          "problem_hash",
+          "outcome",
+          "integrity_fingerprint"
+        ],
+        "title": "VerificationCertificate",
+        "type": "object"
+      },
+      "VerificationOutcome": {
+        "description": "Result of independent deterministic host verification.",
+        "enum": [
+          "VERIFIED_COMPLETE",
+          "VERIFICATION_FAILED",
+          "NOT_APPLICABLE"
+        ],
+        "title": "VerificationOutcome",
+        "type": "string"
+      },
+      "VerifiedSolutionView": {
+        "additionalProperties": false,
+        "description": "Verified execution result and step-by-step trace.",
+        "properties": {
+          "certificate": {
+            "$ref": "#/components/schemas/VerificationCertificate"
+          },
+          "final_answer_latex": {
+            "title": "Final Answer Latex",
+            "type": "string"
+          },
+          "method_id": {
+            "title": "Method Id",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SolutionOutcome"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/RealRootValue"
+            },
+            "title": "Roots",
+            "type": "array"
+          },
+          "trace": {
+            "$ref": "#/components/schemas/SolutionTrace"
+          },
+          "verification_scope": {
+            "const": "FINAL_SOLUTION",
+            "default": "FINAL_SOLUTION",
+            "title": "Verification Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method_id",
+          "outcome",
+          "final_answer_latex",
+          "trace",
+          "certificate"
+        ],
+        "title": "VerifiedSolutionView",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Production FastAPI transport adapter for MKE MVP V1 Algebra Workspace",
+    "title": "Math Knowledge Engine - Algebra Transport API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/algebra/solve": {
+      "post": {
+        "description": "Solve or analyze an algebraic equation via the pure S1 application service.",
+        "operationId": "solve_algebra_v1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ANALYZED_NO_EXECUTION": "#/components/schemas/AnalyzedNoExecutionResponse",
+                      "ERROR": "#/components/schemas/ErrorResponse",
+                      "SOLVED": "#/components/schemas/SolvedResponse"
+                    },
+                    "propertyName": "response_status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SolvedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AnalyzedNoExecutionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ],
+                  "title": "Response Solve Algebra V1"
+                }
+              }
+            },
+            "description": "Successful mathematical analysis or client domain error"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Malformed JSON payload"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Payload exceeds 64 KiB limit"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Content-Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "DTO schema validation failure"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TransportErrorResponse"
+                    }
+                  ],
+                  "title": "Response 500 Solve Algebra V1"
+                }
+              }
+            },
+            "description": "Internal application or transport failure"
+          }
+        },
+        "summary": "Solve Equation Endpoint",
+        "tags": [
+          "Algebra"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Observational health check deriving counts dynamically from underlying domain registries.",
+        "operationId": "health_v1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "System health and runtime registry metadata"
+          }
+        },
+        "summary": "Health Check Endpoint",
+        "tags": [
+          "Algebra"
+        ]
+      }
+    }
+  }
+}

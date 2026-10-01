@@ -9,3 +9,9 @@ dist/
 build/
 .venv/
 env/
+
+# Frontend
+node_modules/
+.temp-drift/
+.drift-temp/
+*.tsbuildinfo

@@ -1,0 +1,131 @@
+.appHeader {
+  background-color: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.65rem 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+}
+
+.headerContainer {
+  max-width: 1360px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  user-select: none;
+}
+
+.brandIconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+}
+
+.brandTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.brandTitleAccent {
+  color: var(--wolfram-orange);
+}
+
+.brandSub {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.prototypeBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+  background-color: var(--badge-demo-bg);
+  color: var(--badge-demo-text);
+  border: 1px solid var(--badge-demo-border);
+  letter-spacing: 0.04em;
+  margin-left: 0.4rem;
+}
+
+.headerRightGroup {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.navBtn {
+  background: transparent;
+  padding: 0.25rem 0.2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-speed) ease;
+  user-select: none;
+}
+
+.navBtn:hover {
+  color: var(--wolfram-orange);
+}
+
+.navBtnActive {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.signInBtn {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.5rem;
+  transition: color var(--transition-speed) ease;
+}
+
+.signInBtn:hover {
+  color: var(--wolfram-orange);
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--border-subtle);
+}
+
+@media (max-width: 600px) {
+  .navLinks {
+    display: none;
+  }
+  .brandSub {
+    display: none;
+  }
+}

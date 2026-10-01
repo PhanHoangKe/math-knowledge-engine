@@ -1,0 +1,134 @@
+.container {
+  max-width: 1100px;
+  width: 100%;
+  margin: 1rem auto 3rem auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.emptyCard {
+  width: 100%;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.iconCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--accent-subtle);
+  color: var(--accent-primary);
+  margin-bottom: 0.5rem;
+}
+
+.emptyTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.emptyMessage {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.emptySub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.shellNote {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--wolfram-orange);
+  background-color: var(--bg-subtle);
+  padding: 0.35rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.skeletonsGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.skeletonCard {
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  opacity: 0.7;
+}
+
+.skeletonHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.skeletonBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.skeletonTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.skeletonBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skeletonLineLong {
+  height: 12px;
+  width: 85%;
+  background-color: var(--bg-subtle);
+  border-radius: 3px;
+}
+
+.skeletonLineShort {
+  height: 12px;
+  width: 55%;
+  background-color: var(--bg-subtle);
+  border-radius: 3px;
+}
+
+@media (max-width: 768px) {
+  .skeletonsGrid {
+    grid-template-columns: 1fr;
+  }
+}
