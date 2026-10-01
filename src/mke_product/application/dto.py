@@ -397,6 +397,9 @@ class ErrorResponse(BaseModel):
             if isinstance(span_val, (tuple, list)) and len(span_val) == 2:
                 data = dict(data)
                 data["span"] = Span(start=int(span_val[0]), end=int(span_val[1]))
+            elif isinstance(span_val, dict) and "start" in span_val and "end" in span_val:
+                data = dict(data)
+                data["span"] = Span(start=int(span_val["start"]), end=int(span_val["end"]))
         return data
 
 
