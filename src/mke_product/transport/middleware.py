@@ -37,7 +37,7 @@ async def _send_json_response(
 
 
 class StreamPayloadLimitMiddleware:
-    """Pure ASGI middleware that strictly enforces the 64 KiB payload limit."""
+    """Pure ASGI middleware that enforces the 64 KiB payload limit via bounded pre-read and replay."""
 
     def __init__(self, app: ASGIApp):
         self.app = app
@@ -50,10 +50,13 @@ class StreamPayloadLimitMiddleware:
         headers_dict: Dict[bytes, bytes] = dict(scope.get("headers", []))
         content_length_raw = headers_dict.get(b"content-length")
 
-        # 1. Early rejection when valid Content-Length header is present and > 65536
-        if content_length_raw:
+        # 1. Early inspection of Content-Length header
+        if content_length_raw is not None:
             try:
-                declared_len = int(content_length_raw.decode("latin1").strip())
+                raw_str = content_length_raw.decode("latin1").strip()
+                if not raw_str.isdigit():
+                    raise ValueError("Malformed or negative Content-Length")
+                declared_len = int(raw_str)
                 if declared_len > MAX_BODY_BYTES:
                     error_resp = TransportErrorResponse(
                         transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE,
@@ -63,19 +66,35 @@ class StreamPayloadLimitMiddleware:
                     )
                     await _send_json_response(send, 413, error_resp)
                     return
-            except ValueError:
-                pass
+            except (ValueError, UnicodeDecodeError):
+                # Malformed or negative Content-Length header rejected immediately with HTTP 400
+                error_resp = TransportErrorResponse(
+                    transport_error_code=TransportErrorCode.MALFORMED_JSON,
+                    message_vi="Tiêu đề Content-Length không hợp lệ.",
+                    message_en="Invalid Content-Length header.",
+                    details={"error": "INVALID_CONTENT_LENGTH"},
+                )
+                await _send_json_response(send, 400, error_resp)
+                return
 
-        # 2. Wrap receive callable with byte accumulator for streaming/chunked requests
+        # 2. Bounded stream pre-read (accumulates at most MAX_BODY_BYTES + 1 bytes)
+        body_chunks: List[bytes] = []
         cumulative_bytes = 0
-        limit_exceeded = False
-        response_sent = False
 
-        async def send_wrapper(message: Message) -> None:
-            nonlocal response_sent
-            if limit_exceeded:
-                if not response_sent:
-                    response_sent = True
+        while True:
+            message = await receive()
+            msg_type = message.get("type")
+
+            if msg_type == "http.request":
+                chunk = message.get("body", b"")
+                if chunk:
+                    # Bounded memory: cap in-memory accumulation to MAX_BODY_BYTES + 1
+                    remaining_cap = (MAX_BODY_BYTES + 1) - cumulative_bytes
+                    if remaining_cap > 0:
+                        body_chunks.append(chunk[:remaining_cap])
+                    cumulative_bytes += len(chunk)
+
+                if cumulative_bytes > MAX_BODY_BYTES:
                     error_resp = TransportErrorResponse(
                         transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE,
                         message_vi="Kích thước yêu cầu vượt quá giới hạn 64 KiB.",
@@ -83,37 +102,32 @@ class StreamPayloadLimitMiddleware:
                         details={"limit_bytes": MAX_BODY_BYTES, "streamed_bytes_exceeded": cumulative_bytes},
                     )
                     await _send_json_response(send, 413, error_resp)
+                    return
+
+                if not message.get("more_body", False):
+                    break
+            elif msg_type == "http.disconnect":
                 return
+            else:
+                break
 
-            await send(message)
+        complete_body = b"".join(body_chunks)
 
-        async def limited_receive() -> Message:
-            nonlocal cumulative_bytes, limit_exceeded
-            if limit_exceeded:
-                return {"type": "http.request", "body": b"", "more_body": False}
+        # 3. Replay bounded request body to downstream application
+        replayed = False
 
-            message = await receive()
-            if message["type"] == "http.request":
-                chunk = message.get("body", b"")
-                cumulative_bytes += len(chunk)
-                if cumulative_bytes > MAX_BODY_BYTES:
-                    limit_exceeded = True
-                    # Return empty to short-circuit further downstream buffering
-                    return {"type": "http.request", "body": b"", "more_body": False}
-            return message
+        async def replayed_receive() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {
+                    "type": "http.request",
+                    "body": complete_body,
+                    "more_body": False,
+                }
+            return {"type": "http.request", "body": b"", "more_body": False}
 
-        try:
-            await self.app(scope, limited_receive, send_wrapper)
-        finally:
-            if limit_exceeded and not response_sent:
-                response_sent = True
-                error_resp = TransportErrorResponse(
-                    transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE,
-                    message_vi="Kích thước yêu cầu vượt quá giới hạn 64 KiB.",
-                    message_en="Request payload exceeds 64 KiB limit.",
-                    details={"limit_bytes": MAX_BODY_BYTES, "streamed_bytes_exceeded": cumulative_bytes},
-                )
-                await _send_json_response(send, 413, error_resp)
+        await self.app(scope, replayed_receive, send)
 
 
 class MediaTypeEnforcementMiddleware:

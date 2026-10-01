@@ -61,12 +61,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
             content=error_response.model_dump(mode="json"),
         )
 
-    # Generic HTTP exception fallback
+    # Generic HTTP exception fallback (strictly sanitized, zero exc.detail / traceback leakage)
     error_response = TransportErrorResponse(
         transport_error_code=TransportErrorCode.INTERNAL_TRANSPORT_ERROR,
         message_vi="Lỗi yêu cầu HTTP.",
         message_en="HTTP request error.",
-        details={"status_code": exc.status_code, "detail": str(exc.detail)},
+        details={"status_code": exc.status_code},
     )
     return JSONResponse(
         status_code=exc.status_code,

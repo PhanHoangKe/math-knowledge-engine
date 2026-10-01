@@ -1,14 +1,16 @@
-"""Focused transport implementation and contract tests for S2-01 FastAPI adapter."""
+"""Focused transport implementation, direct ASGI, and HTTP contract tests for S2-01 FastAPI adapter."""
 
 import asyncio
 import json
 from typing import Any, Dict, List
 import pytest
+from fastapi import APIRouter, HTTPException
 from fastapi.testclient import TestClient
-from starlette.types import Message
+from starlette.types import Message, Scope, Receive, Send
 from pydantic import ValidationError
 
 from mke_product.transport.app import create_app
+from mke_product.transport.middleware import StreamPayloadLimitMiddleware, MAX_BODY_BYTES
 from mke_product.transport.models import TransportErrorCode, TransportErrorResponse
 from mke_product.application.dto import (
     SolveRequest,
@@ -28,7 +30,7 @@ def client():
 
 
 # ============================================================================
-# 1. HEALTH ENDPOINT & REGISTRY OBSERVABILITY
+# 1. HEALTH ENDPOINT & REGISTRY OBSERVABILITY (HTTP / TestClient)
 # ============================================================================
 
 def test_api_health_endpoint_derived_counts(client: TestClient):
@@ -196,7 +198,6 @@ def test_api_dto_validation_failure_sanitized_422(client: TestClient):
     assert len(errors) > 0
     for err in errors:
         assert set(err.keys()) == {"type", "loc", "msg"}
-        # Ensure raw input object or secret sentinels are not present
         assert "LEAK_ME_IF_UNSANITIZED" not in str(err)
         assert "input" not in err
         assert "ctx" not in err
@@ -252,7 +253,305 @@ def test_api_media_type_with_charset_accepted_200(client: TestClient):
 
 
 # ============================================================================
-# 6. PAYLOAD SIZE LIMITS (64 KiB = 65,536 BYTES) & EXACT BOUNDARY (HTTP 413)
+# 6. DIRECT RAW-ASGI STREAM LIMIT & REPLAY TESTS (Direct Middleware Tests)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_direct_asgi_stream_over_64k_rejected_413_downstream_not_invoked():
+    """Direct ASGI test: Stream >65,536 bytes returns 413, emits exactly one response, downstream never invoked."""
+    downstream_invoked = False
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked
+        downstream_invoked = True
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    # 7 chunks of 10,000 bytes = 70,000 bytes (> 65536)
+    chunks = [b"a" * 10000 for _ in range(7)]
+    chunk_index = 0
+
+    async def mock_receive() -> Message:
+        nonlocal chunk_index
+        if chunk_index < len(chunks):
+            body = chunks[chunk_index]
+            chunk_index += 1
+            return {
+                "type": "http.request",
+                "body": body,
+                "more_body": chunk_index < len(chunks),
+            }
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    sent_messages: List[Message] = []
+
+    async def mock_send(msg: Message) -> None:
+        sent_messages.append(msg)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/algebra/solve",
+        "headers": [(b"content-type", b"application/json")],
+    }
+
+    await middleware(scope, mock_receive, mock_send)
+
+    # Downstream must NOT have been called
+    assert downstream_invoked is False
+
+    # Verify exactly one response start and exactly one response body
+    start_messages = [m for m in sent_messages if m["type"] == "http.response.start"]
+    body_messages = [m for m in sent_messages if m["type"] == "http.response.body"]
+
+    assert len(start_messages) == 1
+    assert start_messages[0]["status"] == 413
+
+    assert len(body_messages) == 1
+    assert body_messages[0].get("more_body", False) is False
+
+    body_data = json.loads(body_messages[0]["body"].decode("utf-8"))
+    assert body_data["transport_status"] == "ERROR"
+    assert body_data["transport_error_code"] == "PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_direct_asgi_deceptive_low_content_length_rejected_413():
+    """Direct ASGI test: Deceptive header Content-Length: 10 with actual body > 64 KiB fails 413, downstream never invoked."""
+    downstream_invoked = False
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked
+        downstream_invoked = True
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    # 7 chunks of 10,000 bytes = 70,000 bytes (> 65536)
+    chunks = [b"x" * 10000 for _ in range(7)]
+    chunk_index = 0
+
+    async def mock_receive() -> Message:
+        nonlocal chunk_index
+        if chunk_index < len(chunks):
+            body = chunks[chunk_index]
+            chunk_index += 1
+            return {
+                "type": "http.request",
+                "body": body,
+                "more_body": chunk_index < len(chunks),
+            }
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    sent_messages: List[Message] = []
+
+    async def mock_send(msg: Message) -> None:
+        sent_messages.append(msg)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/algebra/solve",
+        "headers": [
+            (b"content-type", b"application/json"),
+            (b"content-length", b"10"),  # Deceptive low Content-Length
+        ],
+    }
+
+    await middleware(scope, mock_receive, mock_send)
+
+    assert downstream_invoked is False
+
+    start_messages = [m for m in sent_messages if m["type"] == "http.response.start"]
+    body_messages = [m for m in sent_messages if m["type"] == "http.response.body"]
+
+    assert len(start_messages) == 1
+    assert start_messages[0]["status"] == 413
+
+    assert len(body_messages) == 1
+    body_data = json.loads(body_messages[0]["body"].decode("utf-8"))
+    assert body_data["transport_error_code"] == "PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_direct_asgi_missing_content_length_stream_rejected_413():
+    """Direct ASGI test: Missing Content-Length with multiple streaming chunks > 64 KiB fails 413, downstream never invoked."""
+    downstream_invoked = False
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked
+        downstream_invoked = True
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    # 66 chunks of 1,000 bytes = 66,000 bytes (> 65536)
+    chunks = [b"c" * 1000 for _ in range(66)]
+    chunk_index = 0
+
+    async def mock_receive() -> Message:
+        nonlocal chunk_index
+        if chunk_index < len(chunks):
+            body = chunks[chunk_index]
+            chunk_index += 1
+            return {
+                "type": "http.request",
+                "body": body,
+                "more_body": chunk_index < len(chunks),
+            }
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    sent_messages: List[Message] = []
+
+    async def mock_send(msg: Message) -> None:
+        sent_messages.append(msg)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/algebra/solve",
+        "headers": [(b"content-type", b"application/json")],  # Missing content-length
+    }
+
+    await middleware(scope, mock_receive, mock_send)
+
+    assert downstream_invoked is False
+    start_messages = [m for m in sent_messages if m["type"] == "http.response.start"]
+    assert len(start_messages) == 1
+    assert start_messages[0]["status"] == 413
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid_cl", [b"-5", b"abc", b"12.5", b" 10 20 "])
+async def test_direct_asgi_malformed_negative_content_length_rejected_400(invalid_cl: bytes):
+    """Direct ASGI test: Malformed or negative Content-Length header is rejected immediately with HTTP 400."""
+    downstream_invoked = False
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked
+        downstream_invoked = True
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    async def mock_receive() -> Message:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    sent_messages: List[Message] = []
+
+    async def mock_send(msg: Message) -> None:
+        sent_messages.append(msg)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/algebra/solve",
+        "headers": [
+            (b"content-type", b"application/json"),
+            (b"content-length", invalid_cl),
+        ],
+    }
+
+    await middleware(scope, mock_receive, mock_send)
+
+    assert downstream_invoked is False
+    start_messages = [m for m in sent_messages if m["type"] == "http.response.start"]
+    body_messages = [m for m in sent_messages if m["type"] == "http.response.body"]
+
+    assert len(start_messages) == 1
+    assert start_messages[0]["status"] == 400
+    assert len(body_messages) == 1
+    body_data = json.loads(body_messages[0]["body"].decode("utf-8"))
+    assert body_data["transport_status"] == "ERROR"
+    assert body_data["transport_error_code"] == "MALFORMED_JSON"
+    # Ensure no raw header values are echoed
+    assert str(invalid_cl) not in str(body_data)
+
+
+@pytest.mark.asyncio
+async def test_direct_asgi_exact_65536_boundary_replayed_to_downstream():
+    """Direct ASGI test: Stream of exactly 65,536 bytes passes through and is replayed completely to downstream."""
+    downstream_invoked = False
+    downstream_received_body = b""
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked, downstream_received_body
+        downstream_invoked = True
+        msg = await receive()
+        assert msg["type"] == "http.request"
+        downstream_received_body += msg.get("body", b"")
+        assert msg.get("more_body", False) is False
+
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"OK", "more_body": False})
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    # 4 chunks of 16,384 bytes = 65,536 bytes exactly
+    chunk_size = 16384
+    expected_body = b"".join([bytes([i % 256]) * chunk_size for i in range(4)])
+    assert len(expected_body) == MAX_BODY_BYTES
+
+    chunks = [expected_body[i * chunk_size : (i + 1) * chunk_size] for i in range(4)]
+    chunk_index = 0
+
+    async def mock_receive() -> Message:
+        nonlocal chunk_index
+        if chunk_index < len(chunks):
+            body = chunks[chunk_index]
+            chunk_index += 1
+            return {
+                "type": "http.request",
+                "body": body,
+                "more_body": chunk_index < len(chunks),
+            }
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    sent_messages: List[Message] = []
+
+    async def mock_send(msg: Message) -> None:
+        sent_messages.append(msg)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/algebra/solve",
+        "headers": [(b"content-type", b"application/json")],
+    }
+
+    await middleware(scope, mock_receive, mock_send)
+
+    assert downstream_invoked is True
+    assert len(downstream_received_body) == 65536
+    assert downstream_received_body == expected_body
+
+    start_messages = [m for m in sent_messages if m["type"] == "http.response.start"]
+    assert len(start_messages) == 1
+    assert start_messages[0]["status"] == 200
+
+
+@pytest.mark.asyncio
+async def test_direct_asgi_non_http_scope_passthrough():
+    """Direct ASGI test: Non-http scopes (e.g. lifespan) pass through untouched."""
+    downstream_invoked = False
+
+    async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal downstream_invoked
+        downstream_invoked = True
+
+    middleware = StreamPayloadLimitMiddleware(sentinel_app)
+
+    async def mock_receive() -> Message:
+        return {"type": "lifespan.startup"}
+
+    async def mock_send(msg: Message) -> None:
+        pass
+
+    scope: Scope = {"type": "lifespan"}
+    await middleware(scope, mock_receive, mock_send)
+
+    assert downstream_invoked is True
+
+
+# ============================================================================
+# 7. HTTP-LEVEL PAYLOAD SIZE TESTS (TestClient Tests)
 # ============================================================================
 
 def test_api_payload_limit_declared_header_rejected_413(client: TestClient):
@@ -269,7 +568,7 @@ def test_api_payload_limit_declared_header_rejected_413(client: TestClient):
 
 
 def test_api_payload_limit_exact_65536_boundary_accepted(client: TestClient):
-    """Exact 65,536-byte valid JSON body passes payload limit middleware and returns HTTP 200."""
+    """Exact 65,536-byte valid JSON body passes payload limit middleware and returns HTTP 200 SOLVED."""
     base_dict = {
         "input_payload": {
             "input_mode": "RAW_TEXT",
@@ -307,58 +606,8 @@ def test_api_payload_limit_exact_65536_boundary_accepted(client: TestClient):
     assert response.json()["response_status"] == "SOLVED"
 
 
-@pytest.mark.asyncio
-async def test_raw_asgi_streaming_chunks_over_64k_rejected_413():
-    """Direct ASGI test: Streamed request chunks exceeding 65,536 bytes without Content-Length trigger HTTP 413."""
-    app = create_app()
-
-    # Create chunks totaling 70,000 bytes (7 chunks of 10,000 bytes)
-    chunks = [b"a" * 10000 for _ in range(7)]
-    chunk_index = 0
-
-    async def mock_receive() -> Message:
-        nonlocal chunk_index
-        if chunk_index < len(chunks):
-            body = chunks[chunk_index]
-            chunk_index += 1
-            return {
-                "type": "http.request",
-                "body": body,
-                "more_body": chunk_index < len(chunks),
-            }
-        return {"type": "http.request", "body": b"", "more_body": False}
-
-    sent_messages: List[Dict[str, Any]] = []
-
-    async def mock_send(msg: Message) -> None:
-        sent_messages.append(msg)
-
-    scope: Dict[str, Any] = {
-        "type": "http",
-        "method": "POST",
-        "path": "/api/v1/algebra/solve",
-        "headers": [
-            (b"content-type", b"application/json"),
-            # No content-length header!
-        ],
-    }
-
-    await app(scope, mock_receive, mock_send)
-
-    # Verify that HTTP 413 was emitted
-    start_msg = next((m for m in sent_messages if m["type"] == "http.response.start"), None)
-    assert start_msg is not None
-    assert start_msg["status"] == 413
-
-    body_msg = next((m for m in sent_messages if m["type"] == "http.response.body"), None)
-    assert body_msg is not None
-    body_data = json.loads(body_msg["body"].decode("utf-8"))
-    assert body_data["transport_status"] == "ERROR"
-    assert body_data["transport_error_code"] == "PAYLOAD_TOO_LARGE"
-
-
 # ============================================================================
-# 7. API 404 ISOLATION & UNEXPECTED TRANSPORT ERRORS
+# 8. API 404 ISOLATION, SANITIZED HTTP EXCEPTIONS, AND UNHANDLED CRASHES
 # ============================================================================
 
 def test_api_unknown_route_returns_json_404(client: TestClient):
@@ -368,6 +617,36 @@ def test_api_unknown_route_returns_json_404(client: TestClient):
     data = response.json()
     assert data["transport_status"] == "ERROR"
     assert data["transport_error_code"] == "API_NOT_FOUND"
+
+
+def test_api_http_exception_sentinel_sanitization_no_detail_leak():
+    """HTTPException raises non-404 status (e.g. 418) and strictly sanitizes response without leaking exc.detail."""
+    app = create_app()
+    test_router = APIRouter()
+
+    @test_router.get("/api/v1/test-sentinel-leak")
+    def leak_route():
+        raise HTTPException(
+            status_code=418,
+            detail="SECRET_HTTP_EXCEPTION_SENTINEL_STRING_MUST_NEVER_LEAK",
+        )
+
+    app.include_router(test_router)
+    test_client = TestClient(app, raise_server_exceptions=False)
+
+    response = test_client.get("/api/v1/test-sentinel-leak")
+    assert response.status_code == 418
+    data = response.json()
+    assert data["transport_status"] == "ERROR"
+    assert data["transport_error_code"] == "INTERNAL_TRANSPORT_ERROR"
+    assert data["details"] == {"status_code": 418}
+
+    # Sentinel must be completely absent from response
+    sentinel = "SECRET_HTTP_EXCEPTION_SENTINEL_STRING_MUST_NEVER_LEAK"
+    assert sentinel not in data["message_vi"]
+    assert sentinel not in data["message_en"]
+    assert sentinel not in str(data["details"])
+    assert sentinel not in response.text
 
 
 def test_api_unhandled_transport_exception_returns_http_500(monkeypatch):
@@ -399,7 +678,7 @@ def test_api_unhandled_transport_exception_returns_http_500(monkeypatch):
 
 
 # ============================================================================
-# 8. OPENAPI OPERATION IDS & TRANSPORT MODEL RIGIDITY
+# 9. OPENAPI OPERATION IDS & TRANSPORT MODEL RIGIDITY
 # ============================================================================
 
 def test_openapi_operation_ids_and_schemas(client: TestClient):
@@ -448,12 +727,11 @@ def test_transport_error_model_extra_forbid():
 
 
 # ============================================================================
-# 9. MATHEMATICAL AUTHORITY PURITY AUDIT
+# 10. MATHEMATICAL AUTHORITY PURITY AUDIT
 # ============================================================================
 
 def test_transport_purity_authority_boundary():
     """Verify transport package does NOT import CASRouter, sympy, normalizer, traces, or verifier directly."""
-    import sys
     import mke_product.transport.routers.algebra as algebra_router_mod
     import mke_product.transport.app as app_mod
     import mke_product.transport.middleware as middleware_mod
