@@ -3,6 +3,12 @@
 Orchestrates user intake, bounded AST normalization, method selection, and trace execution.
 """
 
+from .degenerate import (
+    DegenerateHostVerifier,
+    DegenerateSolveResult,
+    solve_exact_degenerate,
+    verify_degenerate_solution,
+)
 from .errors import (
     ApplicationError,
     ApplicationErrorCode,
@@ -23,4 +29,8 @@ __all__ = [
     "normalize_equation",
     "normalize_expression",
     "normalize_raw_equation",
+    "DegenerateHostVerifier",
+    "DegenerateSolveResult",
+    "solve_exact_degenerate",
+    "verify_degenerate_solution",
 ]
