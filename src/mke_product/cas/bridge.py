@@ -22,7 +22,7 @@ import sys
 import time
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from mke_product.ai.ir import (
     MathIntermediateRepresentation,
@@ -141,30 +141,75 @@ class QuadraticControlledDispatchResult(ControlledDispatchResult):
 
 
 class SurdRationalComponent(BaseModel):
-    """Exact integer rational component for quadratic surds."""
-    model_config = ConfigDict(extra="forbid")
+    """Exact integer rational component for quadratic surds in lowest terms."""
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     numerator: int = Field(..., description="Exact integer numerator in lowest terms")
-    denominator: int = Field(..., gt=0, description="Exact positive integer denominator in lowest terms")
+    denominator: int = Field(..., description="Exact positive integer denominator in lowest terms")
+
+    @model_validator(mode="after")
+    def _validate_contract(self) -> SurdRationalComponent:
+        if type(self.numerator) is not int or type(self.denominator) is not int or type(self.numerator) is bool or type(self.denominator) is bool:
+            raise ValueError("SurdRationalComponent numerator and denominator must be strict integers.")
+        if self.denominator <= 0:
+            raise ValueError("SurdRationalComponent denominator must be strictly positive.")
+        if abs(self.numerator).bit_length() > 256:
+            raise ValueError("SurdRationalComponent numerator exceeds 256-bit limit.")
+        if self.denominator.bit_length() > 256:
+            raise ValueError("SurdRationalComponent denominator exceeds 256-bit limit.")
+        if math.gcd(abs(self.numerator), self.denominator) != 1:
+            raise ValueError("SurdRationalComponent must be in canonical lowest terms (gcd == 1).")
+        if self.numerator == 0 and self.denominator != 1:
+            raise ValueError("SurdRationalComponent zero value must have canonical denominator 1.")
+        return self
 
 
 class QuadraticSurdRoot(BaseModel):
     """Exact quadratic irrational root in public result: rational_part + sqrt_coefficient * sqrt(radicand)."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     rational_part: SurdRationalComponent = Field(..., description="Rational component a in a + b*sqrt(d)")
     sqrt_coefficient: SurdRationalComponent = Field(..., description="Rational multiplier b in a + b*sqrt(d)")
-    radicand: int = Field(..., ge=2, lt=(1 << 32), description="Certified squarefree integer radicand d in [2, 2^32 - 1]")
+    radicand: int = Field(..., description="Certified squarefree integer radicand d in [2, 2^32 - 1]")
+
+    @model_validator(mode="after")
+    def _validate_root_contract(self) -> QuadraticSurdRoot:
+        if type(self.radicand) is not int or type(self.radicand) is bool:
+            raise ValueError("QuadraticSurdRoot radicand must be a strict integer.")
+        if not (2 <= self.radicand < (1 << 32)):
+            raise ValueError("QuadraticSurdRoot radicand must satisfy 2 <= radicand < 2^32.")
+        if self.sqrt_coefficient.numerator == 0:
+            raise ValueError("QuadraticSurdRoot sqrt_coefficient must be non-zero for a genuine irrational root.")
+        return self
 
 
 class QuadraticSurdControlledDispatchResult(ControlledDispatchResult):
     """B2-specific outcome model carrying quadratic irrational multi-root and surd properties."""
     model_config = ConfigDict(extra="forbid")
 
-    verified_surd_roots: List[QuadraticSurdRoot] = Field(default_factory=list, description="Exact quadratic surd roots")
-    discriminant: Optional[RationalRoot] = Field(default=None, description="Exact rational discriminant")
-    radicand: Optional[int] = Field(default=None, description="Certified squarefree radicand d")
+    verified_surd_roots: List[QuadraticSurdRoot] = Field(..., description="Exact quadratic surd roots pair [r_minus, r_plus]")
+    discriminant: RationalRoot = Field(..., description="Exact rational discriminant")
+    radicand: int = Field(..., description="Certified squarefree radicand d")
     representation: Literal["QUADRATIC_SURD"] = Field(default="QUADRATIC_SURD", description="Representation tag")
+
+    @model_validator(mode="after")
+    def _validate_surd_result_contract(self) -> QuadraticSurdControlledDispatchResult:
+        if type(self.radicand) is not int:
+            raise ValueError("QuadraticSurdControlledDispatchResult radicand must be a strict integer.")
+        if not (2 <= self.radicand < (1 << 32)):
+            raise ValueError("QuadraticSurdControlledDispatchResult radicand must satisfy 2 <= radicand < 2^32.")
+        if not isinstance(self.verified_surd_roots, list) or len(self.verified_surd_roots) != 2:
+            raise ValueError("QuadraticSurdControlledDispatchResult must contain exactly two roots.")
+        r1, r2 = self.verified_surd_roots
+        if r1.rational_part != r2.rational_part:
+            raise ValueError("QuadraticSurdControlledDispatchResult roots must have identical rational parts.")
+        if r1.radicand != self.radicand or r2.radicand != self.radicand:
+            raise ValueError("QuadraticSurdControlledDispatchResult roots must share the top-level radicand.")
+        if r1.sqrt_coefficient.numerator >= 0 or r2.sqrt_coefficient.numerator <= 0:
+            raise ValueError("QuadraticSurdControlledDispatchResult canonical root pair order requires negative sqrt_coeff first and positive second.")
+        if abs(r1.sqrt_coefficient.numerator) != r2.sqrt_coefficient.numerator or r1.sqrt_coefficient.denominator != r2.sqrt_coefficient.denominator:
+            raise ValueError("QuadraticSurdControlledDispatchResult root coefficients must have equal magnitude and opposite sign.")
+        return self
 
 
 class NonAffineExpressionError(Exception):
@@ -683,6 +728,8 @@ def _parse_wire_surd_root(val: Any) -> Optional[Tuple[Rational, Rational, int]]:
     rad_str = val.get("radicand")
 
     if rat_part is None or sqrt_coeff is None:
+        return None
+    if sqrt_coeff.is_zero:
         return None
     if not isinstance(rad_str, str) or not re.match(r"^[1-9][0-9]{0,9}$", rad_str):
         return None
@@ -1530,6 +1577,15 @@ class ControlledDispatchBridge:
                 )
             try:
                 worker_rad = int(rad_val)
+                if worker_rad < 2 or worker_rad >= (1 << 32):
+                    return ControlledDispatchResult(
+                        intake_status=IntakeStatus.VALIDATED,
+                        intake_diagnostic=diagnostic,
+                        execution_status=ExecutionStatus.ENGINE_ERROR,
+                        verification_status=VerificationStatus.VERIFICATION_FAILED,
+                        is_verified=False,
+                        error_code="ERR_MALFORMED_WORKER_RESPONSE",
+                    )
                 if worker_rad != host_d or str(worker_rad) != rad_val:
                     return ControlledDispatchResult(
                         intake_status=IntakeStatus.VALIDATED,

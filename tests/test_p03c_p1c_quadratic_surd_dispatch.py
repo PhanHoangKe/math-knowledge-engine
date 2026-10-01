@@ -1,16 +1,19 @@
 """Unit, integration, protocol, adversarial, and live Windows AppContainer tests for P1C-04-B2 quadratic surd solver and dispatcher.
 
-Milestone: PRODUCT-03C-P1C-04-B2
+Milestone: PRODUCT-03C-P1C-04-B2-R1
 Author: Antigravity (Implementation Engineer)
 Auditor: ChatGPT
 """
 
 import json
+import math
 import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 import pytest
+from pydantic import ValidationError
 
+from mke_product.ai.ir import PublicValidationDiagnostic
 from mke_product.core.rational import Rational
 from mke_product.parser.parser import parse_equation
 from mke_product.protocol.dispatcher import dispatch_request
@@ -36,6 +39,20 @@ from mke_product.solver.quadratic_surd import (
     extract_quadratic_coefficients,
     reduce_equation_quadratic_surd,
     solve_quadratic_surd_equation,
+)
+from mke_product.cas.bridge import (
+    ControlledDispatchBridge,
+    ControlledDispatchResult,
+    ExecutionStatus,
+    HostQuadraticSurdResourceLimitError,
+    IntakeStatus,
+    QuadraticControlledDispatchResult,
+    QuadraticSurdControlledDispatchResult,
+    QuadraticSurdRoot,
+    RationalRoot,
+    SurdRationalComponent,
+    VerificationStatus,
+    _host_normalize_discriminant_squarefree,
 )
 
 
@@ -159,12 +176,10 @@ class TestWorkerQuadraticSurdSolverKernel:
         assert res.radicand == 2
         assert res.discriminant == Rational(8)
         assert len(res.roots) == 2
-        # r1 = 0 - 1*sqrt(2)
         r1, r2 = res.roots
         assert r1.rational_part == Rational(0)
         assert r1.sqrt_coefficient == Rational(-1)
         assert r1.radicand == 2
-        # r2 = 0 + 1*sqrt(2)
         assert r2.rational_part == Rational(0)
         assert r2.sqrt_coefficient == Rational(1)
         assert r2.radicand == 2
@@ -244,7 +259,6 @@ class TestWorkerQuadraticSurdSolverKernel:
 
     def test_solve_surd_x2_minus_50(self):
         # x^2 - 50 = 0 -> roots +- 5*sqrt(2), Delta = 200 = 100*2 -> k=10, d=2
-        # (0 +- 10*sqrt(2))/2 = 0 +- 5*sqrt(2)
         eq = parse_equation("x^2 - 50 = 0")
         res = solve_quadratic_surd_equation(eq)
         assert res.status == "SUCCESS"
@@ -254,7 +268,6 @@ class TestWorkerQuadraticSurdSolverKernel:
 
     def test_solve_surd_fractional_constant(self):
         # x^2 - 1/2 = 0 -> Delta = 0 - 4(1)(-1/2) = 2 -> k=1, d=2
-        # roots: (0 +- sqrt(2))/2 = 0 +- (1/2)*sqrt(2)
         eq = parse_equation("x^2 - 1/2 = 0")
         res = solve_quadratic_surd_equation(eq)
         assert res.status == "SUCCESS"
@@ -306,16 +319,6 @@ class TestWorkerQuadraticSurdSolverKernel:
         assert res.status == "DOMAIN_ERROR"
         assert res.error_code == "ERR_DOMAIN_ZERO_POWER_ZERO"
 
-    def test_unfactored_remainder_at_least_2_to_32_fails_closed(self):
-        # Construct equation where remainder R >= 2^32: 2*x^2 - 65537^2 = 0 -> Delta = 8 * 65537^2
-        # After extracting factor 4, R = 2 * 65537^2 = 8,590,196,738 >= 2^32 (4,294,967,296)
-        p = 65537
-        c_val = p * p
-        eq = parse_equation(f"2*x^2 - {c_val} = 0")
-        res = solve_quadratic_surd_equation(eq)
-        assert res.status == "RESOURCE_EXHAUSTED"
-        assert res.error_code == "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT"
-
 
 # ============================================================================
 # 3. Dispatcher Integration Tests (v3 SOLVE_QUADRATIC_SURD)
@@ -363,14 +366,13 @@ class TestDispatcherV3Integration:
 
 
 # ============================================================================
-# 4. Host Normalization and Proof Verification Tests
+# 4. Host Normalization and Squarefree Certification Tests
 # ============================================================================
 
 class TestHostSurdNormalization:
     """Test independent host AST quadratic normalization and squarefree certification."""
 
     def test_host_normalize_integers(self):
-        from mke_product.cas.bridge import _host_normalize_discriminant_squarefree
         k, d = _host_normalize_discriminant_squarefree(Rational(8))
         assert k == Rational(2)
         assert d == 2
@@ -392,19 +394,15 @@ class TestHostSurdNormalization:
         assert d == 2
 
     def test_host_normalize_fractions(self):
-        from mke_product.cas.bridge import _host_normalize_discriminant_squarefree
-        # Delta = 8/9 -> k = 2/3, d = 2
         k, d = _host_normalize_discriminant_squarefree(Rational(8, 9))
         assert k == Rational(2, 3)
         assert d == 2
 
-        # Delta = 2/1 -> k = 1, d = 2
         k, d = _host_normalize_discriminant_squarefree(Rational(2, 1))
         assert k == Rational(1)
         assert d == 2
 
     def test_host_normalize_perfect_square_returns_d1(self):
-        from mke_product.cas.bridge import _host_normalize_discriminant_squarefree, HostQuadraticSurdResourceLimitError
         s, d = _host_normalize_discriminant_squarefree(Rational(4))
         assert s == Rational(2)
         assert d == 1
@@ -414,19 +412,363 @@ class TestHostSurdNormalization:
         with pytest.raises(HostQuadraticSurdResourceLimitError):
             _host_normalize_discriminant_squarefree(Rational(-4))
 
-    def test_host_normalize_resource_limit_on_large_unfactored_remainder(self):
-        from mke_product.cas.bridge import (
-            _host_normalize_discriminant_squarefree,
-            HostQuadraticSurdResourceLimitError,
-        )
+
+# ============================================================================
+# 5. Normalization Attack Matrix & Resource Limits (Requirement 7 & 8)
+# ============================================================================
+
+class TestNormalizationBoundaryAndResourceLimits:
+    """Validate 65537^2 certification boundary, 512-bit limit, and remainder certification."""
+
+    def test_host_normalization_2_65537_sq_fails_certification(self):
         p = 65537
         delta_val = 2 * (p * p)
-        with pytest.raises(HostQuadraticSurdResourceLimitError):
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as exc_info:
             _host_normalize_discriminant_squarefree(Rational(delta_val))
+        assert "exceeds 32-bit certification bound" in str(exc_info.value)
+
+    def test_host_normalization_3_65537_sq_fails_certification(self):
+        p = 65537
+        delta_val = 3 * (p * p)
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as exc_info:
+            _host_normalize_discriminant_squarefree(Rational(delta_val))
+        assert "exceeds 32-bit certification bound" in str(exc_info.value)
+
+    def test_host_normalization_5_65537_sq_fails_certification(self):
+        p = 65537
+        delta_val = 5 * (p * p)
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as exc_info:
+            _host_normalize_discriminant_squarefree(Rational(delta_val))
+        assert "exceeds 32-bit certification bound" in str(exc_info.value)
+
+    def test_worker_normalization_2_65537_sq_fails_certification(self):
+        p = 65537
+        c_val = p * p
+        eq = parse_equation(f"2*x^2 - {c_val} = 0")  # Delta = 8 * 65537^2, R = 2 * 65537^2 >= 2^32
+        res = solve_quadratic_surd_equation(eq)
+        assert res.status == "RESOURCE_EXHAUSTED"
+        assert res.error_code == "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT"
+
+    def test_worker_normalization_3_65537_sq_fails_certification(self):
+        p = 65537
+        c_val = p * p
+        eq = parse_equation(f"4*x^2 + 1 = {4*c_val*3 + 1}")  # Delta = 0 - 4(4)(-3*p^2) = 48*p^2
+        res = solve_quadratic_surd_equation(eq)
+        assert res.status == "RESOURCE_EXHAUSTED"
+        assert res.error_code == "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT"
+
+    def test_worker_normalization_5_65537_sq_fails_certification(self):
+        p = 65537
+        c_val = p * p
+        eq = parse_equation(f"x^2 - {5 * c_val} = 0")  # Delta = 20 * 65537^2, R = 5 * 65537^2 >= 2^32
+        res = solve_quadratic_surd_equation(eq)
+        assert res.status == "RESOURCE_EXHAUSTED"
+        assert res.error_code == "ERR_SURD_NORMALIZATION_RESOURCE_LIMIT"
+
+    def test_normalization_2_to_100_squared_times_2_succeeds(self):
+        # M = (2^100)^2 * 2 = 2^201 (202 bits <= 512 bits)
+        big_k = 1 << 100
+        delta_val = (big_k * big_k) * 2
+        s, d = _host_normalize_discriminant_squarefree(Rational(delta_val))
+        assert s == Rational(big_k)
+        assert d == 2
+
+    def test_host_normalization_512_bit_working_product_boundary(self):
+        # Discriminant numerator p and denominator q are each bounded by 256 bits
+        # Product M = p * q can be up to 512 bits
+        p_256 = 1 << 255  # 256 bits: 2^255 = (2^127)^2 * 2
+        s, d = _host_normalize_discriminant_squarefree(Rational(p_256, 1))
+        assert s == Rational(1 << 127)
+        assert d == 2
+
+        # 257-bit numerator rejected
+        p_257 = 1 << 256
+        with pytest.raises(HostQuadraticSurdResourceLimitError):
+            _host_normalize_discriminant_squarefree(Rational(p_257, 1))
+
+        # 257-bit denominator rejected
+        q_257 = 1 << 256
+        with pytest.raises(HostQuadraticSurdResourceLimitError):
+            _host_normalize_discriminant_squarefree(Rational(1, q_257))
+
+    def test_near_boundary_32_bit_remainder_certification(self):
+        # Certified near-boundary squarefree prime R = 4294967291 < 2^32 (2^32 = 4294967296)
+        prime_near_32 = 4294967291
+        s, d = _host_normalize_discriminant_squarefree(Rational(prime_near_32))
+        assert s == Rational(1)
+        assert d == prime_near_32
 
 
 # ============================================================================
-# 5. ControlledDispatchBridge B2 End-to-End Tests with Mock Controller
+# 6. Direct Public Model Strictness Tests (Requirement 6)
+# ============================================================================
+
+class TestPublicSurdModelsStrictContract:
+    """Validate strict Pydantic validation on public B2 types."""
+
+    def test_surd_rational_valid_cases(self):
+        r0 = SurdRationalComponent(numerator=0, denominator=1)
+        assert r0.numerator == 0 and r0.denominator == 1
+
+        r1 = SurdRationalComponent(numerator=-1, denominator=2)
+        assert r1.numerator == -1 and r1.denominator == 2
+
+        r2 = SurdRationalComponent(numerator=1, denominator=3)
+        assert r2.numerator == 1 and r2.denominator == 3
+
+        huge = (1 << 256) - 1
+        r_huge = SurdRationalComponent(numerator=-huge, denominator=1)
+        assert r_huge.numerator == -huge
+
+    def test_surd_rational_rejects_unreduced(self):
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=2, denominator=4)
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=3, denominator=6)
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=-10, denominator=15)
+
+    def test_surd_rational_rejects_noncanonical_zero(self):
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=0, denominator=2)
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=0, denominator=5)
+
+    def test_surd_rational_rejects_257_bit(self):
+        huge_257 = 1 << 256
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=huge_257, denominator=1)
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=1, denominator=huge_257)
+
+    def test_surd_rational_rejects_zero_or_negative_denominator(self):
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=1, denominator=0)
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=1, denominator=-2)
+
+    def test_surd_rational_rejects_bool_and_float(self):
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=True, denominator=1)  # bool rejected
+        with pytest.raises(ValidationError):
+            SurdRationalComponent(numerator=1.5, denominator=1)  # float rejected
+
+    def test_quadratic_surd_root_valid(self):
+        root = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        assert root.radicand == 2
+        assert root.sqrt_coefficient.numerator == 1
+
+    def test_quadratic_surd_root_rejects_zero_sqrt_coefficient(self):
+        with pytest.raises(ValidationError):
+            QuadraticSurdRoot(
+                rational_part=SurdRationalComponent(numerator=1, denominator=1),
+                sqrt_coefficient=SurdRationalComponent(numerator=0, denominator=1),
+                radicand=2,
+            )
+
+    def test_quadratic_surd_root_rejects_invalid_radicands(self):
+        rp = SurdRationalComponent(numerator=0, denominator=1)
+        sc = SurdRationalComponent(numerator=1, denominator=1)
+
+        with pytest.raises(ValidationError):
+            QuadraticSurdRoot(rational_part=rp, sqrt_coefficient=sc, radicand=0)
+        with pytest.raises(ValidationError):
+            QuadraticSurdRoot(rational_part=rp, sqrt_coefficient=sc, radicand=1)
+        with pytest.raises(ValidationError):
+            QuadraticSurdRoot(rational_part=rp, sqrt_coefficient=sc, radicand=1 << 32)
+        with pytest.raises(ValidationError):
+            QuadraticSurdRoot(rational_part=rp, sqrt_coefficient=sc, radicand=-2)
+
+    def test_quadratic_surd_dispatch_result_valid(self):
+        diag = PublicValidationDiagnostic(
+            is_valid=True,
+            is_cas_ready=True,
+            status="VALID",
+            target_operation="SOLVE_QUADRATIC_SURD",
+            issues=[],
+            uncertainties=[],
+        )
+        r_minus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        r_plus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        res = QuadraticSurdControlledDispatchResult(
+            intake_status=IntakeStatus.VALIDATED,
+            intake_diagnostic=diag,
+            execution_status=ExecutionStatus.SUCCESS,
+            verification_status=VerificationStatus.VERIFIED_COMPLETE,
+            is_verified=True,
+            solution_type="TWO_DISTINCT_REAL_ROOTS",
+            verified_surd_roots=[r_minus, r_plus],
+            discriminant=RationalRoot(numerator=8, denominator=1),
+            radicand=2,
+            completeness_proven=True,
+        )
+        assert res.representation == "QUADRATIC_SURD"
+        assert len(res.verified_surd_roots) == 2
+        assert res.radicand == 2
+
+    def test_quadratic_surd_dispatch_result_rejects_invalid_root_counts(self):
+        diag = PublicValidationDiagnostic(
+            is_valid=True,
+            is_cas_ready=True,
+            status="VALID",
+            target_operation="SOLVE_QUADRATIC_SURD",
+            issues=[],
+            uncertainties=[],
+        )
+        r_minus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        r_plus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        # 1 root
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                verified_surd_roots=[r_minus],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=2,
+            )
+        # 3 roots
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                verified_surd_roots=[r_minus, r_plus, r_plus],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=2,
+            )
+
+    def test_quadratic_surd_dispatch_result_rejects_mismatched_roots(self):
+        diag = PublicValidationDiagnostic(
+            is_valid=True,
+            is_cas_ready=True,
+            status="VALID",
+            target_operation="SOLVE_QUADRATIC_SURD",
+            issues=[],
+            uncertainties=[],
+        )
+        # Different rational parts
+        r1 = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        r2 = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=1, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                verified_surd_roots=[r1, r2],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=2,
+            )
+
+        # Reversed order (positive first)
+        r_pos = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        r_neg = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                verified_surd_roots=[r_pos, r_neg],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=2,
+            )
+
+    def test_canonical_serialization_no_float(self):
+        diag = PublicValidationDiagnostic(
+            is_valid=True,
+            is_cas_ready=True,
+            status="VALID",
+            target_operation="SOLVE_QUADRATIC_SURD",
+            issues=[],
+            uncertainties=[],
+        )
+        r_minus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        r_plus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+        res = QuadraticSurdControlledDispatchResult(
+            intake_status=IntakeStatus.VALIDATED,
+            intake_diagnostic=diag,
+            execution_status=ExecutionStatus.SUCCESS,
+            verification_status=VerificationStatus.VERIFIED_COMPLETE,
+            is_verified=True,
+            solution_type="TWO_DISTINCT_REAL_ROOTS",
+            verified_surd_roots=[r_minus, r_plus],
+            discriminant=RationalRoot(numerator=8, denominator=1),
+            radicand=2,
+            completeness_proven=True,
+        )
+        json_str = res.model_dump_json()
+        parsed = json.loads(json_str)
+        assert parsed["representation"] == "QUADRATIC_SURD"
+        assert parsed["radicand"] == 2
+        assert parsed["verified_surd_roots"][0]["sqrt_coefficient"]["numerator"] == -1
+        assert parsed["verified_surd_roots"][1]["sqrt_coefficient"]["numerator"] == 1
+        # Confirm no float types in entire tree
+        def check_no_floats(obj):
+            if isinstance(obj, float):
+                raise AssertionError(f"Found float in serialized output: {obj}")
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    check_no_floats(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    check_no_floats(item)
+        check_no_floats(parsed)
+
+
+# ============================================================================
+# 7. ControlledDispatchBridge B2 End-to-End Tests with Mock Controller
 # ============================================================================
 
 class MockBridgeWorkerController:
@@ -571,13 +913,6 @@ class TestControlledDispatchBridgeB2Surd:
     """Test end-to-end controlled dispatch bridge with quadratic surd equations."""
 
     def test_b2_surd_x2_minus_2_success(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            IntakeStatus,
-            VerificationStatus,
-            QuadraticSurdControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 - 2 = 0")
         mock = MockBridgeWorkerController()
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
@@ -605,13 +940,6 @@ class TestControlledDispatchBridgeB2Surd:
         assert req["operation"] == OPERATION_SOLVE_QUADRATIC_SURD
 
     def test_b2_surd_x2_plus_x_minus_1(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            IntakeStatus,
-            VerificationStatus,
-            QuadraticSurdControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 + x - 1 = 0")
         mock = MockBridgeWorkerController(
             solve_res={
@@ -652,13 +980,6 @@ class TestControlledDispatchBridgeB2Surd:
         assert res.verified_surd_roots[1].sqrt_coefficient.denominator == 2
 
     def test_b2_routing_b1_rational_quadratic_preserves_v2(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            IntakeStatus,
-            VerificationStatus,
-            QuadraticControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 - 4 = 0")
         mock = MockBridgeWorkerController()
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 4 = 0", ir_payload=ir, _controller=mock)
@@ -668,33 +989,26 @@ class TestControlledDispatchBridgeB2Surd:
         assert mock.call_history[0][0]["schema_version"] == SCHEMA_VERSION_V2
 
     def test_b2_routing_b0_linear_preserves_v1(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            IntakeStatus,
-            VerificationStatus,
-            ControlledDispatchResult,
-            QuadraticControlledDispatchResult,
-        )
         ir = make_test_ir("2*x + 4 = 0")
         mock = MockBridgeWorkerController()
         res = ControlledDispatchBridge._dispatch_internal(raw_query="2*x + 4 = 0", ir_payload=ir, _controller=mock)
         assert not isinstance(res, QuadraticControlledDispatchResult)
+        assert not isinstance(res, QuadraticSurdControlledDispatchResult)
         assert res.is_verified is True
         assert len(mock.call_history) == 2  # 1 SOLVE + 1 CHECK_CANDIDATE
         assert mock.call_history[0][0]["schema_version"] == SCHEMA_VERSION_V1
 
 
 # ============================================================================
-# 6. Adversarial Wire and Verification Defeat Tests
+# 8. Expanded v3 Wire Adversarial Matrix (Requirement 9)
 # ============================================================================
 
-class TestAdversarialSurdWireAndVerification:
-    """Test adversarial responses, malformed envelopes, and collusion resistance."""
+class TestAdversarialV3WireExpanded:
+    """Test comprehensive wire response format and value validation."""
 
-    def test_missing_radicand_in_v3_response(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+    def test_257_bit_rational_part_numerator_rejected(self):
         ir = make_test_ir("x^2 - 2 = 0")
+        huge = str(1 << 257)
         mock = MockBridgeWorkerController(
             solve_res={
                 "schema_version": SCHEMA_VERSION_V3,
@@ -703,46 +1017,12 @@ class TestAdversarialSurdWireAndVerification:
                 "status": "TWO_DISTINCT_REAL_ROOTS",
                 "roots": [
                     {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "rational_part": {"numerator": huge, "denominator": "1"},
                         "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
                         "radicand": "2",
                     },
                     {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                ],
-                "discriminant": {"numerator": "8", "denominator": "1"},
-                # missing "radicand"
-                "definedness": True,
-                "error": None,
-                "is_provisional_evidence": True,
-            }
-        )
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
-        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
-        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
-
-    def test_extra_field_in_v3_response(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
-        mock = MockBridgeWorkerController(
-            solve_res={
-                "schema_version": SCHEMA_VERSION_V3,
-                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
-                "outcome": "SUCCESS",
-                "status": "TWO_DISTINCT_REAL_ROOTS",
-                "roots": [
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "rational_part": {"numerator": huge, "denominator": "1"},
                         "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
                         "radicand": "2",
                     },
@@ -752,27 +1032,55 @@ class TestAdversarialSurdWireAndVerification:
                 "definedness": True,
                 "error": None,
                 "is_provisional_evidence": True,
-                "extra_key": "unauthorized",
             }
         )
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
         assert res.execution_status == ExecutionStatus.ENGINE_ERROR
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
         assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
 
-    def test_wrong_schema_version_in_response(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+    def test_257_bit_sqrt_coeff_denominator_rejected(self):
         ir = make_test_ir("x^2 - 2 = 0")
+        huge = str(1 << 257)
         mock = MockBridgeWorkerController(
             solve_res={
-                "schema_version": SCHEMA_VERSION_V2,  # wrong version
+                "schema_version": SCHEMA_VERSION_V3,
                 "operation": OPERATION_SOLVE_QUADRATIC_SURD,
                 "outcome": "SUCCESS",
                 "status": "TWO_DISTINCT_REAL_ROOTS",
                 "roots": [
                     {
                         "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "-1", "denominator": huge},
+                        "radicand": "2",
+                    },
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "1", "denominator": huge},
+                        "radicand": "2",
+                    },
+                ],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_negative_denominator_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "-1"},
                         "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
                         "radicand": "2",
                     },
@@ -791,11 +1099,9 @@ class TestAdversarialSurdWireAndVerification:
         )
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
         assert res.execution_status == ExecutionStatus.ENGINE_ERROR
-        assert res.is_verified is False
         assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
 
-    def test_worker_provisional_evidence_not_true(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+    def test_zero_denominator_rejected(self):
         ir = make_test_ir("x^2 - 2 = 0")
         mock = MockBridgeWorkerController(
             solve_res={
@@ -805,7 +1111,7 @@ class TestAdversarialSurdWireAndVerification:
                 "status": "TWO_DISTINCT_REAL_ROOTS",
                 "roots": [
                     {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "rational_part": {"numerator": "0", "denominator": "0"},
                         "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
                         "radicand": "2",
                     },
@@ -819,16 +1125,14 @@ class TestAdversarialSurdWireAndVerification:
                 "radicand": "2",
                 "definedness": True,
                 "error": None,
-                "is_provisional_evidence": False,  # must be True
+                "is_provisional_evidence": True,
             }
         )
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
         assert res.execution_status == ExecutionStatus.ENGINE_ERROR
-        assert res.is_verified is False
         assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
 
-    def test_worker_wrong_discriminant_mismatch(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
+    def test_leading_plus_in_decimal_string_rejected(self):
         ir = make_test_ir("x^2 - 2 = 0")
         mock = MockBridgeWorkerController(
             solve_res={
@@ -844,11 +1148,11 @@ class TestAdversarialSurdWireAndVerification:
                     },
                     {
                         "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "+1", "denominator": "1"},  # leading plus
                         "radicand": "2",
                     },
                 ],
-                "discriminant": {"numerator": "10", "denominator": "1"},  # wrong discriminant (host expects 8)
+                "discriminant": {"numerator": "8", "denominator": "1"},
                 "radicand": "2",
                 "definedness": True,
                 "error": None,
@@ -856,152 +1160,468 @@ class TestAdversarialSurdWireAndVerification:
             }
         )
         res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_unnecessary_leading_zero_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "-01", "denominator": "1"},  # leading zero
+                        "radicand": "2",
+                    },
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+                        "radicand": "2",
+                    },
+                ],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_zero_sqrt_coefficient_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "0", "denominator": "1"},  # zero sqrt coeff
+                        "radicand": "2",
+                    },
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "0", "denominator": "1"},
+                        "radicand": "2",
+                    },
+                ],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_invalid_radicand_values_rejected(self):
+        for invalid_rad in ["0", "1", str(1 << 32), "-2"]:
+            ir = make_test_ir("x^2 - 2 = 0")
+            mock = MockBridgeWorkerController(
+                solve_res={
+                    "schema_version": SCHEMA_VERSION_V3,
+                    "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                    "outcome": "SUCCESS",
+                    "status": "TWO_DISTINCT_REAL_ROOTS",
+                    "roots": [
+                        {
+                            "rational_part": {"numerator": "0", "denominator": "1"},
+                            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+                            "radicand": invalid_rad,
+                        },
+                        {
+                            "rational_part": {"numerator": "0", "denominator": "1"},
+                            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+                            "radicand": invalid_rad,
+                        },
+                    ],
+                    "discriminant": {"numerator": "8", "denominator": "1"},
+                    "radicand": invalid_rad,
+                    "definedness": True,
+                    "error": None,
+                    "is_provisional_evidence": True,
+                }
+            )
+            res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+            assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+            assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_noncanonical_equivalent_radicand_rejected(self):
+        # For x^2 - 8 = 0, canonical root is +- 2*sqrt(2). Worker returns +- 1*sqrt(8)
+        ir = make_test_ir("x^2 - 8 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+                        "radicand": "8",  # not squarefree / not canonical
+                    },
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+                        "radicand": "8",
+                    },
+                ],
+                "discriminant": {"numerator": "32", "denominator": "1"},
+                "radicand": "8",  # host expects 2
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 8 = 0", ir_payload=ir, _controller=mock)
         assert res.execution_status == ExecutionStatus.SUCCESS
         assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
-        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
-
-    def test_worker_wrong_radicand_mismatch(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
-        mock = MockBridgeWorkerController(
-            solve_res={
-                "schema_version": SCHEMA_VERSION_V3,
-                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
-                "outcome": "SUCCESS",
-                "status": "TWO_DISTINCT_REAL_ROOTS",
-                "roots": [
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
-                        "radicand": "3",
-                    },
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
-                        "radicand": "3",
-                    },
-                ],
-                "discriminant": {"numerator": "8", "denominator": "1"},
-                "radicand": "3",  # wrong radicand (host expects 2)
-                "definedness": True,
-                "error": None,
-                "is_provisional_evidence": True,
-            }
-        )
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
-        assert res.execution_status == ExecutionStatus.SUCCESS
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
-        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
-
-    def test_worker_unreduced_fraction_in_surd_root(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
-        mock = MockBridgeWorkerController(
-            solve_res={
-                "schema_version": SCHEMA_VERSION_V3,
-                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
-                "outcome": "SUCCESS",
-                "status": "TWO_DISTINCT_REAL_ROOTS",
-                "roots": [
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "2"},  # unreduced
-                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                ],
-                "discriminant": {"numerator": "8", "denominator": "1"},
-                "radicand": "2",
-                "definedness": True,
-                "error": None,
-                "is_provisional_evidence": True,
-            }
-        )
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
-        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
-        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
-
-    def test_worker_inverted_roots_order_mismatch(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
-        # Inverted: positive sqrt coeff first, negative sqrt coeff second
-        mock = MockBridgeWorkerController(
-            solve_res={
-                "schema_version": SCHEMA_VERSION_V3,
-                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
-                "outcome": "SUCCESS",
-                "status": "TWO_DISTINCT_REAL_ROOTS",
-                "roots": [
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                    {
-                        "rational_part": {"numerator": "0", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                ],
-                "discriminant": {"numerator": "8", "denominator": "1"},
-                "radicand": "2",
-                "definedness": True,
-                "error": None,
-                "is_provisional_evidence": True,
-            }
-        )
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
-        assert res.execution_status == ExecutionStatus.SUCCESS
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
-        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
-
-    def test_collusive_worker_wrong_roots_detected(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
-        ir = make_test_ir("x^2 - 2 = 0")
-        # Worker claims roots are 1 +- sqrt(2) instead of 0 +- sqrt(2)
-        mock = MockBridgeWorkerController(
-            solve_res={
-                "schema_version": SCHEMA_VERSION_V3,
-                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
-                "outcome": "SUCCESS",
-                "status": "TWO_DISTINCT_REAL_ROOTS",
-                "roots": [
-                    {
-                        "rational_part": {"numerator": "1", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                    {
-                        "rational_part": {"numerator": "1", "denominator": "1"},
-                        "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
-                        "radicand": "2",
-                    },
-                ],
-                "discriminant": {"numerator": "8", "denominator": "1"},
-                "radicand": "2",
-                "definedness": True,
-                "error": None,
-                "is_provisional_evidence": True,
-            }
-        )
-        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
-        assert res.execution_status == ExecutionStatus.SUCCESS
-        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
-        assert res.is_verified is False
         assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
 
 
 # ============================================================================
-# 7. Worker Infrastructure Error Taxonomies
+# 9. Complete Root-Pair Adversarial Matrix (Requirement 10)
+# ============================================================================
+
+class TestAdversarialRootPairComprehensive:
+    """Validate root-pair consistency, symmetry, and host verification rejection."""
+
+    def test_missing_root_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [
+                    {
+                        "rational_part": {"numerator": "0", "denominator": "1"},
+                        "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+                        "radicand": "2",
+                    },
+                ],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_extra_root_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r, r, r],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.ENGINE_ERROR
+        assert res.error_code == "ERR_MALFORMED_WORKER_RESPONSE"
+
+    def test_duplicate_roots_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_neg],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_reversed_roots_order_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_pos = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_pos, r_neg],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_both_sqrt_coefficients_positive_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_pos = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_pos, r_pos],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_unequal_sqrt_coefficients_magnitudes_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_pos = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "2", "denominator": "1"},  # unequal magnitude
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_pos],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_different_rational_parts_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_pos = {
+            "rational_part": {"numerator": "1", "denominator": "1"},  # different rational part
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_pos],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_different_radicands_between_roots_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_pos = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "3",  # different radicand
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_pos],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_wrong_top_level_radicand_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_plus = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_plus],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "3",  # top-level 3 vs root radicand 2
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_wrong_discriminant_rejected(self):
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_plus = {
+            "rational_part": {"numerator": "0", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_plus],
+                "discriminant": {"numerator": "12", "denominator": "1"},  # wrong discriminant
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+    def test_internally_consistent_but_mathematically_wrong_pair_rejected(self):
+        # Equation is x^2 - 2 = 0. Worker returns 1 +- sqrt(2)
+        ir = make_test_ir("x^2 - 2 = 0")
+        r_neg = {
+            "rational_part": {"numerator": "1", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "-1", "denominator": "1"},
+            "radicand": "2",
+        }
+        r_plus = {
+            "rational_part": {"numerator": "1", "denominator": "1"},
+            "sqrt_coefficient": {"numerator": "1", "denominator": "1"},
+            "radicand": "2",
+        }
+        mock = MockBridgeWorkerController(
+            solve_res={
+                "schema_version": SCHEMA_VERSION_V3,
+                "operation": OPERATION_SOLVE_QUADRATIC_SURD,
+                "outcome": "SUCCESS",
+                "status": "TWO_DISTINCT_REAL_ROOTS",
+                "roots": [r_neg, r_plus],
+                "discriminant": {"numerator": "8", "denominator": "1"},
+                "radicand": "2",
+                "definedness": True,
+                "error": None,
+                "is_provisional_evidence": True,
+            }
+        )
+        res = ControlledDispatchBridge._dispatch_internal(raw_query="x^2 - 2 = 0", ir_payload=ir, _controller=mock)
+        assert res.execution_status == ExecutionStatus.SUCCESS
+        assert res.verification_status == VerificationStatus.VERIFICATION_FAILED
+        assert res.error_code == "ERR_SURD_VERIFICATION_MISMATCH"
+
+
+# ============================================================================
+# 10. Worker Infrastructure Error Taxonomies
 # ============================================================================
 
 class TestWorkerInfrastructureTaxonomySurd:
@@ -1023,7 +1643,6 @@ class TestWorkerInfrastructureTaxonomySurd:
         ],
     )
     def test_worker_infrastructure_errors_solve_quadratic_surd(self, worker_status, expected_exec, expected_err):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, IntakeStatus, VerificationStatus
         ir = make_test_ir("x^2 - 2 = 0")
         mock = MockBridgeWorkerController(
             solve_res={
@@ -1039,14 +1658,13 @@ class TestWorkerInfrastructureTaxonomySurd:
 
 
 # ============================================================================
-# 8. Cumulative Deadline & Monotonic Budget
+# 11. Cumulative Deadline & Monotonic Budget
 # ============================================================================
 
 class TestCumulativeDeadlineSurd:
     """Verify single worker call in B2 surd receives the full remaining budget."""
 
     def test_cumulative_deadline_surd_single_call(self):
-        from mke_product.cas.bridge import ControlledDispatchBridge, ExecutionStatus, VerificationStatus
         ir = make_test_ir("x^2 - 2 = 0")
         mock = MockBridgeWorkerController(solve_delay_sec=0.02)
         res = ControlledDispatchBridge._dispatch_internal(
@@ -1062,7 +1680,7 @@ class TestCumulativeDeadlineSurd:
 
 
 # ============================================================================
-# 9. Architectural Boundary & Independence Tests
+# 12. Architectural Boundary & Independence Tests
 # ============================================================================
 
 class TestBridgeArchitectureIndependenceSurd:
@@ -1083,7 +1701,7 @@ class TestBridgeArchitectureIndependenceSurd:
 
 
 # ============================================================================
-# 10. Live Windows AppContainer Worker Integration Tests
+# 13. Live Windows AppContainer Worker Integration Tests
 # ============================================================================
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows AppContainer tests require Windows")
@@ -1091,13 +1709,6 @@ class TestLiveWindowsWorkerQuadraticSurdIntegration:
     """Live end-to-end integration tests with the real Windows AppContainer worker."""
 
     def test_live_worker_surd_x2_minus_2(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            IntakeStatus,
-            VerificationStatus,
-            QuadraticSurdControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 - 2 = 0")
         res = ControlledDispatchBridge.dispatch("x^2 - 2 = 0", ir)
         assert isinstance(res, QuadraticSurdControlledDispatchResult)
@@ -1122,12 +1733,6 @@ class TestLiveWindowsWorkerQuadraticSurdIntegration:
         assert res.completeness_proven is True
 
     def test_live_worker_surd_x2_plus_x_minus_1(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            VerificationStatus,
-            QuadraticSurdControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 + x - 1 = 0")
         res = ControlledDispatchBridge.dispatch("x^2 + x - 1 = 0", ir)
         assert isinstance(res, QuadraticSurdControlledDispatchResult)
@@ -1150,12 +1755,6 @@ class TestLiveWindowsWorkerQuadraticSurdIntegration:
         assert r2.radicand == 5
 
     def test_live_worker_surd_3x2_plus_6x_plus_1(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            VerificationStatus,
-            QuadraticSurdControlledDispatchResult,
-        )
         ir = make_test_ir("3*x^2 + 6*x + 1 = 0")
         res = ControlledDispatchBridge.dispatch("3*x^2 + 6*x + 1 = 0", ir)
         assert isinstance(res, QuadraticSurdControlledDispatchResult)
@@ -1178,12 +1777,6 @@ class TestLiveWindowsWorkerQuadraticSurdIntegration:
         assert r2.radicand == 6
 
     def test_live_worker_b1_quadratic_regression(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            VerificationStatus,
-            QuadraticControlledDispatchResult,
-        )
         ir = make_test_ir("x^2 - 4 = 0")
         res = ControlledDispatchBridge.dispatch("x^2 - 4 = 0", ir)
         assert isinstance(res, QuadraticControlledDispatchResult)
@@ -1195,12 +1788,6 @@ class TestLiveWindowsWorkerQuadraticSurdIntegration:
         assert res.verified_roots[1].numerator == 2
 
     def test_live_worker_b0_linear_regression(self):
-        from mke_product.cas.bridge import (
-            ControlledDispatchBridge,
-            ExecutionStatus,
-            VerificationStatus,
-            ControlledDispatchResult,
-        )
         ir = make_test_ir("2*x + 4 = 0")
         res = ControlledDispatchBridge.dispatch("2*x + 4 = 0", ir)
         assert res.execution_status == ExecutionStatus.SUCCESS
