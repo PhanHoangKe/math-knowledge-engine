@@ -5,8 +5,9 @@ Verifies:
 2. DegenerateSolveResult model invariants, immutability, and rejection of extra fields.
 3. Independent host verification for degenerate candidates.
 4. Fail-closed rejection of forged/adversarial candidates without exceptions.
-5. Deterministic tamper-evident certificate fingerprint generation without timestamp contamination.
-6. End-to-end integration with AST normalizer (normalize_raw_equation) and S0 domain models.
+5. Strict runtime type contract enforcement (rejecting float, str, int, invalid candidate/hash) with TypeError.
+6. Deterministic tamper-evident certificate fingerprint generation with canonical JSON serialization and problem_hash isolation.
+7. End-to-end integration with AST normalizer (normalize_raw_equation) and S0 domain models.
 """
 
 from __future__ import annotations
@@ -94,6 +95,66 @@ class TestDegenerateSolveExact(unittest.TestCase):
         self.assertEqual(res.classification, EquationClassificationType.CONTRADICTION)
         self.assertEqual(res.outcome, SolutionOutcome.NO_REAL_SOLUTIONS_CONTRADICTION)
         self.assertIsNone(res.linear_root)
+
+
+class TestDegenerateRuntimeTypeEnforcement(unittest.TestCase):
+    """Adversarial tests ensuring low-level mathematical boundary rejects non-Rational types with TypeError."""
+
+    def setUp(self):
+        self.valid_candidate = solve_exact_degenerate(Rational(2, 1), Rational(-4, 1))
+
+    def test_solve_rejects_float_b(self):
+        with self.assertRaises(TypeError) as ctx:
+            solve_exact_degenerate(2.0, Rational(-4, 1))  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_solve_rejects_float_c(self):
+        with self.assertRaises(TypeError) as ctx:
+            solve_exact_degenerate(Rational(2, 1), -4.0)  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_solve_rejects_string_b(self):
+        with self.assertRaises(TypeError) as ctx:
+            solve_exact_degenerate("2", Rational(-4, 1))  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_solve_rejects_string_c(self):
+        with self.assertRaises(TypeError) as ctx:
+            solve_exact_degenerate(Rational(2, 1), "-4")  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_solve_rejects_raw_int(self):
+        with self.assertRaises(TypeError) as ctx:
+            solve_exact_degenerate(2, Rational(-4, 1))  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_verify_rejects_float_b(self):
+        with self.assertRaises(TypeError) as ctx:
+            verify_degenerate_solution(2.0, Rational(-4, 1), self.valid_candidate)  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_verify_rejects_float_c(self):
+        with self.assertRaises(TypeError) as ctx:
+            verify_degenerate_solution(Rational(2, 1), -4.0, self.valid_candidate)  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_verify_rejects_string_inputs(self):
+        with self.assertRaises(TypeError) as ctx:
+            verify_degenerate_solution("2", Rational(-4, 1), self.valid_candidate)  # type: ignore
+        self.assertIn("must be an instance of Rational", str(ctx.exception))
+
+    def test_verify_rejects_invalid_candidate_type(self):
+        with self.assertRaises(TypeError) as ctx:
+            verify_degenerate_solution(Rational(2, 1), Rational(-4, 1), object())  # type: ignore
+        self.assertIn("candidate", str(ctx.exception))
+        self.assertIn("must be an instance of DegenerateSolveResult", str(ctx.exception))
+
+    def test_verify_rejects_non_string_problem_hash(self):
+        with self.assertRaises(TypeError) as ctx:
+            verify_degenerate_solution(
+                Rational(2, 1), Rational(-4, 1), self.valid_candidate, problem_hash=12345  # type: ignore
+            )
+        self.assertIn("problem_hash", str(ctx.exception))
 
 
 class TestDegenerateSolveResultInvariants(unittest.TestCase):
@@ -273,9 +334,9 @@ class TestDegenerateHostVerifier(unittest.TestCase):
 
 
 class TestDeterministicIntegrityFingerprint(unittest.TestCase):
-    """Tests verifying certificate integrity fingerprint properties."""
+    """Tests verifying certificate integrity fingerprint properties and problem_hash sensitivity."""
 
-    def test_fingerprint_repeatability(self):
+    def test_fingerprint_repeatability_same_state_same_hash(self):
         b = Rational(2, 5)
         c = Rational(-7, 3)
         cand = solve_exact_degenerate(b, c)
@@ -285,6 +346,24 @@ class TestDeterministicIntegrityFingerprint(unittest.TestCase):
         # Despite verified_at_utc timestamps differing, the integrity_fingerprint must be identical
         self.assertEqual(cert_a.integrity_fingerprint, cert_b.integrity_fingerprint)
         self.assertEqual(cert_a.certificate_id, cert_b.certificate_id)
+
+    def test_fingerprint_problem_hash_isolation_exact_audit_spec(self):
+        """Exact test mandated by S1-02-R1 audit: same mathematical candidate with different problem_hashes."""
+        b = Rational(2, 1)
+        c = Rational(-4, 1)
+        candidate = solve_exact_degenerate(b, c)
+
+        cert_A = verify_degenerate_solution(b, c, candidate, problem_hash="problem_A")
+        cert_B = verify_degenerate_solution(b, c, candidate, problem_hash="problem_B")
+
+        # Candidate is identical, but problem_hashes differ -> integrity fingerprints must differ
+        self.assertNotEqual(cert_A.integrity_fingerprint, cert_B.integrity_fingerprint)
+        self.assertNotEqual(cert_A.certificate_id, cert_B.certificate_id)
+
+        # Retain identical fingerprint on re-verification with same problem_hash
+        cert_A2 = verify_degenerate_solution(b, c, candidate, problem_hash="problem_A")
+        self.assertEqual(cert_A.integrity_fingerprint, cert_A2.integrity_fingerprint)
+        self.assertEqual(cert_A.certificate_id, cert_A2.certificate_id)
 
     def test_fingerprint_distinction_on_coefficients(self):
         cand1 = solve_exact_degenerate(Rational(2, 1), Rational(-4, 1))

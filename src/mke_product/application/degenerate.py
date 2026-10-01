@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -22,6 +22,14 @@ from mke_product.domain.models import (
     VerificationCertificate,
     VerificationOutcome,
 )
+
+
+def _validate_rational_arg(val: Any, name: str) -> None:
+    """Ensure argument is strictly an instance of core Rational, rejecting float, str, int, etc."""
+    if not isinstance(val, Rational):
+        raise TypeError(
+            f"Argument '{name}' must be an instance of Rational, got {type(val).__name__}."
+        )
 
 
 class DegenerateSolveResult(BaseModel):
@@ -69,6 +77,9 @@ class DegenerateSolveResult(BaseModel):
 
 def solve_exact_degenerate(b: Rational, c: Rational) -> DegenerateSolveResult:
     """Solve degenerate equation b*x + c = 0 exactly over Q without CAS or floating point."""
+    _validate_rational_arg(b, "b")
+    _validate_rational_arg(c, "c")
+
     if not b.is_zero:
         root_rat = -c / b
         return DegenerateSolveResult(
@@ -113,6 +124,17 @@ class DegenerateHostVerifier:
         5. Exact canonical identity derivation for identity and contradiction.
         6. Issues tamper-evident VerificationCertificate without synthetic discriminants.
         """
+        _validate_rational_arg(b, "b")
+        _validate_rational_arg(c, "c")
+        if not isinstance(candidate, DegenerateSolveResult):
+            raise TypeError(
+                f"Argument 'candidate' must be an instance of DegenerateSolveResult, got {type(candidate).__name__}."
+            )
+        if not isinstance(problem_hash, str):
+            raise TypeError(
+                f"Argument 'problem_hash' must be a str, got {type(problem_hash).__name__}."
+            )
+
         identities: List[str] = []
         residuals: List[str] = []
         all_checks_valid = True
@@ -189,7 +211,7 @@ class DegenerateHostVerifier:
             "identities": identities,
             "residuals": residuals,
         }
-        sig_str = json.dumps(sig_payload, sort_keys=True)
+        sig_str = json.dumps(sig_payload, sort_keys=True, separators=(",", ":"))
         cert_sig = hashlib.sha256(sig_str.encode("utf-8")).hexdigest()
         cert_id = hashlib.sha256(f"cert:degenerate:{problem_hash}:{cert_sig}".encode("utf-8")).hexdigest()[:16]
 
