@@ -298,25 +298,15 @@ class QuadraticProblemIR(ProblemIR):
         if self.solution_domain != "R":
             raise ValueError(f"Solution domain for QuadraticProblemIR must be 'R', got '{self.solution_domain}'.")
 
-        # Verify exact discriminant consistency with b^2 - 4ac
+        # Verify exact discriminant consistency with canonical b^2 - 4ac computation
         from mke_product.domain.exact import compute_quadratic_discriminant
         expected_disc = compute_quadratic_discriminant(
             self.a.to_rational(), self.b.to_rational(), self.c.to_rational()
         )
-        if self.discriminant.value.to_rational() != expected_disc.value.to_rational():
+        if self.discriminant != expected_disc:
             raise ValueError(
-                f"Forged or inconsistent discriminant value: provided {self.discriminant.value}, "
-                f"computed exact b^2 - 4ac = {expected_disc.value}"
+                f"Forged or inconsistent discriminant: provided {self.discriminant} does not match canonical calculation {expected_disc}."
             )
-        if (
-            self.discriminant.is_positive != expected_disc.is_positive
-            or self.discriminant.is_zero != expected_disc.is_zero
-            or self.discriminant.is_negative != expected_disc.is_negative
-            or self.discriminant.is_rational_square != expected_disc.is_rational_square
-            or self.discriminant.squarefree_kernel != expected_disc.squarefree_kernel
-            or self.discriminant.extracted_factor != expected_disc.extracted_factor
-        ):
-            raise ValueError("Forged or inconsistent discriminant squarefree properties with exact b^2 - 4ac computation.")
         return self
 
 

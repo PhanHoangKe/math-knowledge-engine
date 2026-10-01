@@ -1,24 +1,24 @@
 # MKE MVP V1 — S0 Domain Core Architecture & Implementation Record
 
 - **Document Identifier:** `docs/architecture/MVP_V1_S0_DOMAIN_CORE_ARCHITECTURE_RECORD.md`
-- **Milestone:** MVP-V1-S0-R2 (Contract Hardening & Domain Core Closeout)
-- **Document Version:** 1.2.0
+- **Milestone:** MVP-V1-S0-R2-R1 (Discriminant Invariant Hardening & Closeout)
+- **Document Version:** 1.2.1
 - **Author:** Antigravity (Implementation Engineer)
 - **Coordinator / Independent Auditor:** ChatGPT
 - **Project Owner:** Kế Phan Hoàng
 - **Repository:** `PhanHoangKe/math-knowledge-engine`
 - **Branch:** `product/mvp-v1-s0-r2-contract-hardening`
-- **Parent SHA:** `ac5e749beced8ce07cfefd4cf5974cf558ee4f86`
-- **Predecessor Baseline:** S0-R1 Remediation (`ac5e749beced8ce07cfefd4cf5974cf558ee4f86`)
+- **Parent SHA:** `295c9447d9d4e95b38c259a4d7481c45295d515e`
+- **Predecessor Baseline:** S0-R2 Initial Commit (`295c9447d9d4e95b38c259a4d7481c45295d515e`)
 - **Parked B3 Baseline:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61` (`product/p03c-p1c-04-b3-exact-complex-preflight`)
-- **Status:** `PENDING INDEPENDENT S0-R2 AUDIT`
+- **Status:** `PENDING INDEPENDENT S0-R2-R1 AUDIT`
 - **Date:** 2026-10-01
 
 ---
 
 ## 1. Executive Summary
 
-Milestone `MVP-V1-S0-R2` finalizes the contract hardening and semantic verification of the Math Knowledge Engine (MKE) MVP V1 executable domain core. It hardens Pydantic model boundaries against self-contradictory states, canonicalizes exact rational value objects, cleanses the reduced quadratic formula from false prerequisites, aligns method registry execution availability with S0 milestone implementation reality, replaces unverified curriculum claims with neutral metadata, clarifies certificate integrity fingerprinting, and enforces deterministic assumption sorting in semantic problem identity hashing.
+Milestone `MVP-V1-S0-R2-R1` provides targeted invariant hardening for the Math Knowledge Engine (MKE) MVP V1 executable domain core. It hardens `QuadraticProblemIR` discriminant validation by enforcing whole-object canonical payload equality (`self.discriminant == expected_disc`), mathematically protecting all 8 semantic discriminant fields (including `square_root_rational`, `value`, `is_positive`, `is_zero`, `is_negative`, `is_rational_square`, `squarefree_kernel`, and `extracted_factor`).
 
 ---
 
@@ -52,7 +52,7 @@ src/mke_product/domain/
   - `a.numerator != 0` strictly enforced (leading coefficient cannot be zero).
   - `category == ProblemCategory.ALGEBRA_QUADRATIC` and `classification == EquationClassificationType.QUADRATIC`.
   - `coefficient_domain == "Q"` and `solution_domain == "R"` strictly required.
-  - Caller cannot inject or forge inconsistent discriminant values: `discriminant` is validated against exact $b^2 - 4ac$ computation.
+  - Caller cannot inject or forge inconsistent discriminant values: `discriminant` is validated against exact $b^2 - 4ac$ computation via whole-object equality check (`self.discriminant == expected_disc`), protecting all 8 semantic fields: `value`, `is_positive`, `is_zero`, `is_negative`, `is_rational_square`, `square_root_rational`, `squarefree_kernel`, and `extracted_factor`.
 - **`DegenerateEquationIR` Invariants:**
   - `a.numerator == 0` strictly enforced.
   - For $b \neq 0$: classification must be `LINEAR` with `linear_root == -c/b`.

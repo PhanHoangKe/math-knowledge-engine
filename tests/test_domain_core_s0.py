@@ -506,6 +506,139 @@ class TestModelBoundaryInvariants:
                 discriminant=forged_disc,
             )
 
+    def test_quadratic_problem_ir_rejects_forged_square_root_rational(self):
+        """For x^2 - 5x + 6 = 0 (Delta=1), forge square_root_rational=2 or None."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+
+        # 1. Forge square_root_rational = 2 instead of 1
+        forged_disc_2 = QuadraticDiscriminant(
+            value=RationalFraction(numerator=1, denominator=1),
+            is_positive=True,
+            is_zero=False,
+            is_negative=False,
+            is_rational_square=True,
+            square_root_rational=RationalFraction(numerator=2, denominator=1),
+            squarefree_kernel=1,
+            extracted_factor=RationalFraction(numerator=1, denominator=1),
+        )
+        with pytest.raises(ValidationError, match="Forged or inconsistent discriminant"):
+            QuadraticProblemIR(
+                problem_id="prob_forged_sqrt_2",
+                raw_query="x^2 - 5x + 6 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q1",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 5*x + 6 = 0",
+                discriminant=forged_disc_2,
+            )
+
+        # 2. Forge square_root_rational = None for Delta=1
+        forged_disc_none = QuadraticDiscriminant(
+            value=RationalFraction(numerator=1, denominator=1),
+            is_positive=True,
+            is_zero=False,
+            is_negative=False,
+            is_rational_square=True,
+            square_root_rational=None,
+            squarefree_kernel=1,
+            extracted_factor=RationalFraction(numerator=1, denominator=1),
+        )
+        with pytest.raises(ValidationError, match="Forged or inconsistent discriminant"):
+            QuadraticProblemIR(
+                problem_id="prob_forged_sqrt_none",
+                raw_query="x^2 - 5x + 6 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q1",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 5*x + 6 = 0",
+                discriminant=forged_disc_none,
+            )
+
+    def test_quadratic_problem_ir_rejects_injected_square_root_rational_when_non_square(self):
+        """For x^2 - 2 = 0 (Delta=8, non-square), inject non-None square_root_rational."""
+        a = Rational(1, 1)
+        b = Rational(0, 1)
+        c = Rational(-2, 1)
+
+        forged_disc = QuadraticDiscriminant(
+            value=RationalFraction(numerator=8, denominator=1),
+            is_positive=True,
+            is_zero=False,
+            is_negative=False,
+            is_rational_square=False,
+            square_root_rational=RationalFraction(numerator=2, denominator=1),
+            squarefree_kernel=2,
+            extracted_factor=RationalFraction(numerator=2, denominator=1),
+        )
+        with pytest.raises(ValidationError, match="Forged or inconsistent discriminant"):
+            QuadraticProblemIR(
+                problem_id="prob_forged_surd_sqrt",
+                raw_query="x^2 - 2 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q2",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 2 = 0",
+                discriminant=forged_disc,
+            )
+
+    def test_quadratic_problem_ir_rejects_injected_square_root_rational_when_negative(self):
+        """For x^2 + 1 = 0 (Delta=-4, negative), inject non-None square_root_rational."""
+        a = Rational(1, 1)
+        b = Rational(0, 1)
+        c = Rational(1, 1)
+
+        forged_disc = QuadraticDiscriminant(
+            value=RationalFraction(numerator=-4, denominator=1),
+            is_positive=False,
+            is_zero=False,
+            is_negative=True,
+            is_rational_square=False,
+            square_root_rational=RationalFraction(numerator=2, denominator=1),
+            squarefree_kernel=None,
+            extracted_factor=None,
+        )
+        with pytest.raises(ValidationError, match="Forged or inconsistent discriminant"):
+            QuadraticProblemIR(
+                problem_id="prob_forged_neg_sqrt",
+                raw_query="x^2 + 1 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q4",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 + 1 = 0",
+                discriminant=forged_disc,
+            )
+
+    def test_quadratic_problem_ir_accepts_canonical_computed_discriminant(self):
+        """Control case: canonical discriminant returned by compute_quadratic_discriminant() constructs successfully."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+        canonical_disc = compute_quadratic_discriminant(a, b, c)
+
+        prob = QuadraticProblemIR(
+            problem_id="prob_canonical_ok",
+            raw_query="x^2 - 5x + 6 = 0",
+            category=ProblemCategory.ALGEBRA_QUADRATIC,
+            semantic_revision_hash="hash_q1",
+            a=RationalFraction.from_rational(a),
+            b=RationalFraction.from_rational(b),
+            c=RationalFraction.from_rational(c),
+            equation_string="x^2 - 5*x + 6 = 0",
+            discriminant=canonical_disc,
+        )
+        assert prob.discriminant == canonical_disc
+        assert prob.discriminant.square_root_rational == RationalFraction(numerator=1, denominator=1)
+
     def test_degenerate_ir_rejects_a_nonzero(self):
         """DegenerateEquationIR rejects a != 0."""
         with pytest.raises(ValidationError, match="Leading coefficient 'a' must be 0"):
