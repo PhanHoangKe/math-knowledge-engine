@@ -1,0 +1,99 @@
+{
+  "milestone": "PRODUCT-03C-P1C-04-B2-R1",
+  "tested_source_sha": "ab9db461fcded30db4865ad8147e9378c3a66202",
+  "source_branch": "product/p03c-p1c-04-b2-r1-audit-remediation",
+  "source_ref": "refs/heads/product/p03c-p1c-04-b2-r1-audit-remediation",
+  "clean_worktree_before_each_run": true,
+  "files": {
+    "01_quadratic_surd_dispatch.log": {
+      "path": "evidence/p1c_04_b2/01_quadratic_surd_dispatch.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_quadratic_surd_dispatch.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:30:41.434987+00:00",
+      "end_timestamp_utc": "2026-10-01T01:30:48.014383+00:00",
+      "exit_code": 0,
+      "bytes": 14905,
+      "sha256": "8253b406e7fad062a2823709e2f85ab1c8a05b59d57798cfaca2878e42b09796"
+    },
+    "02_quadratic_dispatch.log": {
+      "path": "evidence/p1c_04_b2/02_quadratic_dispatch.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_quadratic_dispatch.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:30:48.150745+00:00",
+      "end_timestamp_utc": "2026-10-01T01:30:54.260665+00:00",
+      "exit_code": 0,
+      "bytes": 13803,
+      "sha256": "83938437022407b1210c061e8c51b0a4898039706937ccea5c387ded9547e73c"
+    },
+    "03_controlled_dispatch.log": {
+      "path": "evidence/p1c_04_b2/03_controlled_dispatch.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_controlled_dispatch.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:30:54.388576+00:00",
+      "end_timestamp_utc": "2026-10-01T01:31:00.680429+00:00",
+      "exit_code": 0,
+      "bytes": 6996,
+      "sha256": "7ee90d2fe9e72023348334a93453af67dce04025013cb3d330bb02745cce2aef"
+    },
+    "04_protocol.log": {
+      "path": "evidence/p1c_04_b2/04_protocol.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_protocol.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:31:00.887981+00:00",
+      "end_timestamp_utc": "2026-10-01T01:31:01.813682+00:00",
+      "exit_code": 0,
+      "bytes": 9253,
+      "sha256": "1db056dfa5168e074308dcba3007647b1a87be23914992182174318bba749ef7"
+    },
+    "05_ir_validator.log": {
+      "path": "evidence/p1c_04_b2/05_ir_validator.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_mke_ir_validator.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:31:01.964061+00:00",
+      "end_timestamp_utc": "2026-10-01T01:31:03.398069+00:00",
+      "exit_code": 0,
+      "bytes": 6607,
+      "sha256": "6352410a1e7416d5b215225189dde4a5af87cde55adbf3a062c4141d6605e3d6"
+    },
+    "06_mock_adapter.log": {
+      "path": "evidence/p1c_04_b2/06_mock_adapter.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1c_mock_adapter.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:31:03.534304+00:00",
+      "end_timestamp_utc": "2026-10-01T01:31:05.346607+00:00",
+      "exit_code": 0,
+      "bytes": 3257,
+      "sha256": "d03c13884a6c2d3d9670a380150c1d130ce3660582be91650e062067f84dad29"
+    },
+    "07_p1b_solver.log": {
+      "path": "evidence/p1c_04_b2/07_p1b_solver.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_p03c_p1b_transcendental_solver.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:31:05.486331+00:00",
+      "end_timestamp_utc": "2026-10-01T01:31:51.853651+00:00",
+      "exit_code": 0,
+      "bytes": 5643,
+      "sha256": "9599c4f1d2f880e2a2eb1a4c983b0c8a5cc406c92d9e8835c8283d550d4dee19"
+    },
+    "08_windows_containment.log": {
+      "path": "evidence/p1c_04_b2/08_windows_containment.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_worker_windows.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:31:52.001377+00:00",
+      "end_timestamp_utc": "2026-10-01T01:32:38.485576+00:00",
+      "exit_code": 0,
+      "bytes": 11570,
+      "sha256": "358bf5dbb3035d398fda62f64448f98ce911ae0cbac4ecc07cdd0efddb7ea31e"
+    },
+    "09_browser_ui.log": {
+      "path": "evidence/p1c_04_b2/09_browser_ui.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/test_browser_canonical_ui.py -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:32:38.655262+00:00",
+      "end_timestamp_utc": "2026-10-01T01:33:22.639233+00:00",
+      "exit_code": 0,
+      "bytes": 3406,
+      "sha256": "327861152999f880952d4d3ea1f35a96ac3dbe072673154952261289eb1007a8"
+    },
+    "10_full_repository.log": {
+      "path": "evidence/p1c_04_b2/10_full_repository.log",
+      "command": "C:\\Users\\kedep\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m pytest tests/ -v -o pythonpath=src",
+      "start_timestamp_utc": "2026-10-01T01:33:22.825301+00:00",
+      "end_timestamp_utc": "2026-10-01T01:36:24.051651+00:00",
+      "exit_code": 0,
+      "bytes": 111118,
+      "sha256": "1ee5469ce60ecaa052c9ef1447a09b5e7fe03df0df8674732f84375e131f9f2b"
+    }
+  }
+}

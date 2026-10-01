@@ -1,0 +1,63 @@
+================================================================================
+MKE PRODUCT — P1C-04-B2 ACCEPTANCE TEST LOG
+Test Target: tests/test_p03c_p1b_transcendental_solver.py
+Tested Source SHA: ab9db461fcded30db4865ad8147e9378c3a66202
+Timestamp (UTC): 2026-10-01T01:31:05.486331+00:00
+Pre-run Git Clean Tree: True
+Pre-run Git Status: <empty>
+================================================================================
+
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kedep\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+rootdir: D:\mke-product-ui-r4
+plugins: anyio-3.7.1, asyncio-1.4.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 44 items
+
+tests/test_p03c_p1b_transcendental_solver.py::test_ast_function_call_and_constants_creation PASSED [  2%]
+tests/test_p03c_p1b_transcendental_solver.py::test_parse_trigonometric_functions PASSED [  4%]
+tests/test_p03c_p1b_transcendental_solver.py::test_parse_power_on_trig_functions PASSED [  6%]
+tests/test_p03c_p1b_transcendental_solver.py::test_parse_exponential_and_constants PASSED [  9%]
+tests/test_p03c_p1b_transcendental_solver.py::test_parse_logarithms_and_subscripts PASSED [ 11%]
+tests/test_p03c_p1b_transcendental_solver.py::test_comma_inside_function_call_does_not_trigger_system PASSED [ 13%]
+tests/test_p03c_p1b_transcendental_solver.py::test_implicit_multiplication_rejection_for_transcendentals PASSED [ 15%]
+tests/test_p03c_p1b_transcendental_solver.py::test_ast_bridge_transcendental_objects PASSED [ 18%]
+tests/test_p03c_p1b_transcendental_solver.py::test_domain_restriction_extraction PASSED [ 20%]
+tests/test_p03c_p1b_transcendental_solver.py::test_trig_simplification PASSED [ 22%]
+tests/test_p03c_p1b_transcendental_solver.py::test_exact_logarithm_evaluation PASSED [ 25%]
+tests/test_p03c_p1b_transcendental_solver.py::test_transcendental_differentiation PASSED [ 27%]
+tests/test_p03c_p1b_transcendental_solver.py::test_log_equation_solving_and_extraneous_root_elimination PASSED [ 29%]
+tests/test_p03c_p1b_transcendental_solver.py::test_log_equality_equation PASSED [ 31%]
+tests/test_p03c_p1b_transcendental_solver.py::test_exponential_equation_solving PASSED [ 34%]
+tests/test_p03c_p1b_transcendental_solver.py::test_transcendental_identity_ln_domain PASSED [ 36%]
+tests/test_p03c_p1b_transcendental_solver.py::test_transcendental_identity_log_domain PASSED [ 38%]
+tests/test_p03c_p1b_transcendental_solver.py::test_transcendental_identity_tan_domain PASSED [ 40%]
+tests/test_p03c_p1b_transcendental_solver.py::test_transcendental_identity_injected_failure PASSED [ 43%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_sin_half PASSED [ 45%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_cos_zero PASSED [ 47%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_tan_one PASSED [ 50%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_transformed_arg PASSED [ 52%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_empty_set PASSED [ 54%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_unsupported_nonlinear_fail_closed PASSED [ 56%]
+tests/test_p03c_p1b_transcendental_solver.py::test_domain_error_invalid_log_and_tan PASSED [ 59%]
+tests/test_p03c_p1b_transcendental_solver.py::test_syntax_error_malformed_inputs_invalid_input PASSED [ 61%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_adversarial_sin_3x_zero PASSED [ 63%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_adversarial_cos_2x_one PASSED [ 65%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_adversarial_tan_2x_one PASSED [ 68%]
+tests/test_p03c_p1b_transcendental_solver.py::test_periodic_trig_adversarial_negative_coefficient PASSED [ 70%]
+tests/test_p03c_p1b_transcendental_solver.py::test_supervised_transcendental_identity_and_trig_solver PASSED [ 72%]
+tests/test_p03c_p1b_transcendental_solver.py::test_counterexample_2_pow_x_eq_x_sq_fails_closed PASSED [ 75%]
+tests/test_p03c_p1b_transcendental_solver.py::test_counterexample_ln_x_plus_x_eq_zero_fails_closed PASSED [ 77%]
+tests/test_p03c_p1b_transcendental_solver.py::test_counterexample_mixed_transcendental_fails_closed PASSED [ 79%]
+tests/test_p03c_p1b_transcendental_solver.py::test_counterexample_2_pow_x_plus_3_pow_x_eq_7_fails_closed PASSED [ 81%]
+tests/test_p03c_p1b_transcendental_solver.py::test_proven_empty_exponential_equation PASSED [ 84%]
+tests/test_p03c_p1b_transcendental_solver.py::test_simulated_empty_candidates_on_unclassified_fails_closed PASSED [ 86%]
+tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_2_pow_x_minus_5_eq_minus_4_normal_and_injected_empty PASSED [ 88%]
+tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_x_pow_4_minus_5x_sq_plus_4_eq_0_injected_incomplete PASSED [ 90%]
+tests/test_p03c_p1b_transcendental_solver.py::test_polynomial_completeness_sturm_isolation PASSED [ 93%]
+tests/test_p03c_p1b_transcendental_solver.py::test_algebraic_radical_and_rational_completeness PASSED [ 95%]
+tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_counterexample_2_pow_x_plus_1_eq_2_pow_x_plus_1 PASSED [ 97%]
+tests/test_p03c_p1b_transcendental_solver.py::test_mandatory_polynomial_multiplicity_distinct_root_sets PASSED [100%]
+
+============================= 44 passed in 45.46s =============================
