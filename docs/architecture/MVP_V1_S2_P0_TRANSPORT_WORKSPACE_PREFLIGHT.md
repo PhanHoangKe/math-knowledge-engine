@@ -1,15 +1,15 @@
-# MKE MVP V1 — S2-P0-R2 Transport & Live Math Workspace Integration Preflight Specification
+# MKE MVP V1 — S2-P0-R3 Transport & Live Math Workspace Integration Preflight Specification
 
-**Document Version:** 1.2.0 (R2 Final Wire-Contract & Transport-Taxonomy Closeout)  
+**Document Version:** 1.3.0 (R3 Final DTO-Truth & HTTP-Adapter Closeout)  
 **Milestone:** MVP V1 — Stage S2 Preflight Architecture  
 **Role:** Antigravity (“Anty”) — Implementation Engineer  
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
 **Accepted S1 Baseline:** `3058b6e904f38003a650a79105ae615226bdbc17`  
-**Parent S2-P0-R1 Baseline:** `93d5599c4b9a8cbdfe569133e988bcffc3074e30`  
+**Parent S2-P0-R2 Baseline:** `d8a8d7af61248f2be22999906f2704eb484acf9f`  
 **Parked B3 Baseline:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61` (UNTOUCHED)  
-**Status:** **`PENDING INDEPENDENT S2-P0-R2 FINAL AUDIT`**
+**Status:** **`PENDING INDEPENDENT S2-P0-R3 FINAL AUDIT`**
 
 ---
 
@@ -116,8 +116,8 @@ To prevent namespace collisions and routing ambiguities, S2 establishes an expli
 
 ```
 Route Precedence Order (Top to Bottom):
-1. /api/v1/algebra/solve      [POST]  -> S1 Pure Python solve_request() entry point
-2. /api/v1/health             [GET]   -> Observational system health & engine capabilities
+1. /api/v1/algebra/solve      [POST]  -> S1 Pure Python solve_request() entry point (operation_id="solve_algebra_v1")
+2. /api/v1/health             [GET]   -> Observational system health (operation_id="health_v1")
 3. /docs, /redoc, /openapi.json [GET] -> OpenAPI 3.1 schemas & interactive documentation
 4. /assets/*, /vendor/*, favicon.ico  -> Static asset mounts
 5. /* (Excluding /api/*)      [GET]   -> SPA Fallback (index.html)
@@ -127,12 +127,22 @@ Route Precedence Order (Top to Bottom):
 > **API 404 vs SPA Fallback Rule:** Requests matching `/api/*` that do not resolve to a registered endpoint MUST return JSON `404 Not Found` with a structured `TransportErrorResponse` envelope. They MUST NEVER fall back to `index.html`.
 
 ### 4.1 Route Specification: `POST /api/v1/algebra/solve`
+- **Operation ID:** `solve_algebra_v1` (Explicitly set to provide a stable key for TypeScript type generation).
 - **Request Body:** Direct JSON representation of `SolveRequest`.
 - **Response Body:** Direct JSON representation of `SolveResponseUnion` (`SolvedResponse` | `AnalyzedNoExecutionResponse` | `ErrorResponse`).
-- **Transport Execution Policy:**
+- **Category-B Status Adapter Implementation:**
   ```python
+  INTERNAL_APPLICATION_CODES = {
+      ApplicationErrorCode.NORMALIZATION_ERROR.value,
+      ApplicationErrorCode.DOMAIN_CONTRACT_ERROR.value,
+      ApplicationErrorCode.METHOD_EXECUTION_FAILED.value,
+      ApplicationErrorCode.VERIFICATION_FAILED.value,
+      ApplicationErrorCode.INTERNAL_ERROR.value,
+  }
+
   @router.post(
       "/algebra/solve",
+      operation_id="solve_algebra_v1",
       response_model=SolveResponseUnion,
       responses={
           200: {"description": "Successful mathematical analysis or client domain error"},
@@ -140,12 +150,21 @@ Route Precedence Order (Top to Bottom):
           413: {"model": TransportErrorResponse, "description": "Payload exceeds 64 KiB limit"},
           415: {"model": TransportErrorResponse, "description": "Unsupported Content-Type"},
           422: {"model": TransportErrorResponse, "description": "DTO schema validation failure"},
-          500: {"model": Union[ErrorResponse, TransportErrorResponse], "description": "Internal server failure"},
+          500: {"model": Union[ErrorResponse, TransportErrorResponse], "description": "Internal application or transport failure"},
       },
   )
-  async def solve_equation_endpoint(request: SolveRequest) -> SolveResponseUnion:
+  async def solve_equation_endpoint(request: SolveRequest, response: Response) -> SolveResponseUnion:
       # Direct delegation to pure application service — ZERO transport re-solving
-      return solve_request(request)
+      application_response = solve_request(request)
+
+      # Category-B Internal Execution Failures map to HTTP 500 without mutating ErrorResponse body
+      if isinstance(application_response, ErrorResponse):
+          if application_response.error_code in INTERNAL_APPLICATION_CODES:
+              response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+          else:
+              response.status_code = status.HTTP_200_OK
+
+      return application_response
   ```
 - **Invariants:**
   - Zero SymPy/CAS fallback inside this route.
@@ -155,7 +174,7 @@ Route Precedence Order (Top to Bottom):
 ### 4.2 Route Specification: `GET /api/v1/health`
 Health metadata is derived **dynamically** from the underlying domain registries at runtime:
 ```python
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health", operation_id="health_v1", response_model=HealthResponse)
 async def health_check_endpoint() -> HealthResponse:
     from mke_product.domain.registry import MethodRegistry
     from mke_product.application.traces import TRACE_GENERATORS
@@ -217,9 +236,9 @@ Transport status codes strictly distinguish between **Transport Failures (4xx / 
                         SolveResponse  ErrorResponse
 ```
 
-### 5.1 Transport Error Taxonomy
+### 5.1 Strict Transport Error Taxonomy
 
-To prevent namespace contamination between mathematical errors and HTTP transport failures, S2 freezes a dedicated `TransportErrorResponse` schema:
+To prevent namespace contamination between mathematical errors and HTTP transport failures, S2 freezes a dedicated, strictly typed `TransportErrorResponse` schema:
 
 ```python
 class TransportErrorCode(str, Enum):
@@ -232,11 +251,17 @@ class TransportErrorCode(str, Enum):
 
 
 class TransportErrorResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        frozen=True,
+    )
+
     transport_status: Literal["ERROR"] = "ERROR"
-    transport_error_code: str
+    transport_error_code: TransportErrorCode
     message_vi: str
     message_en: str
-    details: Optional[Dict[str, Any]] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
 ```
 
 ### 5.2 Transport & Application Error Matrix:
@@ -254,31 +279,42 @@ class TransportErrorResponse(BaseModel):
 | **Transport: Unknown API Route** | Nonexistent `/api/*` route | `404 Not Found` | `TransportErrorResponse` (`API_NOT_FOUND`) | API route not found (isolated from SPA fallback) |
 | **Transport: Internal Transport Error** | Unhandled middleware / ASGI crash | `500 Internal Server Error` | `TransportErrorResponse` (`INTERNAL_TRANSPORT_ERROR`) | Transport-level exception before application orchestrator |
 
-### 5.3 Malformed JSON vs Schema Validation Exception Handlers:
-FastAPI by default groups JSON parse errors and Pydantic validation errors under `RequestValidationError` (returning HTTP 422). S2 implements a custom exception handler:
+### 5.3 Malformed JSON vs Schema Validation Exception Handlers (Sanitized Output):
+FastAPI by default groups JSON parse errors and Pydantic validation errors under `RequestValidationError` (returning HTTP 422). S2 implements a custom exception handler that sanitizes all error fields:
 ```python
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Check if any error is due to malformed JSON body
+    # 1. Check if error is due to malformed JSON body
     for err in exc.errors():
         if err.get("type") == "json_invalid":
             return JSONResponse(
                 status_code=400,
                 content=TransportErrorResponse(
-                    transport_error_code=TransportErrorCode.MALFORMED_JSON.value,
+                    transport_error_code=TransportErrorCode.MALFORMED_JSON,
                     message_vi="Định dạng JSON trong yêu cầu không hợp lệ.",
                     message_en="Malformed JSON request body.",
-                    details={"error_type": "json_invalid", "loc": err.get("loc")},
+                    details={"error_type": "json_invalid", "loc": list(err.get("loc", []))},
                 ).model_dump(mode="json"),
             )
-    # Standard Pydantic schema validation failures return HTTP 422 with normalized TransportErrorResponse
+
+    # 2. Sanitize validation errors: include ONLY safe fields (type, loc, msg)
+    # Exclude raw request input, ctx, url, exception instances
+    sanitized_errors = [
+        {
+            "type": e.get("type"),
+            "loc": list(e.get("loc", [])),
+            "msg": e.get("msg"),
+        }
+        for e in exc.errors()
+    ]
+
     return JSONResponse(
         status_code=422,
         content=TransportErrorResponse(
-            transport_error_code=TransportErrorCode.REQUEST_VALIDATION_FAILED.value,
+            transport_error_code=TransportErrorCode.REQUEST_VALIDATION_FAILED,
             message_vi="Dữ liệu yêu cầu không khớp với schema định nghĩa.",
             message_en="Request body failed schema validation.",
-            details={"validation_errors": exc.errors()},
+            details={"validation_errors": sanitized_errors},
         ).model_dump(mode="json"),
     )
 ```
@@ -330,7 +366,7 @@ class StreamPayloadLimitMiddleware:
 
     async def _send_413_response(self, send: Send) -> None:
         payload = TransportErrorResponse(
-            transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE.value,
+            transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE,
             message_vi="Kích thước yêu cầu vượt quá giới hạn 64 KiB.",
             message_en="Request payload exceeds 64 KiB limit.",
             details={"limit_bytes": self.MAX_BYTES},
@@ -347,6 +383,9 @@ class StreamPayloadLimitMiddleware:
         })
         await send({"type": "http.response.body", "body": body})
 ```
+
+> [!IMPORTANT]
+> **Exact 65,536-Byte Boundary Semantics:** A valid `application/json` `SolveRequest` payload whose total HTTP body is exactly 65,536 bytes (using benign JSON whitespace padding if necessary) is allowed through the payload limit middleware. Once passed, normal application processing applies (valid DTO $\to$ 200 or mapped status; invalid JSON $\to$ 400; invalid DTO $\to$ 422). Any payload of 65,537 bytes or greater is rejected with `HTTP 413`.
 
 ### 5.5 Content-Type Header Parsing & Media-Type Enforcement:
 For all POST requests under `/api/`, the `Content-Type` header is extracted, stripped of parameters, and checked:
@@ -368,7 +407,7 @@ class MediaTypeEnforcementMiddleware:
             # Accept strictly "application/json" (with optional parameters such as charset)
             if media_type != "application/json":
                 payload = TransportErrorResponse(
-                    transport_error_code=TransportErrorCode.UNSUPPORTED_MEDIA_TYPE.value,
+                    transport_error_code=TransportErrorCode.UNSUPPORTED_MEDIA_TYPE,
                     message_vi="Tiêu đề Content-Type phải là 'application/json'.",
                     message_en="Content-Type header must be 'application/json'.",
                     details={"received_content_type": raw_content_type},
@@ -394,9 +433,17 @@ class MediaTypeEnforcementMiddleware:
 
 ---
 
-## 6. DTO JSON Contract & Exact Serialization Specification
+## 6. DTO JSON Contract & Serialization Specification
 
-The DTO models in `mke_product.application.dto` serve as the Single Source of Truth (SSOT).
+> [!IMPORTANT]
+> **Abridged Structural Examples Notice:** The JSON examples in this section are illustrative structural subsets designed for architectural documentation and do not exhaustively serialize every default or optional model field. The authoritative Single Source of Truth (SSOT) is the Pydantic model definitions in `mke_product.application.dto` and the generated OpenAPI 3.1 schema.
+> 
+> Common fields omitted or defaulted in illustrative examples below include:
+> - `SolutionTrace.is_complete` (defaults to `True`)
+> - `SolutionStep.sub_steps` (defaults to `[]`)
+> - `VerificationCertificate`: `verifier_name`, `verifier_version`, `algebraic_identities_passed`, `residual_checks`, `vieta_relations_checked`, `multiplicity_verified`, `no_real_roots_verified`, `certificate_signature`.
+> 
+> Frontend clients must consume generated TypeScript types from OpenAPI (`api.generated.ts`), not infer schemas from abridged markdown snippets.
 
 ### Contract Formatting Rules:
 - `semantic_revision_hash`: Raw 64-character SHA-256 lowercase hex string (e.g. `"8f4a1c0d2e3b4a5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c"`). **No `sha256_` prefix**.
@@ -437,10 +484,11 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
 }
 ```
 
-### 6.2 Response JSON Payloads
+### 6.2 Response JSON Payloads (Abridged Structural Examples)
 
-#### A. SOLVED Response Example:
+#### A. SOLVED Response Example (for $x^2 - 5x + 6 = 0$):
 ```json
+/* ABRIDGED STRUCTURAL EXAMPLE — illustrative subset; not a complete serialized payload */
 {
   "response_status": "SOLVED",
   "problem": {
@@ -468,7 +516,7 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
   "available_methods": [
     {
       "method_id": "QUAD_FORMULA_STANDARD",
-      "title_vi": "Công thức nghiệm chuẩn (Biệt thức Δ)",
+      "title_vi": "Công thức nghiệm tổng quát",
       "mathematical_applicability": "APPLICABLE",
       "support_status": "SUPPORTED",
       "execution_availability": "AVAILABLE",
@@ -481,18 +529,18 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
     },
     {
       "method_id": "QUAD_FORMULA_REDUCED",
-      "title_vi": "Công thức nghiệm thu gọn (Biệt thức Δ')",
-      "mathematical_applicability": "NOT_APPLICABLE",
+      "title_vi": "Công thức nghiệm thu gọn",
+      "mathematical_applicability": "APPLICABLE",
       "support_status": "SUPPORTED",
       "execution_availability": "AVAILABLE",
-      "pedagogical_recommendation": "NOT_RECOMMENDED",
+      "pedagogical_recommendation": "NEUTRAL",
       "verification_capability": "HOST_VERIFIABLE",
-      "reasons": ["COEFFICIENT_B_NOT_EVEN"],
+      "reasons": [],
       "prerequisites": [],
       "has_trace_available": true,
-      "pedagogical_priority": 2
+      "pedagogical_priority": 4
     }
-    /* ABRIDGED EXAMPLE — full array contains all 9 registered methods */
+    /* Array contains all 9 registered methods in actual execution */
   ],
   "selected_method_id": "QUAD_FORMULA_STANDARD",
   "solution": {
@@ -539,12 +587,13 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
           "step_number": 1,
           "latex_expression": "\\Delta = b^2 - 4ac = (-5)^2 - 4(1)(6) = 1",
           "explanation_vi": "Tính biệt thức Delta",
-          "rule_or_theorem_used": "DEFINITION_DISCRIMINANT",
-          "intermediate_substitutions": {"b": "-5", "a": "1", "c": "6"},
-          "why_this_step_vi": "Xác định số lượng và tính chất nghiệm"
+          "rule_or_theorem_used": "RULE_QUADRATIC_DISCRIMINANT",
+          "why_this_step_vi": "Xác định số lượng và tính chất nghiệm",
+          "sub_steps": []
         }
       ],
-      "final_answer_latex": "S = \\left\\{ 2, 3 \\right\\}"
+      "final_answer_latex": "S = \\left\\{ 2, 3 \\right\\}",
+      "is_complete": true
     },
     "verification_scope": "FINAL_SOLUTION",
     "certificate": {
@@ -560,6 +609,7 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
 
 #### B. ANALYZED_NO_EXECUTION Response Example (Degenerate $a=0$):
 ```json
+/* ABRIDGED STRUCTURAL EXAMPLE — illustrative subset; not a complete serialized payload */
 {
   "response_status": "ANALYZED_NO_EXECUTION",
   "problem": {
@@ -651,16 +701,18 @@ To eliminate manual shadow schema duplication and prevent client-server drift:
 
 ### OpenAPI $\to$ TypeScript Union Strategy:
 - `SolveResponseUnion` is defined in Python as an `Annotated[Union[...], Field(discriminator='response_status')]`.
-- **Preferred Approach:** In frontend TypeScript code, derive the union type directly from the OpenAPI operation response:
+- **Preferred Approach:** In frontend TypeScript code, derive the union type directly from the stable OpenAPI operation response:
   ```typescript
   import type { operations, components } from "./types/api.generated";
 
   export type SolveResponseUnion =
-    operations["solve_equation_endpoint"]["responses"]["200"]["content"]["application/json"];
+    operations["solve_algebra_v1"]["responses"]["200"]["content"]["application/json"];
   export type SolvedResponse = components["schemas"]["SolvedResponse"];
   export type AnalyzedNoExecutionResponse = components["schemas"]["AnalyzedNoExecutionResponse"];
   export type ErrorResponse = components["schemas"]["ErrorResponse"];
   export type TransportErrorResponse = components["schemas"]["TransportErrorResponse"];
+  export type HealthResponse =
+    operations["health_v1"]["responses"]["200"]["content"]["application/json"];
   ```
 - **S2-01 Implementation Option:** If a named component schema is found to simplify tooling, introduce a Pydantic `RootModel[SolveResponseUnion]` transport schema alias whose wire JSON remains bit-for-bit identical.
 
@@ -696,7 +748,7 @@ The workspace state is structured as an immutable, unidirectional state machine 
 import type { operations, components } from "./types/api.generated";
 
 export type SolveResponseUnion =
-  operations["solve_equation_endpoint"]["responses"]["200"]["content"]["application/json"];
+  operations["solve_algebra_v1"]["responses"]["200"]["content"]["application/json"];
 export type SolvedResponse = components["schemas"]["SolvedResponse"];
 export type AnalyzedNoExecutionResponse = components["schemas"]["AnalyzedNoExecutionResponse"];
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
@@ -767,7 +819,7 @@ The method selection UI must present the complete **9-method pedagogical catalog
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │                             CHỌN PHƯƠNG PHÁP GIẢI (9 PHƯƠNG PHÁP)                         │
 ├──────────────────────────────────────────────────────────────────────────────────────────┤
-│ [●] Công thức nghiệm chuẩn (Δ)        [KHẢ DỤNG]   [KHUYÊN DÙNG]  [ĐÃ KIỂM ĐỊNH]          │
+│ [●] Công thức nghiệm tổng quát (Δ)    [KHẢ DỤNG]   [KHUYÊN DÙNG]  [ĐÃ KIỂM ĐỊNH]          │
 │ [○] Công thức nghiệm thu gọn (Δ')     [KHẢ DỤNG]   [KHUYÊN DÙNG]  [ĐÃ KIỂM ĐỊNH]          │
 │ [○] Nhẩm nghiệm Viète (a + b + c = 0) [KHẢ DỤNG]   [ƯU TIÊN 1]    [ĐÃ KIỂM ĐỊNH]          │
 │ [○] Nhẩm nghiệm Viète (a - b + c = 0) [KHẢ DỤNG]   [ƯU TIÊN 1]    [ĐÃ KIỂM ĐỊNH]          │
@@ -797,7 +849,7 @@ The method selection UI must present the complete **9-method pedagogical catalog
 - **Stable Knowledge Anchors:** Remedial tips, knowledge cards, and prerequisite links must bind strictly to stable domain identifiers:
   - `method_id` (e.g. `QUAD_FORMULA_STANDARD`)
   - `PrerequisiteStatus.prerequisite_id` (e.g. `PREREQ_RADICALS`, `PREREQ_VIETE_SUM`)
-  - `SolutionStep.rule_or_theorem_used` (e.g. `DEFINITION_DISCRIMINANT`, `THEOREM_QUADRATIC_FORMULA`)
+  - `SolutionStep.rule_or_theorem_used` (e.g. `RULE_QUADRATIC_DISCRIMINANT`, `RULE_QUADRATIC_FORMULA`)
 - **Presentation Strings:** `step.explanation_vi` and `why_this_step_vi` are human-readable presentation text only and must never be used as foreign key anchors.
 
 ---
@@ -850,8 +902,12 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 - `test_api_method_switch_reactivity`: Method switch preserves `semantic_revision_hash` and updates trace.
 - `test_api_degenerate_solution_linear`: Linear equation returns HTTP 200 with `DEGENERATE_EXACT_SOLUTION`.
 - `test_api_syntax_error_returns_http_200_error_response`: Category A client errors return HTTP 200 `ErrorResponse` with span.
+- `test_api_all_category_a_errors_return_http_200`: All Category A codes return HTTP 200 with exact `ErrorResponse` body.
+- `test_api_all_category_b_errors_return_http_500`: All Category B internal codes (`NORMALIZATION_ERROR`, `DOMAIN_CONTRACT_ERROR`, `METHOD_EXECUTION_FAILED`, `VERIFICATION_FAILED`, `INTERNAL_ERROR`) return HTTP 500 with exact `ErrorResponse` body.
 - `test_api_invalid_json_returns_http_400_custom_handler`: Malformed JSON returns HTTP 400 with `TransportErrorResponse(MALFORMED_JSON)`.
-- `test_api_pydantic_validation_failure_returns_http_422`: Schema violations return HTTP 422 with `TransportErrorResponse(REQUEST_VALIDATION_FAILED)`.
+- `test_api_pydantic_validation_failure_returns_http_422`: Schema violations return HTTP 422 with sanitized `TransportErrorResponse(REQUEST_VALIDATION_FAILED)`.
+- `test_api_validation_error_sanitization_no_input_leak`: Input sentinels and raw contexts are not leaked in 422 `details`.
+- `test_transport_error_model_extra_forbid`: `TransportErrorResponse` rejects unknown `transport_error_code` or extra fields.
 - `test_api_unsupported_media_type_text_plain_returns_http_415`: `text/plain` returns HTTP 415 `TransportErrorResponse(UNSUPPORTED_MEDIA_TYPE)`.
 - `test_api_unsupported_media_type_invalid_suffix_returns_http_415`: `application/json-not-really` returns HTTP 415.
 - `test_api_supported_media_type_application_json_accepted`: `application/json` returns HTTP 200.
@@ -859,11 +915,11 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 - `test_api_stream_limit_header_rejection_returns_http_413`: Declared `Content-Length: 65537` returns HTTP 413 `TransportErrorResponse(PAYLOAD_TOO_LARGE)`.
 - `test_api_stream_limit_streamed_chunks_returns_http_413`: Streamed chunks > 64 KiB without `Content-Length` return HTTP 413.
 - `test_api_stream_limit_deceptive_header_returns_http_413`: Declared `Content-Length: 10` but stream sending > 64 KiB returns HTTP 413.
-- `test_api_stream_limit_exact_65536_boundary_accepted`: Exactly 65,536 bytes payload accepted.
-- `test_api_internal_execution_failure_returns_http_500_application_error`: Category B internal failures return sanitized HTTP 500 `ErrorResponse`.
+- `test_api_stream_limit_exact_65536_boundary_accepted`: Exactly 65,536 bytes valid JSON payload passes middleware successfully.
 - `test_api_internal_transport_failure_returns_http_500_transport_error`: Transport-level failures return HTTP 500 `TransportErrorResponse`.
 - `test_api_nonexistent_api_route_returns_json_404_no_spa_fallback`: `/api/*` routes return JSON 404 and never SPA `index.html`.
 - `test_api_health_endpoint_derived_dynamically`: `GET /api/v1/health` verifies counts match `len(MethodRegistry().list_all())` and `len(TRACE_GENERATORS)` dynamically via monkeypatching.
+- `test_openapi_operation_ids_stable`: OpenAPI export contains `operationId="solve_algebra_v1"` and `operationId="health_v1"`.
 - `test_openapi_schema_drift_check`: Generated TypeScript types match FastAPI `/openapi.json` without drift.
 
 ### 14.2 Live Workspace Browser Tests (`tests/test_browser_live_workspace_s2.py`):
@@ -887,6 +943,7 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 │        - Implement src/mke_product/transport/app.py & routers/algebra.py               │
 │        - Implement pure ASGI streaming 64 KiB limit & media type enforcement           │
 │        - Implement TransportErrorResponse & custom 400/413/415/422/500 handlers        │
+│        - Implement Category-B HTTP 500 status adapter in solve endpoint                │
 │        - Connect /api/v1/algebra/solve directly to solve_request()                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ S2-02: Transport Acceptance & Direct-vs-HTTP Parity Verification Suite                 │
@@ -947,4 +1004,4 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 
 This preflight specification resolves all transport, error handling, state management, schema generation, and UI migration requirements for MKE MVP V1 Stage S2.
 
-**Milestone Status:** **`PENDING INDEPENDENT S2-P0-R2 FINAL AUDIT`**
+**Milestone Status:** **`PENDING INDEPENDENT S2-P0-R3 FINAL AUDIT`**
