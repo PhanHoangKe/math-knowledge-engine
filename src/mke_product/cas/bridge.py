@@ -189,12 +189,12 @@ class QuadraticSurdControlledDispatchResult(ControlledDispatchResult):
 
     verified_surd_roots: List[QuadraticSurdRoot] = Field(..., description="Exact quadratic surd roots pair [r_minus, r_plus]")
     discriminant: RationalRoot = Field(..., description="Exact rational discriminant")
-    radicand: int = Field(..., description="Certified squarefree radicand d")
+    radicand: int = Field(..., strict=True, description="Certified squarefree radicand d")
     representation: Literal["QUADRATIC_SURD"] = Field(default="QUADRATIC_SURD", description="Representation tag")
 
     @model_validator(mode="after")
     def _validate_surd_result_contract(self) -> QuadraticSurdControlledDispatchResult:
-        if type(self.radicand) is not int:
+        if type(self.radicand) is not int or type(self.radicand) is bool:
             raise ValueError("QuadraticSurdControlledDispatchResult radicand must be a strict integer.")
         if not (2 <= self.radicand < (1 << 32)):
             raise ValueError("QuadraticSurdControlledDispatchResult radicand must satisfy 2 <= radicand < 2^32.")

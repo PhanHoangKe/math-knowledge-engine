@@ -476,20 +476,37 @@ class TestNormalizationBoundaryAndResourceLimits:
     def test_host_normalization_512_bit_working_product_boundary(self):
         # Discriminant numerator p and denominator q are each bounded by 256 bits
         # Product M = p * q can be up to 512 bits
-        p_256 = 1 << 255  # 256 bits: 2^255 = (2^127)^2 * 2
-        s, d = _host_normalize_discriminant_squarefree(Rational(p_256, 1))
-        assert s == Rational(1 << 127)
-        assert d == 2
+        p = (1 << 256) - 1
+        q = (1 << 256) - 3
+
+        assert p.bit_length() == 256
+        assert q.bit_length() == 256
+        assert math.gcd(p, q) == 1
+        assert (p * q).bit_length() == 512
+
+        delta = Rational(p, q)
+
+        # Valid 256-bit/256-bit input is NOT rejected by M.bit_length() > 512 guard
+        # Fails closed because remaining uncertified radicand remainder exceeds 32-bit certification bound
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as excinfo:
+            _host_normalize_discriminant_squarefree(delta)
+
+        err_msg = str(excinfo.value)
+        assert "exceeds 32-bit certification bound" in err_msg
+        assert "exceeds 512 bits" not in err_msg
+        assert "256 bits" not in err_msg
 
         # 257-bit numerator rejected
         p_257 = 1 << 256
-        with pytest.raises(HostQuadraticSurdResourceLimitError):
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as exc_p:
             _host_normalize_discriminant_squarefree(Rational(p_257, 1))
+        assert "exceeded 256 bits" in str(exc_p.value)
 
         # 257-bit denominator rejected
         q_257 = 1 << 256
-        with pytest.raises(HostQuadraticSurdResourceLimitError):
+        with pytest.raises(HostQuadraticSurdResourceLimitError) as exc_q:
             _host_normalize_discriminant_squarefree(Rational(1, q_257))
+        assert "exceeded 256 bits" in str(exc_q.value)
 
     def test_near_boundary_32_bit_remainder_certification(self):
         # Certified near-boundary squarefree prime R = 4294967291 < 2^32 (2^32 = 4294967296)
@@ -765,6 +782,102 @@ class TestPublicSurdModelsStrictContract:
                 for item in obj:
                     check_no_floats(item)
         check_no_floats(parsed)
+
+    def test_quadratic_surd_dispatch_result_rejects_coercible_and_invalid_radicand(self):
+        diag = PublicValidationDiagnostic(
+            is_valid=True,
+            is_cas_ready=True,
+            status="VALID",
+            target_operation="SOLVE_QUADRATIC_SURD",
+            issues=[],
+            uncertainties=[],
+        )
+        r_minus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=-1, denominator=1),
+            radicand=2,
+        )
+        r_plus = QuadraticSurdRoot(
+            rational_part=SurdRationalComponent(numerator=0, denominator=1),
+            sqrt_coefficient=SurdRationalComponent(numerator=1, denominator=1),
+            radicand=2,
+        )
+
+        # Valid integer radicand
+        res = QuadraticSurdControlledDispatchResult(
+            intake_status=IntakeStatus.VALIDATED,
+            intake_diagnostic=diag,
+            execution_status=ExecutionStatus.SUCCESS,
+            verification_status=VerificationStatus.VERIFIED_COMPLETE,
+            is_verified=True,
+            solution_type="TWO_DISTINCT_REAL_ROOTS",
+            verified_surd_roots=[r_minus, r_plus],
+            discriminant=RationalRoot(numerator=8, denominator=1),
+            radicand=2,
+            completeness_proven=True,
+        )
+        assert res.radicand == 2
+
+        # Rejects string coercible radicand "2"
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                solution_type="TWO_DISTINCT_REAL_ROOTS",
+                verified_surd_roots=[r_minus, r_plus],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand="2",
+                completeness_proven=True,
+            )
+
+        # Rejects float coercible radicand 2.0
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                solution_type="TWO_DISTINCT_REAL_ROOTS",
+                verified_surd_roots=[r_minus, r_plus],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=2.0,
+                completeness_proven=True,
+            )
+
+        # Rejects boolean radicand True
+        with pytest.raises(ValidationError):
+            QuadraticSurdControlledDispatchResult(
+                intake_status=IntakeStatus.VALIDATED,
+                intake_diagnostic=diag,
+                execution_status=ExecutionStatus.SUCCESS,
+                verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                is_verified=True,
+                solution_type="TWO_DISTINCT_REAL_ROOTS",
+                verified_surd_roots=[r_minus, r_plus],
+                discriminant=RationalRoot(numerator=8, denominator=1),
+                radicand=True,
+                completeness_proven=True,
+            )
+
+        # Rejects non-squarefree or out-of-bounds integer radicands
+        for inv_rad in [0, 1, 1 << 32, -2]:
+            with pytest.raises(ValidationError):
+                QuadraticSurdControlledDispatchResult(
+                    intake_status=IntakeStatus.VALIDATED,
+                    intake_diagnostic=diag,
+                    execution_status=ExecutionStatus.SUCCESS,
+                    verification_status=VerificationStatus.VERIFIED_COMPLETE,
+                    is_verified=True,
+                    solution_type="TWO_DISTINCT_REAL_ROOTS",
+                    verified_surd_roots=[r_minus, r_plus],
+                    discriminant=RationalRoot(numerator=8, denominator=1),
+                    radicand=inv_rad,
+                    completeness_proven=True,
+                )
 
 
 # ============================================================================
