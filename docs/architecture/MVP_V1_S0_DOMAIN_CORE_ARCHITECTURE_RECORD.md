@@ -1,24 +1,24 @@
 # MKE MVP V1 — S0 Domain Core Architecture & Implementation Record
 
 - **Document Identifier:** `docs/architecture/MVP_V1_S0_DOMAIN_CORE_ARCHITECTURE_RECORD.md`
-- **Milestone:** MVP-V1-S0-R1 (Targeted Remediation & Domain Core Verification)
-- **Document Version:** 1.1.0
+- **Milestone:** MVP-V1-S0-R2 (Contract Hardening & Domain Core Closeout)
+- **Document Version:** 1.2.0
 - **Author:** Antigravity (Implementation Engineer)
 - **Coordinator / Independent Auditor:** ChatGPT
 - **Project Owner:** Kế Phan Hoàng
 - **Repository:** `PhanHoangKe/math-knowledge-engine`
-- **Branch:** `product/mvp-v1-s0-r1-remediation`
-- **Parent SHA:** `5282d0d6c8d5720b8ea2a7c16d6332e28149f8eb`
-- **Predecessor Baseline:** Accepted MVP Preflight Remediation (`66c2c45fef74bb665de3437bb500d9d4a5df40f2`)
+- **Branch:** `product/mvp-v1-s0-r2-contract-hardening`
+- **Parent SHA:** `ac5e749beced8ce07cfefd4cf5974cf558ee4f86`
+- **Predecessor Baseline:** S0-R1 Remediation (`ac5e749beced8ce07cfefd4cf5974cf558ee4f86`)
 - **Parked B3 Baseline:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61` (`product/p03c-p1c-04-b3-exact-complex-preflight`)
-- **Status:** `PENDING INDEPENDENT S0-R1 AUDIT`
+- **Status:** `PENDING INDEPENDENT S0-R2 AUDIT`
 - **Date:** 2026-10-01
 
 ---
 
 ## 1. Executive Summary
 
-Milestone `MVP-V1-S0-R1` establishes the typed, deterministic, pure-Python domain core for the Math Knowledge Engine (MKE) MVP V1. It remediates S0 audit findings, guarantees zero unneeded coupling to historical subsystems, enforces explicit package dependency declarations (`pydantic>=2.6.0,<3.0.0`), documents the strict mathematical vs pedagogical semantics of the reduced quadratic formula, accurately terms unkeyed SHA-256 integrity fingerprints, and certifies exhaustive test coverage across acceptance, degenerate, and adversarial fixtures.
+Milestone `MVP-V1-S0-R2` finalizes the contract hardening and semantic verification of the Math Knowledge Engine (MKE) MVP V1 executable domain core. It hardens Pydantic model boundaries against self-contradictory states, canonicalizes exact rational value objects, cleanses the reduced quadratic formula from false prerequisites, aligns method registry execution availability with S0 milestone implementation reality, replaces unverified curriculum claims with neutral metadata, clarifies certificate integrity fingerprinting, and enforces deterministic assumption sorting in semantic problem identity hashing.
 
 ---
 
@@ -29,24 +29,35 @@ The domain core is implemented under `src/mke_product/domain/`:
 ```
 src/mke_product/domain/
 ├── __init__.py         # Clean public exports for domain contracts and engines
-├── models.py           # Pydantic v2 strict models (ProblemIR, QuadraticProblemIR, GeometryProblemIR, MethodAssessment)
+├── models.py           # Pydantic v2 strict models with semantic mathematical invariant validators
 ├── exact.py            # Exact rational and real quadratic surd arithmetic & decomposition
-├── registry.py         # MethodRegistry & orthogonal assessment evaluator
+├── registry.py         # MethodRegistry & truthful orthogonal capability evaluator
 ├── verifier.py         # HostIndependentVerifier & VerificationCertificate generator
 ├── dag.py              # Reactive DependencyGraph with cycle rejection and invalidation
-├── identity.py         # Semantic problem identity & computation cache identity hashing
+├── identity.py         # Deterministic semantic problem & computation cache identity hashing
 └── schema.py           # Deterministic JSON Schema exporter
 ```
 
 ---
 
-## 3. Core Architectural Contracts
+## 3. Core Architectural Contracts & Semantic Invariants
 
-### 3.1 Python Single Source of Truth (SSOT)
+### 3.1 Python Single Source of Truth (SSOT) & Model Invariant Enforcement
 - All domain entities are defined in `src/mke_product/domain/models.py` using **Pydantic v2** (`BaseModel`, `ConfigDict(extra="forbid", strict=True, frozen=True)`).
-- Unknown or extra fields raise `ValidationError` to prevent silent distortion of mathematical semantics.
-- Export pipeline: Pydantic v2 SSOT $\longrightarrow$ `export_mvp_v1_json_schema()` $\longrightarrow$ JSON Schema Draft 2020-12 $\longrightarrow$ future TypeScript client bindings.
-- Explicit package dependencies are pinned in `requirements.txt` (`pydantic>=2.6.0,<3.0.0`, `pytest>=7.0.0`, `sympy>=1.12`, `mpmath>=1.3.0`).
+- **`RationalFraction` Invariants:**
+  - Enforces deterministic canonicalization: `denominator > 0`, `gcd(abs(numerator), denominator) == 1`.
+  - Zero is canonicalized strictly to `0/1` (preventing dual representations like `0/7` vs `0/1` or `2/4` vs `1/2`).
+  - Denominator zero is rejected with `ValidationError`.
+- **`QuadraticProblemIR` Invariants:**
+  - `a.numerator != 0` strictly enforced (leading coefficient cannot be zero).
+  - `category == ProblemCategory.ALGEBRA_QUADRATIC` and `classification == EquationClassificationType.QUADRATIC`.
+  - `coefficient_domain == "Q"` and `solution_domain == "R"` strictly required.
+  - Caller cannot inject or forge inconsistent discriminant values: `discriminant` is validated against exact $b^2 - 4ac$ computation.
+- **`DegenerateEquationIR` Invariants:**
+  - `a.numerator == 0` strictly enforced.
+  - For $b \neq 0$: classification must be `LINEAR` with `linear_root == -c/b`.
+  - For $b = 0, c = 0$: classification must be `IDENTITY` with `linear_root is None`.
+  - For $b = 0, c \neq 0$: classification must be `CONTRADICTION` with `linear_root is None`.
 
 ### 3.2 Exact Arithmetic Boundary
 - **Zero Floating Point Authority:** Float arithmetic is strictly prohibited as a mathematical authority for exact algebra.
@@ -55,13 +66,7 @@ src/mke_product/domain/
 - **Squarefree Kernel Extraction:** For $\Delta = p/q > 0$, decomposes $p \cdot q = k^2 \cdot d$ with squarefree $d \ge 1$ and rational factor $s = k/q \in \mathbb{Q}$, yielding $\sqrt{\Delta} = s\sqrt{d}$ in closed form.
 - **Negative Discriminant ($\Delta < 0$):** Produces mathematically valid `NO_REAL_ROOTS` ($S = \emptyset$) in $\mathbb{R}$ without invoking complex solver (B3).
 
-### 3.3 Equation Classification & Routing
-- `a != 0` $\longrightarrow$ `QUADRATIC`
-- `a == 0, b != 0` $\longrightarrow$ `LINEAR` (exact root $-c/b$)
-- `a == 0, b == 0, c == 0` $\longrightarrow$ `IDENTITY` (infinitely many real solutions)
-- `a == 0, b == 0, c != 0` $\longrightarrow$ `CONTRADICTION` (no solution)
-
-### 3.4 Orthogonal Method Assessment Model
+### 3.3 Truthful Orthogonal Method Assessment Model
 Method evaluation is decoupled across 5 independent dimensions:
 1. `mathematical_applicability`: `APPLICABLE`, `NOT_APPLICABLE`, `UNKNOWN`
 2. `support_status`: `SUPPORTED`, `UNSUPPORTED`
@@ -69,39 +74,33 @@ Method evaluation is decoupled across 5 independent dimensions:
 4. `pedagogical_recommendation`: `RECOMMENDED`, `NEUTRAL`, `DISCOURAGED`
 5. `verification_capability`: `HOST_VERIFIABLE`, `UNVERIFIED`, `NOT_APPLICABLE`
 
-#### Reduced Quadratic Formula Mathematical vs Pedagogical Semantics:
-For `QUAD_FORMULA_REDUCED` ($x = \frac{-b' \pm \sqrt{\Delta'}}{a}$ where $b' = b/2, \Delta' = b'^2 - ac$):
-- **Mathematical Applicability:** `APPLICABLE` for **all** quadratic equations ($a \neq 0$), including odd integer $b$ (where $b' \in \mathbb{Q} \setminus \mathbb{Z}$) and fractional $b$. The formula is mathematically sound over any field $\mathbb{F}$ of characteristic $\neq 2$.
-- **Pedagogical Recommendation:**
-  - `RECOMMENDED` if $b$ is an even integer ($b \in \mathbb{Z} \land b \equiv 0 \pmod 2$), saving algebraic computation.
-  - `NEUTRAL` if $b$ is odd or non-integer rational, as standard formula avoids half-fraction arithmetic.
+#### Key Invariant: Coexistence of `APPLICABLE` and `UNAVAILABLE`
+In S0 (domain core), mathematical applicability is assessed accurately regardless of whether a full execution trace engine is implemented in the current milestone:
+- Methods with executable algebraic solvers in S0 (`QUAD_FORMULA_STANDARD`, `QUAD_FORMULA_REDUCED`, `QUAD_VIETE_SPECIAL_SUM`, `QUAD_VIETE_SPECIAL_DIF`) report `execution_availability = AVAILABLE`.
+- Methods whose full step-by-step trace engines are deferred to future milestones (`QUAD_FACTORIZATION_Q`, `QUAD_FACTORIZATION_R`, `QUAD_COMPLETE_SQUARE`, `QUAD_VIETE_SUM_PRODUCT`, `QUAD_GRAPHICAL_ANALYSIS`) report `support_status = SUPPORTED` (metadata & assessment supported) but `execution_availability = UNAVAILABLE`.
 
-### 3.5 Registered MVP Quadratic Methods
-1. `QUAD_FORMULA_STANDARD` (Công thức nghiệm tổng quát)
-2. `QUAD_FORMULA_REDUCED` (Công thức nghiệm thu gọn)
-3. `QUAD_FACTORIZATION_Q` (Phân tích nhân tử trên $\mathbb{Q}$)
-4. `QUAD_FACTORIZATION_R` (Phân tích nhân tử trên $\mathbb{R}$)
-5. `QUAD_COMPLETE_SQUARE` (Biến đổi tách bình phương)
-6. `QUAD_VIETE_SPECIAL_SUM` (Nhẩm nghiệm $a + b + c = 0$)
-7. `QUAD_VIETE_SPECIAL_DIF` (Nhẩm nghiệm $a - b + c = 0$)
-8. `QUAD_VIETE_SUM_PRODUCT` (Tìm hai số theo Tổng và Tích)
-9. `QUAD_GRAPHICAL_ANALYSIS` (Khảo sát đồ thị Parabol — `verification_capability = NOT_APPLICABLE`)
+#### Reduced Quadratic Formula Prerequisite Correction:
+- For `QUAD_FORMULA_REDUCED` ($x = \frac{-b' \pm \sqrt{\Delta'}}{a}$ where $b' = b/2, \Delta' = b'^2 - ac$):
+  - **Mathematical Applicability:** Always `APPLICABLE` for all $a \neq 0$ (including odd integer $b$ and fractional $b$).
+  - **Prerequisites:** Contains only `PREREQ_RADICALS`. False prerequisite `PREREQ_EVEN_COEFF` is removed.
+  - **Pedagogical Recommendation:** `RECOMMENDED` if $b$ is an even integer ($b \in \mathbb{Z} \land b \equiv 0 \pmod 2$), else `NEUTRAL`.
 
-### 3.6 Host Independent Verifier Gateway
+### 3.4 Neutral Curriculum Metadata
+All registered methods in `MethodRegistry` use the neutral curriculum reference tag:
+`curriculum_level = "VIETNAM_SECONDARY_TO_BE_VERIFIED"`
+preventing unverified grade/semester claims in the executable domain core prior to authoritative MoET mapping.
+
+### 3.5 Host Independent Verifier & Integrity Fingerprint
 - **Zero CAS/AI Authority:** Verification is performed independently on the host by checking:
   - Exact polynomial residuals ($f(r) == 0$).
   - Exact surd polynomial residuals in $\mathbb{Q}(\sqrt{d})$ ($P_{\text{const}} == 0 \land P_{\text{surd}} == 0$).
   - Viète relations ($r_1 + r_2 == -b/a \land r_1 r_2 == c/a$).
   - Derivative multiplicity ($f'(r) == 0$ when $\Delta == 0$).
   - Canonical sign stability identity ($4a(ax^2+bx+c) = (2ax+b)^2 - \Delta > 0$ when $\Delta < 0$).
-- Issues tamper-evident `VerificationCertificate` with unkeyed SHA-256 `integrity_fingerprint` (reproducible digest computed over canonical certificate payload).
+- Issues tamper-evident `VerificationCertificate` with unkeyed SHA-256 `integrity_fingerprint` (reproducible digest computed over canonical certificate payload; content identifier, not a digital signature).
 
-### 3.7 Dependency DAG & Invalidation
-- Directed Acyclic Graph (`DependencyGraph`) with cycle rejection (`CycleDetectedError`).
-- Invalidation cascade: invalidating any node (e.g. `coefficients`) invalidates all transitive downstream nodes in topological order while leaving independent branches unaffected.
-
-### 3.8 Deterministic Identity Hashing
-- **Semantic Problem Identity:** Unkeyed SHA-256 over canonical mathematical truth inputs (excludes theme, mode, viewport, timestamps).
+### 3.6 Deterministic Identity Hashing
+- **Semantic Problem Identity:** Unkeyed SHA-256 over canonical mathematical truth inputs. Assumptions are deterministically sorted by `(symbol, domain)`, ensuring list order invariance while remaining sensitive to truth-affecting changes.
 - **Engine Config Identity:** Unkeyed SHA-256 over engine, registry, and verifier versions.
 - **Computation Cache Identity:** Composite key (`cache:<semantic_id>:<engine_id>`).
 
@@ -140,7 +139,7 @@ Total external runtime domain imports: `pydantic` and `mke_product.core.rational
 
 - No web application scaffold, Next.js, React UI, or JSXGraph.
 - No FastAPI REST endpoints.
-- No SymPy / CAS worker integration.
+- No SymPy / CAS worker integration in S0 domain core.
 - No OCR, image parsing, or LLM paraphrasing.
 - No geometry prover implementation.
 - No complex quadratic roots (B3).

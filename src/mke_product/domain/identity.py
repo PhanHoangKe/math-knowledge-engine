@@ -40,7 +40,7 @@ def compute_semantic_quadratic_identity(
                 "symbol": asm.symbol,
                 "domain": asm.domain,
             })
-        assump_payload.sort(key=lambda x: x["symbol"])
+        assump_payload.sort(key=lambda x: (x["symbol"], x["domain"]))
 
     payload: Dict[str, Any] = {
         "schema_version": schema_version,

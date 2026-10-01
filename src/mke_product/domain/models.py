@@ -11,7 +11,7 @@ import math
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mke_product.core.rational import Rational
 
@@ -137,6 +137,45 @@ class RationalFraction(BaseModel):
     numerator: int = Field(..., description="Canonical integer numerator")
     denominator: int = Field(default=1, gt=0, description="Canonical integer denominator > 0")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_rational_input(cls, data: Any) -> Any:
+        """Deterministic canonicalization before model construction."""
+        if isinstance(data, dict):
+            num = data.get("numerator")
+            den = data.get("denominator", 1)
+            if num is not None and den is not None:
+                if isinstance(num, bool) or isinstance(den, bool) or not isinstance(num, int) or not isinstance(den, int):
+                    return data
+                if den == 0:
+                    raise ValueError("Denominator cannot be zero in RationalFraction")
+                if den < 0:
+                    num = -num
+                    den = -den
+                if num == 0:
+                    den = 1
+                else:
+                    g = math.gcd(abs(num), den)
+                    num //= g
+                    den //= g
+                data = dict(data)
+                data["numerator"] = num
+                data["denominator"] = den
+        return data
+
+    @model_validator(mode="after")
+    def _validate_canonical_form(self) -> RationalFraction:
+        """Enforce canonical mathematical invariant: denominator > 0, coprime, 0/1."""
+        if self.denominator <= 0:
+            raise ValueError(f"Canonical denominator must be > 0, got {self.denominator}")
+        if self.numerator == 0 and self.denominator != 1:
+            raise ValueError(f"Canonical zero fraction must have denominator 1, got {self.denominator}")
+        if self.numerator != 0:
+            g = math.gcd(abs(self.numerator), self.denominator)
+            if g != 1:
+                raise ValueError(f"RationalFraction must be coprime, got gcd({self.numerator}, {self.denominator}) = {g}")
+        return self
+
     @classmethod
     def from_rational(cls, r: Rational) -> RationalFraction:
         """Create from a core Rational instance."""
@@ -245,6 +284,41 @@ class QuadraticProblemIR(ProblemIR):
         description="Always QUADRATIC for valid QuadraticProblemIR instances"
     )
 
+    @model_validator(mode="after")
+    def _validate_quadratic_invariants(self) -> QuadraticProblemIR:
+        """Enforce semantic mathematical invariants for QuadraticProblemIR."""
+        if self.a.numerator == 0:
+            raise ValueError("Leading coefficient 'a' cannot be zero in QuadraticProblemIR (a != 0 is required).")
+        if self.category != ProblemCategory.ALGEBRA_QUADRATIC:
+            raise ValueError(f"Category for QuadraticProblemIR must be ALGEBRA_QUADRATIC, got '{self.category}'.")
+        if self.classification != EquationClassificationType.QUADRATIC:
+            raise ValueError(f"Classification for QuadraticProblemIR must be QUADRATIC, got '{self.classification}'.")
+        if self.coefficient_domain != "Q":
+            raise ValueError(f"Coefficient domain for QuadraticProblemIR must be 'Q', got '{self.coefficient_domain}'.")
+        if self.solution_domain != "R":
+            raise ValueError(f"Solution domain for QuadraticProblemIR must be 'R', got '{self.solution_domain}'.")
+
+        # Verify exact discriminant consistency with b^2 - 4ac
+        from mke_product.domain.exact import compute_quadratic_discriminant
+        expected_disc = compute_quadratic_discriminant(
+            self.a.to_rational(), self.b.to_rational(), self.c.to_rational()
+        )
+        if self.discriminant.value.to_rational() != expected_disc.value.to_rational():
+            raise ValueError(
+                f"Forged or inconsistent discriminant value: provided {self.discriminant.value}, "
+                f"computed exact b^2 - 4ac = {expected_disc.value}"
+            )
+        if (
+            self.discriminant.is_positive != expected_disc.is_positive
+            or self.discriminant.is_zero != expected_disc.is_zero
+            or self.discriminant.is_negative != expected_disc.is_negative
+            or self.discriminant.is_rational_square != expected_disc.is_rational_square
+            or self.discriminant.squarefree_kernel != expected_disc.squarefree_kernel
+            or self.discriminant.extracted_factor != expected_disc.extracted_factor
+        ):
+            raise ValueError("Forged or inconsistent discriminant squarefree properties with exact b^2 - 4ac computation.")
+        return self
+
 
 class DegenerateEquationIR(ProblemIR):
     """Representation of degenerate equations with a == 0."""
@@ -258,6 +332,47 @@ class DegenerateEquationIR(ProblemIR):
     linear_root: Optional[RationalFraction] = Field(
         None, description="Exact rational root -c/b when classification is LINEAR"
     )
+
+    @model_validator(mode="after")
+    def _validate_degenerate_invariants(self) -> DegenerateEquationIR:
+        """Enforce semantic mathematical invariants for DegenerateEquationIR."""
+        if self.a.numerator != 0:
+            raise ValueError(f"Leading coefficient 'a' must be 0 in DegenerateEquationIR, got {self.a}.")
+        b_rat = self.b.to_rational()
+        c_rat = self.c.to_rational()
+
+        if not b_rat.is_zero:
+            # Linear equation: bx + c = 0 with b != 0 -> root = -c/b
+            if self.classification != EquationClassificationType.LINEAR:
+                raise ValueError(
+                    f"Degenerate equation with b != 0 must have classification LINEAR, got '{self.classification}'."
+                )
+            expected_root = RationalFraction.from_rational(-c_rat / b_rat)
+            if self.linear_root is None or self.linear_root.to_rational() != expected_root.to_rational():
+                raise ValueError(
+                    f"Linear equation root must equal -c/b = {expected_root}, got {self.linear_root}."
+                )
+        elif c_rat.is_zero:
+            # Identity equation: 0x + 0 = 0 -> infinitely many solutions
+            if self.classification != EquationClassificationType.IDENTITY:
+                raise ValueError(
+                    f"Degenerate equation with b == 0 and c == 0 must have classification IDENTITY, got '{self.classification}'."
+                )
+            if self.linear_root is not None:
+                raise ValueError(
+                    f"Identity equation (0 = 0) cannot have a discrete linear root, got {self.linear_root}."
+                )
+        else:
+            # Contradiction equation: 0x + c = 0 with c != 0 -> no solution
+            if self.classification != EquationClassificationType.CONTRADICTION:
+                raise ValueError(
+                    f"Degenerate equation with b == 0 and c != 0 must have classification CONTRADICTION, got '{self.classification}'."
+                )
+            if self.linear_root is not None:
+                raise ValueError(
+                    f"Contradiction equation (0 = {c_rat}) cannot have a linear root, got {self.linear_root}."
+                )
+        return self
 
 
 # ============================================================================
@@ -281,7 +396,10 @@ class MethodDefinition(BaseModel):
     problem_family: ProblemCategory
     title_vi: str = Field(..., description="Vietnamese pedagogical title")
     description_vi: str
-    curriculum_level: str = Field(..., description="GDPT 2018 grade reference e.g. 'Toán 9'")
+    curriculum_level: str = Field(
+        default="VIETNAM_SECONDARY_TO_BE_VERIFIED",
+        description="Curriculum reference tag (to be verified against authoritative MoET curriculum mapping)"
+    )
     relative_complexity: int = Field(default=1, ge=1, le=5, description="1=Direct, 5=Advanced")
     prerequisite_ids: List[str] = Field(default_factory=list)
     verification_capability: VerificationCapability = Field(default=VerificationCapability.HOST_VERIFIABLE)
@@ -401,8 +519,14 @@ class VerificationCertificate(BaseModel):
     vieta_relations_checked: bool = False
     multiplicity_verified: bool = False
     no_real_roots_verified: bool = False
-    integrity_fingerprint: str = Field(..., description="Deterministic SHA-256 integrity fingerprint (unkeyed digest) of verified claims")
-    certificate_signature: str = Field(..., description="Deterministic SHA-256 integrity fingerprint of verified claims")
+    integrity_fingerprint: str = Field(
+        ...,
+        description="Deterministic unkeyed SHA-256 digest of canonical certificate verification payload (content identifier, not a digital signature)"
+    )
+    certificate_signature: Optional[str] = Field(
+        default=None,
+        description="Deprecated alias for integrity_fingerprint. Note: this is an unkeyed SHA-256 digest, NOT a cryptographic signature."
+    )
 
 
 # ============================================================================

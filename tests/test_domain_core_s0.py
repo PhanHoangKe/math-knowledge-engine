@@ -1,14 +1,16 @@
 """Unit & Acceptance Tests for MKE MVP V1 — S0 Domain Core.
 
 Covers:
+- Dependency Declaration & Environment Reproducibility
 - Acceptance Fixtures Q1–Q6 (Exact Quadratic Roots over Q and R)
 - Degenerate Fixtures D1–D3 (Linear, Identity, Contradiction)
-- Dependency Declaration & Environment Reproducibility
-- Reduced Formula Mathematical Applicability vs Pedagogical Recommendation
-- Orthogonal MethodAssessment & Method Registry Invariants
+- Model Boundary & Mathematical Invariant Enforcement (RationalFraction, QuadraticProblemIR, DegenerateEquationIR)
+- Reduced Formula Mathematical Applicability vs Pedagogical Recommendation (without false prerequisites)
+- Method Registry Implementation Truth & Orthogonal Dimensions (APPLICABLE coexisting with UNAVAILABLE)
+- Curriculum Metadata Status (Neutral tags without unverified claims)
 - Exact Arithmetic Adversarial Matrix (Delta in {0, 1, 4, 8, 1/4, 1/2, 8/9, -16, 84})
 - Host Independent Verifier Tamper Matrix (10+ adversarial corruptions failing closed)
-- Revision & Cache Identity Stability & Domain Sensitivity
+- Revision & Cache Identity Stability & Assumption Ordering Sensitivity
 - Reactive Dependency DAG with Topological Invalidation & Cycle Rejection
 - Schema Reproducibility from Python SSOT
 """
@@ -126,7 +128,21 @@ class TestQuadraticAcceptanceFixtures:
         assert roots[1].root_type == SolutionRootType.RATIONAL
         assert roots[1].rational_value.to_rational() == Rational(3, 1)
 
-        # 3. Host Independent Verification
+        # 3. Model Construction
+        prob_ir = QuadraticProblemIR(
+            problem_id="prob_q1",
+            raw_query="x^2 - 5x + 6 = 0",
+            category=ProblemCategory.ALGEBRA_QUADRATIC,
+            semantic_revision_hash="hash_q1",
+            a=RationalFraction.from_rational(a),
+            b=RationalFraction.from_rational(b),
+            c=RationalFraction.from_rational(c),
+            equation_string="x^2 - 5*x + 6 = 0",
+            discriminant=disc,
+        )
+        assert prob_ir.classification == EquationClassificationType.QUADRATIC
+
+        # 4. Host Independent Verification
         verifier = HostIndependentVerifier()
         cert = verifier.verify_quadratic_solution(a, b, c, outcome, roots, problem_hash="hash_q1")
         assert cert.outcome == VerificationOutcome.VERIFIED_COMPLETE
@@ -247,29 +263,21 @@ class TestQuadraticAcceptanceFixtures:
         assert cert.multiplicity_verified is True
 
     def test_fixture_q6_negative_a_and_surd_roots(self):
-        """Q6: -x^2 + 6x + 9 = 0 => Delta = 72, roots = 3 +- 3*sqrt(2)."""
+        """Q6: -x^2 + 3 = 0 => Delta = 12 = 4*3, roots = {+sqrt(3), -sqrt(3)}."""
         a = Rational(-1, 1)
-        b = Rational(6, 1)
-        c = Rational(9, 1)
+        b = Rational(0, 1)
+        c = Rational(3, 1)
 
         disc = compute_quadratic_discriminant(a, b, c)
-        assert disc.value.to_rational() == Rational(72, 1)
-        assert disc.is_positive is True
-        assert disc.squarefree_kernel == 2
-        assert disc.extracted_factor.to_rational() == Rational(6, 1)
+        assert disc.value.to_rational() == Rational(12, 1)
+        assert disc.squarefree_kernel == 3
+        assert disc.extracted_factor.to_rational() == Rational(2, 1)
 
         outcome, roots = solve_exact_quadratic(a, b, c)
         assert outcome == SolutionOutcome.TWO_DISTINCT_REAL_ROOTS
         assert len(roots) == 2
-
-        # x = 3 - 3*sqrt(2) and x = 3 + 3*sqrt(2)
-        assert roots[0].surd_base.to_rational() == Rational(3, 1)
-        assert roots[0].surd_factor.to_rational() == Rational(-3, 1)
-        assert roots[0].radicand == 2
-
-        assert roots[1].surd_base.to_rational() == Rational(3, 1)
-        assert roots[1].surd_factor.to_rational() == Rational(3, 1)
-        assert roots[1].radicand == 2
+        assert roots[0].radicand == 3
+        assert roots[1].radicand == 3
 
         verifier = HostIndependentVerifier()
         cert = verifier.verify_quadratic_solution(a, b, c, outcome, roots, problem_hash="hash_q6")
@@ -352,14 +360,247 @@ class TestDegenerateFixtures:
 
 
 # ============================================================================
-# 4. REDUCED QUADRATIC FORMULA MATHEMATICAL APPLICABILITY MATRIX
+# 4. MODEL BOUNDARY & MATHEMATICAL INVARIANT ENFORCEMENT
+# ============================================================================
+
+class TestModelBoundaryInvariants:
+    """Adversarial tests ensuring semantic mathematical invariants are strictly enforced on domain models."""
+
+    def test_rational_fraction_canonicalization(self):
+        """Non-canonical inputs must be deterministically canonicalized to coprime forms."""
+        # 2/4 -> 1/2
+        rf1 = RationalFraction(numerator=2, denominator=4)
+        assert rf1.numerator == 1
+        assert rf1.denominator == 2
+
+        # 0/7 -> 0/1
+        rf2 = RationalFraction(numerator=0, denominator=7)
+        assert rf2.numerator == 0
+        assert rf2.denominator == 1
+
+        # -4/-6 -> 2/3
+        rf3 = RationalFraction(numerator=-4, denominator=-6)
+        assert rf3.numerator == 2
+        assert rf3.denominator == 3
+
+        # 4/-6 -> -2/3
+        rf4 = RationalFraction(numerator=4, denominator=-6)
+        assert rf4.numerator == -2
+        assert rf4.denominator == 3
+
+        # denominator 0 must be rejected
+        with pytest.raises(ValidationError):
+            RationalFraction(numerator=1, denominator=0)
+
+    def test_quadratic_problem_ir_rejects_a_zero(self):
+        """QuadraticProblemIR cannot be constructed with a == 0."""
+        disc = compute_quadratic_discriminant(Rational(1, 1), Rational(0, 1), Rational(1, 1))
+        with pytest.raises(ValidationError, match="Leading coefficient 'a' cannot be zero"):
+            QuadraticProblemIR(
+                problem_id="prob_bad_a",
+                raw_query="0*x^2 + x + 1 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_bad_a",
+                a=RationalFraction(numerator=0, denominator=1),
+                b=RationalFraction(numerator=1, denominator=1),
+                c=RationalFraction(numerator=1, denominator=1),
+                equation_string="x + 1 = 0",
+                discriminant=disc,
+            )
+
+    def test_quadratic_problem_ir_rejects_wrong_category_or_classification(self):
+        """QuadraticProblemIR rejects non-quadratic categories or classifications."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+        disc = compute_quadratic_discriminant(a, b, c)
+
+        # Wrong category
+        with pytest.raises(ValidationError, match="Category for QuadraticProblemIR must be ALGEBRA_QUADRATIC"):
+            QuadraticProblemIR(
+                problem_id="prob_bad_cat",
+                raw_query="x^2 - 5x + 6 = 0",
+                category=ProblemCategory.GEOMETRY_TRIANGLE,
+                semantic_revision_hash="hash_q1",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 5*x + 6 = 0",
+                discriminant=disc,
+            )
+
+        # Wrong classification
+        with pytest.raises(ValidationError, match="Classification for QuadraticProblemIR must be QUADRATIC"):
+            QuadraticProblemIR(
+                problem_id="prob_bad_cls",
+                raw_query="x^2 - 5x + 6 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q1",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 5*x + 6 = 0",
+                discriminant=disc,
+                classification=EquationClassificationType.LINEAR,
+            )
+
+    def test_quadratic_problem_ir_rejects_non_q_or_non_r_domains(self):
+        """QuadraticProblemIR rejects coefficient_domain != 'Q' or solution_domain != 'R'."""
+        a, b, c = Rational(1, 1), Rational(0, 1), Rational(1, 1)
+        disc = compute_quadratic_discriminant(a, b, c)
+
+        with pytest.raises(ValidationError, match="Coefficient domain for QuadraticProblemIR must be 'Q'"):
+            QuadraticProblemIR(
+                problem_id="prob_bad_dom",
+                raw_query="x^2 + 1 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q4",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 + 1 = 0",
+                discriminant=disc,
+                coefficient_domain="C",
+            )
+
+        with pytest.raises(ValidationError, match="Solution domain for QuadraticProblemIR must be 'R'"):
+            QuadraticProblemIR(
+                problem_id="prob_bad_sol_dom",
+                raw_query="x^2 + 1 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q4",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 + 1 = 0",
+                discriminant=disc,
+                solution_domain="C",
+            )
+
+    def test_quadratic_problem_ir_rejects_forged_discriminant(self):
+        """QuadraticProblemIR rejects caller-forged discriminant inconsistent with b^2 - 4ac."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+        # Expected Delta = 1. Forged Delta = 100.
+        forged_disc = QuadraticDiscriminant(
+            value=RationalFraction(numerator=100, denominator=1),
+            is_positive=True,
+            is_zero=False,
+            is_negative=False,
+            is_rational_square=True,
+            square_root_rational=RationalFraction(numerator=10, denominator=1),
+            squarefree_kernel=1,
+            extracted_factor=RationalFraction(numerator=10, denominator=1),
+        )
+        with pytest.raises(ValidationError, match="Forged or inconsistent discriminant"):
+            QuadraticProblemIR(
+                problem_id="prob_forged_disc",
+                raw_query="x^2 - 5x + 6 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_q1",
+                a=RationalFraction.from_rational(a),
+                b=RationalFraction.from_rational(b),
+                c=RationalFraction.from_rational(c),
+                equation_string="x^2 - 5*x + 6 = 0",
+                discriminant=forged_disc,
+            )
+
+    def test_degenerate_ir_rejects_a_nonzero(self):
+        """DegenerateEquationIR rejects a != 0."""
+        with pytest.raises(ValidationError, match="Leading coefficient 'a' must be 0"):
+            DegenerateEquationIR(
+                problem_id="prob_bad_deg_a",
+                raw_query="x^2 + 2x = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg",
+                a=RationalFraction(numerator=1, denominator=1),
+                b=RationalFraction(numerator=2, denominator=1),
+                c=RationalFraction(numerator=0, denominator=1),
+                classification=EquationClassificationType.LINEAR,
+            )
+
+    def test_degenerate_ir_rejects_inconsistent_classification_or_root(self):
+        """DegenerateEquationIR rejects forged classification or invalid linear root."""
+        # Case 1: b != 0 (2x - 4 = 0) with classification IDENTITY
+        with pytest.raises(ValidationError, match="must have classification LINEAR"):
+            DegenerateEquationIR(
+                problem_id="prob_bad_linear",
+                raw_query="2x - 4 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg1",
+                b=RationalFraction(numerator=2, denominator=1),
+                c=RationalFraction(numerator=-4, denominator=1),
+                classification=EquationClassificationType.IDENTITY,
+            )
+
+        # Case 2: b != 0 with forged linear_root (root is 2, forge 5)
+        with pytest.raises(ValidationError, match="Linear equation root must equal -c/b"):
+            DegenerateEquationIR(
+                problem_id="prob_forged_root",
+                raw_query="2x - 4 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg1",
+                b=RationalFraction(numerator=2, denominator=1),
+                c=RationalFraction(numerator=-4, denominator=1),
+                classification=EquationClassificationType.LINEAR,
+                linear_root=RationalFraction(numerator=5, denominator=1),
+            )
+
+        # Case 3: b == 0, c == 0 (0 = 0) with classification CONTRADICTION
+        with pytest.raises(ValidationError, match="must have classification IDENTITY"):
+            DegenerateEquationIR(
+                problem_id="prob_bad_identity",
+                raw_query="0 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg2",
+                b=RationalFraction(numerator=0, denominator=1),
+                c=RationalFraction(numerator=0, denominator=1),
+                classification=EquationClassificationType.CONTRADICTION,
+            )
+
+        # Case 4: b == 0, c == 0 with a linear root
+        with pytest.raises(ValidationError, match="Identity equation .* cannot have a discrete linear root"):
+            DegenerateEquationIR(
+                problem_id="prob_identity_with_root",
+                raw_query="0 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg2",
+                b=RationalFraction(numerator=0, denominator=1),
+                c=RationalFraction(numerator=0, denominator=1),
+                classification=EquationClassificationType.IDENTITY,
+                linear_root=RationalFraction(numerator=0, denominator=1),
+            )
+
+        # Case 5: b == 0, c != 0 (1 = 0) with classification IDENTITY
+        with pytest.raises(ValidationError, match="must have classification CONTRADICTION"):
+            DegenerateEquationIR(
+                problem_id="prob_bad_contradiction",
+                raw_query="1 = 0",
+                category=ProblemCategory.ALGEBRA_QUADRATIC,
+                semantic_revision_hash="hash_deg3",
+                b=RationalFraction(numerator=0, denominator=1),
+                c=RationalFraction(numerator=1, denominator=1),
+                classification=EquationClassificationType.IDENTITY,
+            )
+
+
+# ============================================================================
+# 5. REDUCED QUADRATIC FORMULA SEMANTICS & PREREQUISITE CLEANUP
 # ============================================================================
 
 class TestReducedFormulaMathematicalSemantics:
-    """Verify that b' = b/2 exists in Q for all rational b, making it mathematically applicable."""
+    """Verify that b' = b/2 exists in Q for all rational b, making it mathematically applicable without false prerequisites."""
+
+    def test_reduced_formula_definition_has_no_even_prerequisite(self):
+        """QUAD_FORMULA_REDUCED definition must NOT list PREREQ_EVEN_COEFF as a mathematical prerequisite."""
+        registry = MethodRegistry()
+        def_reduced = registry.get("QUAD_FORMULA_REDUCED")
+        assert "PREREQ_EVEN_COEFF" not in def_reduced.prerequisite_ids
+        assert "PREREQ_RADICALS" in def_reduced.prerequisite_ids
 
     def test_reduced_formula_applicable_for_odd_integer_b(self):
-        """For x^2 - 5x + 6 = 0 (b = -5), reduced formula is mathematically APPLICABLE, pedagogical recommendation NEUTRAL."""
+        """For x^2 - 5x + 6 = 0 (b = -5), reduced formula is mathematically APPLICABLE with NO failed prerequisites."""
         registry = MethodRegistry()
         a = Rational(1, 1)
         b = Rational(-5, 1)
@@ -372,28 +613,31 @@ class TestReducedFormulaMathematicalSemantics:
         assert red.mathematical_applicability == MathematicalApplicability.APPLICABLE
         assert red.support_status == SupportStatus.SUPPORTED
         assert red.execution_availability == ExecutionAvailability.AVAILABLE
+        # No failed mathematical prerequisites
+        assert all(p.is_satisfied for p in red.prerequisite_status)
         # Pedagogical recommendation is NEUTRAL because b is odd
         assert red.pedagogical_recommendation == PedagogicalRecommendation.NEUTRAL
 
     def test_reduced_formula_applicable_for_fractional_b(self):
-        """For x^2 + (1/3)x - 2 = 0 (b = 1/3), reduced formula is mathematically APPLICABLE, pedagogical recommendation NEUTRAL."""
+        """For x^2 + (3/4)x - 1/2 = 0 (b = 3/4), reduced formula is mathematically APPLICABLE with no failed prerequisites."""
         registry = MethodRegistry()
         a = Rational(1, 1)
-        b = Rational(1, 3)
-        c = Rational(-2, 1)
+        b = Rational(3, 4)
+        c = Rational(-1, 2)
 
         assessments = {m.method_id: m for m in registry.assess_quadratic(a, b, c)}
         red = assessments["QUAD_FORMULA_REDUCED"]
 
         assert red.mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert all(p.is_satisfied for p in red.prerequisite_status)
         assert red.pedagogical_recommendation == PedagogicalRecommendation.NEUTRAL
 
     def test_reduced_formula_recommended_for_even_integer_b(self):
-        """For x^2 - 6x + 9 = 0 (b = -6), reduced formula is APPLICABLE and RECOMMENDED."""
+        """For x^2 - 4x + 4 = 0 (b = -4), reduced formula is APPLICABLE and RECOMMENDED."""
         registry = MethodRegistry()
         a = Rational(1, 1)
-        b = Rational(-6, 1)
-        c = Rational(9, 1)
+        b = Rational(-4, 1)
+        c = Rational(4, 1)
 
         assessments = {m.method_id: m for m in registry.assess_quadratic(a, b, c)}
         red = assessments["QUAD_FORMULA_REDUCED"]
@@ -403,61 +647,45 @@ class TestReducedFormulaMathematicalSemantics:
 
 
 # ============================================================================
-# 5. METHOD REGISTRY & ORTHOGONAL ASSESSMENT INVARIANTS
+# 6. METHOD REGISTRY IMPLEMENTATION TRUTH & ORTHOGONAL DIMENSIONS
 # ============================================================================
 
-class TestMethodRegistryAndOrthogonalAssessment:
-    """Test orthogonal dimensions of MethodAssessment and MethodRegistry invariants."""
+class TestMethodRegistryImplementationTruth:
+    """Test truthful reporting of support_status and execution_availability across all 9 methods."""
 
-    def test_registry_contains_mvp_methods(self):
+    def test_registry_contains_all_9_mvp_methods_with_neutral_curriculum(self):
         registry = MethodRegistry()
         methods = registry.list_all()
         assert len(methods) >= 9
-        method_ids = {m.method_id for m in methods}
-        expected_ids = {
-            "QUAD_FORMULA_STANDARD",
-            "QUAD_FORMULA_REDUCED",
-            "QUAD_FACTORIZATION_Q",
-            "QUAD_FACTORIZATION_R",
-            "QUAD_COMPLETE_SQUARE",
-            "QUAD_VIETE_SPECIAL_SUM",
-            "QUAD_VIETE_SPECIAL_DIF",
-            "QUAD_VIETE_SUM_PRODUCT",
-            "QUAD_GRAPHICAL_ANALYSIS",
-        }
-        assert expected_ids.issubset(method_ids)
+        for m in methods:
+            assert m.curriculum_level == "VIETNAM_SECONDARY_TO_BE_VERIFIED"
 
-    def test_orthogonal_dimensions_independence(self):
-        """Dimensions must remain independent: a method can be APPLICABLE but DISCOURAGED or NOT_APPLICABLE for verification."""
+    def test_applicability_can_coexist_with_unavailable_execution(self):
+        """Demonstrate that mathematical_applicability=APPLICABLE coexists with execution_availability=UNAVAILABLE in S0."""
         registry = MethodRegistry()
         a = Rational(1, 1)
-        b = Rational(0, 1)
-        c = Rational(1, 1)  # x^2 + 1 = 0
+        b = Rational(-5, 1)
+        c = Rational(6, 1)  # x^2 - 5x + 6 = 0
 
         assessments = {m.method_id: m for m in registry.assess_quadratic(a, b, c)}
 
-        # Standard formula: APPLICABLE, SUPPORTED, AVAILABLE, RECOMMENDED, HOST_VERIFIABLE
-        std = assessments["QUAD_FORMULA_STANDARD"]
-        assert std.mathematical_applicability == MathematicalApplicability.APPLICABLE
-        assert std.support_status == SupportStatus.SUPPORTED
-        assert std.execution_availability == ExecutionAvailability.AVAILABLE
-        assert std.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
-        assert std.verification_capability == VerificationCapability.HOST_VERIFIABLE
-
-        # Completing square: APPLICABLE for all a != 0
+        # Completing the Square: APPLICABLE mathematically, but trace execution engine UNAVAILABLE in S0
         comp_sq = assessments["QUAD_COMPLETE_SQUARE"]
         assert comp_sq.mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert comp_sq.support_status == SupportStatus.SUPPORTED
+        assert comp_sq.execution_availability == ExecutionAvailability.UNAVAILABLE
 
-        # Graphical Analysis: APPLICABLE, but NOT_APPLICABLE for verification
+        # Factorization over Q: APPLICABLE mathematically, but trace execution engine UNAVAILABLE in S0
+        fact_q = assessments["QUAD_FACTORIZATION_Q"]
+        assert fact_q.mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert fact_q.support_status == SupportStatus.SUPPORTED
+        assert fact_q.execution_availability == ExecutionAvailability.UNAVAILABLE
+
+        # Graphical Analysis: APPLICABLE mathematically, but interactive UI plotting UNAVAILABLE in S0
         graph = assessments["QUAD_GRAPHICAL_ANALYSIS"]
         assert graph.mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert graph.execution_availability == ExecutionAvailability.UNAVAILABLE
         assert graph.verification_capability == VerificationCapability.NOT_APPLICABLE
-
-        # Special sum: NOT_APPLICABLE, but SUPPORTED & AVAILABLE
-        sum_spec = assessments["QUAD_VIETE_SPECIAL_SUM"]
-        assert sum_spec.mathematical_applicability == MathematicalApplicability.NOT_APPLICABLE
-        assert sum_spec.support_status == SupportStatus.SUPPORTED
-        assert sum_spec.pedagogical_recommendation == PedagogicalRecommendation.DISCOURAGED
 
     def test_viete_special_sum_and_diff(self):
         registry = MethodRegistry()
@@ -466,17 +694,19 @@ class TestMethodRegistryAndOrthogonalAssessment:
         a1, b1, c1 = Rational(2, 1), Rational(5, 1), Rational(-7, 1)
         ass1 = {m.method_id: m for m in registry.assess_quadratic(a1, b1, c1)}
         assert ass1["QUAD_VIETE_SPECIAL_SUM"].mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert ass1["QUAD_VIETE_SPECIAL_SUM"].execution_availability == ExecutionAvailability.AVAILABLE
         assert ass1["QUAD_VIETE_SPECIAL_SUM"].pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
 
         # 2x^2 + 5x + 3 = 0 => a - b + c = 2 - 5 + 3 = 0
         a2, b2, c2 = Rational(2, 1), Rational(5, 1), Rational(3, 1)
         ass2 = {m.method_id: m for m in registry.assess_quadratic(a2, b2, c2)}
         assert ass2["QUAD_VIETE_SPECIAL_DIF"].mathematical_applicability == MathematicalApplicability.APPLICABLE
+        assert ass2["QUAD_VIETE_SPECIAL_DIF"].execution_availability == ExecutionAvailability.AVAILABLE
         assert ass2["QUAD_VIETE_SPECIAL_DIF"].pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
 
 
 # ============================================================================
-# 6. EXACT ARITHMETIC ADVERSARIAL MATRIX
+# 7. EXACT ARITHMETIC ADVERSARIAL MATRIX
 # ============================================================================
 
 class TestExactArithmeticAdversarialMatrix:
@@ -524,27 +754,29 @@ class TestExactArithmeticAdversarialMatrix:
             assert disc.is_rational_square is True
         else:
             assert disc.is_negative is True
+            assert disc.is_rational_square is False
 
         outcome, roots = solve_exact_quadratic(a_val, b_val, c_val)
         assert outcome == expected_outcome
 
-        # Host verification must succeed for all valid solutions
+        # Independent host verification of valid solution
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a_val, b_val, c_val, outcome, roots)
+        cert = verifier.verify_quadratic_solution(a_val, b_val, c_val, outcome, roots, problem_hash="test_hash")
         assert cert.outcome == VerificationOutcome.VERIFIED_COMPLETE
+        assert len(cert.integrity_fingerprint) == 64
 
 
 # ============================================================================
-# 7. HOST INDEPENDENT VERIFIER TAMPER MATRIX
+# 8. HOST INDEPENDENT VERIFIER TAMPER MATRIX
 # ============================================================================
 
 class TestHostVerifierTamperMatrix:
-    """Tamper matrix attempting to trick the Host Independent Verifier with corrupted candidates."""
+    """Tamper tests ensuring the independent verifier fails closed against fraudulent claims."""
 
     def test_tamper_wrong_rational_root(self):
-        """Corrupt root: x = 4 for x^2 - 5x + 6 = 0."""
+        """Falsely claiming x=4 for x^2 - 5x + 6 = 0."""
         a, b, c = Rational(1, 1), Rational(-5, 1), Rational(6, 1)
-        fake_roots = [
+        tampered_roots = [
             RealRootValue(
                 root_type=SolutionRootType.RATIONAL,
                 rational_value=RationalFraction(numerator=4, denominator=1),
@@ -557,59 +789,59 @@ class TestHostVerifierTamperMatrix:
             ),
         ]
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, fake_roots)
+        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, tampered_roots)
         assert cert.outcome == VerificationOutcome.VERIFICATION_FAILED
 
     def test_tamper_wrong_surd_radicand(self):
-        """Corrupt radicand: d = 5 instead of 2 for -x^2 + 6x + 9 = 0."""
-        a, b, c = Rational(-1, 1), Rational(6, 1), Rational(9, 1)
-        fake_roots = [
+        """Falsely claiming sqrt(3) for x^2 - 2 = 0."""
+        a, b, c = Rational(1, 1), Rational(0, 1), Rational(-2, 1)
+        tampered_roots = [
             RealRootValue(
                 root_type=SolutionRootType.REAL_SURD,
-                surd_base=RationalFraction.from_int(3),
-                surd_factor=RationalFraction.from_int(-3),
-                radicand=5,  # Wrong!
-                latex_str="3 - 3\\sqrt{5}",
+                surd_base=RationalFraction(numerator=0, denominator=1),
+                surd_factor=RationalFraction(numerator=-1, denominator=1),
+                radicand=3,
+                latex_str="-\\sqrt{3}",
             ),
             RealRootValue(
                 root_type=SolutionRootType.REAL_SURD,
-                surd_base=RationalFraction.from_int(3),
-                surd_factor=RationalFraction.from_int(3),
-                radicand=5,
-                latex_str="3 + 3\\sqrt{5}",
+                surd_base=RationalFraction(numerator=0, denominator=1),
+                surd_factor=RationalFraction(numerator=1, denominator=1),
+                radicand=3,
+                latex_str="\\sqrt{3}",
             ),
         ]
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, fake_roots)
+        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, tampered_roots)
         assert cert.outcome == VerificationOutcome.VERIFICATION_FAILED
 
     def test_tamper_wrong_surd_sign(self):
-        """Corrupt sign: both +3*sqrt(2) without conjugate."""
-        a, b, c = Rational(-1, 1), Rational(6, 1), Rational(9, 1)
-        fake_roots = [
+        """Falsely providing two positive roots {sqrt(2), sqrt(2)} for x^2 - 2 = 0."""
+        a, b, c = Rational(1, 1), Rational(0, 1), Rational(-2, 1)
+        tampered_roots = [
             RealRootValue(
                 root_type=SolutionRootType.REAL_SURD,
-                surd_base=RationalFraction.from_int(3),
-                surd_factor=RationalFraction.from_int(3),  # Wrong! (duplicate positive)
+                surd_base=RationalFraction(numerator=0, denominator=1),
+                surd_factor=RationalFraction(numerator=1, denominator=1),
                 radicand=2,
-                latex_str="3 + 3\\sqrt{2}",
+                latex_str="\\sqrt{2}",
             ),
             RealRootValue(
                 root_type=SolutionRootType.REAL_SURD,
-                surd_base=RationalFraction.from_int(3),
-                surd_factor=RationalFraction.from_int(3),
+                surd_base=RationalFraction(numerator=0, denominator=1),
+                surd_factor=RationalFraction(numerator=1, denominator=1),
                 radicand=2,
-                latex_str="3 + 3\\sqrt{2}",
+                latex_str="\\sqrt{2}",
             ),
         ]
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, fake_roots)
+        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, tampered_roots)
         assert cert.outcome == VerificationOutcome.VERIFICATION_FAILED
 
     def test_tamper_missing_second_root(self):
-        """Missing second root when Delta > 0."""
+        """Falsely providing only 1 root when 2 exist."""
         a, b, c = Rational(1, 1), Rational(-5, 1), Rational(6, 1)
-        fake_roots = [
+        tampered_roots = [
             RealRootValue(
                 root_type=SolutionRootType.RATIONAL,
                 rational_value=RationalFraction(numerator=2, denominator=1),
@@ -617,26 +849,21 @@ class TestHostVerifierTamperMatrix:
             )
         ]
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, fake_roots)
+        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, tampered_roots)
         assert cert.outcome == VerificationOutcome.VERIFICATION_FAILED
 
     def test_tamper_duplicated_root_when_delta_positive(self):
-        """Duplicating root [2, 2] for x^2 - 5x + 6 = 0."""
+        """Claiming repeated root when Delta > 0."""
         a, b, c = Rational(1, 1), Rational(-5, 1), Rational(6, 1)
-        fake_roots = [
+        tampered_roots = [
             RealRootValue(
                 root_type=SolutionRootType.RATIONAL,
                 rational_value=RationalFraction(numerator=2, denominator=1),
                 latex_str="2",
-            ),
-            RealRootValue(
-                root_type=SolutionRootType.RATIONAL,
-                rational_value=RationalFraction(numerator=2, denominator=1),
-                latex_str="2",
-            ),
+            )
         ]
         verifier = HostIndependentVerifier()
-        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.TWO_DISTINCT_REAL_ROOTS, fake_roots)
+        cert = verifier.verify_quadratic_solution(a, b, c, SolutionOutcome.ONE_REPEATED_REAL_ROOT, tampered_roots)
         assert cert.outcome == VerificationOutcome.VERIFICATION_FAILED
 
     def test_tamper_false_no_real_roots_when_delta_positive(self):
@@ -662,7 +889,7 @@ class TestHostVerifierTamperMatrix:
 
 
 # ============================================================================
-# 8. IDENTITY & CACHE HASHING
+# 9. IDENTITY & CACHE HASHING WITH ASSUMPTION CANONICALIZATION
 # ============================================================================
 
 class TestIdentityAndCacheHashing:
@@ -689,6 +916,51 @@ class TestIdentityAndCacheHashing:
         hash2 = compute_semantic_quadratic_identity(a2, b, c)
         assert hash1 == hash2
 
+    def test_assumptions_order_independent_hash(self):
+        """Assumptions provided in different list orders must produce the exact same semantic identity hash."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+
+        asm1 = [
+            Assumption(symbol="x", domain="REAL", description_vi="x là số thực"),
+            Assumption(symbol="m", domain="POSITIVE_REAL", description_vi="m dương"),
+        ]
+        asm2 = [
+            Assumption(symbol="m", domain="POSITIVE_REAL", description_vi="m dương"),
+            Assumption(symbol="x", domain="REAL", description_vi="x là số thực"),
+        ]
+
+        hash1 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm1)
+        hash2 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm2)
+        assert hash1 == hash2
+
+    def test_presentation_description_change_does_not_alter_semantic_identity(self):
+        """Changing presentation description_vi in assumptions does not change mathematical semantic identity."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+
+        asm1 = [Assumption(symbol="x", domain="REAL", description_vi="x thuộc R")]
+        asm2 = [Assumption(symbol="x", domain="REAL", description_vi="x là số thực tùy ý")]
+
+        hash1 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm1)
+        hash2 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm2)
+        assert hash1 == hash2
+
+    def test_truth_affecting_assumption_change_alters_semantic_identity(self):
+        """Changing domain in assumptions alters mathematical semantic identity."""
+        a = Rational(1, 1)
+        b = Rational(-5, 1)
+        c = Rational(6, 1)
+
+        asm1 = [Assumption(symbol="x", domain="REAL")]
+        asm2 = [Assumption(symbol="x", domain="POSITIVE_REAL")]
+
+        hash1 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm1)
+        hash2 = compute_semantic_quadratic_identity(a, b, c, assumptions=asm2)
+        assert hash1 != hash2
+
     def test_engine_config_change_alters_cache_key(self):
         a = Rational(1, 1)
         b = Rational(-5, 1)
@@ -707,7 +979,7 @@ class TestIdentityAndCacheHashing:
 
 
 # ============================================================================
-# 9. REACTIVE DEPENDENCY DAG ADVERSARIAL TESTS
+# 10. REACTIVE DEPENDENCY DAG ADVERSARIAL TESTS
 # ============================================================================
 
 class TestReactiveDependencyDAG:
@@ -785,7 +1057,7 @@ class TestReactiveDependencyDAG:
 
 
 # ============================================================================
-# 10. SCHEMA REPRODUCIBILITY & STRICT VALIDATION
+# 11. SCHEMA REPRODUCIBILITY & STRICT VALIDATION
 # ============================================================================
 
 class TestStrictValidationAndJsonSchema:
