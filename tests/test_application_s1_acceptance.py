@@ -850,18 +850,65 @@ class TestSerializationRoundTrip(unittest.TestCase):
         self.assertEqual(restored.reason_code, NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION)
 
     def test_error_response_round_trip(self):
-        """ErrorResponse round-trips cleanly through JSON."""
+        """ErrorResponse with Span round-trips cleanly through model_dump and JSON."""
         req = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 + = 0"))
         resp = solve_request(req)
         self.assertIsInstance(resp, ErrorResponse)
+        self.assertIsNotNone(resp.span)
+        self.assertEqual(resp.error_code, ApplicationErrorCode.SYNTAX_ERROR)
 
+        # 1. model_dump() -> validate_python()
         dumped = resp.model_dump()
         adapter = TypeAdapter(SolveResponseUnion)
         restored = adapter.validate_python(dumped)
 
         self.assertIsInstance(restored, ErrorResponse)
         self.assertEqual(restored.response_status, "ERROR")
-        self.assertEqual(restored.error_code, ApplicationErrorCode.SYNTAX_ERROR)
+        self.assertEqual(restored.error_code, resp.error_code)
+        self.assertEqual(restored.span, resp.span)
+
+        # 2. model_dump_json() -> validate_json()
+        json_str = resp.model_dump_json()
+        restored_json = adapter.validate_json(json_str)
+
+        self.assertIsInstance(restored_json, ErrorResponse)
+        self.assertEqual(restored_json.response_status, "ERROR")
+        self.assertEqual(restored_json.error_code, resp.error_code)
+        self.assertEqual(restored_json.span, resp.span)
+
+    def test_solve_request_raw_text_round_trip(self):
+        """SolveRequest with RawEquationInput preserves input_mode='RAW_TEXT' discriminator across JSON."""
+        req = SolveRequest(
+            input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0"),
+            selected_method_id="QUAD_FORMULA_STANDARD",
+        )
+        json_str = req.model_dump_json()
+        restored = SolveRequest.model_validate_json(json_str)
+
+        self.assertIsInstance(restored.input_payload, RawEquationInput)
+        self.assertEqual(restored.input_payload.input_mode, "RAW_TEXT")
+        self.assertEqual(restored.input_payload.raw_query, "x^2 - 5*x + 6 = 0")
+        self.assertEqual(restored.selected_method_id, "QUAD_FORMULA_STANDARD")
+
+    def test_solve_request_coefficients_round_trip(self):
+        """SolveRequest with CanonicalCoefficientInput preserves input_mode='COEFFICIENTS' discriminator across JSON."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(1),
+                b=RationalFraction.from_int(-5),
+                c=RationalFraction.from_int(6),
+            ),
+            selected_method_id="QUAD_FORMULA_REDUCED",
+        )
+        json_str = req.model_dump_json()
+        restored = SolveRequest.model_validate_json(json_str)
+
+        self.assertIsInstance(restored.input_payload, CanonicalCoefficientInput)
+        self.assertEqual(restored.input_payload.input_mode, "COEFFICIENTS")
+        self.assertEqual(restored.input_payload.a, RationalFraction.from_int(1))
+        self.assertEqual(restored.input_payload.b, RationalFraction.from_int(-5))
+        self.assertEqual(restored.input_payload.c, RationalFraction.from_int(6))
+        self.assertEqual(restored.selected_method_id, "QUAD_FORMULA_REDUCED")
 
 
 # ============================================================================
@@ -870,6 +917,48 @@ class TestSerializationRoundTrip(unittest.TestCase):
 
 class TestStateMachineImpossibility(unittest.TestCase):
     """Adversarial tests proving impossible state combinations are rejected by Pydantic validators."""
+
+    def test_verified_solution_view_rejects_mismatched_roots(self):
+        """VerifiedSolutionView raises ValidationError if trace.roots != roots."""
+        cert = VerificationCertificate(
+            certificate_id="cert1",
+            problem_hash="hash1",
+            outcome=VerificationOutcome.VERIFIED_COMPLETE,
+            integrity_fingerprint="fp1",
+            verified_at_utc=datetime.utcnow(),
+        )
+        step = SolutionStep(
+            step_number=1,
+            latex_expression="x = 1",
+            explanation_vi="Bước 1",
+        )
+        real_root = RealRootValue(
+            root_type=SolutionRootType.RATIONAL,
+            rational_value=RationalFraction.from_int(1),
+            latex_str="1",
+        )
+        forged_root = RealRootValue(
+            root_type=SolutionRootType.RATIONAL,
+            rational_value=RationalFraction.from_int(999),
+            latex_str="999",
+        )
+        trace = SolutionTrace(
+            method_id="QUAD_FORMULA_STANDARD",
+            solution_outcome=SolutionOutcome.ONE_REPEATED_REAL_ROOT,
+            roots=[real_root],
+            steps=[step],
+            final_answer_latex="x = 1",
+        )
+
+        with self.assertRaises(ValidationError):
+            VerifiedSolutionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                outcome=SolutionOutcome.ONE_REPEATED_REAL_ROOT,
+                roots=[forged_root],  # Mismatched with trace.roots = [real_root]
+                final_answer_latex="x = 1",
+                trace=trace,
+                certificate=cert,
+            )
 
     def test_solved_response_rejects_unverified_certificate(self):
         """SolvedResponse rejects certificate with outcome != VERIFIED_COMPLETE."""
