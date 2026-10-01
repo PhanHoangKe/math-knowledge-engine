@@ -1,0 +1,2 @@
+# MKE Transport & Development Test Dependencies
+httpx>=0.25.0
