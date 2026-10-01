@@ -1,8 +1,8 @@
 ================================================================================
 MKE PRODUCT — P1C-04-B2 ACCEPTANCE TEST LOG
 Test Target: tests/test_p03c_p1c_quadratic_surd_dispatch.py
-Tested Source SHA: ab9db461fcded30db4865ad8147e9378c3a66202
-Timestamp (UTC): 2026-10-01T01:30:41.434987+00:00
+Tested Source SHA: e7265539634919bdbc7c276553033b8e9fda2659
+Timestamp (UTC): 2026-10-01T02:05:09.597287+00:00
 Pre-run Git Clean Tree: True
 Pre-run Git Status: <empty>
 ================================================================================
@@ -13,7 +13,7 @@ cachedir: .pytest_cache
 rootdir: D:\mke-product-ui-r4
 plugins: anyio-3.7.1, asyncio-1.4.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 94 items
+collecting ... collected 95 items
 
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestProtocolVersionOperationMatrixV3::test_v3_solve_quadratic_surd_allowed PASSED [  1%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestProtocolVersionOperationMatrixV3::test_v3_solve_rejected PASSED [  2%]
@@ -30,9 +30,9 @@ tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKer
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_x2_minus_18 PASSED [ 13%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_2x2_minus_1 PASSED [ 14%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_x2_plus_x_minus_1 PASSED [ 15%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_3x2_plus_6x_plus_1 PASSED [ 17%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_shifted_square PASSED [ 18%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_x2_minus_50 PASSED [ 19%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_3x2_plus_6x_plus_1 PASSED [ 16%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_shifted_square PASSED [ 17%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_x2_minus_50 PASSED [ 18%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_solve_surd_fractional_constant PASSED [ 20%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_rational_roots_fail_closed_out_of_scope PASSED [ 21%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerQuadraticSurdSolverKernel::test_unique_repeated_root_fail_closed PASSED [ 22%]
@@ -46,12 +46,12 @@ tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestDispatcherV3Integration::tes
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestHostSurdNormalization::test_host_normalize_integers PASSED [ 30%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestHostSurdNormalization::test_host_normalize_fractions PASSED [ 31%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestHostSurdNormalization::test_host_normalize_perfect_square_returns_d1 PASSED [ 32%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_2_65537_sq_fails_certification PASSED [ 34%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_3_65537_sq_fails_certification PASSED [ 35%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_5_65537_sq_fails_certification PASSED [ 36%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_2_65537_sq_fails_certification PASSED [ 37%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_3_65537_sq_fails_certification PASSED [ 38%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_5_65537_sq_fails_certification PASSED [ 39%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_2_65537_sq_fails_certification PASSED [ 33%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_3_65537_sq_fails_certification PASSED [ 34%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_5_65537_sq_fails_certification PASSED [ 35%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_2_65537_sq_fails_certification PASSED [ 36%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_3_65537_sq_fails_certification PASSED [ 37%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_worker_normalization_5_65537_sq_fails_certification PASSED [ 38%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_normalization_2_to_100_squared_times_2_succeeds PASSED [ 40%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_host_normalization_512_bit_working_product_boundary PASSED [ 41%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestNormalizationBoundaryAndResourceLimits::test_near_boundary_32_bit_remainder_certification PASSED [ 42%]
@@ -61,22 +61,23 @@ tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContra
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_surd_rational_rejects_257_bit PASSED [ 46%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_surd_rational_rejects_zero_or_negative_denominator PASSED [ 47%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_surd_rational_rejects_bool_and_float PASSED [ 48%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_valid PASSED [ 50%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_rejects_zero_sqrt_coefficient PASSED [ 51%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_rejects_invalid_radicands PASSED [ 52%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_valid PASSED [ 53%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_rejects_invalid_root_counts PASSED [ 54%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_rejects_mismatched_roots PASSED [ 55%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_canonical_serialization_no_float PASSED [ 56%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_valid PASSED [ 49%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_rejects_zero_sqrt_coefficient PASSED [ 50%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_root_rejects_invalid_radicands PASSED [ 51%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_valid PASSED [ 52%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_rejects_invalid_root_counts PASSED [ 53%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_rejects_mismatched_roots PASSED [ 54%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_canonical_serialization_no_float PASSED [ 55%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestPublicSurdModelsStrictContract::test_quadratic_surd_dispatch_result_rejects_coercible_and_invalid_radicand PASSED [ 56%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_surd_x2_minus_2_success PASSED [ 57%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_surd_x2_plus_x_minus_1 PASSED [ 58%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_routing_b1_rational_quadratic_preserves_v2 PASSED [ 59%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_routing_b0_linear_preserves_v1 PASSED [ 60%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_257_bit_rational_part_numerator_rejected PASSED [ 61%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_257_bit_sqrt_coeff_denominator_rejected PASSED [ 62%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_negative_denominator_rejected PASSED [ 63%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_zero_denominator_rejected PASSED [ 64%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_leading_plus_in_decimal_string_rejected PASSED [ 65%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_routing_b1_rational_quadratic_preserves_v2 PASSED [ 60%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestControlledDispatchBridgeB2Surd::test_b2_routing_b0_linear_preserves_v1 PASSED [ 61%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_257_bit_rational_part_numerator_rejected PASSED [ 62%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_257_bit_sqrt_coeff_denominator_rejected PASSED [ 63%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_negative_denominator_rejected PASSED [ 64%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_zero_denominator_rejected PASSED [ 65%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_leading_plus_in_decimal_string_rejected PASSED [ 66%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_unnecessary_leading_zero_rejected PASSED [ 67%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_zero_sqrt_coefficient_rejected PASSED [ 68%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialV3WireExpanded::test_invalid_radicand_values_rejected PASSED [ 69%]
@@ -89,10 +90,10 @@ tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehen
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_unequal_sqrt_coefficients_magnitudes_rejected PASSED [ 76%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_different_rational_parts_rejected PASSED [ 77%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_different_radicands_between_roots_rejected PASSED [ 78%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_wrong_top_level_radicand_rejected PASSED [ 79%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_wrong_discriminant_rejected PASSED [ 80%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_internally_consistent_but_mathematically_wrong_pair_rejected PASSED [ 81%]
-tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerInfrastructureTaxonomySurd::test_worker_infrastructure_errors_solve_quadratic_surd[WORKER_TIMEOUT-TIMEOUT-ERR_TIMEOUT] PASSED [ 82%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_wrong_top_level_radicand_rejected PASSED [ 80%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_wrong_discriminant_rejected PASSED [ 81%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestAdversarialRootPairComprehensive::test_internally_consistent_but_mathematically_wrong_pair_rejected PASSED [ 82%]
+tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerInfrastructureTaxonomySurd::test_worker_infrastructure_errors_solve_quadratic_surd[WORKER_TIMEOUT-TIMEOUT-ERR_TIMEOUT] PASSED [ 83%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerInfrastructureTaxonomySurd::test_worker_infrastructure_errors_solve_quadratic_surd[WORKER_RESOURCE_EXHAUSTED-ENGINE_ERROR-ERR_RESOURCE_EXHAUSTED] PASSED [ 84%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerInfrastructureTaxonomySurd::test_worker_infrastructure_errors_solve_quadratic_surd[WORKER_STARTUP_FAILURE-ENGINE_ERROR-ERR_WORKER_STARTUP_FAILURE] PASSED [ 85%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestWorkerInfrastructureTaxonomySurd::test_worker_infrastructure_errors_solve_quadratic_surd[WORKER_ASSIGNMENT_FAILURE-ENGINE_ERROR-ERR_WORKER_ASSIGNMENT_FAILURE] PASSED [ 86%]
@@ -110,4 +111,4 @@ tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestLiveWindowsWorkerQuadraticSu
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestLiveWindowsWorkerQuadraticSurdIntegration::test_live_worker_b1_quadratic_regression PASSED [ 98%]
 tests/test_p03c_p1c_quadratic_surd_dispatch.py::TestLiveWindowsWorkerQuadraticSurdIntegration::test_live_worker_b0_linear_regression PASSED [100%]
 
-============================= 94 passed in 5.38s ==============================
+============================= 95 passed in 5.82s ==============================

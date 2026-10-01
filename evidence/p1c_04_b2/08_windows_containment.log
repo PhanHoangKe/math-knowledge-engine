@@ -1,8 +1,8 @@
 ================================================================================
 MKE PRODUCT — P1C-04-B2 ACCEPTANCE TEST LOG
 Test Target: tests/test_worker_windows.py
-Tested Source SHA: ab9db461fcded30db4865ad8147e9378c3a66202
-Timestamp (UTC): 2026-10-01T01:31:52.001377+00:00
+Tested Source SHA: e7265539634919bdbc7c276553033b8e9fda2659
+Timestamp (UTC): 2026-10-01T02:06:17.861523+00:00
 Pre-run Git Clean Tree: True
 Pre-run Git Status: <empty>
 ================================================================================
@@ -96,4 +96,4 @@ tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_si
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_stdout_pipe_close_failure_fails_closed_and_preserves_ownership PASSED [ 98%]
 tests/test_worker_windows.py::TestWindowsCancellationAndHandleOwnership::test_writer_setup_hang_quarantines_handle PASSED [100%]
 
-============================= 80 passed in 45.44s =============================
+============================= 80 passed in 49.09s =============================

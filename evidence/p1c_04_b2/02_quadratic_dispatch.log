@@ -1,8 +1,8 @@
 ================================================================================
 MKE PRODUCT — P1C-04-B2 ACCEPTANCE TEST LOG
 Test Target: tests/test_p03c_p1c_quadratic_dispatch.py
-Tested Source SHA: ab9db461fcded30db4865ad8147e9378c3a66202
-Timestamp (UTC): 2026-10-01T01:30:48.150745+00:00
+Tested Source SHA: e7265539634919bdbc7c276553033b8e9fda2659
+Timestamp (UTC): 2026-10-01T02:05:16.872666+00:00
 Pre-run Git Clean Tree: True
 Pre-run Git Status: <empty>
 ================================================================================
@@ -107,4 +107,4 @@ tests/test_p03c_p1c_quadratic_dispatch.py::TestCollusiveWorkerVerificationDefeat
 tests/test_p03c_p1c_quadratic_dispatch.py::TestCumulativeDeadlineStrictBudget::test_cumulative_deadline_3_calls PASSED [ 98%]
 tests/test_p03c_p1c_quadratic_dispatch.py::TestBridgeHostArchitectureIndependence::test_bridge_does_not_import_solver_quadratic PASSED [100%]
 
-============================= 91 passed in 4.97s ==============================
+============================= 91 passed in 5.61s ==============================

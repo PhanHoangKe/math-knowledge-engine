@@ -1,8 +1,8 @@
 ================================================================================
 MKE PRODUCT — P1C-04-B2 ACCEPTANCE TEST LOG
 Test Target: tests/test_p03c_p1c_controlled_dispatch.py
-Tested Source SHA: ab9db461fcded30db4865ad8147e9378c3a66202
-Timestamp (UTC): 2026-10-01T01:30:54.388576+00:00
+Tested Source SHA: e7265539634919bdbc7c276553033b8e9fda2659
+Timestamp (UTC): 2026-10-01T02:05:23.934842+00:00
 Pre-run Git Clean Tree: True
 Pre-run Git Status: <empty>
 ================================================================================
@@ -57,4 +57,4 @@ tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::te
 tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_identity PASSED [ 97%]
 tests/test_p03c_p1c_controlled_dispatch.py::TestLiveWindowsWorkerIntegration::test_live_worker_solve_linear PASSED [100%]
 
-============================= 41 passed in 4.90s ==============================
+============================= 41 passed in 4.56s ==============================
