@@ -308,7 +308,14 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
     # 3. BRANCH: DEGENERATE EQUATION (a == 0)
     # ------------------------------------------------------------------------
     if a_rat.is_zero:
-        deg_result = solve_exact_degenerate(b_rat, c_rat)
+        try:
+            deg_result = solve_exact_degenerate(b_rat, c_rat)
+        except Exception:
+            return ErrorResponse(
+                error_code=ApplicationErrorCode.VERIFICATION_FAILED,
+                message_vi="Xác minh độc lập cho phương trình suy biến gặp lỗi nội bộ.",
+                message_en="Internal error during degenerate independent verification.",
+            )
 
         # Authoritative Domain IR Gate
         try:
@@ -333,9 +340,17 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
                 message_en="Domain contract error while constructing DegenerateEquationIR.",
             )
 
-        cert = verify_degenerate_solution(
-            b=b_rat, c=c_rat, candidate=deg_result, problem_hash=semantic_hash
-        )
+        try:
+            cert = verify_degenerate_solution(
+                b=b_rat, c=c_rat, candidate=deg_result, problem_hash=semantic_hash
+            )
+        except Exception:
+            return ErrorResponse(
+                error_code=ApplicationErrorCode.VERIFICATION_FAILED,
+                message_vi="Xác minh độc lập cho phương trình suy biến gặp lỗi nội bộ.",
+                message_en="Internal error during degenerate independent verification.",
+            )
+
         if cert.outcome != VerificationOutcome.VERIFIED_COMPLETE:
             return ErrorResponse(
                 error_code=ApplicationErrorCode.VERIFICATION_FAILED,
@@ -481,15 +496,14 @@ def solve_request(request: SolveRequest) -> SolveResponseUnion:
             and m.execution_availability == ExecutionAvailability.AVAILABLE
         ]
         if not candidates:
-            return AnalyzedNoExecutionResponse(
-                problem=quad_problem_view,
-                available_methods=method_views,
-                selected_method_id=None,
-                reason_code=NoExecutionReasonCode.METHOD_NOT_EXECUTABLE,
-                analysis_message_vi="Không có phương pháp giải nào khả dụng để thực thi.",
+            return ErrorResponse(
+                error_code=ApplicationErrorCode.DOMAIN_CONTRACT_ERROR,
+                message_vi="Không tìm thấy phương pháp giải hợp lệ nào khả dụng trong hệ thống.",
+                message_en="Domain contract violation: no applicable and executable method found in registry.",
             )
 
-        # Sort tie-breaker by pedagogical_priority (lowest int = highest priority)
+        # Sort tie-breaker by pedagogical_priority (lowest int = highest priority).
+        # Python's stable sort guarantees preservation of registry/assessment insertion order for equal priorities.
         candidates.sort(key=lambda m: m.pedagogical_priority)
         chosen_method_id = candidates[0].method_id
 

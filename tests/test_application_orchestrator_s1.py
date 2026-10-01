@@ -1,20 +1,20 @@
-"""MKE MVP V1 — Comprehensive Test Suite for S1-04-R1 Application Orchestrator & Discriminated DTOs.
+"""MKE MVP V1 — Comprehensive Test Suite for S1-04-R2 Application Orchestrator & Discriminated DTOs.
 
 Validates:
 1. End-to-end Pure Python Application Service pipeline (solve_request).
 2. Authoritative Domain IR Gate (QuadraticProblemIR, DegenerateEquationIR).
 3. RAW_TEXT vs COEFFICIENTS intake invariance & semantic identity equivalence.
 4. Clean parseable canonical source string formatting.
-5. Strict single method-selection authority and resolution policy.
+5. Strict single method-selection authority and resolution policy with stable insertion-order tie-breaking.
 6. Comprehensive 32-case Acceptance Matrix (Q1-Q9, C1-C5, D1-D4, E1-E8, B1-B6).
-7. Degenerate equation exact verification & discriminated response modeling.
-8. Multi-method orthogonal assessment mapping & trace execution.
+7. Degenerate equation fail-closed exact verification & discriminated response modeling.
+8. Multi-method orthogonal assessment mapping & trace execution with fail-closed contract mapping.
 9. Host independent verification and tamper-evident certificate attachment.
-10. Fail-closed typed trace error mapping and Domain IR contract enforcement.
-11. Client-facing error message sanitization (zero internal exception leakage).
-12. Pydantic v2 discriminated union cross-field validators and adversarial invariant rejection.
+10. Strict client-facing error message sanitization (zero internal exception leakage).
+11. Pydantic v2 discriminated union cross-field validators and complete adversarial invariant rejection.
 """
 
+from datetime import datetime
 import unittest
 from unittest.mock import patch
 from pydantic import TypeAdapter, ValidationError
@@ -177,19 +177,20 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(resp_raw.problem.problem_id, resp_coeff.problem.problem_id)
         self.assertEqual(resp_raw.problem.problem_id, resp_unred.problem.problem_id)
 
-        # Method assessment catalog equality
-        self.assertEqual(
-            [m.method_id for m in resp_raw.available_methods],
-            [m.method_id for m in resp_coeff.available_methods],
-        )
-        self.assertEqual(
-            [m.mathematical_applicability for m in resp_raw.available_methods],
-            [m.mathematical_applicability for m in resp_coeff.available_methods],
-        )
-        self.assertEqual(
-            [m.execution_availability for m in resp_raw.available_methods],
-            [m.execution_availability for m in resp_coeff.available_methods],
-        )
+        # Method assessment catalog equality (all 11 fields for every method)
+        self.assertEqual(len(resp_raw.available_methods), len(resp_coeff.available_methods))
+        for m_raw, m_coeff in zip(resp_raw.available_methods, resp_coeff.available_methods):
+            self.assertEqual(m_raw.method_id, m_coeff.method_id)
+            self.assertEqual(m_raw.title_vi, m_coeff.title_vi)
+            self.assertEqual(m_raw.mathematical_applicability, m_coeff.mathematical_applicability)
+            self.assertEqual(m_raw.support_status, m_coeff.support_status)
+            self.assertEqual(m_raw.execution_availability, m_coeff.execution_availability)
+            self.assertEqual(m_raw.pedagogical_recommendation, m_coeff.pedagogical_recommendation)
+            self.assertEqual(m_raw.verification_capability, m_coeff.verification_capability)
+            self.assertEqual(m_raw.reasons, m_coeff.reasons)
+            self.assertEqual(m_raw.prerequisites, m_coeff.prerequisites)
+            self.assertEqual(m_raw.has_trace_available, m_coeff.has_trace_available)
+            self.assertEqual(m_raw.pedagogical_priority, m_coeff.pedagogical_priority)
 
         # Solution equality
         self.assertEqual(resp_raw.selected_method_id, resp_coeff.selected_method_id)
@@ -539,6 +540,31 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
             resp.degenerate_solution.linear_root, RationalFraction.from_int(2)
         )
 
+    def test_degenerate_verification_exception_fails_closed(self):
+        """If degenerate verification raises an exception, return ErrorResponse(VERIFICATION_FAILED) without leaking strings."""
+        secret_sentinel = "SECRET_DEGENERATE_SENTINEL_TOKEN"
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(0),
+                b=RationalFraction.from_int(2),
+                c=RationalFraction.from_int(-4),
+            )
+        )
+
+        with patch(
+            "mke_product.application.orchestrator.verify_degenerate_solution"
+        ) as mock_deg_ver:
+            mock_deg_ver.side_effect = RuntimeError(secret_sentinel)
+            resp = solve_request(req)
+            self.assertIsInstance(resp, ErrorResponse)
+            self.assertEqual(
+                resp.error_code, ApplicationErrorCode.VERIFICATION_FAILED
+            )
+            # Ensure sentinel is strictly absent from messages and details
+            self.assertNotIn(secret_sentinel, resp.message_vi)
+            self.assertNotIn(secret_sentinel, resp.message_en)
+            self.assertNotIn(secret_sentinel, str(resp.details))
+
     # ========================================================================
     # 6. ACCEPTANCE MATRIX: ERROR / SCOPE CASES (E1 - E8)
     # ========================================================================
@@ -689,8 +715,50 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         self.assertEqual(resp.solution.method_id, "QUAD_VIETE_SPECIAL_SUM")
         self.assertEqual(resp.solution.final_answer_latex, "S = \\left\\{ 1, 2 \\right\\}")
 
-    def test_method_option_catalog_order_and_consistency(self):
-        """Method catalog in SolvedResponse matches MethodRegistry definition order and data exactly."""
+    def test_stable_insertion_order_tie_break(self):
+        """When multiple candidates share the same pedagogical_priority, stable sort preserves registry order."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(1),
+                b=RationalFraction.from_int(-5),
+                c=RationalFraction.from_int(6),
+            ),
+            selected_method_id=None,
+        )
+
+        with patch("mke_product.domain.registry.MethodRegistry.assess_quadratic") as mock_assess:
+            # Create two synthetic assessments with identical pedagogical_priority = 1
+            assessments = [
+                MethodAssessment(
+                    method_id="QUAD_FORMULA_STANDARD",
+                    problem_family=ProblemCategory.ALGEBRA_QUADRATIC,
+                    mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                    support_status=SupportStatus.SUPPORTED,
+                    execution_availability=ExecutionAvailability.AVAILABLE,
+                    pedagogical_recommendation=PedagogicalRecommendation.RECOMMENDED,
+                    verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                    pedagogical_priority=1,
+                ),
+                MethodAssessment(
+                    method_id="QUAD_FORMULA_REDUCED",
+                    problem_family=ProblemCategory.ALGEBRA_QUADRATIC,
+                    mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                    support_status=SupportStatus.SUPPORTED,
+                    execution_availability=ExecutionAvailability.AVAILABLE,
+                    pedagogical_recommendation=PedagogicalRecommendation.RECOMMENDED,
+                    verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                    pedagogical_priority=1,
+                ),
+            ]
+            mock_assess.return_value = assessments
+
+            resp = solve_request(req)
+            self.assertIsInstance(resp, SolvedResponse)
+            # First item in insertion order MUST win tie-break
+            self.assertEqual(resp.selected_method_id, "QUAD_FORMULA_STANDARD")
+
+    def test_full_9_method_option_catalog_order_and_consistency(self):
+        """Method catalog in SolvedResponse matches MethodRegistry definition order and all 11 fields exactly."""
         req = SolveRequest(
             input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
         )
@@ -699,17 +767,67 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
 
         registry = MethodRegistry()
         all_defs = registry.list_all()
-        self.assertEqual(len(resp.available_methods), len(all_defs))
+        assessments = registry.assess_quadratic(Rational(1, 1), Rational(-5, 1), Rational(6, 1))
+        assess_dict = {a.method_id: a for a in assessments}
+
         self.assertEqual(len(resp.available_methods), 9)
+        self.assertEqual(len(all_defs), 9)
+        seen_ids = set()
 
         from mke_product.application.traces import TRACE_GENERATORS
 
         for option_view, method_def in zip(resp.available_methods, all_defs):
+            self.assertNotIn(option_view.method_id, seen_ids)
+            seen_ids.add(option_view.method_id)
+
+            assess = assess_dict[option_view.method_id]
+
+            # Field-by-field check across definition and assessment
             self.assertEqual(option_view.method_id, method_def.method_id)
             self.assertEqual(option_view.title_vi, method_def.title_vi)
+            self.assertEqual(option_view.mathematical_applicability, assess.mathematical_applicability)
+            self.assertEqual(option_view.support_status, assess.support_status)
+            self.assertEqual(option_view.execution_availability, assess.execution_availability)
+            self.assertEqual(option_view.pedagogical_recommendation, assess.pedagogical_recommendation)
+            self.assertEqual(option_view.verification_capability, assess.verification_capability)
+            self.assertEqual(option_view.reasons, assess.reasons)
+            self.assertEqual(option_view.prerequisites, assess.prerequisite_status)
+            self.assertEqual(option_view.pedagogical_priority, assess.pedagogical_priority)
             self.assertEqual(
                 option_view.has_trace_available,
                 option_view.method_id in TRACE_GENERATORS,
+            )
+
+    def test_zero_candidates_automatic_selection_returns_domain_contract_error(self):
+        """If automatic selection finds 0 APPLICABLE+AVAILABLE candidates, returns DOMAIN_CONTRACT_ERROR."""
+        req = SolveRequest(
+            input_payload=CanonicalCoefficientInput(
+                a=RationalFraction.from_int(1),
+                b=RationalFraction.from_int(-5),
+                c=RationalFraction.from_int(6),
+            ),
+            selected_method_id=None,
+        )
+
+        with patch("mke_product.domain.registry.MethodRegistry.assess_quadratic") as mock_assess:
+            # Force all methods to be UNAVAILABLE
+            assessments = [
+                MethodAssessment(
+                    method_id="QUAD_FORMULA_STANDARD",
+                    problem_family=ProblemCategory.ALGEBRA_QUADRATIC,
+                    mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                    support_status=SupportStatus.SUPPORTED,
+                    execution_availability=ExecutionAvailability.UNAVAILABLE,
+                    pedagogical_recommendation=PedagogicalRecommendation.NEUTRAL,
+                    verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                    pedagogical_priority=1,
+                )
+            ]
+            mock_assess.return_value = assessments
+            resp = solve_request(req)
+            self.assertIsInstance(resp, ErrorResponse)
+            self.assertEqual(
+                resp.error_code, ApplicationErrorCode.DOMAIN_CONTRACT_ERROR
             )
 
     # ========================================================================
@@ -805,8 +923,6 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
 
     def test_verified_solution_view_rejects_mismatched_roots(self):
         """VerifiedSolutionView raises ValidationError if trace.roots != roots."""
-        from datetime import datetime
-
         cert = VerificationCertificate(
             certificate_id="cert1",
             problem_hash="hash1",
@@ -847,34 +963,122 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
                 certificate=cert,
             )
 
-    def test_solved_response_cross_field_validators(self):
-        """SolvedResponse enforces cross-field consistency between selected_method_id, available_methods, and solution."""
+    def test_solved_response_cross_field_validators_complete(self):
+        """SolvedResponse enforces cross-field consistency across all 6 invariant dimensions."""
         req = SolveRequest(
             input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0")
         )
         resp = solve_request(req)
         self.assertIsInstance(resp, SolvedResponse)
 
-        # 1. selected_method_id != solution.method_id
+        # A. selected_method_id is NOT_APPLICABLE in available_methods
+        not_app_methods = [
+            MethodOptionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                title_vi="Test",
+                mathematical_applicability=MathematicalApplicability.NOT_APPLICABLE,
+                support_status=SupportStatus.SUPPORTED,
+                execution_availability=ExecutionAvailability.AVAILABLE,
+                pedagogical_recommendation=PedagogicalRecommendation.NEUTRAL,
+                verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                has_trace_available=True,
+                pedagogical_priority=1,
+            )
+        ]
         with self.assertRaises(ValidationError):
             SolvedResponse(
                 problem=resp.problem,
-                available_methods=resp.available_methods,
-                selected_method_id="QUAD_FORMULA_REDUCED",  # Mismatch with solution.method_id
+                available_methods=not_app_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",
                 solution=resp.solution,
             )
 
-        # 2. selected_method_id absent from available_methods
+        # B. selected_method_id is UNAVAILABLE
+        unavail_methods = [
+            MethodOptionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                title_vi="Test",
+                mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                support_status=SupportStatus.SUPPORTED,
+                execution_availability=ExecutionAvailability.UNAVAILABLE,
+                pedagogical_recommendation=PedagogicalRecommendation.NEUTRAL,
+                verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                has_trace_available=True,
+                pedagogical_priority=1,
+            )
+        ]
         with self.assertRaises(ValidationError):
             SolvedResponse(
                 problem=resp.problem,
-                available_methods=[],  # Empty available_methods
+                available_methods=unavail_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",
+                solution=resp.solution,
+            )
+
+        # C. support_status != SUPPORTED
+        unsupported_methods = [
+            MethodOptionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                title_vi="Test",
+                mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                support_status=SupportStatus.UNSUPPORTED,
+                execution_availability=ExecutionAvailability.AVAILABLE,
+                pedagogical_recommendation=PedagogicalRecommendation.NEUTRAL,
+                verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                has_trace_available=True,
+                pedagogical_priority=1,
+            )
+        ]
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=unsupported_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",
+                solution=resp.solution,
+            )
+
+        # D. has_trace_available == False
+        no_trace_methods = [
+            MethodOptionView(
+                method_id="QUAD_FORMULA_STANDARD",
+                title_vi="Test",
+                mathematical_applicability=MathematicalApplicability.APPLICABLE,
+                support_status=SupportStatus.SUPPORTED,
+                execution_availability=ExecutionAvailability.AVAILABLE,
+                pedagogical_recommendation=PedagogicalRecommendation.NEUTRAL,
+                verification_capability=VerificationCapability.HOST_VERIFIABLE,
+                has_trace_available=False,
+                pedagogical_priority=1,
+            )
+        ]
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=no_trace_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",
+                solution=resp.solution,
+            )
+
+        # E. selected_method_id absent from available_methods
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=[],
                 selected_method_id=resp.selected_method_id,
                 solution=resp.solution,
             )
 
-    def test_analyzed_no_execution_cross_field_validators(self):
-        """AnalyzedNoExecutionResponse enforces reason_code and problem/method consistency."""
+        # F. selected_method_id != solution.method_id
+        with self.assertRaises(ValidationError):
+            SolvedResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_FORMULA_REDUCED",  # Mismatched ID
+                solution=resp.solution,
+            )
+
+    def test_analyzed_no_execution_adversarial_rejections(self):
+        """AnalyzedNoExecutionResponse rejects all contradictory configurations."""
         req = SolveRequest(
             input_payload=CanonicalCoefficientInput(
                 a=RationalFraction.from_int(1),
@@ -886,7 +1090,6 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
         resp = solve_request(req)
         self.assertIsInstance(resp, AnalyzedNoExecutionResponse)
 
-        # Contradiction: METHOD_NOT_APPLICABLE on degenerate problem view
         deg_problem = CanonicalDegenerateProblemView(
             problem_id="prob_deg",
             equation_latex="2x - 4 = 0",
@@ -897,13 +1100,163 @@ class TestApplicationOrchestratorS1(unittest.TestCase):
             linear_root=RationalFraction.from_int(2),
             semantic_revision_hash="hash_deg",
         )
+        cert_deg = VerificationCertificate(
+            certificate_id="cert_d",
+            problem_hash="hash_deg",
+            outcome=VerificationOutcome.VERIFIED_COMPLETE,
+            integrity_fingerprint="fp_d",
+        )
+        deg_sol = DegenerateSolutionView(
+            classification=EquationClassificationType.LINEAR,
+            outcome=SolutionOutcome.ONE_REAL_LINEAR_ROOT,
+            linear_root=RationalFraction.from_int(2),
+            final_answer_latex="x = 2",
+            certificate=cert_deg,
+        )
+
+        # --- METHOD_NOT_APPLICABLE ---
+        # 1. selected_method_id is None
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id=None,
+                reason_code=NoExecutionReasonCode.METHOD_NOT_APPLICABLE,
+                analysis_message_vi="Test",
+            )
+        # 2. selected method is actually APPLICABLE
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",  # Standard formula is APPLICABLE!
+                reason_code=NoExecutionReasonCode.METHOD_NOT_APPLICABLE,
+                analysis_message_vi="Test",
+            )
+        # 3. degenerate_solution populated on METHOD_NOT_APPLICABLE
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_VIETE_SPECIAL_SUM",
+                degenerate_solution=deg_sol,
+                reason_code=NoExecutionReasonCode.METHOD_NOT_APPLICABLE,
+                analysis_message_vi="Test",
+            )
+
+        # --- METHOD_NOT_EXECUTABLE ---
+        # 1. selected_method_id is None
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id=None,
+                reason_code=NoExecutionReasonCode.METHOD_NOT_EXECUTABLE,
+                analysis_message_vi="Test",
+            )
+        # 2. selected method is AVAILABLE
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_FORMULA_STANDARD",  # Standard formula is AVAILABLE!
+                reason_code=NoExecutionReasonCode.METHOD_NOT_EXECUTABLE,
+                analysis_message_vi="Test",
+            )
+        # 3. selected method is NOT_APPLICABLE (must be rejected from METHOD_NOT_EXECUTABLE)
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_VIETE_SPECIAL_SUM",  # Viète is NOT_APPLICABLE!
+                reason_code=NoExecutionReasonCode.METHOD_NOT_EXECUTABLE,
+                analysis_message_vi="Test",
+            )
+        # 4. degenerate_solution populated on METHOD_NOT_EXECUTABLE
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,
+                available_methods=resp.available_methods,
+                selected_method_id="QUAD_COMPLETE_SQUARE",
+                degenerate_solution=deg_sol,
+                reason_code=NoExecutionReasonCode.METHOD_NOT_EXECUTABLE,
+                analysis_message_vi="Test",
+            )
+
+        # --- DEGENERATE_EXACT_SOLUTION ---
+        # 1. Quadratic problem on DEGENERATE_EXACT_SOLUTION
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=resp.problem,  # Quadratic view
+                available_methods=[],
+                selected_method_id=None,
+                degenerate_solution=deg_sol,
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
+            )
+        # 2. available_methods non-empty
         with self.assertRaises(ValidationError):
             AnalyzedNoExecutionResponse(
                 problem=deg_problem,
-                available_methods=resp.available_methods,
-                selected_method_id="QUAD_VIETE_SPECIAL_SUM",
-                reason_code=NoExecutionReasonCode.METHOD_NOT_APPLICABLE,
-                analysis_message_vi="Test invalid",
+                available_methods=resp.available_methods,  # Non-empty
+                selected_method_id=None,
+                degenerate_solution=deg_sol,
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
+            )
+        # 3. selected_method_id non-None
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=deg_problem,
+                available_methods=[],
+                selected_method_id="QUAD_FORMULA_STANDARD",
+                degenerate_solution=deg_sol,
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
+            )
+        # 4. degenerate_solution missing
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=deg_problem,
+                available_methods=[],
+                selected_method_id=None,
+                degenerate_solution=None,
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
+            )
+        # 5. classification mismatch
+        deg_sol_identity = DegenerateSolutionView(
+            classification=EquationClassificationType.IDENTITY,
+            outcome=SolutionOutcome.INFINITE_REAL_SOLUTIONS,
+            linear_root=None,
+            final_answer_latex="S = \\mathbb{R}",
+            certificate=cert_deg,
+        )
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=deg_problem,  # LINEAR problem
+                available_methods=[],
+                selected_method_id=None,
+                degenerate_solution=deg_sol_identity,  # IDENTITY solution
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
+            )
+        # 6. LINEAR root mismatch
+        deg_sol_wrong_root = DegenerateSolutionView(
+            classification=EquationClassificationType.LINEAR,
+            outcome=SolutionOutcome.ONE_REAL_LINEAR_ROOT,
+            linear_root=RationalFraction.from_int(999),  # Mismatch with problem.linear_root = 2
+            final_answer_latex="x = 999",
+            certificate=cert_deg,
+        )
+        with self.assertRaises(ValidationError):
+            AnalyzedNoExecutionResponse(
+                problem=deg_problem,
+                available_methods=[],
+                selected_method_id=None,
+                degenerate_solution=deg_sol_wrong_root,
+                reason_code=NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION,
+                analysis_message_vi="Test",
             )
 
     def test_discriminated_union_adapter_validation(self):

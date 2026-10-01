@@ -342,9 +342,18 @@ class AnalyzedNoExecutionResponse(BaseModel):
             if self.degenerate_solution is not None:
                 raise ValueError("METHOD_NOT_EXECUTABLE must have degenerate_solution=None.")
             matching = [m for m in self.available_methods if m.method_id == self.selected_method_id]
-            if len(matching) != 1 or matching[0].execution_availability == ExecutionAvailability.AVAILABLE:
+            if len(matching) != 1:
                 raise ValueError(
-                    f"Selected method '{self.selected_method_id}' must exist and have execution_availability != AVAILABLE."
+                    f"Selected method '{self.selected_method_id}' must appear exactly once in available_methods."
+                )
+            target = matching[0]
+            if target.mathematical_applicability != MathematicalApplicability.APPLICABLE:
+                raise ValueError(
+                    f"Selected method '{self.selected_method_id}' must have mathematical_applicability == APPLICABLE for METHOD_NOT_EXECUTABLE."
+                )
+            if target.execution_availability == ExecutionAvailability.AVAILABLE:
+                raise ValueError(
+                    f"Selected method '{self.selected_method_id}' must have execution_availability != AVAILABLE."
                 )
 
         elif self.reason_code == NoExecutionReasonCode.DEGENERATE_EXACT_SOLUTION:
