@@ -1,15 +1,15 @@
-# MKE MVP V1 — S2-P0-R1 Transport & Live Math Workspace Integration Preflight Specification
+# MKE MVP V1 — S2-P0-R2 Transport & Live Math Workspace Integration Preflight Specification
 
-**Document Version:** 1.1.0 (R1 Contract Hardened)  
+**Document Version:** 1.2.0 (R2 Final Wire-Contract & Transport-Taxonomy Closeout)  
 **Milestone:** MVP V1 — Stage S2 Preflight Architecture  
 **Role:** Antigravity (“Anty”) — Implementation Engineer  
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
 **Accepted S1 Baseline:** `3058b6e904f38003a650a79105ae615226bdbc17`  
-**Parent S2-P0 Baseline:** `b2c6b864d1665c1adbab6bffb6c347f8cf5e15cc`  
+**Parent S2-P0-R1 Baseline:** `93d5599c4b9a8cbdfe569133e988bcffc3074e30`  
 **Parked B3 Baseline:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61` (UNTOUCHED)  
-**Status:** **`PENDING INDEPENDENT S2-P0-R1 AUDIT`**
+**Status:** **`PENDING INDEPENDENT S2-P0-R2 FINAL AUDIT`**
 
 ---
 
@@ -124,7 +124,7 @@ Route Precedence Order (Top to Bottom):
 ```
 
 > [!CRITICAL]
-> **API 404 vs SPA Fallback Rule:** Requests matching `/api/*` that do not resolve to a registered endpoint MUST return JSON `404 Not Found` with a structured `ErrorResponse` envelope. They MUST NEVER fall back to `index.html`.
+> **API 404 vs SPA Fallback Rule:** Requests matching `/api/*` that do not resolve to a registered endpoint MUST return JSON `404 Not Found` with a structured `TransportErrorResponse` envelope. They MUST NEVER fall back to `index.html`.
 
 ### 4.1 Route Specification: `POST /api/v1/algebra/solve`
 - **Request Body:** Direct JSON representation of `SolveRequest`.
@@ -135,12 +135,12 @@ Route Precedence Order (Top to Bottom):
       "/algebra/solve",
       response_model=SolveResponseUnion,
       responses={
-          200: {"description": "Successful mathematical analysis or domain error"},
-          400: {"model": ErrorResponse, "description": "Malformed JSON payload"},
-          413: {"model": ErrorResponse, "description": "Payload exceeds 64 KiB limit"},
-          415: {"model": ErrorResponse, "description": "Unsupported Content-Type"},
-          422: {"description": "DTO schema validation failure"},
-          500: {"model": ErrorResponse, "description": "Internal server execution failure"},
+          200: {"description": "Successful mathematical analysis or client domain error"},
+          400: {"model": TransportErrorResponse, "description": "Malformed JSON payload"},
+          413: {"model": TransportErrorResponse, "description": "Payload exceeds 64 KiB limit"},
+          415: {"model": TransportErrorResponse, "description": "Unsupported Content-Type"},
+          422: {"model": TransportErrorResponse, "description": "DTO schema validation failure"},
+          500: {"model": Union[ErrorResponse, TransportErrorResponse], "description": "Internal server failure"},
       },
   )
   async def solve_equation_endpoint(request: SolveRequest) -> SolveResponseUnion:
@@ -155,10 +155,12 @@ Route Precedence Order (Top to Bottom):
 ### 4.2 Route Specification: `GET /api/v1/health`
 Health metadata is derived **dynamically** from the underlying domain registries at runtime:
 ```python
-@router.get("/health")
+@router.get("/health", response_model=HealthResponse)
 async def health_check_endpoint() -> HealthResponse:
-    from mke_product.methods.registry import MethodRegistry
-    from mke_product.methods.traces import TRACE_GENERATORS
+    from mke_product.domain.registry import MethodRegistry
+    from mke_product.application.traces import TRACE_GENERATORS
+
+    registry = MethodRegistry()
 
     return HealthResponse(
         status="HEALTHY",
@@ -166,12 +168,12 @@ async def health_check_endpoint() -> HealthResponse:
         milestone="MVP_V1_S2",
         algebra_authority="mke_product.application.orchestrator.solve_request",
         supported_input_modes=["RAW_TEXT", "COEFFICIENTS"],
-        registered_methods_count=len(MethodRegistry.list_all()),
+        registered_methods_count=len(registry.list_all()),
         executable_methods_count=len(TRACE_GENERATORS),
     )
 ```
 
-**Health Response Payload:**
+**Health Response Payload Example (Illustrative observed values):**
 ```json
 {
   "status": "HEALTHY",
@@ -186,9 +188,9 @@ async def health_check_endpoint() -> HealthResponse:
 
 ---
 
-## 5. HTTP Status Semantics & Error Mapping Policy
+## 5. HTTP Status Semantics, Error Mapping Policy & Transport Taxonomy
 
-Transport status codes strictly distinguish between **Transport / Request Malformation (4xx)**, **Application Domain Outcomes (Category A $\to$ HTTP 200)**, and **Internal Integrity / Execution Failures (Category B $\to$ HTTP 500)**:
+Transport status codes strictly distinguish between **Transport Failures (4xx / 500 Transport)**, **Application Domain Outcomes (Category A $\to$ HTTP 200)**, and **Internal Integrity / Execution Failures (Category B $\to$ HTTP 500 Application)**:
 
 ```
                                 ┌─────────────────────────────┐
@@ -201,31 +203,58 @@ Transport status codes strictly distinguish between **Transport / Request Malfor
                       │                                                 │
            solve_request(SolveRequest)                        ┌─────────┼─────────┬─────────┐
                       │                                       ▼         ▼         ▼         ▼
-        ┌─────────────┼─────────────┐                      Bad JSON  Too Large Bad Media Pydantic
+        ┌─────────────┼─────────────┐                      Bad JSON  Too Large Bad Media Validation
         ▼             ▼             ▼                      HTTP 400  HTTP 413  HTTP 415  HTTP 422
      SOLVED        ANALYZED       ERROR                    (Syntax)  (>64KiB)  (!=json)  (Schema)
-    HTTP 200       HTTP 200      ┌──┴──┐
-   (Verified)     (Degenerate/   │     │
-                  Unavailable)   ▼     ▼
-                            Category A Category B
+    HTTP 200       HTTP 200      ┌──┴──┐                      │         │         │         │
+   (Verified)     (Degenerate/   │     │                      └─────────┴────┬────┴─────────┘
+                  Unavailable)   ▼     ▼                                     ▼
+                            Category A Category B                  TransportErrorResponse
                             HTTP 200   HTTP 500
                             (Client)   (Internal)
+                               │          │
+                               ▼          ▼
+                        SolveResponse  ErrorResponse
 ```
 
-### 5.1 Error Categorization Matrix:
+### 5.1 Transport Error Taxonomy
 
-| Category | Outcome / Error Code | HTTP Status | Response Schema | Description & UI Handling |
+To prevent namespace contamination between mathematical errors and HTTP transport failures, S2 freezes a dedicated `TransportErrorResponse` schema:
+
+```python
+class TransportErrorCode(str, Enum):
+    MALFORMED_JSON = "MALFORMED_JSON"
+    REQUEST_VALIDATION_FAILED = "REQUEST_VALIDATION_FAILED"
+    PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
+    UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+    API_NOT_FOUND = "API_NOT_FOUND"
+    INTERNAL_TRANSPORT_ERROR = "INTERNAL_TRANSPORT_ERROR"
+
+
+class TransportErrorResponse(BaseModel):
+    transport_status: Literal["ERROR"] = "ERROR"
+    transport_error_code: str
+    message_vi: str
+    message_en: str
+    details: Optional[Dict[str, Any]] = None
+```
+
+### 5.2 Transport & Application Error Matrix:
+
+| Category | Trigger / Condition | HTTP Status | Response Schema | Description & Client Handling |
 | :--- | :--- | :--- | :--- | :--- |
 | **Mathematical Success** | `response_status="SOLVED"` | `200 OK` | `SolvedResponse` | Solved & verified; render solution card, roots, and trace |
 | **Mathematical Analysis** | `response_status="ANALYZED_NO_EXECUTION"` | `200 OK` | `AnalyzedNoExecutionResponse` | Degenerate ($a=0$) or deferred method; render explanation |
-| **Category A: Client Domain Error** | `SYNTAX_ERROR`<br>`UNSUPPORTED_VARIABLE`<br>`UNSUPPORTED_SYNTAX`<br>`IMPLICIT_MULTIPLICATION_UNSUPPORTED`<br>`DEGREE_OUT_OF_SCOPE`<br>`NON_POLYNOMIAL_INPUT`<br>`DIVISION_BY_ZERO`<br>`INPUT_LIMIT_EXCEEDED`<br>`METHOD_NOT_FOUND` | `200 OK` | `ErrorResponse` | Mathematical/input errors caused by client request; render inline error panel with error code and span highlight |
-| **Category B: Internal Execution Failure** | `NORMALIZATION_ERROR` (internal)<br>`DOMAIN_CONTRACT_ERROR`<br>`METHOD_EXECUTION_FAILED`<br>`VERIFICATION_FAILED`<br>`INTERNAL_ERROR` | `500 Internal Server Error` | `ErrorResponse` (sanitized) | Engine invariant violation or unexpected failure; render localized server error banner without leaking internal trace |
-| **Transport: Malformed JSON** | `json_invalid` | `400 Bad Request` | `ErrorResponse` | Body is not valid JSON; custom exception handler returns HTTP 400 |
-| **Transport: Schema Validation** | `ValidationError` | `422 Unprocessable Entity` | Standard FastAPI / Pydantic validation error | Schema constraint violation (e.g. string > 256 chars, missing field) |
-| **Transport: Payload Exceeded** | `StreamPayloadLimitExceeded` | `413 Payload Too Large` | `ErrorResponse` | Body exceeds 65,536 bytes limit |
-| **Transport: Unsupported Media** | `UnsupportedMediaType` | `415 Unsupported Media Type` | `ErrorResponse` | `Content-Type` is not `application/json` |
+| **Category A: Client Domain Error** | `SYNTAX_ERROR`<br>`UNSUPPORTED_VARIABLE`<br>`UNSUPPORTED_SYNTAX`<br>`IMPLICIT_MULTIPLICATION_UNSUPPORTED`<br>`DEGREE_OUT_OF_SCOPE`<br>`NON_POLYNOMIAL_INPUT`<br>`DIVISION_BY_ZERO`<br>`INPUT_LIMIT_EXCEEDED`<br>`METHOD_NOT_FOUND` | `200 OK` | `ErrorResponse` | Mathematical/input errors caused by client query; render inline error panel with error code and span highlight |
+| **Category B: Internal Application Failure** | `NORMALIZATION_ERROR` (internal)<br>`DOMAIN_CONTRACT_ERROR`<br>`METHOD_EXECUTION_FAILED`<br>`VERIFICATION_FAILED`<br>`INTERNAL_ERROR` | `500 Internal Server Error` | `ErrorResponse` (sanitized) | Engine invariant violation or internal execution failure; render server error banner without leaking internal stack trace |
+| **Transport: Malformed JSON** | JSON body parse failure (`json_invalid`) | `400 Bad Request` | `TransportErrorResponse` (`MALFORMED_JSON`) | Body is not valid JSON; custom exception handler returns HTTP 400 |
+| **Transport: Schema Validation** | Pydantic `ValidationError` | `422 Unprocessable Entity` | `TransportErrorResponse` (`REQUEST_VALIDATION_FAILED`) | Request body does not conform to `SolveRequest` schema |
+| **Transport: Payload Exceeded** | Cumulative stream body > 65,536 bytes | `413 Payload Too Large` | `TransportErrorResponse` (`PAYLOAD_TOO_LARGE`) | Payload exceeds 64 KiB limit |
+| **Transport: Unsupported Media** | `Content-Type` is not `application/json` | `415 Unsupported Media Type` | `TransportErrorResponse` (`UNSUPPORTED_MEDIA_TYPE`) | Media type rejected before body processing |
+| **Transport: Unknown API Route** | Nonexistent `/api/*` route | `404 Not Found` | `TransportErrorResponse` (`API_NOT_FOUND`) | API route not found (isolated from SPA fallback) |
+| **Transport: Internal Transport Error** | Unhandled middleware / ASGI crash | `500 Internal Server Error` | `TransportErrorResponse` (`INTERNAL_TRANSPORT_ERROR`) | Transport-level exception before application orchestrator |
 
-### 5.2 Malformed JSON vs Schema Validation Exception Handlers:
+### 5.3 Malformed JSON vs Schema Validation Exception Handlers:
 FastAPI by default groups JSON parse errors and Pydantic validation errors under `RequestValidationError` (returning HTTP 422). S2 implements a custom exception handler:
 ```python
 @app.exception_handler(RequestValidationError)
@@ -235,65 +264,133 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         if err.get("type") == "json_invalid":
             return JSONResponse(
                 status_code=400,
-                content={
-                    "response_status": "ERROR",
-                    "error_code": "SYNTAX_ERROR",
-                    "message_vi": "Định dạng JSON trong yêu cầu không hợp lệ.",
-                    "message_en": "Malformed JSON request body.",
-                    "span": None,
-                    "details": {"error_type": "json_invalid"},
-                },
+                content=TransportErrorResponse(
+                    transport_error_code=TransportErrorCode.MALFORMED_JSON.value,
+                    message_vi="Định dạng JSON trong yêu cầu không hợp lệ.",
+                    message_en="Malformed JSON request body.",
+                    details={"error_type": "json_invalid", "loc": err.get("loc")},
+                ).model_dump(mode="json"),
             )
-    # Standard Pydantic schema validation failures return HTTP 422
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    # Standard Pydantic schema validation failures return HTTP 422 with normalized TransportErrorResponse
+    return JSONResponse(
+        status_code=422,
+        content=TransportErrorResponse(
+            transport_error_code=TransportErrorCode.REQUEST_VALIDATION_FAILED.value,
+            message_vi="Dữ liệu yêu cầu không khớp với schema định nghĩa.",
+            message_en="Request body failed schema validation.",
+            details={"validation_errors": exc.errors()},
+        ).model_dump(mode="json"),
+    )
 ```
 
-### 5.3 Streaming 64 KiB Payload Limit Middleware:
-To prevent memory exhaustion via chunked transfer or omitted `Content-Length`:
+### 5.4 Pure ASGI Streaming 64 KiB Payload Limit Middleware:
+To prevent memory exhaustion without buffering unbounded bodies, S2 implements a pure ASGI middleware wrapping the `receive` callable:
 ```python
-class PayloadLimitMiddleware(BaseHTTPMiddleware):
+class StreamPayloadLimitMiddleware:
     MAX_BYTES = 65536  # 64 KiB
 
-    async def dispatch(self, request: Request, call_next):
-        # 1. Early rejection via Content-Length header
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > self.MAX_BYTES:
-            return JSONResponse(
-                status_code=413,
-                content={
-                    "response_status": "ERROR",
-                    "error_code": "INPUT_LIMIT_EXCEEDED",
-                    "message_vi": "Kích thước yêu cầu vượt quá giới hạn 64 KiB.",
-                    "message_en": "Request payload exceeds 64 KiB limit.",
-                    "span": None,
-                    "details": {"limit_bytes": self.MAX_BYTES},
-                },
-            )
-        # 2. Chunk-counting stream validator for chunked/unbounded transfers
-        # (Stream-level byte counter aborts connection if cumulative chunks exceed MAX_BYTES)
-        return await call_next(request)
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length_raw = headers.get(b"content-length")
+
+        # 1. Early rejection when Content-Length header is present and > 65536
+        if content_length_raw:
+            try:
+                if int(content_length_raw.decode("latin1")) > self.MAX_BYTES:
+                    await self._send_413_response(send)
+                    return
+            except ValueError:
+                pass
+
+        # 2. Wrap receive callable with byte accumulator for streaming/chunked requests
+        cumulative_bytes = 0
+
+        async def limited_receive() -> Message:
+            nonlocal cumulative_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                body_chunk = message.get("body", b"")
+                cumulative_bytes += len(body_chunk)
+                if cumulative_bytes > self.MAX_BYTES:
+                    # Short-circuit without loading unbounded body
+                    raise PayloadTooLargeException()
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except PayloadTooLargeException:
+            await self._send_413_response(send)
+
+    async def _send_413_response(self, send: Send) -> None:
+        payload = TransportErrorResponse(
+            transport_error_code=TransportErrorCode.PAYLOAD_TOO_LARGE.value,
+            message_vi="Kích thước yêu cầu vượt quá giới hạn 64 KiB.",
+            message_en="Request payload exceeds 64 KiB limit.",
+            details={"limit_bytes": self.MAX_BYTES},
+        ).model_dump(mode="json")
+        body = json.dumps(payload).encode("utf-8")
+
+        await send({
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("latin1")),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
 ```
 
-### 5.4 Unsupported Media Type Middleware:
+### 5.5 Content-Type Header Parsing & Media-Type Enforcement:
+For all POST requests under `/api/`, the `Content-Type` header is extracted, stripped of parameters, and checked:
 ```python
-class MediaTypeEnforcementMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if request.method == "POST" and request.url.path.startswith("/api/"):
-            content_type = request.headers.get("content-type", "")
-            if not content_type.startswith("application/json"):
-                return JSONResponse(
-                    status_code=415,
-                    content={
-                        "response_status": "ERROR",
-                        "error_code": "UNSUPPORTED_SYNTAX",
-                        "message_vi": "Tiêu đề Content-Type phải là 'application/json'.",
-                        "message_en": "Content-Type header must be 'application/json'.",
-                        "span": None,
-                        "details": {"received_content_type": content_type},
-                    },
-                )
-        return await call_next(request)
+def extract_media_type(raw_header: str) -> str:
+    # Extracts portion before first ';', trimmed and lowercased
+    return raw_header.split(";")[0].strip().lower()
+
+class MediaTypeEnforcementMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"].startswith("/api/"):
+            headers = dict(scope.get("headers", []))
+            raw_content_type = headers.get(b"content-type", b"").decode("latin1")
+            media_type = extract_media_type(raw_content_type)
+
+            # Accept strictly "application/json" (with optional parameters such as charset)
+            if media_type != "application/json":
+                payload = TransportErrorResponse(
+                    transport_error_code=TransportErrorCode.UNSUPPORTED_MEDIA_TYPE.value,
+                    message_vi="Tiêu đề Content-Type phải là 'application/json'.",
+                    message_en="Content-Type header must be 'application/json'.",
+                    details={"received_content_type": raw_content_type},
+                ).model_dump(mode="json")
+                body = json.dumps(payload).encode("utf-8")
+
+                await send({
+                    "type": "http.response.start",
+                    "status": 415,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode("latin1")),
+                    ],
+                })
+                await send({"type": "http.response.body", "body": body})
+                return
+
+        await self.app(scope, receive, send)
 ```
+
+> [!NOTE]
+> **Media Type Policy for MVP V1:** `application/*+json` is explicitly unsupported for S2. Requests must specify `Content-Type: application/json` (with optional parameters like `charset=utf-8`).
 
 ---
 
@@ -302,10 +399,12 @@ class MediaTypeEnforcementMiddleware(BaseHTTPMiddleware):
 The DTO models in `mke_product.application.dto` serve as the Single Source of Truth (SSOT).
 
 ### Contract Formatting Rules:
-- `semantic_revision_hash`: Raw 64-character SHA-256 lowercase hex string (e.g. `"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"`). **No `sha256_` prefix**.
-- `problem_id`: `"prob_" + semantic_revision_hash[:16]` (e.g. `"prob_e3b0c44298fc1c14"`).
-- `certificate_id`: `"cert_" + problem_hash[:16]`.
-- `verified_at_utc`: Pydantic ISO-8601 UTC timestamp (e.g. `"2026-10-01T22:00:00Z"`).
+- `semantic_revision_hash`: Raw 64-character SHA-256 lowercase hex string (e.g. `"8f4a1c0d2e3b4a5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c"`). **No `sha256_` prefix**.
+- `problem_id`: `"prob_" + semantic_revision_hash[:16]` (e.g. `"prob_8f4a1c0d2e3b4a5c"`).
+- `certificate_id`: Exact 16 lowercase hex characters without `"cert_"` prefix:
+  - Quadratic: `SHA256("cert:" + problem_hash + ":" + cert_sig).hexdigest()[:16]`
+  - Degenerate: `SHA256("cert:degenerate:" + problem_hash + ":" + cert_sig).hexdigest()[:16]`
+- `verified_at_utc`: Pydantic ISO-8601 UTC timestamp generated from naive `datetime.utcnow()` without trailing `Z` suffix (e.g. `"2026-10-01T22:00:00"`). Preserved in S2 transport without mutation.
 - `available_methods`: Array of 9 `MethodOptionView` entries for quadratic equations, empty for degenerate equations.
 
 ### 6.1 Request JSON Payloads
@@ -449,11 +548,11 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
     },
     "verification_scope": "FINAL_SOLUTION",
     "certificate": {
-      "certificate_id": "cert_8f4a1c0d2e3b4a5c",
+      "certificate_id": "c1d2e3f4a5b6c7d8",
       "problem_hash": "8f4a1c0d2e3b4a5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c",
       "outcome": "VERIFIED_COMPLETE",
       "integrity_fingerprint": "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
-      "verified_at_utc": "2026-10-01T22:00:00Z"
+      "verified_at_utc": "2026-10-01T22:00:00"
     }
   }
 }
@@ -485,11 +584,11 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
     "final_answer_latex": "x = 2",
     "verification_scope": "FINAL_SOLUTION",
     "certificate": {
-      "certificate_id": "cert_d1e2f3a4b5c6d7e8",
+      "certificate_id": "f1e2d3c4b5a69788",
       "problem_hash": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2",
       "outcome": "VERIFIED_COMPLETE",
       "integrity_fingerprint": "f1e2d3c4b5a69788796a5b4c3d2e1f001a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
-      "verified_at_utc": "2026-10-01T22:00:00Z"
+      "verified_at_utc": "2026-10-01T22:00:00"
     }
   },
   "reason_code": "DEGENERATE_EXACT_SOLUTION",
@@ -497,7 +596,7 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
 }
 ```
 
-#### C. ERROR Response Example:
+#### C. ERROR Response Example (Category A Client Domain Error):
 ```json
 {
   "response_status": "ERROR",
@@ -510,6 +609,20 @@ The DTO models in `mke_product.application.dto` serve as the Single Source of Tr
   },
   "details": {
     "token": "="
+  }
+}
+```
+
+#### D. Transport Error Response Example (HTTP 400 / 413 / 415 / 422):
+```json
+{
+  "transport_status": "ERROR",
+  "transport_error_code": "MALFORMED_JSON",
+  "message_vi": "Định dạng JSON trong yêu cầu không hợp lệ.",
+  "message_en": "Malformed JSON request body.",
+  "details": {
+    "error_type": "json_invalid",
+    "loc": ["body", 12]
   }
 }
 ```
@@ -536,18 +649,20 @@ To eliminate manual shadow schema duplication and prevent client-server drift:
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Automation & CI Drift Check Strategy:
-1. **Generation Command:**
-   ```bash
-   npm run generate:api-types
-   # Executes: openapi-typescript http://127.0.0.1:8000/openapi.json -o src/frontend/src/types/api.generated.ts
-   ```
-2. **CI Drift Check Command:**
-   ```bash
-   npm run check:api-types
-   # Dumps schema, generates types to a temporary file, and verifies git diff == 0
-   ```
-3. **No Shadow Types:** Frontend code must import exclusively from `api.generated.ts`. Zero manual hand-written interface definitions for backend DTOs.
+### OpenAPI $\to$ TypeScript Union Strategy:
+- `SolveResponseUnion` is defined in Python as an `Annotated[Union[...], Field(discriminator='response_status')]`.
+- **Preferred Approach:** In frontend TypeScript code, derive the union type directly from the OpenAPI operation response:
+  ```typescript
+  import type { operations, components } from "./types/api.generated";
+
+  export type SolveResponseUnion =
+    operations["solve_equation_endpoint"]["responses"]["200"]["content"]["application/json"];
+  export type SolvedResponse = components["schemas"]["SolvedResponse"];
+  export type AnalyzedNoExecutionResponse = components["schemas"]["AnalyzedNoExecutionResponse"];
+  export type ErrorResponse = components["schemas"]["ErrorResponse"];
+  export type TransportErrorResponse = components["schemas"]["TransportErrorResponse"];
+  ```
+- **S2-01 Implementation Option:** If a named component schema is found to simplify tooling, introduce a Pydantic `RootModel[SolveResponseUnion]` transport schema alias whose wire JSON remains bit-for-bit identical.
 
 ---
 
@@ -578,13 +693,14 @@ Theme/Language Popover         ─────>  <SettingsPopover /> component
 The workspace state is structured as an immutable, unidirectional state machine driven by server response DTOs:
 
 ```typescript
-import type { components } from "./types/api.generated";
+import type { operations, components } from "./types/api.generated";
 
-type SolveResponseUnion = components["schemas"]["SolveResponseUnion"];
-type SolvedResponse = components["schemas"]["SolvedResponse"];
-type AnalyzedNoExecutionResponse = components["schemas"]["AnalyzedNoExecutionResponse"];
-type ErrorResponse = components["schemas"]["ErrorResponse"];
-type RationalFraction = components["schemas"]["RationalFraction"];
+export type SolveResponseUnion =
+  operations["solve_equation_endpoint"]["responses"]["200"]["content"]["application/json"];
+export type SolvedResponse = components["schemas"]["SolvedResponse"];
+export type AnalyzedNoExecutionResponse = components["schemas"]["AnalyzedNoExecutionResponse"];
+export type ErrorResponse = components["schemas"]["ErrorResponse"];
+export type RationalFraction = components["schemas"]["RationalFraction"];
 
 interface WorkspaceState {
   // Input State
@@ -619,7 +735,7 @@ interface WorkspaceState {
                                ┌─────────────────────────────┐
                                │     <AlgebraWorkspace />    │
                                └──────────────┬──────────────┘
-                                              │
+                                               │
          ┌────────────────────────────────────┼────────────────────────────────────┐
          ▼                                    ▼                                    ▼
 ┌──────────────────┐               ┌──────────────────────┐             ┌─────────────────────┐
@@ -692,10 +808,35 @@ Parity between direct Python execution `solve_request(req)` and HTTP transport `
 
 > **"Semantic parity after normalization of intentionally nondeterministic metadata."**
 
+### Parity Verification Procedure:
+1. Obtain direct Python execution dictionary:
+   ```python
+   direct_resp = solve_request(req)
+   direct_dict = direct_resp.model_dump(mode="json")
+   ```
+2. Obtain HTTP response dictionary:
+   ```python
+   http_resp = test_client.post("/api/v1/algebra/solve", json=req.model_dump(mode="json"))
+   assert http_resp.status_code == 200
+   http_dict = http_resp.json()
+   ```
+3. Normalize only intentionally nondeterministic metadata fields:
+   - Mask `verified_at_utc` in both dictionaries (e.g. `direct_dict["solution"]["certificate"]["verified_at_utc"] = "NORMALIZED"`).
+4. Assert exact semantic equality:
+   ```python
+   assert direct_dict == http_dict
+   ```
+
 ### Parity Invariants:
-1. All mathematical structures (`problem`, `classification`, $a, b, c$, `discriminant`, `roots`, `trace`, `available_methods`, `semantic_revision_hash`) must match bit-for-bit.
-2. The only field permitted to vary across invocations is `verified_at_utc` in the verification certificate (which reflects the invocation wall clock).
-3. Test suites assert equality by masking or normalizing `verified_at_utc` prior to assertion.
+Strict bit-for-bit equality is required across:
+- `response_status`
+- Canonical problem fields (`problem_id`, `equation_latex`, $a, b, c$, `discriminant`, `classification`)
+- `semantic_revision_hash`
+- `available_methods` (all 9 items and their properties)
+- `selected_method_id`
+- Solution outcome, exact roots, and formatting
+- Complete step-by-step trace intermediate expressions and rules
+- Verification outcome, `integrity_fingerprint`, and `certificate_id`
 
 ---
 
@@ -704,18 +845,25 @@ Parity between direct Python execution `solve_request(req)` and HTTP transport `
 The future Stage S2 implementation must satisfy the following comprehensive test suites:
 
 ### 14.1 Transport Integration Tests (`tests/test_transport_fastapi_s2.py`):
-- `test_api_solve_raw_text_solved_parity`: HTTP `POST /api/v1/algebra/solve` achieves semantic parity with direct `solve_request()`.
+- `test_api_solve_raw_text_solved_parity`: HTTP `POST /api/v1/algebra/solve` achieves semantic parity with direct `solve_request()` after timestamp normalization.
 - `test_api_solve_coefficients_solved_parity`: HTTP `COEFFICIENTS` solve matches direct execution.
 - `test_api_method_switch_reactivity`: Method switch preserves `semantic_revision_hash` and updates trace.
 - `test_api_degenerate_solution_linear`: Linear equation returns HTTP 200 with `DEGENERATE_EXACT_SOLUTION`.
 - `test_api_syntax_error_returns_http_200_error_response`: Category A client errors return HTTP 200 `ErrorResponse` with span.
-- `test_api_invalid_json_returns_http_400_custom_handler`: Malformed JSON returns HTTP 400 with custom error envelope.
-- `test_api_pydantic_validation_failure_returns_http_422`: Schema violations return HTTP 422.
-- `test_api_unsupported_media_type_returns_http_415`: Non-JSON requests return HTTP 415.
-- `test_api_payload_exceeding_64kb_stream_returns_http_413`: Payloads > 64 KiB rejected via early header or stream counter.
-- `test_api_internal_execution_failure_returns_http_500`: Category B internal failures return sanitized HTTP 500 `ErrorResponse`.
+- `test_api_invalid_json_returns_http_400_custom_handler`: Malformed JSON returns HTTP 400 with `TransportErrorResponse(MALFORMED_JSON)`.
+- `test_api_pydantic_validation_failure_returns_http_422`: Schema violations return HTTP 422 with `TransportErrorResponse(REQUEST_VALIDATION_FAILED)`.
+- `test_api_unsupported_media_type_text_plain_returns_http_415`: `text/plain` returns HTTP 415 `TransportErrorResponse(UNSUPPORTED_MEDIA_TYPE)`.
+- `test_api_unsupported_media_type_invalid_suffix_returns_http_415`: `application/json-not-really` returns HTTP 415.
+- `test_api_supported_media_type_application_json_accepted`: `application/json` returns HTTP 200.
+- `test_api_supported_media_type_with_charset_accepted`: `application/json; charset=utf-8` returns HTTP 200.
+- `test_api_stream_limit_header_rejection_returns_http_413`: Declared `Content-Length: 65537` returns HTTP 413 `TransportErrorResponse(PAYLOAD_TOO_LARGE)`.
+- `test_api_stream_limit_streamed_chunks_returns_http_413`: Streamed chunks > 64 KiB without `Content-Length` return HTTP 413.
+- `test_api_stream_limit_deceptive_header_returns_http_413`: Declared `Content-Length: 10` but stream sending > 64 KiB returns HTTP 413.
+- `test_api_stream_limit_exact_65536_boundary_accepted`: Exactly 65,536 bytes payload accepted.
+- `test_api_internal_execution_failure_returns_http_500_application_error`: Category B internal failures return sanitized HTTP 500 `ErrorResponse`.
+- `test_api_internal_transport_failure_returns_http_500_transport_error`: Transport-level failures return HTTP 500 `TransportErrorResponse`.
 - `test_api_nonexistent_api_route_returns_json_404_no_spa_fallback`: `/api/*` routes return JSON 404 and never SPA `index.html`.
-- `test_api_health_endpoint_derived_counts`: `GET /api/v1/health` returns dynamically derived counts (9 registered, 4 executable).
+- `test_api_health_endpoint_derived_dynamically`: `GET /api/v1/health` verifies counts match `len(MethodRegistry().list_all())` and `len(TRACE_GENERATORS)` dynamically via monkeypatching.
 - `test_openapi_schema_drift_check`: Generated TypeScript types match FastAPI `/openapi.json` without drift.
 
 ### 14.2 Live Workspace Browser Tests (`tests/test_browser_live_workspace_s2.py`):
@@ -737,11 +885,12 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 │ S2-01: FastAPI Transport Adapter & Route Namespace Implementation                      │
 │        - Add fastapi/uvicorn to requirements.txt & httpx to requirements-dev.txt       │
 │        - Implement src/mke_product/transport/app.py & routers/algebra.py               │
-│        - Implement 400/413/415/500 handlers, streaming middleware & CORS               │
+│        - Implement pure ASGI streaming 64 KiB limit & media type enforcement           │
+│        - Implement TransportErrorResponse & custom 400/413/415/422/500 handlers        │
 │        - Connect /api/v1/algebra/solve directly to solve_request()                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ S2-02: Transport Acceptance & Direct-vs-HTTP Parity Verification Suite                 │
-│        - Implement tests/test_transport_fastapi_s2.py using TestClient                 │
+│        - Implement tests/test_transport_fastapi_s2.py using TestClient / ASGI harness  │
 │        - Prove 100% mathematical semantic parity between direct Python & HTTP          │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ S2-03: Production Frontend Shell Migration (React + TypeScript + Vite)                 │
@@ -798,4 +947,4 @@ The future Stage S2 implementation must satisfy the following comprehensive test
 
 This preflight specification resolves all transport, error handling, state management, schema generation, and UI migration requirements for MKE MVP V1 Stage S2.
 
-**Milestone Status:** **`PENDING INDEPENDENT S2-P0-R1 AUDIT`**
+**Milestone Status:** **`PENDING INDEPENDENT S2-P0-R2 FINAL AUDIT`**
