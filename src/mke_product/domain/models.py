@@ -400,8 +400,9 @@ class VerificationCertificate(BaseModel):
     residual_checks: List[str] = Field(default_factory=list)
     vieta_relations_checked: bool = False
     multiplicity_verified: bool = False
-    no_real_root_verified: bool = False
-    certificate_signature: str = Field(..., description="SHA-256 signature of verified claims")
+    no_real_roots_verified: bool = False
+    integrity_fingerprint: str = Field(..., description="Deterministic SHA-256 integrity fingerprint (unkeyed digest) of verified claims")
+    certificate_signature: str = Field(..., description="Deterministic SHA-256 integrity fingerprint of verified claims")
 
 
 # ============================================================================

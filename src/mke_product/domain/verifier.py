@@ -208,7 +208,7 @@ class HostIndependentVerifier:
             else VerificationOutcome.VERIFICATION_FAILED
         )
 
-        # Build cryptographic / structural signature
+        # Build deterministic integrity fingerprint (unkeyed SHA-256 digest)
         sig_payload = {
             "verifier": self.VERIFIER_NAME,
             "version": self.VERIFIER_VERSION,
@@ -235,6 +235,7 @@ class HostIndependentVerifier:
             residual_checks=residuals,
             vieta_relations_checked=vieta_passed,
             multiplicity_verified=multiplicity_passed,
-            no_real_root_verified=no_real_root_passed,
+            no_real_roots_verified=no_real_root_passed,
+            integrity_fingerprint=cert_sig,
             certificate_signature=cert_sig,
         )
