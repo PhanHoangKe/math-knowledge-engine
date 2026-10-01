@@ -6,6 +6,17 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from mke_product.transport.models import TransportErrorCode, TransportErrorResponse
 
 MAX_BODY_BYTES = 65536  # Exactly 64 KiB
+ALGEBRA_SOLVE_PATH = "/api/v1/algebra/solve"
+ALGEBRA_SOLVE_METHOD = "POST"
+
+
+def is_algebra_solve_request(scope: Scope) -> bool:
+    """Check if the ASGI scope targets the POST /api/v1/algebra/solve endpoint."""
+    return (
+        scope.get("type") == "http"
+        and scope.get("method") == ALGEBRA_SOLVE_METHOD
+        and scope.get("path") == ALGEBRA_SOLVE_PATH
+    )
 
 
 def extract_media_type(raw_header: str) -> str:
@@ -37,13 +48,13 @@ async def _send_json_response(
 
 
 class StreamPayloadLimitMiddleware:
-    """Pure ASGI middleware that enforces the 64 KiB payload limit via bounded pre-read and replay."""
+    """Pure ASGI middleware that enforces the 64 KiB payload limit via bounded pre-read and replay for solve requests."""
 
     def __init__(self, app: ASGIApp):
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if not is_algebra_solve_request(scope):
             await self.app(scope, receive, send)
             return
 
@@ -67,12 +78,12 @@ class StreamPayloadLimitMiddleware:
                     await _send_json_response(send, 413, error_resp)
                     return
             except (ValueError, UnicodeDecodeError):
-                # Malformed or negative Content-Length header rejected immediately with HTTP 400
+                # Malformed or negative Content-Length header rejected immediately with HTTP 400 REQUEST_VALIDATION_FAILED
                 error_resp = TransportErrorResponse(
-                    transport_error_code=TransportErrorCode.MALFORMED_JSON,
+                    transport_error_code=TransportErrorCode.REQUEST_VALIDATION_FAILED,
                     message_vi="Tiêu đề Content-Length không hợp lệ.",
                     message_en="Invalid Content-Length header.",
-                    details={"error": "INVALID_CONTENT_LENGTH"},
+                    details={"header": "Content-Length", "reason": "INVALID_CONTENT_LENGTH"},
                 )
                 await _send_json_response(send, 400, error_resp)
                 return
@@ -131,26 +142,29 @@ class StreamPayloadLimitMiddleware:
 
 
 class MediaTypeEnforcementMiddleware:
-    """Pure ASGI middleware enforcing Content-Type: application/json on API POST requests."""
+    """Pure ASGI middleware enforcing Content-Type: application/json on the algebra solve endpoint."""
 
     def __init__(self, app: ASGIApp):
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"].startswith("/api/"):
-            headers_dict: Dict[bytes, bytes] = dict(scope.get("headers", []))
-            raw_content_type = headers_dict.get(b"content-type", b"").decode("latin1")
-            media_type = extract_media_type(raw_content_type)
+        if not is_algebra_solve_request(scope):
+            await self.app(scope, receive, send)
+            return
 
-            # Accept strictly "application/json" (with optional parameters like charset)
-            if media_type != "application/json":
-                error_resp = TransportErrorResponse(
-                    transport_error_code=TransportErrorCode.UNSUPPORTED_MEDIA_TYPE,
-                    message_vi="Tiêu đề Content-Type phải là 'application/json'.",
-                    message_en="Content-Type header must be 'application/json'.",
-                    details={"received_content_type": raw_content_type},
-                )
-                await _send_json_response(send, 415, error_resp)
-                return
+        headers_dict: Dict[bytes, bytes] = dict(scope.get("headers", []))
+        raw_content_type = headers_dict.get(b"content-type", b"").decode("latin1")
+        media_type = extract_media_type(raw_content_type)
+
+        # Accept strictly "application/json" (with optional parameters like charset)
+        if media_type != "application/json":
+            error_resp = TransportErrorResponse(
+                transport_error_code=TransportErrorCode.UNSUPPORTED_MEDIA_TYPE,
+                message_vi="Tiêu đề Content-Type phải là 'application/json'.",
+                message_en="Content-Type header must be 'application/json'.",
+                details={"received_content_type": raw_content_type},
+            )
+            await _send_json_response(send, 415, error_resp)
+            return
 
         await self.app(scope, receive, send)

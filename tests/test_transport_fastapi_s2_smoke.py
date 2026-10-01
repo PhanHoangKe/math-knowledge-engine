@@ -164,7 +164,7 @@ def test_api_category_b_application_errors_map_to_http_500(monkeypatch, client: 
 # ============================================================================
 
 def test_api_malformed_json_returns_http_400(client: TestClient):
-    """Malformed JSON returns HTTP 400 with TransportErrorResponse(MALFORMED_JSON)."""
+    """Malformed JSON on solve route returns HTTP 400 with TransportErrorResponse(MALFORMED_JSON)."""
     malformed_body = b'{"input_payload": {"input_mode": "RAW_TEXT", "raw_query": '  # truncated
     response = client.post(
         "/api/v1/algebra/solve",
@@ -204,11 +204,11 @@ def test_api_dto_validation_failure_sanitized_422(client: TestClient):
 
 
 # ============================================================================
-# 5. MEDIA TYPE ENFORCEMENT (HTTP 415)
+# 5. MEDIA TYPE ENFORCEMENT & ROUTE ISOLATION (HTTP 415 vs 404)
 # ============================================================================
 
-def test_api_media_type_text_plain_rejected_415(client: TestClient):
-    """Content-Type: text/plain returns HTTP 415 TransportErrorResponse(UNSUPPORTED_MEDIA_TYPE)."""
+def test_api_media_type_text_plain_rejected_415_on_solve_route(client: TestClient):
+    """Content-Type: text/plain on solve route returns HTTP 415 TransportErrorResponse(UNSUPPORTED_MEDIA_TYPE)."""
     response = client.post(
         "/api/v1/algebra/solve",
         content=b"x^2 - 5*x + 6 = 0",
@@ -220,8 +220,8 @@ def test_api_media_type_text_plain_rejected_415(client: TestClient):
     assert data["transport_error_code"] == "UNSUPPORTED_MEDIA_TYPE"
 
 
-def test_api_media_type_invalid_suffix_rejected_415(client: TestClient):
-    """Content-Type: application/json-not-really returns HTTP 415."""
+def test_api_media_type_invalid_suffix_rejected_415_on_solve_route(client: TestClient):
+    """Content-Type: application/json-not-really on solve route returns HTTP 415."""
     response = client.post(
         "/api/v1/algebra/solve",
         content=b"{}",
@@ -232,8 +232,8 @@ def test_api_media_type_invalid_suffix_rejected_415(client: TestClient):
     assert data["transport_error_code"] == "UNSUPPORTED_MEDIA_TYPE"
 
 
-def test_api_media_type_with_charset_accepted_200(client: TestClient):
-    """Content-Type: application/json; charset=utf-8 is accepted."""
+def test_api_media_type_with_charset_accepted_200_on_solve_route(client: TestClient):
+    """Content-Type: application/json; charset=utf-8 on solve route is accepted."""
     payload = {
         "input_payload": {
             "input_mode": "RAW_TEXT",
@@ -253,12 +253,69 @@ def test_api_media_type_with_charset_accepted_200(client: TestClient):
 
 
 # ============================================================================
-# 6. DIRECT RAW-ASGI STREAM LIMIT & REPLAY TESTS (Direct Middleware Tests)
+# 6. UNKNOWN POST ROUTE ISOLATION (HTTP 404 API_NOT_FOUND)
+# ============================================================================
+
+def test_unknown_post_route_text_plain_returns_404_not_415(client: TestClient):
+    """Unknown POST route with text/plain reaches routing and returns HTTP 404 API_NOT_FOUND (not 415)."""
+    response = client.post(
+        "/api/v1/nonexistent",
+        content=b"x=1",
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["transport_status"] == "ERROR"
+    assert data["transport_error_code"] == "API_NOT_FOUND"
+
+
+def test_unknown_post_route_oversized_declared_header_returns_404_not_413(client: TestClient):
+    """Unknown POST route with declared Content-Length: 70000 reaches routing and returns HTTP 404 (not 413)."""
+    response = client.post(
+        "/api/v1/nonexistent",
+        content=b"{}",
+        headers={"Content-Type": "application/json", "Content-Length": "70000"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["transport_status"] == "ERROR"
+    assert data["transport_error_code"] == "API_NOT_FOUND"
+
+
+def test_unknown_post_route_actual_oversized_body_returns_404_not_413(client: TestClient):
+    """Unknown POST route with actual body >64 KiB reaches routing and returns HTTP 404 (not 413)."""
+    oversized_body = b" " * 70000
+    response = client.post(
+        "/api/v1/nonexistent",
+        content=oversized_body,
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["transport_status"] == "ERROR"
+    assert data["transport_error_code"] == "API_NOT_FOUND"
+
+
+def test_unknown_post_route_malformed_content_length_returns_404_not_400(client: TestClient):
+    """Unknown POST route with malformed Content-Length reaches routing and returns HTTP 404 (not 400)."""
+    response = client.post(
+        "/api/v1/nonexistent",
+        content=b"{}",
+        headers={"Content-Type": "application/json", "Content-Length": "abc"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["transport_status"] == "ERROR"
+    assert data["transport_error_code"] == "API_NOT_FOUND"
+
+
+# ============================================================================
+# 7. DIRECT RAW-ASGI STREAM LIMIT & REPLAY TESTS (Solve Route Only)
 # ============================================================================
 
 @pytest.mark.asyncio
 async def test_direct_asgi_stream_over_64k_rejected_413_downstream_not_invoked():
-    """Direct ASGI test: Stream >65,536 bytes returns 413, emits exactly one response, downstream never invoked."""
+    """Direct ASGI test: Stream >65,536 bytes on solve route returns 413, emits exactly one response, downstream never invoked."""
     downstream_invoked = False
 
     async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
@@ -422,7 +479,7 @@ async def test_direct_asgi_missing_content_length_stream_rejected_413():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("invalid_cl", [b"-5", b"abc", b"12.5", b" 10 20 "])
 async def test_direct_asgi_malformed_negative_content_length_rejected_400(invalid_cl: bytes):
-    """Direct ASGI test: Malformed or negative Content-Length header is rejected immediately with HTTP 400."""
+    """Direct ASGI test: Malformed/negative Content-Length header is rejected with HTTP 400 REQUEST_VALIDATION_FAILED."""
     downstream_invoked = False
 
     async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
@@ -460,8 +517,9 @@ async def test_direct_asgi_malformed_negative_content_length_rejected_400(invali
     assert len(body_messages) == 1
     body_data = json.loads(body_messages[0]["body"].decode("utf-8"))
     assert body_data["transport_status"] == "ERROR"
-    assert body_data["transport_error_code"] == "MALFORMED_JSON"
-    # Ensure no raw header values are echoed
+    assert body_data["transport_error_code"] == "REQUEST_VALIDATION_FAILED"
+    assert body_data["details"] == {"header": "Content-Length", "reason": "INVALID_CONTENT_LENGTH"}
+    # Ensure no raw header values or tracebacks are echoed
     assert str(invalid_cl) not in str(body_data)
 
 
@@ -528,8 +586,8 @@ async def test_direct_asgi_exact_65536_boundary_replayed_to_downstream():
 
 
 @pytest.mark.asyncio
-async def test_direct_asgi_non_http_scope_passthrough():
-    """Direct ASGI test: Non-http scopes (e.g. lifespan) pass through untouched."""
+async def test_direct_asgi_non_solve_route_passthrough():
+    """Direct ASGI test: Non-solve routes (e.g. GET /api/v1/health or lifespan) pass through untouched."""
     downstream_invoked = False
 
     async def sentinel_app(scope: Scope, receive: Receive, send: Send) -> None:
@@ -551,11 +609,11 @@ async def test_direct_asgi_non_http_scope_passthrough():
 
 
 # ============================================================================
-# 7. HTTP-LEVEL PAYLOAD SIZE TESTS (TestClient Tests)
+# 8. HTTP-LEVEL PAYLOAD SIZE TESTS (TestClient Tests on Solve Route)
 # ============================================================================
 
 def test_api_payload_limit_declared_header_rejected_413(client: TestClient):
-    """Declared Content-Length: 65537 returns HTTP 413 TransportErrorResponse(PAYLOAD_TOO_LARGE)."""
+    """Declared Content-Length: 65537 on solve route returns HTTP 413 TransportErrorResponse(PAYLOAD_TOO_LARGE)."""
     response = client.post(
         "/api/v1/algebra/solve",
         content=b"{}",
@@ -568,7 +626,7 @@ def test_api_payload_limit_declared_header_rejected_413(client: TestClient):
 
 
 def test_api_payload_limit_exact_65536_boundary_accepted(client: TestClient):
-    """Exact 65,536-byte valid JSON body passes payload limit middleware and returns HTTP 200 SOLVED."""
+    """Exact 65,536-byte valid JSON body on solve route passes payload limit and returns HTTP 200 SOLVED."""
     base_dict = {
         "input_payload": {
             "input_mode": "RAW_TEXT",
@@ -607,7 +665,7 @@ def test_api_payload_limit_exact_65536_boundary_accepted(client: TestClient):
 
 
 # ============================================================================
-# 8. API 404 ISOLATION, SANITIZED HTTP EXCEPTIONS, AND UNHANDLED CRASHES
+# 9. API 404 ISOLATION, SANITIZED HTTP EXCEPTIONS, AND UNHANDLED CRASHES
 # ============================================================================
 
 def test_api_unknown_route_returns_json_404(client: TestClient):
@@ -678,7 +736,7 @@ def test_api_unhandled_transport_exception_returns_http_500(monkeypatch):
 
 
 # ============================================================================
-# 9. OPENAPI OPERATION IDS & TRANSPORT MODEL RIGIDITY
+# 10. OPENAPI OPERATION IDS & TRANSPORT MODEL RIGIDITY
 # ============================================================================
 
 def test_openapi_operation_ids_and_schemas(client: TestClient):
@@ -727,11 +785,15 @@ def test_transport_error_model_extra_forbid():
 
 
 # ============================================================================
-# 10. MATHEMATICAL AUTHORITY PURITY AUDIT
+# 11. MATHEMATICAL AUTHORITY PURITY AUDIT
 # ============================================================================
 
 def test_transport_purity_authority_boundary():
-    """Verify transport package does NOT import CASRouter, sympy, normalizer, traces, or verifier directly."""
+    """Verify transport package does NOT import execution authority (CASRouter, sympy, normalizer, traces, or verifiers).
+    
+    Note: Read-only observational metadata count of TRACE_GENERATORS in the health endpoint is permitted.
+    All mathematical execution authority symbols remain strictly forbidden in transport modules.
+    """
     import mke_product.transport.routers.algebra as algebra_router_mod
     import mke_product.transport.app as app_mod
     import mke_product.transport.middleware as middleware_mod
@@ -739,17 +801,18 @@ def test_transport_purity_authority_boundary():
 
     transport_modules = [algebra_router_mod, app_mod, middleware_mod, handlers_mod]
 
-    forbidden_symbols = [
+    forbidden_execution_symbols = [
         "CASRouter",
         "execute_cas_operation",
         "sympy",
         "normalize_raw_equation",
         "generate_solution_trace",
+        "get_trace_generator",
         "HostIndependentVerifier",
         "DegenerateHostVerifier",
     ]
 
     for mod in transport_modules:
         mod_dict = mod.__dict__
-        for sym in forbidden_symbols:
+        for sym in forbidden_execution_symbols:
             assert sym not in mod_dict, f"Purity violation: {sym} found in transport module {mod.__name__}"
