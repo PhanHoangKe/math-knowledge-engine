@@ -28,15 +28,32 @@ def test_product_app_serves_frontend_root_index_html(product_client: TestClient)
 
 
 def test_product_app_serves_known_frontend_asset(product_client: TestClient):
-    """GET /assets/* or /vendor/katex/* serves built static assets."""
-    # Check for any asset in dist/assets
+    """GET /assets/* serves built static JS/CSS assets without vacuous skips."""
     assets_dir = DEFAULT_FRONTEND_DIST / "assets"
-    if assets_dir.is_dir():
-        asset_files = [f for f in assets_dir.iterdir() if f.is_file()]
-        if asset_files:
-            asset_name = asset_files[0].name
-            response = product_client.get(f"/assets/{asset_name}")
-            assert response.status_code == 200
+    assert assets_dir.is_dir(), f"Frontend assets directory not found at {assets_dir}"
+    asset_files = [f for f in assets_dir.iterdir() if f.is_file()]
+    assert len(asset_files) > 0, f"No asset files found in {assets_dir}"
+    asset_name = asset_files[0].name
+    response = product_client.get(f"/assets/{asset_name}")
+    assert response.status_code == 200
+    assert len(response.content) > 0
+
+
+def test_product_app_serves_katex_css_static_asset(product_client: TestClient):
+    """GET /vendor/katex/katex.min.css returns HTTP 200 with CSS content type."""
+    response = product_client.get("/vendor/katex/katex.min.css")
+    assert response.status_code == 200
+    assert "text/css" in response.headers.get("content-type", "")
+    assert ".katex" in response.text
+
+
+def test_product_app_serves_katex_woff2_font_asset(product_client: TestClient):
+    """GET /vendor/katex/fonts/KaTeX_Main-Regular.woff2 returns HTTP 200 with valid font/woff2 MIME."""
+    response = product_client.get("/vendor/katex/fonts/KaTeX_Main-Regular.woff2")
+    assert response.status_code == 200
+    content_type = response.headers.get("content-type", "")
+    assert "font/woff2" in content_type or "application/font-woff2" in content_type or "font" in content_type
+    assert len(response.content) > 0
 
 
 # ============================================================================
@@ -208,3 +225,15 @@ def test_product_app_contains_no_mathematics():
     ]
     for symbol in forbidden_symbols:
         assert symbol not in source, f"Forbidden symbol '{symbol}' detected in product_app.py"
+
+
+def test_product_app_delegates_docs_and_redoc_endpoints(product_client: TestClient):
+    """GET /docs and /redoc return HTTP 200 from FastAPI transport layer."""
+    docs_resp = product_client.get("/docs")
+    assert docs_resp.status_code == 200
+    assert "text/html" in docs_resp.headers.get("content-type", "")
+
+    redoc_resp = product_client.get("/redoc")
+    assert redoc_resp.status_code == 200
+    assert "text/html" in redoc_resp.headers.get("content-type", "")
+

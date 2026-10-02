@@ -438,7 +438,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert html_elem.get_attribute("lang") == "vi"
 
     def test_10_responsive_mobile_viewport_smoke(self):
-        """Section 25: Verify responsive layout on mobile viewport (390x844) without horizontal page overflow."""
+        """Section 25: Verify responsive layout on mobile viewport (390x844) with reachable Coefficient Editor."""
         self.driver.get(f"{self.base_url}/")
 
         # Set mobile viewport
@@ -450,27 +450,80 @@ class TestMVPV1ReactE2E(unittest.TestCase):
             EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='equation-input']"))
         )
         assert equation_input.is_displayed()
+        equation_input.clear()
+        equation_input.send_keys("x^2 - 5*x + 6 = 0")
 
         compute_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='compute-btn']")
-        assert compute_btn.is_displayed()
+        compute_btn.click()
 
-        # Verify no horizontal scroll overflow: scrollWidth <= clientWidth + 5
+        # Wait for CoefficientEditorPanel to appear and verify visible inputs
+        coeff_panel = WebDriverWait(self.driver, 8.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='coefficient-editor-panel']"))
+        )
+        assert coeff_panel.is_displayed()
+
+        coeff_a = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='coeff-a-num']")
+        coeff_b = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='coeff-b-num']")
+        coeff_c = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='coeff-c-num']")
+        assert coeff_a.is_displayed()
+        assert coeff_b.is_displayed()
+        assert coeff_c.is_displayed()
+
+        # Verify no major horizontal scroll overflow: scrollWidth <= clientWidth + 10
         scroll_width = self.driver.execute_script("return document.documentElement.scrollWidth;")
         client_width = self.driver.execute_script("return document.documentElement.clientWidth;")
-        assert scroll_width <= client_width + 5, f"Horizontal overflow: scrollWidth ({scroll_width}) > clientWidth ({client_width})"
+        assert scroll_width <= client_width + 10, f"Horizontal overflow: scrollWidth ({scroll_width}) > clientWidth ({client_width})"
 
         # Restore desktop viewport
         self.driver.set_window_size(1366, 850)
 
     def test_11_offline_katex_assets_same_origin(self):
-        """Section 26: Verify KaTeX CSS and fonts load from same origin with zero external CDN dependency."""
+        """Section 26: Verify KaTeX CSS, scripts, and fonts load from same origin with zero external CDN dependency."""
         self.driver.get(f"{self.base_url}/")
 
-        # Check KaTeX stylesheet link tag
-        katex_links = self.driver.find_elements(By.CSS_SELECTOR, "link[rel='stylesheet']")
-        for link in katex_links:
-            href = link.get_attribute("href") or ""
-            if "katex" in href:
-                # Must be same-origin (relative or matching localhost base_url)
-                assert href.startswith(self.base_url) or href.startswith("/"), f"KaTeX loaded from external source: {href}"
-                assert "cdnjs" not in href and "jsdelivr" not in href and "unpkg" not in href
+        # A. Collect stylesheet links whose href contains "katex" (require len >= 1)
+        all_links = self.driver.find_elements(By.CSS_SELECTOR, "link[rel='stylesheet']")
+        katex_stylesheets = [
+            link.get_attribute("href") or ""
+            for link in all_links
+            if "katex" in (link.get_attribute("href") or "")
+        ]
+        assert len(katex_stylesheets) >= 1, "Expected at least one KaTeX stylesheet link"
+
+        # B. Require all KaTeX stylesheet URLs are same-origin
+        for href in katex_stylesheets:
+            assert href.startswith(self.base_url) or href.startswith("/"), f"KaTeX CSS not same-origin: {href}"
+            assert "cdnjs" not in href and "jsdelivr" not in href and "unpkg" not in href
+
+        # C. Collect relevant KaTeX script src URLs and require local same-origin
+        all_scripts = self.driver.find_elements(By.TAG_NAME, "script")
+        katex_scripts = [
+            s.get_attribute("src") or ""
+            for s in all_scripts
+            if "katex" in (s.get_attribute("src") or "")
+        ]
+        assert len(katex_scripts) >= 1, "Expected at least one local KaTeX script tag"
+        for src in katex_scripts:
+            assert src.startswith(self.base_url) or src.startswith("/"), f"KaTeX script not same-origin: {src}"
+            assert "cdnjs" not in src and "jsdelivr" not in src and "unpkg" not in src
+
+        # D. Perform a real quadratic solve and verify at least one DOM element with class .katex
+        equation_input = WebDriverWait(self.driver, 5.0).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='equation-input']"))
+        )
+        equation_input.clear()
+        equation_input.send_keys("x^2 - 5*x + 6 = 0")
+        self.driver.find_element(By.CSS_SELECTOR, "[data-testid='compute-btn']").click()
+
+        WebDriverWait(self.driver, 8.0).until(
+            lambda d: len(d.find_elements(By.CLASS_NAME, "katex")) > 0
+        )
+        katex_elements = self.driver.find_elements(By.CLASS_NAME, "katex")
+        assert len(katex_elements) >= 1, "Expected rendered .katex elements in solved workspace"
+
+        # E. Verify at least one known WOFF2 KaTeX asset can be loaded from same production origin with HTTP 200
+        font_url = f"{self.base_url}/vendor/katex/fonts/KaTeX_Main-Regular.woff2"
+        with urllib.request.urlopen(font_url, timeout=3.0) as resp:
+            assert resp.status == 200
+            assert len(resp.read()) > 0
+

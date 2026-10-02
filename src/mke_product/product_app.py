@@ -7,6 +7,7 @@ Composes:
 
 from __future__ import annotations
 
+import mimetypes
 import os
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,10 @@ from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from mke_product.transport.app import create_app as create_transport_app
+
+# Ensure font/woff2 MIME types are registered across all OS platforms
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
 
 # Default repository-local frontend distribution path: <repo>/src/frontend/dist
 DEFAULT_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
