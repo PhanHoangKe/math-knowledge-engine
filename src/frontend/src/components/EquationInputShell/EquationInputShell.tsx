@@ -3,6 +3,10 @@ import { usePreferences } from '../../state/preferences';
 import { MathPalette } from './MathPalette';
 import { PALETTE_CATEGORIES } from './mathPaletteCapabilities';
 import {
+  VisualMathComposer,
+  VisualMathComposerHandle,
+} from './VisualMathComposer';
+import {
   serializePaletteAction,
   toMathModeFormat,
   toNaturalModeFormat,
@@ -49,12 +53,6 @@ const SAMPLE_EQUATIONS = [
   'x^2 - 2 = 0',
 ];
 
-interface FractionSlotState {
-  num: string;
-  den: string;
-  after: string;
-}
-
 export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   query,
   onQueryChange,
@@ -75,28 +73,8 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   const [sampleIdx, setSampleIdx] = useState<number>(0);
   const [cameraNote, setCameraNote] = useState<string | null>(null);
 
-  // Casio-style visual interactive fraction mode
-  const [isFractionActive, setIsFractionActive] = useState<boolean>(false);
-  const [fractionSlots, setFractionSlots] = useState<FractionSlotState>({
-    num: '',
-    den: '',
-    after: '',
-  });
-  const [activeSlot, setActiveSlot] = useState<'num' | 'den' | 'after'>('num');
-
   const mainInputRef = useRef<HTMLInputElement>(null);
-  const numInputRef = useRef<HTMLInputElement>(null);
-  const denInputRef = useRef<HTMLInputElement>(null);
-  const afterInputRef = useRef<HTMLInputElement>(null);
-
-  // Sync fraction slots with query when in fraction mode
-  const updateFractionQuery = (slots: FractionSlotState) => {
-    setFractionSlots(slots);
-    const numPart = slots.num || '';
-    const denPart = slots.den || '';
-    const combined = `(${numPart})/(${denPart})${slots.after ? ' ' + slots.after : ''}`;
-    onQueryChange(mode === 'math' ? toMathModeFormat(combined) : combined);
-  };
+  const composerRef = useRef<VisualMathComposerHandle>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
@@ -138,7 +116,6 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
       }
     } else {
       setMode('natural');
-      setIsFractionActive(false);
       const naturalFormatted = toNaturalModeFormat(query);
       if (naturalFormatted !== query) {
         onQueryChange(naturalFormatted);
@@ -158,8 +135,9 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   const handlePaletteAction = useCallback(
     (actionId: string) => {
       if (actionId === 'CLEAR') {
-        setIsFractionActive(false);
-        setFractionSlots({ num: '', den: '', after: '' });
+        if (composerRef.current) {
+          composerRef.current.clear();
+        }
         if (onClear) {
           onClear();
         } else {
@@ -168,28 +146,8 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         return;
       }
 
-      if (actionId === 'FRACTION') {
-        // Activate visual Casio 2-tier fraction box (Picture 1 & 2)
-        setIsFractionActive(true);
-        setActiveSlot('num');
-        const initialSlots: FractionSlotState = { num: '', den: '', after: '' };
-        setFractionSlots(initialSlots);
-        updateFractionQuery(initialSlots);
-        requestAnimationFrame(() => {
-          numInputRef.current?.focus();
-        });
-        return;
-      }
-
-      if (isFractionActive) {
-        // Insert directly into active Casio slot
-        const currentSlotVal = fractionSlots[activeSlot];
-        const { newQuery } = serializePaletteAction(currentSlotVal, actionId);
-        const updated = {
-          ...fractionSlots,
-          [activeSlot]: mode === 'math' ? toMathModeFormat(newQuery) : newQuery,
-        };
-        updateFractionQuery(updated);
+      if (mode === 'math' && composerRef.current) {
+        composerRef.current.insertPaletteAction(actionId);
         return;
       }
 
@@ -209,13 +167,12 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         }
       });
     },
-    [query, onQueryChange, onClear, isFractionActive, fractionSlots, activeSlot, mode]
+    [query, onQueryChange, onClear, mode]
   );
 
   const handleRandomSample = () => {
     const nextEq = SAMPLE_EQUATIONS[sampleIdx % SAMPLE_EQUATIONS.length] ?? 'x^2 - 5*x + 6 = 0';
     setSampleIdx((prev) => prev + 1);
-    setIsFractionActive(false);
     if (mode === 'math') {
       onQueryChange(toMathModeFormat(nextEq));
     } else {
@@ -231,8 +188,9 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   };
 
   const handleClearAll = () => {
-    setIsFractionActive(false);
-    setFractionSlots({ num: '', den: '', after: '' });
+    if (composerRef.current) {
+      composerRef.current.clear();
+    }
     onClear();
   };
 
@@ -270,62 +228,28 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
           {t('input_label')}
         </label>
 
-        {isFractionActive && mode === 'math' ? (
-          /* Visual Casio 2-Tier Nested Fraction Editor (Picture 1 & 2) */
-          <div className={styles.casioFractionContainer}>
-            <div className={styles.casioFractionColumn}>
-              {/* Numerator Light Blue Dotted Box */}
-              <input
-                ref={numInputRef}
-                type="text"
-                className={`${styles.casioSlot} ${styles.casioNumerator} ${
-                  activeSlot === 'num' ? styles.casioSlotActive : ''
-                }`}
-                value={fractionSlots.num}
-                placeholder=""
-                onChange={(e) =>
-                  updateFractionQuery({ ...fractionSlots, num: e.target.value })
-                }
-                onFocus={() => setActiveSlot('num')}
-                onKeyDown={handleKeyDown}
-                disabled={isLoading}
-              />
-              {/* Horizontal Fraction Bar */}
-              <div className={styles.casioFractionBar} />
-              {/* Denominator Light Yellow Dotted Box */}
-              <input
-                ref={denInputRef}
-                type="text"
-                className={`${styles.casioSlot} ${styles.casioDenominator} ${
-                  activeSlot === 'den' ? styles.casioSlotActive : ''
-                }`}
-                value={fractionSlots.den}
-                placeholder=""
-                onChange={(e) =>
-                  updateFractionQuery({ ...fractionSlots, den: e.target.value })
-                }
-                onFocus={() => setActiveSlot('den')}
-                onKeyDown={handleKeyDown}
-                disabled={isLoading}
-              />
-            </div>
-            {/* After Fraction Inline Continuation */}
+        {mode === 'math' ? (
+          /* Visual Interactive Math Composer (x² with editable slot [2], Casio templates, etc.) */
+          <>
             <input
-              ref={afterInputRef}
-              type="text"
-              className={`${styles.inputField} ${styles.casioAfterField}`}
-              value={fractionSlots.after}
-              placeholder=" + ... = 0"
-              onChange={(e) =>
-                updateFractionQuery({ ...fractionSlots, after: e.target.value })
-              }
-              onFocus={() => setActiveSlot('after')}
-              onKeyDown={handleKeyDown}
-              disabled={isLoading}
+              type="hidden"
+              id="equation-input"
+              value={query}
+              data-testid="equation-input"
+              readOnly
             />
-          </div>
+            <VisualMathComposer
+              ref={composerRef}
+              rawQuery={query}
+              onChange={onQueryChange}
+              onSubmit={handleExecuteSolve}
+              disabled={isLoading}
+              placeholder={t('input_placeholder')}
+              data-testid="visual-math-composer"
+            />
+          </>
         ) : (
-          /* Standard Direct Mathematical Visual Input (x² − 5x + 6 = 0) */
+          /* Natural Language Raw Text Input */
           <input
             ref={mainInputRef}
             id="equation-input"
@@ -498,7 +422,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         </div>
       </div>
 
-      {/* Expanded Math Palette Bar (Picture 3) */}
+      {/* Expanded Math Palette Bar */}
       {mode === 'math' && activeCategory && (
         <div className={styles.paletteDrawerWrapper}>
           <MathPalette

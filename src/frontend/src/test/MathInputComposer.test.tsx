@@ -266,5 +266,68 @@ describe('MathInputComposer & Serialization Utilities', () => {
       const btnCompute = screen.getByTestId('compute-btn');
       expect(btnCompute).toBeDisabled();
     });
+
+    it('allows direct in-box editing of exponent slot from 2 to 4', () => {
+      let queryValue = 'x^2 - 5*x + 6 = 0';
+      const onQueryChange = vi.fn((val: string) => {
+        queryValue = val;
+      });
+      const onSubmit = vi.fn();
+      const onClear = vi.fn();
+
+      render(
+        <PreferencesProvider>
+          <EquationInputShell
+            query={queryValue}
+            onQueryChange={onQueryChange}
+            onSubmit={onSubmit}
+            onClear={onClear}
+            initialMode="math"
+          />
+        </PreferencesProvider>
+      );
+
+      // Find the exponent slot input
+      const expSlot = screen.getByLabelText('Số mũ');
+      expect(expSlot).toHaveValue('2');
+
+      // Directly edit exponent to 4
+      fireEvent.change(expSlot, { target: { value: '4' } });
+
+      // Equation query reflects modified exponent
+      expect(onQueryChange).toHaveBeenCalledWith(expect.stringContaining('x^4'));
+    });
+
+    it('handles backspace deletion directly from empty slot', () => {
+      let queryValue = 'x^2';
+      const onQueryChange = vi.fn((val: string) => {
+        queryValue = val;
+      });
+      const onSubmit = vi.fn();
+      const onClear = vi.fn();
+
+      render(
+        <PreferencesProvider>
+          <EquationInputShell
+            query={queryValue}
+            onQueryChange={onQueryChange}
+            onSubmit={onSubmit}
+            onClear={onClear}
+            initialMode="math"
+          />
+        </PreferencesProvider>
+      );
+
+      const expSlot = screen.getByLabelText('Số mũ');
+      // Clear exponent slot
+      fireEvent.change(expSlot, { target: { value: '' } });
+
+      // Press backspace on empty exponent slot
+      fireEvent.keyDown(expSlot, { key: 'Backspace', code: 'Backspace' });
+
+      // Power block collapses to base text
+      expect(onQueryChange).toHaveBeenCalledWith('x');
+    });
   });
 });
+

@@ -1,0 +1,609 @@
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import {
+  MathBlock,
+  parseStringToBlocks,
+  blocksToVisualString,
+  genId,
+} from './visualMathModel';
+import styles from './VisualMathComposer.module.css';
+
+export interface VisualMathComposerHandle {
+  insertPaletteAction: (actionId: string) => void;
+  clear: () => void;
+  focus: () => void;
+}
+
+export interface VisualMathComposerProps {
+  rawQuery: string;
+  onChange: (newRawQuery: string) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  'data-testid'?: string;
+}
+
+interface FocusTarget {
+  blockId: string;
+  slot: string; // 'value' | 'base' | 'exponent' | 'num' | 'den' | 'radicand' | 'index' | 'expr' | 'wrt'
+}
+
+export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMathComposerProps>(
+  ({ rawQuery, onChange, onSubmit, disabled = false, placeholder = 'x² − 5x + 6 = 0', 'data-testid': testId = 'visual-math-composer' }, ref) => {
+    const [blocks, setBlocks] = useState<MathBlock[]>(() => parseStringToBlocks(rawQuery));
+    const [focusedTarget, setFocusedTarget] = useState<FocusTarget | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+
+    // Synchronize local blocks if external rawQuery changes drastically
+    useEffect(() => {
+      const currentVisual = blocksToVisualString(blocks);
+      const cleanedCurrent = currentVisual.replace(/\s+/g, '');
+      const cleanedIncoming = rawQuery.replace(/\s+/g, '');
+
+      if (cleanedCurrent !== cleanedIncoming) {
+        setBlocks(parseStringToBlocks(rawQuery));
+      }
+    }, [rawQuery]);
+
+    const setInputRef = (key: string, el: HTMLInputElement | null) => {
+      if (el) {
+        inputRefs.current.set(key, el);
+      } else {
+        inputRefs.current.delete(key);
+      }
+    };
+
+    const notifyChange = (updatedBlocks: MathBlock[]) => {
+      setBlocks(updatedBlocks);
+      const visual = blocksToVisualString(updatedBlocks);
+      onChange(visual);
+    };
+
+    // Expose imperative handle for palette actions and external controls
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        const initial: MathBlock[] = [{ type: 'text', id: genId(), value: '' }];
+        setBlocks(initial);
+        onChange('');
+      },
+      focus: () => {
+        const firstKey = Array.from(inputRefs.current.keys())[0];
+        if (firstKey) {
+          inputRefs.current.get(firstKey)?.focus();
+        }
+      },
+      insertPaletteAction: (actionId: string) => {
+        handleApplyPaletteAction(actionId);
+      },
+    }));
+
+    const handleApplyPaletteAction = (actionId: string) => {
+      if (actionId === 'CLEAR') {
+        const initial: MathBlock[] = [{ type: 'text', id: genId(), value: '' }];
+        notifyChange(initial);
+        return;
+      }
+
+      // Check template insertions
+      if (actionId === 'FRACTION') {
+        const newFrac: MathBlock = { type: 'fraction', id: genId(), num: '', den: '' };
+        insertBlockAtFocus(newFrac, 'num');
+        return;
+      }
+
+      if (actionId === 'POWER' || actionId === 'SQUARE') {
+        const exponentVal = actionId === 'SQUARE' ? '2' : '';
+        let baseVal = 'x';
+        const updated = [...blocks];
+
+        let targetIdx = -1;
+        if (focusedTarget) {
+          targetIdx = updated.findIndex((b) => b.id === focusedTarget.blockId);
+        } else if (updated.length > 0) {
+          targetIdx = updated.length - 1;
+        }
+
+        if (targetIdx !== -1) {
+          const targetBlock = updated[targetIdx];
+          if (targetBlock && targetBlock.type === 'text') {
+            if (targetBlock.value.endsWith('x')) {
+              targetBlock.value = targetBlock.value.slice(0, -1);
+              baseVal = 'x';
+            } else if (targetBlock.value) {
+              baseVal = targetBlock.value.slice(-1);
+              targetBlock.value = targetBlock.value.slice(0, -1);
+            }
+          }
+        }
+
+        const newPow: MathBlock = { type: 'power', id: genId(), base: baseVal, exponent: exponentVal };
+        const insertIdx = targetIdx !== -1 ? targetIdx + 1 : updated.length;
+        updated.splice(insertIdx, 0, newPow);
+
+        if (actionId === 'SQUARE') {
+          // For square (x²), automatically append a trailing text slot so subsequent actions continue after x²
+          const trailingText: MathBlock = { type: 'text', id: genId(), value: '' };
+          updated.splice(insertIdx + 1, 0, trailingText);
+          const cleaned = updated.filter((b, i) => !(b.type === 'text' && !b.value && i < updated.length - 1));
+          notifyChange(cleaned);
+          setFocusedTarget({ blockId: trailingText.id, slot: 'value' });
+          requestAnimationFrame(() => {
+            const el = inputRefs.current.get(`${trailingText.id}_value`);
+            el?.focus();
+          });
+        } else {
+          // For power template (□^□), focus the exponent slot
+          const cleaned = updated.filter((b, i) => !(b.type === 'text' && !b.value && i < updated.length - 1));
+          notifyChange(cleaned);
+          setFocusedTarget({ blockId: newPow.id, slot: 'exponent' });
+          requestAnimationFrame(() => {
+            const el = inputRefs.current.get(`${newPow.id}_exponent`);
+            el?.focus();
+          });
+        }
+        return;
+      }
+
+      if (actionId === 'SQRT') {
+        const newSqrt: MathBlock = { type: 'sqrt', id: genId(), radicand: '' };
+        insertBlockAtFocus(newSqrt, 'radicand');
+        return;
+      }
+
+      if (actionId === 'CUBE_ROOT') {
+        const newCube: MathBlock = { type: 'nth_root', id: genId(), index: '3', radicand: '' };
+        insertBlockAtFocus(newCube, 'radicand');
+        return;
+      }
+
+      if (actionId === 'NTH_ROOT') {
+        const newNth: MathBlock = { type: 'nth_root', id: genId(), index: 'n', radicand: '' };
+        insertBlockAtFocus(newNth, 'radicand');
+        return;
+      }
+
+      if (actionId === 'DERIVATIVE') {
+        const newDeriv: MathBlock = { type: 'derivative', id: genId(), order: 1, wrt: 'x', expr: '' };
+        insertBlockAtFocus(newDeriv, 'expr');
+        return;
+      }
+
+      if (actionId === 'INTEGRAL') {
+        const newInt: MathBlock = { type: 'integral', id: genId(), isDefinite: false, expr: '', wrt: 'x' };
+        insertBlockAtFocus(newInt, 'expr');
+        return;
+      }
+
+      // Map standard token actions
+      let snippet = '';
+      switch (actionId) {
+        case 'VAR_X': snippet = 'x'; break;
+        case 'VAR_Y': snippet = 'y'; break;
+        case 'PLUS': snippet = ' + '; break;
+        case 'MINUS': snippet = ' − '; break;
+        case 'MULTIPLY': snippet = '*'; break;
+        case 'DIVIDE': snippet = '/'; break;
+        case 'EQUALS': snippet = ' = '; break;
+        case 'LPAREN': snippet = '('; break;
+        case 'RPAREN': snippet = ')'; break;
+        case 'PLUS_MINUS': snippet = '±'; break;
+        case 'DELTA': snippet = 'Δ'; break;
+        case 'PI': snippet = 'π'; break;
+        case 'ALPHA': snippet = 'α'; break;
+        case 'BETA': snippet = 'β'; break;
+        case 'GAMMA': snippet = 'γ'; break;
+        case 'THETA': snippet = 'θ'; break;
+        case 'LAMBDA': snippet = 'λ'; break;
+        case 'MU': snippet = 'μ'; break;
+        case 'SIGMA': snippet = 'σ'; break;
+        case 'OMEGA': snippet = 'ω'; break;
+        case 'SIN': snippet = 'sin('; break;
+        case 'COS': snippet = 'cos('; break;
+        case 'TAN': snippet = 'tan('; break;
+        case 'LOG': snippet = 'log('; break;
+        case 'LN': snippet = 'ln('; break;
+        case 'EXP': snippet = 'exp('; break;
+        case 'DIGIT_0': snippet = '0'; break;
+        case 'DIGIT_1': snippet = '1'; break;
+        case 'DIGIT_2': snippet = '2'; break;
+        case 'DIGIT_3': snippet = '3'; break;
+        case 'DIGIT_4': snippet = '4'; break;
+        case 'DIGIT_5': snippet = '5'; break;
+        case 'DIGIT_6': snippet = '6'; break;
+        case 'DIGIT_7': snippet = '7'; break;
+        case 'DIGIT_8': snippet = '8'; break;
+        case 'DIGIT_9': snippet = '9'; break;
+        case 'DOT': snippet = '.'; break;
+        case 'BACKSPACE':
+          handleBackspaceOnFocus();
+          return;
+        default:
+          snippet = actionId;
+      }
+
+      insertTextAtFocus(snippet);
+    };
+
+    const insertBlockAtFocus = (newBlock: MathBlock, focusSlot: string) => {
+      const updated = [...blocks];
+      let insertIdx = updated.length;
+
+      if (focusedTarget) {
+        const found = updated.findIndex((b) => b.id === focusedTarget.blockId);
+        if (found !== -1) {
+          insertIdx = found + 1;
+        }
+      }
+
+      updated.splice(insertIdx, 0, newBlock);
+      // Append a trailing text block if not present
+      if (updated[updated.length - 1]?.type !== 'text') {
+        updated.push({ type: 'text', id: genId(), value: '' });
+      }
+
+      notifyChange(updated);
+      setFocusedTarget({ blockId: newBlock.id, slot: focusSlot });
+      requestAnimationFrame(() => {
+        const el = inputRefs.current.get(`${newBlock.id}_${focusSlot}`);
+        el?.focus();
+      });
+    };
+
+    const insertTextAtFocus = (text: string) => {
+      const updated = [...blocks];
+      let targetBlock = focusedTarget ? updated.find((b) => b.id === focusedTarget.blockId) : null;
+      if (!targetBlock) {
+        // Fallback to last block or create a new text block
+        const last = updated[updated.length - 1];
+        if (last && last.type === 'text') {
+          targetBlock = last;
+          setFocusedTarget({ blockId: last.id, slot: 'value' });
+        } else {
+          const newTextBlock: MathBlock = { type: 'text', id: genId(), value: '' };
+          updated.push(newTextBlock);
+          targetBlock = newTextBlock;
+          setFocusedTarget({ blockId: newTextBlock.id, slot: 'value' });
+        }
+      }
+
+      if (targetBlock.type === 'text') {
+        targetBlock.value += text;
+      } else if (targetBlock.type === 'power') {
+        if (focusedTarget?.slot === 'exponent') targetBlock.exponent += text;
+        else targetBlock.base += text;
+      } else if (targetBlock.type === 'fraction') {
+        if (focusedTarget?.slot === 'num') targetBlock.num += text;
+        else targetBlock.den += text;
+      } else if (targetBlock.type === 'sqrt' || targetBlock.type === 'nth_root') {
+        if (focusedTarget?.slot === 'radicand') targetBlock.radicand += text;
+        else if (targetBlock.type === 'nth_root') targetBlock.index += text;
+      }
+
+      notifyChange(updated);
+    };
+
+    const handleBackspaceOnFocus = () => {
+      if (!focusedTarget) return;
+      const updated = [...blocks];
+      const idx = updated.findIndex((b) => b.id === focusedTarget.blockId);
+      if (idx === -1) return;
+
+      const targetBlock = updated[idx];
+      if (!targetBlock) return;
+
+      if (targetBlock.type === 'text') {
+        if (targetBlock.value.length > 0) {
+          targetBlock.value = targetBlock.value.slice(0, -1);
+          notifyChange(updated);
+        } else if (updated.length > 1) {
+          // Remove empty text block and focus previous
+          updated.splice(idx, 1);
+          notifyChange(updated);
+        }
+      } else {
+        // For non-text blocks, if current slot is empty, remove the block
+        let isSlotEmpty = false;
+        if (targetBlock.type === 'power' && focusedTarget.slot === 'exponent') isSlotEmpty = !targetBlock.exponent;
+        if (targetBlock.type === 'fraction') isSlotEmpty = !targetBlock.num && !targetBlock.den;
+        if (targetBlock.type === 'sqrt') isSlotEmpty = !targetBlock.radicand;
+
+        if (isSlotEmpty || targetBlock.type === 'power') {
+          // If power exponent is empty, convert back to text
+          if (targetBlock.type === 'power' && !targetBlock.exponent) {
+            updated[idx] = { type: 'text', id: genId(), value: targetBlock.base };
+          } else {
+            updated.splice(idx, 1);
+          }
+          notifyChange(updated);
+        }
+      }
+    };
+
+    const handleSlotKeyDown = (
+      e: React.KeyboardEvent<HTMLInputElement>,
+      block: MathBlock,
+      slot: string,
+      index: number
+    ) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onSubmit();
+        return;
+      }
+
+      if (e.key === 'Backspace') {
+        const inputEl = e.currentTarget;
+        // If cursor at position 0 or input is empty, handle backspace deletion
+        if (inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) {
+          if (block.type === 'power' && slot === 'exponent' && !block.exponent) {
+            e.preventDefault();
+            const updated = [...blocks];
+            // Convert power to plain text base
+            updated[index] = { type: 'text', id: genId(), value: block.base };
+            notifyChange(updated);
+            return;
+          }
+
+          if (block.type === 'fraction' && slot === 'den' && !block.den) {
+            e.preventDefault();
+            // Move focus to numerator
+            setFocusedTarget({ blockId: block.id, slot: 'num' });
+            requestAnimationFrame(() => {
+              inputRefs.current.get(`${block.id}_num`)?.focus();
+            });
+            return;
+          }
+
+          if (block.type === 'fraction' && slot === 'num' && !block.num && !block.den) {
+            e.preventDefault();
+            const updated = [...blocks];
+            updated.splice(index, 1);
+            notifyChange(updated);
+            return;
+          }
+
+          if (block.type === 'sqrt' && !block.radicand) {
+            e.preventDefault();
+            const updated = [...blocks];
+            updated.splice(index, 1);
+            notifyChange(updated);
+            return;
+          }
+        }
+      }
+    };
+
+    const updateBlock = (blockId: string, updates: Partial<MathBlock>) => {
+      const updated = blocks.map((b) => {
+        if (b.id === blockId) {
+          return { ...b, ...updates } as MathBlock;
+        }
+        return b;
+      });
+      notifyChange(updated);
+    };
+
+    return (
+      <div
+        ref={containerRef}
+        className={styles.composerContainer}
+        data-testid={testId}
+        onClick={() => {
+          if (!focusedTarget && blocks.length > 0) {
+            const last = blocks[blocks.length - 1];
+            if (last) {
+              const el = inputRefs.current.get(`${last.id}_${last.type === 'text' ? 'value' : 'exponent'}`);
+              el?.focus();
+            }
+          }
+        }}
+      >
+        {blocks.map((b, idx) => {
+          if (b.type === 'text') {
+            const inputWidth = Math.max(1, (b.value || placeholder).length) * 0.9 + 0.4;
+            return (
+              <input
+                key={b.id}
+                ref={(el) => setInputRef(`${b.id}_value`, el)}
+                type="text"
+                className={styles.textInput}
+                style={{ width: b.value ? `${inputWidth}ch` : `${placeholder.length * 0.85}ch` }}
+                value={b.value}
+                placeholder={blocks.length === 1 && !b.value ? placeholder : ''}
+                onChange={(e) => updateBlock(b.id, { value: e.target.value })}
+                onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'value' })}
+                onKeyDown={(e) => handleSlotKeyDown(e, b, 'value', idx)}
+                disabled={disabled}
+                autoComplete="off"
+                spellCheck="false"
+              />
+            );
+          }
+
+          if (b.type === 'power') {
+            const expWidth = Math.max(1, (b.exponent || ' ').length) * 1.1 + 0.6;
+            return (
+              <span key={b.id} className={styles.powerBlock}>
+                <span className={styles.powerBase}>{b.base}</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_exponent`, el)}
+                  type="text"
+                  className={styles.slotExponent}
+                  style={{ width: `${expWidth}ch` }}
+                  value={b.exponent}
+                  placeholder="2"
+                  onChange={(e) => updateBlock(b.id, { exponent: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'exponent' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'exponent', idx)}
+                  disabled={disabled}
+                  aria-label="Số mũ"
+                  data-testid={`exponent-slot-${b.id}`}
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'fraction') {
+            const numWidth = Math.max(1, (b.num || ' ').length) * 1.1 + 0.6;
+            const denWidth = Math.max(1, (b.den || ' ').length) * 1.1 + 0.6;
+            return (
+              <span key={b.id} className={styles.fractionBlock}>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_num`, el)}
+                  type="text"
+                  className={styles.slotNumerator}
+                  style={{ width: `${numWidth}ch` }}
+                  value={b.num}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { num: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'num' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'num', idx)}
+                  disabled={disabled}
+                  aria-label="Tử số"
+                  data-testid={`fraction-num-${b.id}`}
+                />
+                <div className={styles.fractionBar} />
+                <input
+                  ref={(el) => setInputRef(`${b.id}_den`, el)}
+                  type="text"
+                  className={styles.slotDenominator}
+                  style={{ width: `${denWidth}ch` }}
+                  value={b.den}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { den: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'den' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'den', idx)}
+                  disabled={disabled}
+                  aria-label="Mẫu số"
+                  data-testid={`fraction-den-${b.id}`}
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'sqrt') {
+            const radWidth = Math.max(1, (b.radicand || ' ').length) * 1.1 + 0.6;
+            return (
+              <span key={b.id} className={styles.sqrtBlock}>
+                <span className={styles.sqrtSymbol}>√</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_radicand`, el)}
+                  type="text"
+                  className={styles.slotRadicand}
+                  style={{ width: `${radWidth}ch` }}
+                  value={b.radicand}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { radicand: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'radicand' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'radicand', idx)}
+                  disabled={disabled}
+                  aria-label="Biểu thức dưới căn"
+                  data-testid={`sqrt-slot-${b.id}`}
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'nth_root') {
+            const radWidth = Math.max(1, (b.radicand || ' ').length) * 1.1 + 0.6;
+            return (
+              <span key={b.id} className={styles.nthRootBlock}>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_index`, el)}
+                  type="text"
+                  className={styles.slotNthIndex}
+                  value={b.index}
+                  placeholder="n"
+                  onChange={(e) => updateBlock(b.id, { index: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'index' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'index', idx)}
+                  disabled={disabled}
+                  aria-label="Bậc căn"
+                />
+                <span className={styles.sqrtSymbol}>√</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_radicand`, el)}
+                  type="text"
+                  className={styles.slotRadicand}
+                  style={{ width: `${radWidth}ch` }}
+                  value={b.radicand}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { radicand: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'radicand' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'radicand', idx)}
+                  disabled={disabled}
+                  aria-label="Biểu thức dưới căn"
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'derivative') {
+            return (
+              <span key={b.id} className={styles.calculusBlock}>
+                <span className={styles.calculusSymbol}>
+                  {b.order === 2 ? 'd²/d' : 'd/d'}
+                </span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_wrt`, el)}
+                  type="text"
+                  className={styles.slotGeneric}
+                  style={{ width: '22px' }}
+                  value={b.wrt}
+                  onChange={(e) => updateBlock(b.id, { wrt: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'wrt' })}
+                  disabled={disabled}
+                />
+                <span>(</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_expr`, el)}
+                  type="text"
+                  className={styles.slotGeneric}
+                  style={{ width: `${Math.max(2, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  value={b.expr}
+                  onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
+                  disabled={disabled}
+                />
+                <span>)</span>
+              </span>
+            );
+          }
+
+          if (b.type === 'integral') {
+            return (
+              <span key={b.id} className={styles.calculusBlock}>
+                <span className={styles.calculusSymbol}>∫</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_expr`, el)}
+                  type="text"
+                  className={styles.slotGeneric}
+                  style={{ width: `${Math.max(2, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  value={b.expr}
+                  onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
+                  disabled={disabled}
+                />
+                <span>d</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_wrt`, el)}
+                  type="text"
+                  className={styles.slotGeneric}
+                  style={{ width: '22px' }}
+                  value={b.wrt}
+                  onChange={(e) => updateBlock(b.id, { wrt: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'wrt' })}
+                  disabled={disabled}
+                />
+              </span>
+            );
+          }
+
+          return null;
+        })}
+      </div>
+    );
+  }
+);

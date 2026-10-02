@@ -672,7 +672,8 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         # 4. Verify switching back to Quick Input converts equation to raw format
         quick_tab.click()
         time.sleep(0.2)
-        natural_val = eq_input.get_attribute("value") or ""
+        natural_eq_input = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='equation-input']")
+        natural_val = natural_eq_input.get_attribute("value") or ""
         assert "x^2" in natural_val
         assert "5*x" in natural_val
 
