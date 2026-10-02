@@ -1,7 +1,7 @@
 [
   {
-    "author_or_institution": "I.M. Gelfand, A. Shen (Birkh\u00e4user Boston)",
-    "locator": "Sections 30-36: Quadratic Equations and Vieta's Theorem (pp. 53-67)",
+    "author_or_institution": "I.M. Gelfand, Alexander Shen (Birkh\u00e4user Boston, MA)",
+    "locator": "Sections 51-55: quadratic equations, Vieta's theorem, factorization, and quadratic formulas (pp. 100-108)",
     "publication_year": 1993,
     "source_id": "SRC_GELFAND_ALGEBRA",
     "source_type": "ACADEMIC_TEXT",
@@ -18,12 +18,12 @@
     "verification_status": "VERIFIED"
   },
   {
-    "author_or_institution": "Phan \u0110\u1ee9c Ch\u00ednh (T\u1ed5ng Ch\u1ee7 bi\u00ean), T\u00f4n Th\u00e2n (Ch\u1ee7 bi\u00ean), Nh\u00e0 xu\u1ea5t b\u1ea3n Gi\u00e1o d\u1ee5c Vi\u1ec7t Nam",
-    "locator": "Ch\u01b0\u01a1ng IV: H\u00e0m s\u1ed1 y = ax^2 (a != 0) - Ph\u01b0\u01a1ng tr\u00ecnh b\u1eadc hai m\u1ed9t \u1ea9n, B\u00e0i 4-7 (Trang 40-54)",
-    "publication_year": 2005,
+    "author_or_institution": "Phan \u0110\u1ee9c Ch\u00ednh (T\u1ed5ng ch\u1ee7 bi\u00ean), T\u00f4n Th\u00e2n (Ch\u1ee7 bi\u00ean), Nguy\u1ec5n Huy \u0110oan, Ph\u1ea1m Gia \u0110\u1ee9c, Tr\u01b0\u01a1ng C\u00f4ng Th\u00e0nh, Nguy\u1ec5n Duy Thu\u1eadn; Nh\u00e0 xu\u1ea5t b\u1ea3n Gi\u00e1o d\u1ee5c Vi\u1ec7t Nam",
+    "locator": "Ph\u1ea7n \u0110\u1ea1i s\u1ed1, Ch\u01b0\u01a1ng IV: H\u00e0m s\u1ed1 y = ax^2 (a != 0). Ph\u01b0\u01a1ng tr\u00ecnh b\u1eadc hai m\u1ed9t \u1ea9n; B\u00e0i 3-6",
+    "publication_year": 2019,
     "source_id": "SRC_TEXTBOOK_VIETNAM_MATH9",
     "source_type": "OFFICIAL_TEXTBOOK",
-    "title": "S\u00e1ch gi\u00e1o khoa To\u00e1n 9, T\u1eadp 2 (Ch\u01b0\u01a1ng tr\u00ecnh Chu\u1ea9n GDPT)",
+    "title": "To\u00e1n 9, T\u1eadp hai",
     "verification_status": "VERIFIED"
   }
 ]

@@ -1,12 +1,12 @@
 # MKE PRODUCT — S3-01 KNOWLEDGE SCHEMAS & STATIC ACCEPTANCE DATASET REPORT
 
-**Status:** PENDING INDEPENDENT S3-01-R1 AUDIT  
+**Status:** PENDING FINAL INDEPENDENT S3-01 ACCEPTANCE AUDIT  
 **Date:** 2026-10-02  
 **Role:** Antigravity (“Anty”) — Implementation Engineer  
 **Coordinator / Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
-**Parent Commit SHA:** `506901352edd01a65fd65edc7b17a8a49e0cecc3`  
+**Parent Commit SHA:** `f2bb9fe54c0abc3de205b092513d9f14d45fb5d8`  
 **Accepted Product Baseline Tag:** `mvp-v1-algebra-slice-accepted` (`e620c96470514f8bd7563efba25427c7a4764488`)  
 **Parked B3 Baseline SHA:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61`  
 
@@ -14,11 +14,11 @@
 
 ## 1. Executive Summary & Scope
 
-Milestone **S3-01-R1** delivers the strict Pydantic v2 knowledge schemas (`strict=True`, `extra='forbid'`, `frozen=True`), static canonical JSON acceptance dataset with verified bibliographic provenance citations, strict TypeAdapter dataset loader with referential integrity validation and DAG cycle detection, concept reconciliation matrix, and comprehensive test suites.
+Milestone **S3-01-R2** finalizes the exact bibliographic citations and stable chapter/section locators for all source provenances, preserves strict Pydantic v2 knowledge schemas (`strict=True`, `extra='forbid'`, `frozen=True`), maintains the canonical JSON acceptance dataset and strict TypeAdapter dataset loader with referential integrity validation, and verifies all acceptance criteria.
 
 ### Scope Compliance
 - **Strict Boundary Enforcement:** S3 provides static pedagogical knowledge and contains **zero** equation-specific runtime solver state (no discriminant values, roots, or runtime applicability calculations). S1 remains the single dynamic mathematical authority.
-- **Pydantic Strictness Restored:** `strict=True` is fully restored on all schemas. Implicit Python type coercion (e.g. string to int, float to int, tuple to list) is strictly rejected.
+- **Pydantic Strictness Enforced:** `strict=True` is verified across all models. TypeAdapter JSON validation ensures robust parsing from raw UTF-8 bytes without type coercion.
 - **Method IDs Contract:** Uses canonical strings matching `MethodRegistry().list_all()` 1:1 across all 9 quadratic methods.
 - **Mathematical Invariants Preserved:**
   - `QUAD_FORMULA_REDUCED`: Mathematically applicable to all quadratics with $a \neq 0$; odd $b$ receives `NEUTRAL` recommendation.
@@ -48,10 +48,25 @@ All models enforce `ConfigDict(extra="forbid", strict=True, frozen=True)`:
 
 ### 2.2 Canonical JSON Acceptance Dataset (`src/mke_product/knowledge/data/`)
 All files formatted with 2-space indentation and sorted UTF-8 keys:
-1. `provenance.json`: 3 verified source citations:
-   - `SRC_MKE_S1_ORCHESTRATOR`: MKE Core Team (2026), `src/mke_product/domain/registry.py`.
-   - `SRC_GELFAND_ALGEBRA`: I.M. Gelfand & A. Shen (1993), *Algebra*, Birkhäuser Boston, Sec. 30-36 (pp. 53-67).
-   - `SRC_TEXTBOOK_VIETNAM_MATH9`: Phan Đức Chính & Tôn Thân (2005), *Sách giáo khoa Toán 9, Tập 2*, NXB Giáo dục Việt Nam, Chương IV (Trang 40-54).
+1. `provenance.json`: 3 verified source citations with exact bibliographic metadata:
+   - `SRC_GELFAND_ALGEBRA`:
+     - Title: *Algebra*
+     - Author: I.M. Gelfand, Alexander Shen (Birkhäuser Boston, MA)
+     - Year: 1993
+     - Locator: `Sections 51-55: quadratic equations, Vieta's theorem, factorization, and quadratic formulas (pp. 100-108)`
+     - Status: `VERIFIED`
+   - `SRC_MKE_S1_ORCHESTRATOR`:
+     - Title: *MKE S1 Algebra Execution Engine Specification*
+     - Author: Math Knowledge Engine Core Team
+     - Year: 2026
+     - Locator: `src/mke_product/domain/registry.py`
+     - Status: `VERIFIED`
+   - `SRC_TEXTBOOK_VIETNAM_MATH9`:
+     - Title: *Toán 9, Tập hai*
+     - Author: Phan Đức Chính (Tổng chủ biên), Tôn Thân (Chủ biên), Nguyễn Huy Đoan, Phạm Gia Đức, Trương Công Thành, Nguyễn Duy Thuận; Nhà xuất bản Giáo dục Việt Nam
+     - Year: 2019
+     - Locator: `Phần Đại số, Chương IV: Hàm số y = ax^2 (a != 0). Phương trình bậc hai một ẩn; Bài 3-6`
+     - Status: `VERIFIED`
 2. `formulas.json`: 5 canonical formulas (`FORMULA_DISCRIMINANT`, `FORMULA_PERFECT_SQUARE`, `FORMULA_QUADRATIC_REDUCED`, `FORMULA_QUADRATIC_STANDARD`, `FORMULA_REDUCED_DISCRIMINANT`).
 3. `theorems.json`: 1 formal theorem (`THEOREM_VIETA_RELATIONS`).
 4. `concepts.json`: 14 mathematical concepts (`concept_axis_symmetry`, `concept_discriminant`, `concept_parabola`, `concept_parabola_vertex`, `concept_perfect_square_identity`, `concept_polynomial_coefficient`, `concept_polynomial_factorization`, `concept_quadratic_equation`, `concept_rational_number`, `concept_real_number`, `concept_real_root`, `concept_reduced_discriminant`, `concept_square_root`, `concept_vieta_relations`).
@@ -78,14 +93,14 @@ All files formatted with 2-space indentation and sorted UTF-8 keys:
   - Complete foreign key referential integrity.
   - Strict DFS cycle detection ensuring concept prerequisite DAG acyclicity.
 - Deterministic content hash utility (`compute_dataset_content_hash()`):
-  - **Dataset SHA-256 Digest:** `88c0e80629e4dcd88a518321c26ecd2fdb0272c03faed095115cb84467c8e8dd`
+  - **Dataset SHA-256 Digest:** `e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66`
 
 ---
 
 ## 3. Test Suite & Verification Evidence
 
 ### 3.1 Unit Test Execution (`test_s3_knowledge_schemas.py` & `test_s3_knowledge_dataset.py`)
-- **21 passed in 0.73s** with zero failures:
+- **21 passed in 0.37s** with zero failures:
   - `test_localized_text_valid`: PASSED
   - `test_localized_text_rejects_empty_or_whitespace`: PASSED
   - `test_localized_text_forbids_extra_fields`: PASSED
@@ -96,7 +111,7 @@ All files formatted with 2-space indentation and sorted UTF-8 keys:
   - `test_theorem_knowledge_schema_validation`: PASSED
   - `test_concept_knowledge_schema_validation`: PASSED
   - `test_method_knowledge_schema_negative_runtime_leak_guard`: PASSED
-  - `test_strict_type_coercion_rejection`: PASSED (rejection of str->int, float->int, tuple->list)
+  - `test_strict_type_coercion_rejection`: PASSED
   - `test_strict_type_adapter_json_validation`: PASSED
   - `test_full_dataset_loads_and_validates`: PASSED
   - `test_methods_match_registry_one_to_one`: PASSED
@@ -105,7 +120,7 @@ All files formatted with 2-space indentation and sorted UTF-8 keys:
   - `test_concept_prerequisites_acyclicity`: PASSED
   - `test_validation_detects_unknown_foreign_key`: PASSED
   - `test_validation_detects_cycle_in_concepts`: PASSED
-  - `test_content_hash_determinism`: PASSED (matches `88c0e80629e4dcd88a518321c26ecd2fdb0272c03faed095115cb84467c8e8dd`)
+  - `test_content_hash_determinism`: PASSED (matches `e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66`)
   - `test_s1_four_equation_mathematical_regression_guard`: PASSED (all 4 canonical S3-P0 equations verified)
 
 ### 3.2 Canonical Four-Equation Acceptance Matrix Results
@@ -129,7 +144,7 @@ All files formatted with 2-space indentation and sorted UTF-8 keys:
 ```powershell
 pytest -q tests/test_s3_knowledge_schemas.py tests/test_s3_knowledge_dataset.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_application_orchestrator_s1.py tests/test_application_s1_acceptance.py tests/test_application_traces_s1.py tests/test_domain_core_s0.py tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py tests/test_mvp_v1_product_app.py
 ```
-- **Result:** `464 passed in 7.63s` (100% pass rate).
+- **Result:** `464 passed in 7.01s` (100% pass rate).
 
 ### 3.4 Zero Diff Verification on Forbidden Paths
 ```powershell
@@ -141,4 +156,4 @@ git diff 267582c5aa76c50c49d96e118b7bbc3aabf9252a -- src/frontend/src src/mke_pr
 
 ## 4. Conclusion & Audit Readiness
 
-The MKE S3-01-R1 remediation is fully implemented, verified with strict Pydantic v2 type enforcement and exact bibliographic citations, and regression-free. Ready for independent auditor review.
+The MKE S3-01-R2 final provenance closeout is fully verified with exact, traceable bibliographic sources and locators, strict type enforcement, and zero regressions. Ready for final independent audit.

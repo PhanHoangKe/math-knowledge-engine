@@ -201,7 +201,7 @@ def test_content_hash_determinism() -> None:
     hash2 = compute_dataset_content_hash()
     assert hash1 == hash2
     assert len(hash1) == 64  # SHA-256 hex string
-    assert hash1 == "88c0e80629e4dcd88a518321c26ecd2fdb0272c03faed095115cb84467c8e8dd"
+    assert hash1 == "e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66"
 
 
 def test_s1_four_equation_mathematical_regression_guard() -> None:
