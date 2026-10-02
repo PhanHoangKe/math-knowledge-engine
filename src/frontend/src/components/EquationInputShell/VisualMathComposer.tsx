@@ -512,13 +512,33 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
     };
 
     const updateBlock = (blockId: string, updates: Partial<MathBlock>) => {
-      const updated = blocks.map((b) => {
+      const updated: MathBlock[] = [];
+      for (const b of blocks) {
         if (b.id === blockId) {
-          return { ...b, ...updates } as MathBlock;
+          const merged = { ...b, ...updates } as MathBlock;
+          if (merged.type === 'text' && (merged.value.includes('^') || merged.value.includes('\\frac') || merged.value.includes('sqrt('))) {
+            const parsed = parseStringToBlocks(merged.value);
+            updated.push(...parsed);
+          } else {
+            updated.push(merged);
+          }
+        } else {
+          updated.push(b);
         }
-        return b;
-      });
-      notifyChange(updated);
+      }
+
+      // Merge adjacent text blocks
+      const mergedBlocks: MathBlock[] = [];
+      for (const b of updated) {
+        if (b.type === 'text' && mergedBlocks.length > 0 && mergedBlocks[mergedBlocks.length - 1]?.type === 'text') {
+          const prev = mergedBlocks[mergedBlocks.length - 1] as { type: 'text'; id: string; value: string };
+          prev.value += b.value;
+        } else {
+          mergedBlocks.push(b);
+        }
+      }
+
+      notifyChange(mergedBlocks);
     };
 
     return (
@@ -583,17 +603,17 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           }
 
           if (b.type === 'power') {
-            const expWidth = Math.max(1, (b.exponent || ' ').length) * 1.1 + 0.6;
+            const expWidth = Math.max(1, (b.exponent || ' ').length) * 1.1 + 0.4;
             return (
               <span key={b.id} className={styles.powerBlock}>
                 <span className={styles.powerBase}>{b.base}</span>
                 <input
                   ref={(el) => setInputRef(`${b.id}_exponent`, el)}
                   type="text"
-                  className={styles.slotExponent}
+                  className={`${styles.slotExponent} ${!b.exponent ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${expWidth}ch` }}
                   value={b.exponent}
-                  placeholder="2"
+                  placeholder=""
                   onChange={(e) => updateBlock(b.id, { exponent: e.target.value })}
                   onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'exponent' })}
                   onKeyDown={(e) => handleSlotKeyDown(e, b, 'exponent', idx)}
@@ -613,7 +633,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_num`, el)}
                   type="text"
-                  className={styles.slotNumerator}
+                  className={`${styles.slotNumerator} ${!b.num ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${numWidth}ch` }}
                   value={b.num}
                   placeholder=""
@@ -628,7 +648,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_den`, el)}
                   type="text"
-                  className={styles.slotDenominator}
+                  className={`${styles.slotDenominator} ${!b.den ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${denWidth}ch` }}
                   value={b.den}
                   placeholder=""
@@ -651,7 +671,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_radicand`, el)}
                   type="text"
-                  className={styles.slotRadicand}
+                  className={`${styles.slotRadicand} ${!b.radicand ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${radWidth}ch` }}
                   value={b.radicand}
                   placeholder=""
@@ -673,7 +693,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_index`, el)}
                   type="text"
-                  className={styles.slotNthIndex}
+                  className={`${styles.slotNthIndex} ${!b.index ? styles.emptySlot : styles.filledSlot}`}
                   value={b.index}
                   placeholder="n"
                   onChange={(e) => updateBlock(b.id, { index: e.target.value })}
@@ -686,7 +706,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_radicand`, el)}
                   type="text"
-                  className={styles.slotRadicand}
+                  className={`${styles.slotRadicand} ${!b.radicand ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${radWidth}ch` }}
                   value={b.radicand}
                   placeholder=""
@@ -711,7 +731,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_wrt`, el)}
                       type="text"
-                      className={styles.mathSlot}
+                      className={`${styles.mathSlot} ${!b.wrt ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.wrt || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.wrt}
                       placeholder=""
@@ -725,7 +745,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.mathSlot}
+                  className={`${styles.mathSlot} ${!b.expr ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
                   placeholder=""
@@ -746,7 +766,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_upper`, el)}
                       type="text"
-                      className={styles.slotSuper}
+                      className={`${styles.slotSuper} ${!b.upper ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.upper || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.upper ?? ''}
                       placeholder=""
@@ -758,7 +778,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_lower`, el)}
                       type="text"
-                      className={styles.slotSub}
+                      className={`${styles.slotSub} ${!b.lower ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.lower || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.lower ?? ''}
                       placeholder=""
@@ -773,7 +793,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.mathSlot}
+                  className={`${styles.mathSlot} ${!b.expr ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
                   placeholder=""
@@ -786,7 +806,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_wrt`, el)}
                   type="text"
-                  className={styles.mathSlot}
+                  className={`${styles.mathSlot} ${!b.wrt ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${Math.max(1, (b.wrt || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.wrt}
                   placeholder=""
@@ -805,7 +825,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   <input
                     ref={(el) => setInputRef(`${b.id}_upper`, el)}
                     type="text"
-                    className={styles.slotSuper}
+                    className={`${styles.slotSuper} ${!b.to ? styles.emptySlot : styles.filledSlot}`}
                     style={{ width: `${Math.max(1, (b.to || ' ').length) * 1.1 + 0.6}ch` }}
                     value={b.to ?? ''}
                     placeholder=""
@@ -818,7 +838,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_var`, el)}
                       type="text"
-                      className={styles.slotSub}
+                      className={`${styles.slotSub} ${!b.variable ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.variable || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.variable ?? ''}
                       placeholder=""
@@ -830,7 +850,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_lower`, el)}
                       type="text"
-                      className={styles.slotSub}
+                      className={`${styles.slotSub} ${!b.from ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.from || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.from ?? ''}
                       placeholder=""
@@ -843,7 +863,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.mathSlot}
+                  className={`${styles.mathSlot} ${!b.expr ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
                   placeholder=""
@@ -865,7 +885,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_var`, el)}
                       type="text"
-                      className={styles.slotSub}
+                      className={`${styles.slotSub} ${!b.variable ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.variable || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.variable ?? ''}
                       placeholder=""
@@ -877,7 +897,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_target`, el)}
                       type="text"
-                      className={styles.slotSub}
+                      className={`${styles.slotSub} ${!b.target ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (b.target || ' ').length) * 1.1 + 0.6}ch` }}
                       value={b.target ?? ''}
                       placeholder=""
@@ -890,7 +910,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.mathSlot}
+                  className={`${styles.mathSlot} ${!b.expr ? styles.emptySlot : styles.filledSlot}`}
                   style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
                   placeholder=""
@@ -915,7 +935,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <input
                       ref={(el) => setInputRef(`${b.id}_item_${itIdx}`, el)}
                       type="text"
-                      className={styles.mathSlot}
+                      className={`${styles.mathSlot} ${!item ? styles.emptySlot : styles.filledSlot}`}
                       style={{ width: `${Math.max(1, (item || ' ').length) * 1.1 + 0.6}ch` }}
                       value={item}
                       placeholder=""
@@ -951,7 +971,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                           key={cIdx}
                           ref={(el) => setInputRef(`${b.id}_cell_${rIdx}_${cIdx}`, el)}
                           type="text"
-                          className={styles.mathSlot}
+                          className={`${styles.mathSlot} ${!cell ? styles.emptySlot : styles.filledSlot}`}
                           style={{ width: `${Math.max(1, (cell || ' ').length) * 1.1 + 0.6}ch` }}
                           value={cell}
                           placeholder=""
