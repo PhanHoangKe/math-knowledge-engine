@@ -106,7 +106,6 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
           </span>
         );
       case 'SQRT':
-
         return (
           <span className={styles.btnSqrt}>
             <span className={styles.btnSqrtSym}>√</span>
@@ -124,7 +123,7 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
       case 'NTH_ROOT':
         return (
           <span className={styles.btnNthRoot}>
-            <span className={styles.btnRootIdx}><span className={styles.btnTinyBox} /></span>
+            <span className={styles.btnRootIdx}><span className={styles.btnMicroBox} /></span>
             <span className={styles.btnSqrtSym}>√</span>
             <span className={styles.btnBox} />
           </span>
@@ -148,7 +147,43 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             <span className={styles.btnDerivDen}>
               <span className={styles.btnText}>d</span>
               <span className={styles.btnBox} />
-              <span className={styles.btnText}>²</span>
+              <span className={styles.btnSuperText}>2</span>
+            </span>
+          </span>
+        );
+      case 'PARTIAL':
+        return (
+          <span className={styles.btnFrac}>
+            <span className={styles.btnText}>∂</span>
+            <span className={styles.btnFracBar} />
+            <span className={styles.btnDerivDen}>
+              <span className={styles.btnText}>∂</span>
+              <span className={styles.btnBox} />
+            </span>
+          </span>
+        );
+      case 'SECOND_PARTIAL':
+        return (
+          <span className={styles.btnFrac}>
+            <span className={styles.btnText}>∂²</span>
+            <span className={styles.btnFracBar} />
+            <span className={styles.btnDerivDen}>
+              <span className={styles.btnText}>∂</span>
+              <span className={styles.btnBox} />
+              <span className={styles.btnSuperText}>2</span>
+            </span>
+          </span>
+        );
+      case 'MIXED_PARTIAL':
+        return (
+          <span className={styles.btnFrac}>
+            <span className={styles.btnText}>∂²</span>
+            <span className={styles.btnFracBar} />
+            <span className={styles.btnDerivDen}>
+              <span className={styles.btnText}>∂</span>
+              <span className={styles.btnBox} />
+              <span className={styles.btnText}>∂</span>
+              <span className={styles.btnBox} />
             </span>
           </span>
         );
@@ -156,6 +191,34 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
         return (
           <span className={styles.btnInt}>
             <span className={styles.btnIntSym}>∫</span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      case 'DOUBLE_INT':
+        return (
+          <span className={styles.btnInt}>
+            <span className={styles.btnIntSym}>∬</span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      case 'TRIPLE_INT':
+        return (
+          <span className={styles.btnInt}>
+            <span className={styles.btnIntSym}>∭</span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      case 'CONTOUR_INT':
+        return (
+          <span className={styles.btnInt}>
+            <span className={styles.btnIntSym}>∮</span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      case 'SURFACE_INT':
+        return (
+          <span className={styles.btnInt}>
+            <span className={styles.btnIntSym}>∯</span>
             <span className={styles.btnBox} />
           </span>
         );
@@ -180,6 +243,16 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             </span>
           </span>
         );
+      case 'PRODUCT':
+        return (
+          <span className={styles.btnSum}>
+            <span className={styles.btnTinyBox} />
+            <span className={styles.btnSumSym}>∏</span>
+            <span className={styles.btnSubBoxes}>
+              <span className={styles.btnTinyBox} /><span className={styles.btnTinyBox} />
+            </span>
+          </span>
+        );
       case 'LIMIT':
         return (
           <span className={styles.btnLim}>
@@ -189,10 +262,58 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             </span>
           </span>
         );
+      case 'LIMIT_LEFT':
+        return (
+          <span className={styles.btnLim}>
+            <span className={styles.btnLimText}>lim</span>
+            <span className={styles.btnLimSub}>
+              <span className={styles.btnMicroBox} />→<span className={styles.btnMicroBox} />⁻
+            </span>
+          </span>
+        );
+      case 'LIMIT_RIGHT':
+        return (
+          <span className={styles.btnLim}>
+            <span className={styles.btnLimText}>lim</span>
+            <span className={styles.btnLimSub}>
+              <span className={styles.btnMicroBox} />→<span className={styles.btnMicroBox} />⁺
+            </span>
+          </span>
+        );
+      case 'STEP_FUNC':
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>θ</span>(
+            <span className={styles.btnBox} />)
+          </span>
+        );
+      case 'DELTA_FUNC':
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>δ</span>(
+            <span className={styles.btnBox} />)
+          </span>
+        );
       case 'VEC_3':
+      case 'VECTOR':
         return (
           <span className={styles.btnVec}>
             [<span className={styles.btnMicroBox} />,<span className={styles.btnMicroBox} />,<span className={styles.btnMicroBox} />]
+          </span>
+        );
+      case 'MAT_2X2':
+        return (
+          <span className={styles.btnMat}>
+            (<span className={styles.btnMatGrid}>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} />
+              </span>
+            </span>)
           </span>
         );
       case 'MAT_3X3':
