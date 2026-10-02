@@ -6,12 +6,10 @@ import styles from './RevisionHistoryPanel.module.css';
 
 export interface RevisionHistoryPanelProps {
   history: RevisionHistoryEntry[];
-  onRestoreRevision?: (entry: RevisionHistoryEntry) => void;
 }
 
 export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
   history,
-  onRestoreRevision,
 }) => {
   const { t } = usePreferences();
 
@@ -74,18 +72,6 @@ export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
                     <MathLatex latex={entry.equation_latex} />
                   </div>
                 </div>
-
-                {onRestoreRevision && (
-                  <button
-                    type="button"
-                    className={styles.restoreButton}
-                    onClick={() => onRestoreRevision(entry)}
-                    aria-label={`Restore revision ${entry.semantic_revision_hash.slice(0, 8)}`}
-                    data-testid={`restore-revision-button-${index}`}
-                  >
-                    {t('btn_restore_revision')}
-                  </button>
-                )}
               </div>
             );
           })}

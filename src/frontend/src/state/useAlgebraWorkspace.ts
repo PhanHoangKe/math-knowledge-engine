@@ -32,7 +32,13 @@ export type WorkspaceStatus =
 
 export type RequestOrigin = 'RAW_TEXT' | 'COEFFICIENT_EDIT' | 'METHOD_SWITCH';
 export type WorkspaceSourceMode = 'RAW_TEXT' | 'COEFFICIENTS';
-export type ReactiveCoeffStatus = 'idle' | 'debouncing' | 'recomputing' | 'invalid' | 'updated';
+export type ReactiveCoeffStatus =
+  | 'idle'
+  | 'debouncing'
+  | 'recomputing'
+  | 'invalid'
+  | 'updated'
+  | 'error';
 
 export interface RevisionHistoryEntry {
   problem_id: string;
@@ -66,7 +72,6 @@ export interface UseAlgebraWorkspaceReturn {
   submitRawSolve: (overrideQuery?: string) => Promise<void>;
   switchMethod: (methodId: string) => Promise<void>;
   retryLastRequest: () => Promise<void>;
-  restoreRevision: (entry: RevisionHistoryEntry) => void;
   clearWorkspace: () => void;
 }
 
@@ -195,7 +200,16 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
         const resp = solveResult.response;
         if (resp.response_status === 'SOLVED' || resp.response_status === 'ANALYZED_NO_EXECUTION') {
           const prob = resp.problem;
-          setSourceMode(origin === 'COEFFICIENT_EDIT' ? 'COEFFICIENTS' : 'RAW_TEXT');
+
+          // Freeze provenance semantics:
+          // RAW_TEXT -> RAW_TEXT
+          // COEFFICIENT_EDIT -> COEFFICIENTS
+          // METHOD_SWITCH -> preserve current sourceMode
+          if (origin === 'RAW_TEXT') {
+            setSourceMode('RAW_TEXT');
+          } else if (origin === 'COEFFICIENT_EDIT') {
+            setSourceMode('COEFFICIENTS');
+          }
 
           // Rehydrate draft from authoritative backend values
           if (prob.problem_type === 'QUADRATIC') {
@@ -217,7 +231,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
             problem_type: prob.problem_type,
             classification: prob.classification,
             equation_latex: prob.equation_latex,
-            source_mode: origin === 'COEFFICIENT_EDIT' ? 'COEFFICIENTS' : 'RAW_TEXT',
+            source_mode: origin === 'COEFFICIENT_EDIT' ? 'COEFFICIENTS' : origin === 'RAW_TEXT' ? 'RAW_TEXT' : sourceMode,
             timestamp_frontend_received: new Date().toISOString(),
             a: prob.problem_type === 'QUADRATIC' ? prob.a : undefined,
             b: prob.b,
@@ -225,8 +239,8 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
           };
 
           setRevisionHistory((prevHistory) => {
-            // Deduplicate if newest entry has the exact same semantic revision hash
-            if (prevHistory.length > 0 && prevHistory[0]?.semantic_revision_hash === prob.semantic_revision_hash) {
+            // Deduplicate across entire session history using backend semantic_revision_hash
+            if (prevHistory.some((entry) => entry.semantic_revision_hash === prob.semantic_revision_hash)) {
               return prevHistory;
             }
             return [newEntry, ...prevHistory.slice(0, 14)];
@@ -235,6 +249,9 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
       } else {
         setStatus('transport-error');
         setLastFailedRequest({ origin, solveRequest: request });
+        if (origin === 'COEFFICIENT_EDIT') {
+          setReactiveStatus('error');
+        }
       }
     } catch (err: unknown) {
       if (currentSeq !== sequenceRef.current) {
@@ -246,6 +263,10 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
       }
 
       setLastFailedRequest({ origin, solveRequest: request });
+      if (origin === 'COEFFICIENT_EDIT') {
+        setReactiveStatus('error');
+      }
+
       if (err instanceof ProtocolError) {
         setHttpStatus(err.status ?? null);
         setStatus('protocol-error');
@@ -257,7 +278,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
         setStatus('network-error');
       }
     }
-  }, [cancelDebounce]);
+  }, [cancelDebounce, sourceMode]);
 
   /**
    * Submit raw mathematical query equation.
@@ -309,13 +330,27 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
 
   /**
    * Update an individual coefficient input field with validation and debounced recomputation.
+   * On EVERY edit:
+   * - cancel pending debounce
+   * - immediately increment sequenceRef.current
+   * - abort in-flight request if present
    */
   const updateCoefficientField = useCallback((
     coeff: 'a' | 'b' | 'c',
     part: 'numerator' | 'denominator',
     value: string
   ) => {
+    // 1. Cancel pending debounce
     cancelDebounce();
+
+    // 2. Immediately increment sequence counter to invalidate ANY in-flight request
+    sequenceRef.current += 1;
+
+    // 3. Abort in-flight request if present
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
 
     setCoeffDraft((prev) => {
       const fieldKey = `${part}Str` as const;
@@ -336,6 +371,11 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
         debounceTimerRef.current = null;
         setReactiveStatus('recomputing');
         const payload = draftToRationalPayload(nextDraft);
+        if (!payload) {
+          setReactiveStatus('invalid');
+          return;
+        }
+
         const solveRequest: SolveRequest = {
           schema_version: '1.0.0',
           input_payload: {
@@ -407,39 +447,6 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     await executeSolve(lastFailedRequest.solveRequest, lastFailedRequest.origin);
   }, [lastFailedRequest, executeSolve]);
 
-  /**
-   * Restore a historical revision into the active workspace.
-   */
-  const restoreRevision = useCallback((entry: RevisionHistoryEntry) => {
-    cancelDebounce();
-    const draft: CoefficientsDraft = {
-      a: entry.a
-        ? { numeratorStr: String(entry.a.numerator), denominatorStr: String(entry.a.denominator) }
-        : { numeratorStr: '0', denominatorStr: '1' },
-      b: { numeratorStr: String(entry.b.numerator), denominatorStr: String(entry.b.denominator) },
-      c: { numeratorStr: String(entry.c.numerator), denominatorStr: String(entry.c.denominator) },
-    };
-    setCoeffDraft(draft);
-    setCoeffValidationErrors({});
-    const payload = draftToRationalPayload(draft);
-    if (payload) {
-      executeSolve(
-        {
-          schema_version: '1.0.0',
-          input_payload: {
-            input_mode: 'COEFFICIENTS',
-            a: payload.a,
-            b: payload.b,
-            c: payload.c,
-            target_variable: 'x',
-          },
-          selected_method_id: null,
-        },
-        'COEFFICIENT_EDIT'
-      );
-    }
-  }, [cancelDebounce, executeSolve]);
-
   return {
     query,
     setQuery,
@@ -459,7 +466,6 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     submitRawSolve,
     switchMethod,
     retryLastRequest,
-    restoreRevision,
     clearWorkspace,
   };
 }

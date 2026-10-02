@@ -191,6 +191,7 @@ export const vi = {
   status_coeff_recomputing: 'Đang tính toán lại bài toán theo hệ số mới...',
   status_coeff_updated: 'Bài toán đã được cập nhật từ máy chủ',
   status_coeff_invalid: 'Dữ liệu hệ số không hợp lệ - đã dừng gửi yêu cầu',
+  status_coeff_error: 'Tính toán lại thất bại - đã lưu bản nháp',
 
   panel_revision_history: 'Lịch sử Phiên bản Phiên làm việc',
   lbl_history_empty: 'Chưa có phiên bản tính toán nào trong phiên làm việc.',
@@ -199,7 +200,7 @@ export const vi = {
   lbl_history_type: 'Phân loại',
   lbl_history_hash: 'Mã băm ngữ nghĩa',
   lbl_history_source: 'Nguồn gốc',
-  btn_restore_revision: 'Khôi phục phiên bản',
+  lbl_last_accepted_revision: 'Phiên bản backend được chấp nhận gần nhất',
 } as const;
 
 export type TranslationKey = keyof typeof vi;

@@ -318,7 +318,7 @@ export const mockTransportErrorWithSecretDetail: TransportErrorResponse = {
   message_vi: 'Lỗi xác thực dữ liệu kiểm tra rò rỉ chi tiết.',
   message_en: 'Validation error for testing detail leakage.',
   details: {
-    safe_expected_field: 'Safe validation summary',
+    reason: 'Safe validation summary',
     SECRET_UNKNOWN_DETAIL_SENTINEL: 'MUST_NOT_RENDER',
   },
 };

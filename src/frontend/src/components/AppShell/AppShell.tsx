@@ -42,7 +42,6 @@ export const AppShell: React.FC = () => {
     submitRawSolve,
     switchMethod,
     retryLastRequest,
-    restoreRevision,
     clearWorkspace,
   } = useAlgebraWorkspace();
 
@@ -219,7 +218,6 @@ export const AppShell: React.FC = () => {
           {revisionHistory.length > 0 && (
             <RevisionHistoryPanel
               history={revisionHistory}
-              onRestoreRevision={restoreRevision}
             />
           )}
         </section>

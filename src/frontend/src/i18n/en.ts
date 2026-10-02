@@ -193,6 +193,7 @@ export const en: Translations = {
   status_coeff_recomputing: 'Recomputing mathematical problem with new coefficients...',
   status_coeff_updated: 'Problem updated from server',
   status_coeff_invalid: 'Invalid coefficient input — recomputation paused',
+  status_coeff_error: 'Recomputation failed — draft retained',
 
   panel_revision_history: 'Session Revision History',
   lbl_history_empty: 'No revisions recorded in current session.',
@@ -201,5 +202,5 @@ export const en: Translations = {
   lbl_history_type: 'Classification',
   lbl_history_hash: 'Semantic Hash',
   lbl_history_source: 'Origin',
-  btn_restore_revision: 'Restore revision',
+  lbl_last_accepted_revision: 'Last accepted backend revision',
 };

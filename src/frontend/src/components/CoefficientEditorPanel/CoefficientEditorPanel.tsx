@@ -43,6 +43,8 @@ export const CoefficientEditorPanel: React.FC<CoefficientEditorPanelProps> = ({
         return t('status_coeff_updated');
       case 'invalid':
         return t('status_coeff_invalid');
+      case 'error':
+        return t('status_coeff_error');
       default:
         return t('status_coeff_idle');
     }
@@ -57,6 +59,7 @@ export const CoefficientEditorPanel: React.FC<CoefficientEditorPanelProps> = ({
       case 'updated':
         return styles.statusUpdated;
       case 'invalid':
+      case 'error':
         return styles.statusInvalid;
       default:
         return '';

@@ -9,13 +9,14 @@ export interface TransportErrorPanelProps {
 }
 
 const SAFE_WHITELIST_KEYS = new Set([
-  'expected_content_type',
-  'max_bytes',
-  'actual_bytes',
-  'safe_expected_field',
-  'field',
+  'error_type',
+  'limit_bytes',
+  'declared_bytes',
+  'streamed_bytes_exceeded',
+  'header',
   'reason',
   'path',
+  'status_code',
 ]);
 
 interface SafeValidationError {
@@ -40,9 +41,11 @@ function extractSafeDetails(details: Record<string, unknown> | undefined): {
     return { validationErrors, scalarDetails };
   }
 
-  // If details has an errors array or detail array (e.g., Pydantic validation items)
+  // If details has a validation_errors array, errors array, or detail array (e.g., FastAPI 422 validation items)
   const candidateArray = Array.isArray(details)
     ? details
+    : Array.isArray(details.validation_errors)
+    ? details.validation_errors
     : Array.isArray(details.errors)
     ? details.errors
     : Array.isArray(details.detail)
@@ -67,12 +70,24 @@ function extractSafeDetails(details: Record<string, unknown> | undefined): {
     }
   }
 
-  // Process scalar keys against strict whitelist
+  // Process scalar keys against strict contract whitelist
   for (const [key, val] of Object.entries(details)) {
     if (SAFE_WHITELIST_KEYS.has(key)) {
       if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
         scalarDetails.push({ key, value: String(val) });
       }
+    }
+  }
+
+  // If top-level loc exists without candidateArray (e.g., 400 malformed JSON), format loc safely
+  if (!candidateArray && details.loc) {
+    const locStr = Array.isArray(details.loc)
+      ? details.loc.map(String).join(' → ')
+      : typeof details.loc === 'string'
+      ? details.loc
+      : undefined;
+    if (locStr) {
+      scalarDetails.push({ key: 'loc', value: locStr });
     }
   }
 

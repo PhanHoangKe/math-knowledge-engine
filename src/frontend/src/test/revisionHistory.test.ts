@@ -1,70 +1,127 @@
-import { describe, it, expect } from 'vitest';
-import type { RevisionHistoryEntry } from '../state/useAlgebraWorkspace';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useAlgebraWorkspace } from '../state/useAlgebraWorkspace';
+import * as apiClient from '../api/client';
+import { mockSolvedTwoRoots } from './fixtures/responses';
+import type { SolvedResponse } from '../api/contract';
 
-describe('Bounded In-Memory Session Revision History (Section 35)', () => {
-  function appendRevision(
-    history: RevisionHistoryEntry[],
-    newEntry: RevisionHistoryEntry,
-    limit: number = 15
-  ): RevisionHistoryEntry[] {
-    if (history.length > 0 && history[0]?.semantic_revision_hash === newEntry.semantic_revision_hash) {
-      return history;
-    }
-    return [newEntry, ...history.slice(0, limit - 1)];
-  }
-
-  const createEntry = (hash: string, eq: string, source: 'RAW_TEXT' | 'COEFFICIENTS'): RevisionHistoryEntry => ({
-    problem_id: `prob_${hash}`,
-    semantic_revision_hash: hash,
-    problem_type: 'QUADRATIC',
-    classification: 'REAL_DISTINCT_ROOTS',
-    equation_latex: eq,
-    source_mode: source,
-    timestamp_frontend_received: new Date().toISOString(),
-    a: { numerator: 1, denominator: 1 },
-    b: { numerator: -5, denominator: 1 },
-    c: { numerator: 6, denominator: 1 },
+describe('Bounded In-Memory Session Revision History via useAlgebraWorkspace (Sections 7, 8, 9)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  it('records distinct revisions and places newest first', () => {
-    let history: RevisionHistoryEntry[] = [];
-
-    const e1 = createEntry('hash1', 'x^2 - 5x + 6 = 0', 'RAW_TEXT');
-    history = appendRevision(history, e1);
-    expect(history).toHaveLength(1);
-    expect(history[0]!.semantic_revision_hash).toBe('hash1');
-
-    const e2 = createEntry('hash2', 'x^2 - 5x + 7 = 0', 'COEFFICIENTS');
-    history = appendRevision(history, e2);
-    expect(history).toHaveLength(2);
-    expect(history[0]!.semantic_revision_hash).toBe('hash2');
-    expect(history[1]!.semantic_revision_hash).toBe('hash1');
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it('deduplicates consecutive responses having the exact same semantic revision hash', () => {
-    let history: RevisionHistoryEntry[] = [];
-
-    const e1 = createEntry('hash_identical', 'x^2 - 5x + 6 = 0', 'RAW_TEXT');
-    history = appendRevision(history, e1);
-    expect(history).toHaveLength(1);
-
-    // Same hash again
-    const e2 = createEntry('hash_identical', 'x^2 - 5x + 6 = 0', 'COEFFICIENTS');
-    history = appendRevision(history, e2);
-    expect(history).toHaveLength(1);
-    expect(history[0]!.semantic_revision_hash).toBe('hash_identical');
+  const createMockSolvedResponse = (hash: string, eqLatex: string, cNum: number): SolvedResponse => ({
+    ...mockSolvedTwoRoots,
+    problem: {
+      ...mockSolvedTwoRoots.problem,
+      problem_id: `prob_${hash}`,
+      equation_latex: eqLatex,
+      semantic_revision_hash: hash,
+      c: { numerator: cNum, denominator: 1 },
+    },
   });
 
-  it('strictly bounds revision history to a maximum of 15 entries (FIFO oldest drop)', () => {
-    let history: RevisionHistoryEntry[] = [];
+  it('records distinct revisions, preserves deduplication on identical hash and method switches', async () => {
+    const respA = createMockSolvedResponse('hash_A', 'x^2 - 5x + 6 = 0', 6);
+    const respB = createMockSolvedResponse('hash_B', 'x^2 - 5x + 7 = 0', 7);
 
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation');
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    // A. Raw solve hash A -> exactly 1 entry
+    solveSpy.mockResolvedValueOnce({
+      kind: 'application',
+      status: 200,
+      response: respA,
+    });
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    expect(result.current.revisionHistory).toHaveLength(1);
+    expect(result.current.revisionHistory[0]?.semantic_revision_hash).toBe('hash_A');
+    expect(result.current.revisionHistory[0]?.source_mode).toBe('RAW_TEXT');
+
+    // B. Coefficient edit hash B -> exactly 2 entries
+    solveSpy.mockResolvedValueOnce({
+      kind: 'application',
+      status: 200,
+      response: respB,
+    });
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(result.current.revisionHistory).toHaveLength(2);
+    expect(result.current.revisionHistory[0]?.semantic_revision_hash).toBe('hash_B');
+    expect(result.current.revisionHistory[0]?.source_mode).toBe('COEFFICIENTS');
+    expect(result.current.revisionHistory[1]?.semantic_revision_hash).toBe('hash_A');
+
+    // C. Method switch on hash B -> still exactly 2 entries
+    solveSpy.mockResolvedValueOnce({
+      kind: 'application',
+      status: 200,
+      response: {
+        ...respB,
+        selected_method_id: 'QUAD_FORMULA_REDUCED',
+      },
+    });
+    await act(async () => {
+      await result.current.switchMethod('QUAD_FORMULA_REDUCED');
+    });
+
+    expect(result.current.revisionHistory).toHaveLength(2);
+    expect(result.current.revisionHistory[0]?.semantic_revision_hash).toBe('hash_B');
+
+    // D. Return to hash A again (A -> B -> A) -> does not create duplicate A in history!
+    solveSpy.mockResolvedValueOnce({
+      kind: 'application',
+      status: 200,
+      response: respA,
+    });
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '6');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(result.current.revisionHistory).toHaveLength(2);
+  });
+
+  it('strictly bounds session history to a maximum of 15 entries through the hook', async () => {
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation');
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    // Generate 20 distinct backend problem responses
     for (let i = 1; i <= 20; i++) {
-      const entry = createEntry(`hash_${i}`, `x^2 - 5x + ${i} = 0`, 'COEFFICIENTS');
-      history = appendRevision(history, entry, 15);
+      const resp = createMockSolvedResponse(`hash_rev_${i}`, `x^2 - 5x + ${i} = 0`, i);
+      solveSpy.mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: resp,
+      });
+
+      act(() => {
+        result.current.updateCoefficientField('c', 'numerator', String(i));
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
     }
 
-    expect(history).toHaveLength(15);
-    expect(history[0]!.semantic_revision_hash).toBe('hash_20');
-    expect(history[14]!.semantic_revision_hash).toBe('hash_6'); // 1..5 dropped
+    // Exactly 15 entries retained, newest first
+    expect(result.current.revisionHistory).toHaveLength(15);
+    expect(result.current.revisionHistory[0]?.semantic_revision_hash).toBe('hash_rev_20');
+    expect(result.current.revisionHistory[14]?.semantic_revision_hash).toBe('hash_rev_6');
   });
 });

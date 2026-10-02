@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { RevisionHistoryPanel } from '../components/RevisionHistoryPanel/RevisionHistoryPanel';
 import { PreferencesProvider } from '../state/preferences';
 import type { RevisionHistoryEntry } from '../state/useAlgebraWorkspace';
 
-describe('RevisionHistoryPanel Component (Section 35 & 38)', () => {
+describe('RevisionHistoryPanel Component (Observational Only - Sections 7 & 38)', () => {
   const mockEntries: RevisionHistoryEntry[] = [
     {
       problem_id: 'prob_1',
@@ -43,12 +43,10 @@ describe('RevisionHistoryPanel Component (Section 35 & 38)', () => {
     expect(screen.getByTestId('revision-history-count')).toHaveTextContent('0');
   });
 
-  it('renders history items with provenance badges, problem classification, and equation', () => {
-    const handleRestore = vi.fn();
-
+  it('renders history items with provenance badges, problem classification, and equation without rollback buttons', () => {
     render(
       <PreferencesProvider>
-        <RevisionHistoryPanel history={mockEntries} onRestoreRevision={handleRestore} />
+        <RevisionHistoryPanel history={mockEntries} />
       </PreferencesProvider>
     );
 
@@ -60,9 +58,8 @@ describe('RevisionHistoryPanel Component (Section 35 & 38)', () => {
     expect(items[0]).toHaveTextContent('QUADRATIC');
     expect(items[0]).toHaveTextContent('REAL_DISTINCT_ROOTS');
 
-    // Verify restore button interaction
-    const restoreBtn = screen.getByTestId('restore-revision-button-0');
-    fireEvent.click(restoreBtn);
-    expect(handleRestore).toHaveBeenCalledWith(mockEntries[0]);
+    // Confirm no restore/undo buttons exist (observational only)
+    expect(screen.queryByRole('button', { name: /restore/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /khôi phục/i })).toBeNull();
   });
 });
