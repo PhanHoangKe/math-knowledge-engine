@@ -62,6 +62,31 @@ export const en: Translations = {
   panel_skeleton_methods: 'Applicable Methods (Awaiting Query)',
   panel_skeleton_solution_trace: 'Step-by-Step Solution (Awaiting Query)',
 
+  topic_col_math: 'Mathematics & Algebra',
+  topic_step_by_step: 'Step-by-Step Solutions',
+  topic_quadratic_eq: 'Quadratic Equations',
+  topic_viete: 'Viète Theorem & Roots',
+  topic_delta: 'Discriminant Analysis (Δ)',
+  topic_factoring: 'Algebraic Identities & Factoring',
+
+  topic_col_knowledge: 'Knowledge & Theorems',
+  topic_theorems: 'Theorems & Corollaries Repository',
+  topic_formulas: 'Formula Reference Table',
+  topic_verification: 'Independent Verification',
+  topic_rational: 'Reasoning over ℝ & ℚ',
+
+  topic_col_functions: 'Functions & Plots',
+  topic_parabola: 'Parabola Curve Analysis',
+  topic_vertex: 'Vertex & Axis of Symmetry',
+  topic_intercepts: 'Coordinate Axis Intercepts',
+  topic_roots_class: 'Real Roots Classification',
+
+  topic_col_tools: 'Tools & Solvers',
+  topic_multi_methods: 'Multi-Method Comparison',
+  topic_reactive: 'Reactive Coefficient Editor',
+  topic_latex: 'LaTeX Formula Export',
+  topic_history: 'Session History & Audit',
+
   shell_status_idle: 'Status: Ready (Deterministic Mathematical Engine)',
   shell_status_loading: 'Submitting query and analyzing on mathematical server...',
   shell_status_solved: 'Status: Solved and comprehensively verified',

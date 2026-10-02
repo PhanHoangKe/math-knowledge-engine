@@ -9,33 +9,43 @@
   --bg-canvas: #ffffff;
   --bg-surface: #ffffff;
   --bg-surface-elevated: #ffffff;
-  --bg-subtle: #f7f7f9;
-  --border-subtle: #e2e8f0;
-  --border-card: #e5e7eb;
-  --border-card-hover: #cbd5e1;
+  --bg-subtle: #f5f5f5;
+  --border-subtle: #dfdfdf;
+  --border-card: #dfdfdf;
+  --border-card-hover: #9371b5;
 
   /* Accent & Interaction Tokens (Light Theme) */
-  --border-accent: #8e6cd9; /* Iconic Wolfram violet border */
-  --border-focus: #7a54cc;
-  --compute-btn: #8e6cd9;
-  --compute-btn-hover: #7b55ca;
+  --border-accent: #f96932; /* Wolfram Signature Orange for natural mode */
+  --border-accent-math: #9371b5; /* Wolfram Violet for math mode */
+  --border-focus: #f96932;
+  --focus-ring-color: #FFC845; /* Iconic Wolfram Amber focus glow */
+  --compute-btn: #f96932;
+  --compute-btn-hover: #ec561a;
+  --compute-btn-math: #6b21a8;
   --compute-text: #ffffff;
-  --accent-primary: #8e6cd9;
-  --accent-hover: #7a54cc;
+  --accent-primary: #9371b5;
+  --accent-hover: #6c5694;
   --accent-subtle: #f3f0fc;
 
   /* Typography Colors (Light Theme) */
-  --text-primary: #1e293b;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-italic: #475569;
+  --text-primary: #333333;
+  --text-secondary: #535353;
+  --text-muted: #777777;
+  --text-placeholder: #888888;
+  --text-italic: #535353;
 
   /* 4 Column Category Domain Colors (Matches WolframAlpha Baseline) */
-  --col-math: #8e6cd9;       /* Mathematics / Step Solutions (Purple/Violet) */
-  --col-science: #059669;    /* Science / Rational Field (Emerald Green) */
-  --col-society: #e05638;    /* Society / Quadratics (Terracotta Coral) */
-  --col-life: #0284c7;       /* Everyday Life / Classroom (Sky Blue) */
-  --wolfram-orange: #ea580c; /* Signature orange accent */
+  --col-math: #9371b5;       /* Mathematics / Step Solutions (Purple/Violet) */
+  --col-math-active: #6c5694;
+  --col-science: #369c63;    /* Science & Tech / Rational Field (Green) */
+  --col-science-active: #00905d;
+  --col-society: #dc565d;    /* Society & Quadratics (Coral/Red) */
+  --col-society-active: #d23e32;
+  --col-life: #00adb8;       /* Everyday Life / Classroom (Teal/Cyan) */
+  --col-life-active: #009ca8;
+  --wolfram-orange: #f96932; /* Signature orange accent */
+  --wolfram-purple: #6b21a8; /* Signature math purple */
+  --wolfram-purple-tile: #8b2cb0; /* Key tile matte purple */
 
   /* Badges & Status */
   --badge-active-bg: #dcfce7;
@@ -47,21 +57,22 @@
   --badge-demo-border: #fef3c7;
 
   /* Shadows */
-  --shadow-input: 0 2px 14px rgba(142, 108, 217, 0.12);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-input: 0 0 0 3px #FFC845, 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-popover: 0 8px 24px -4px rgba(0, 0, 0, 0.15);
 
   /* Font Stacks */
-  --font-math: "Cambria Math", "Charter", "Georgia", serif;
-  --font-serif-italic: "Charter", "Georgia", "Cambria", serif;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "Cascadia Code", "Consolas", "Courier New", monospace;
+  --font-math: "KaTeX_Math", "KaTeX_Main", "Cambria Math", serif;
+  --font-serif: "Roboto Slab", "Source Serif Pro", "Lexia", Georgia, serif;
+  --font-serif-italic: "Roboto Slab", "Source Serif Pro", "Lexia", Georgia, 'Times New Roman', serif;
+  --font-sans: 'Source Sans 3', 'Source Sans Pro', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Source Code Pro", "Fira Code", "Cascadia Code", Consolas, monospace;
 
   --transition-speed: 0.18s;
-  --radius-capsule: 20px;
-  --radius-card: 8px;
-  --radius-btn: 12px;
+  --radius-capsule: 14px;
+  --radius-card: 6px;
+  --radius-btn: 8px;
 }
 
 /* Charcoal Dark Theme Tokens */

@@ -109,7 +109,14 @@ export const AppShell: React.FC = () => {
           aria-live="polite"
           aria-busy={status === 'loading'}
         >
-          {status === 'idle' && <WorkspaceEmptyState />}
+          {status === 'idle' && (
+            <WorkspaceEmptyState
+              onSelectEquation={(eq) => {
+                setQuery(eq);
+                submitRawSolve(eq);
+              }}
+            />
+          )}
 
           {status === 'loading' && (
             <div className={styles.loadingContainer} data-testid="workspace-loading">

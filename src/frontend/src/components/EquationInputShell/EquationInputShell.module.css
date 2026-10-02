@@ -9,31 +9,35 @@
 /* Hero Section */
 .heroSection {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .heroSuper {
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-primary-600, #7e22ce);
-  margin-bottom: 0.2rem;
+  color: #cb1000;
+  margin-bottom: 0.35rem;
 }
 
 .heroTitle {
-  font-size: 1.85rem;
+  font-size: 2.1rem;
   font-weight: 800;
-  color: var(--color-text-primary, #111827);
-  margin: 0 0 0.25rem 0;
+  color: var(--text-primary, #333333);
+  margin: 0 0 0.4rem 0;
   letter-spacing: -0.02em;
 }
 
 .heroTagline {
-  font-size: 0.88rem;
-  color: var(--color-text-muted, #6b7280);
-  margin: 0;
+  font-family: var(--font-serif-italic, 'Roboto Slab', Georgia, serif);
+  font-size: 1.12rem;
+  color: var(--text-secondary, #535353);
+  margin: 0 auto;
+  max-width: 680px;
+  line-height: 1.45;
   font-style: italic;
+  font-weight: 300;
 }
 
 /* Main Capsule Box - 100% WolframAlpha sleek rounded rectangle */
@@ -43,27 +47,27 @@
   width: 100%;
   max-width: 840px;
   height: 46px;
-  background: var(--color-surface, #ffffff);
+  background: var(--bg-surface, #ffffff);
   border-radius: 14px;
   padding: 0 5px 0 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .capsuleNatural {
-  border: 2px solid #f59e0b;
+  border: 1px solid #f96932;
 }
 
 .capsuleNatural:focus-within {
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 3px #FFC845, 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .capsuleMath {
-  border: 2px solid #a855f7;
+  border: 1px solid #9371b5;
 }
 
 .capsuleMath:focus-within {
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 3px rgba(147, 113, 181, 0.28), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .capsuleLoading {
@@ -74,8 +78,8 @@
   flex: 1;
   height: 100%;
   font-size: 1.05rem;
-  font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--color-text-primary, #111827);
+  font-family: 'KaTeX_Math', 'Cambria Math', var(--font-sans), sans-serif;
+  color: var(--text-primary, #333333);
   background: transparent;
   border: none;
   outline: none;
@@ -84,9 +88,9 @@
 
 .inputField::placeholder {
   font-style: italic;
-  color: #9ca3af;
+  color: var(--text-placeholder, #888888);
   font-size: 0.98rem;
-  font-family: sans-serif;
+  font-family: var(--font-sans), sans-serif;
 }
 
 /* Clear Circular Button */
@@ -106,7 +110,7 @@
 }
 
 .clearCircleBtn:hover {
-  color: #ef4444;
+  color: #cb1000;
   transform: scale(1.1);
 }
 
@@ -126,16 +130,20 @@
 }
 
 .computeBtnOrange {
-  background: #ea580c;
+  background: #f96932;
 }
 
 .computeBtnOrange:hover:not(:disabled) {
-  background: #c2410c;
+  background: #ec561a;
   transform: translateY(-1px);
 }
 
+.computeBtnOrange:active:not(:disabled) {
+  background: #cb1000;
+}
+
 .computeBtnPurple {
-  background: #9333ea;
+  background: #6b21a8;
 }
 
 .computeBtnPurple:hover:not(:disabled) {

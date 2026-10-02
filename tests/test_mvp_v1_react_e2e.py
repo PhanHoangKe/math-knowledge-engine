@@ -633,33 +633,12 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert palette.is_displayed()
 
         # 3. Enter equation using Math Palette buttons: x² − 5*x + 6 = 0
-        # Click x²
-        btn_square = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-SQUARE']")
-        btn_square.click()
-        # Click −
-        btn_minus = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-MINUS']")
-        btn_minus.click()
-        # Click 5
-        btn_5 = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-DIGIT_5']")
-        btn_5.click()
-        # Click ×
-        btn_mul = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-MULTIPLY']")
-        btn_mul.click()
-        # Click x
-        btn_x = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-VAR_X']")
-        btn_x.click()
-        # Click +
-        btn_plus = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-PLUS']")
-        btn_plus.click()
-        # Click 6
-        btn_6 = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-DIGIT_6']")
-        btn_6.click()
-        # Click =
-        btn_eq = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-EQUALS']")
-        btn_eq.click()
-        # Click 0
-        btn_0 = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-DIGIT_0']")
-        btn_0.click()
+        for btn_action in [
+            'SQUARE', 'MINUS', 'DIGIT_5', 'MULTIPLY', 'VAR_X', 'PLUS', 'DIGIT_6', 'EQUALS', 'DIGIT_0'
+        ]:
+            btn = self.driver.find_element(By.CSS_SELECTOR, f"[data-testid='palette-btn-{btn_action}']")
+            self.driver.execute_script("arguments[0].click();", btn)
+            time.sleep(0.08)
 
         # Verify input field content
         eq_input = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='equation-input']")

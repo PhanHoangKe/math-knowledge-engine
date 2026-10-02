@@ -59,6 +59,31 @@ export const vi = {
   panel_skeleton_canonical_form: 'Dạng Chuẩn tắc & Hệ số (Chờ truy vấn)',
   panel_skeleton_methods: 'Phương pháp Khả dụng (Chờ truy vấn)',
   panel_skeleton_solution_trace: 'Lời giải Từng bước (Chờ truy vấn)',
+
+  topic_col_math: 'Toán học & Đại số',
+  topic_step_by_step: 'Giải pháp từng bước',
+  topic_quadratic_eq: 'Phương trình bậc hai',
+  topic_viete: 'Định lý Viète & Nhẩm nghiệm',
+  topic_delta: 'Biệt thức Delta (Δ)',
+  topic_factoring: 'Hằng đẳng thức & Nhân tử',
+
+  topic_col_knowledge: 'Tri thức & Định lý',
+  topic_theorems: 'Kho Định lý & Hệ quả',
+  topic_formulas: 'Bảng tra cứu Công thức',
+  topic_verification: 'Xác minh độc lập',
+  topic_rational: 'Suy luận trên ℝ & ℚ',
+
+  topic_col_functions: 'Khảo sát & Đồ thị',
+  topic_parabola: 'Đồ thị Parabol bậc hai',
+  topic_vertex: 'Tọa độ đỉnh & Trục đối xứng',
+  topic_intercepts: 'Giao điểm các trục tọa độ',
+  topic_roots_class: 'Phân loại nghiệm thực',
+
+  topic_col_tools: 'Công cụ & Tính toán',
+  topic_multi_methods: 'So sánh Đa phương pháp',
+  topic_reactive: 'Sửa hệ số tương tác',
+  topic_latex: 'Xuất công thức LaTeX',
+  topic_history: 'Lịch sử giải toán',
   
   shell_status_idle: 'Trạng thái: Sẵn sàng (Động cơ Toán học Tất định)',
   shell_status_loading: 'Đang gửi truy vấn và phân tích trên máy chủ toán học...',
