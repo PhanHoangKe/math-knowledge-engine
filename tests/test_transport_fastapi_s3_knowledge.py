@@ -6,7 +6,7 @@ Verifies:
 3. Graph export endpoint parity (29 nodes, 84 edges, KNOWLEDGE_GRAPH kind).
 4. Semantic distinction between known-route/unknown-entity (404 KnowledgeApiErrorResponse) and unknown-route (404 TransportErrorResponse).
 5. Read-only API guarantee (zero POST/PUT/PATCH/DELETE endpoints under /api/v1/knowledge).
-6. OpenAPI contract adherence (stable operation IDs, schema refs, extra=forbid schemas).
+6. OpenAPI contract adherence (exact 200/404/500 schema refs, stable operation IDs, extra=forbid schemas).
 7. Determinism across repeated requests and sanitized HTTP 500 on unexpected internal errors.
 """
 
@@ -134,7 +134,7 @@ def test_http_get_knowledge_graph_success(client: TestClient, graph_service: Kno
     assert len(graph_model.nodes) == 29
     assert len(graph_model.edges) == 84
 
-    # Exact equality with service export
+    # Exact semantic JSON parity with service export
     expected_data = graph_service.export_knowledge_graph().model_dump(mode="json")
     assert data == expected_data
 
@@ -253,7 +253,7 @@ def test_knowledge_api_is_strictly_read_only(client: TestClient) -> None:
 # 6. OPENAPI CONTRACT & OPERATION IDS
 # ============================================================================
 
-def test_openapi_knowledge_schema_contract(client: TestClient) -> None:
+def test_openapi_knowledge_operation_ids(client: TestClient) -> None:
     openapi = client.get("/openapi.json").json()
     paths = openapi["paths"]
 
@@ -270,12 +270,99 @@ def test_openapi_knowledge_schema_contract(client: TestClient) -> None:
         get_op = paths[path]["get"]
         assert get_op["operationId"] == op_id, f"Operation ID mismatch on {path}: {get_op['operationId']}"
 
-        # Check response documentation
-        responses = get_op["responses"]
-        assert "200" in responses
-        assert "500" in responses
-        if "{method_id}" in path or "{concept_id}" in path or "{formula_id}" in path or "{theorem_id}" in path:
-            assert "404" in responses
+
+def test_openapi_exact_200_response_schema_refs(client: TestClient) -> None:
+    openapi = client.get("/openapi.json").json()
+    paths = openapi["paths"]
+
+    expected_200_refs = {
+        "/api/v1/knowledge/methods/{method_id}": "#/components/schemas/MethodKnowledge",
+        "/api/v1/knowledge/concepts/{concept_id}": "#/components/schemas/ConceptKnowledge",
+        "/api/v1/knowledge/formulas/{formula_id}": "#/components/schemas/FormulaKnowledge",
+        "/api/v1/knowledge/theorems/{theorem_id}": "#/components/schemas/TheoremKnowledge",
+        "/api/v1/knowledge/graph": "#/components/schemas/GraphModel",
+    }
+
+    for path, expected_ref in expected_200_refs.items():
+        assert path in paths
+        schema = paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+        assert schema.get("$ref") == expected_ref, f"200 schema ref mismatch on {path}: {schema}"
+
+
+def test_openapi_exact_404_error_schema_refs(client: TestClient) -> None:
+    openapi = client.get("/openapi.json").json()
+    paths = openapi["paths"]
+
+    entity_paths = [
+        "/api/v1/knowledge/methods/{method_id}",
+        "/api/v1/knowledge/concepts/{concept_id}",
+        "/api/v1/knowledge/formulas/{formula_id}",
+        "/api/v1/knowledge/theorems/{theorem_id}",
+    ]
+
+    for path in entity_paths:
+        assert path in paths
+        schema = paths[path]["get"]["responses"]["404"]["content"]["application/json"]["schema"]
+        assert schema.get("$ref") == "#/components/schemas/KnowledgeApiErrorResponse", (
+            f"404 schema ref mismatch on {path}: {schema}"
+        )
+
+    # Graph endpoint does NOT advertise a 404 knowledge entity not found response
+    assert "404" not in paths["/api/v1/knowledge/graph"]["get"]["responses"]
+
+
+def test_openapi_exact_500_error_schema_refs(client: TestClient) -> None:
+    openapi = client.get("/openapi.json").json()
+    paths = openapi["paths"]
+
+    all_knowledge_paths = [
+        "/api/v1/knowledge/methods/{method_id}",
+        "/api/v1/knowledge/concepts/{concept_id}",
+        "/api/v1/knowledge/formulas/{formula_id}",
+        "/api/v1/knowledge/theorems/{theorem_id}",
+        "/api/v1/knowledge/graph",
+    ]
+
+    for path in all_knowledge_paths:
+        assert path in paths
+        schema = paths[path]["get"]["responses"]["500"]["content"]["application/json"]["schema"]
+        assert schema.get("$ref") == "#/components/schemas/TransportErrorResponse", (
+            f"500 schema ref mismatch on {path}: {schema}"
+        )
+
+
+def test_openapi_strict_additional_properties_false(client: TestClient) -> None:
+    openapi = client.get("/openapi.json").json()
+    schemas = openapi["components"]["schemas"]
+
+    required_strict_models = [
+        "MethodKnowledge",
+        "ConceptKnowledge",
+        "FormulaKnowledge",
+        "TheoremKnowledge",
+        "GraphModel",
+        "GraphNode",
+        "GraphEdge",
+        "KnowledgeApiErrorResponse",
+        "TransportErrorResponse",
+    ]
+
+    for model_name in required_strict_models:
+        assert model_name in schemas, f"Missing schema in OpenAPI: {model_name}"
+        assert schemas[model_name].get("additionalProperties") is False, (
+            f"Model '{model_name}' must have additionalProperties=False in OpenAPI, got: {schemas[model_name].get('additionalProperties')}"
+        )
+
+
+def test_openapi_knowledge_api_error_code_enum(client: TestClient) -> None:
+    openapi = client.get("/openapi.json").json()
+    schemas = openapi["components"]["schemas"]
+
+    assert "KnowledgeApiErrorCode" in schemas
+    enum_values = schemas["KnowledgeApiErrorCode"].get("enum", [])
+    assert enum_values == ["KNOWLEDGE_ENTITY_NOT_FOUND"], (
+        f"KnowledgeApiErrorCode enum mismatch: expected ['KNOWLEDGE_ENTITY_NOT_FOUND'], got {enum_values}"
+    )
 
 
 # ============================================================================
