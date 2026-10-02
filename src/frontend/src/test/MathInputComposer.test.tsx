@@ -6,6 +6,9 @@ import {
   insertSnippet,
   handleBackspace,
   toVisualLatex,
+  toMathModeFormat,
+  toNaturalModeFormat,
+  normalizeForSolver,
   isSupportedByComposer,
   serializePaletteAction,
 } from '../utils/mathInputSerialization';
@@ -40,6 +43,20 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(res.newCursorPos).toBe(1);
     });
 
+    it('toMathModeFormat and toNaturalModeFormat convert bidirectionally', () => {
+      const raw = 'x^2 - 5*x + 6 = 0';
+      const math = toMathModeFormat(raw);
+      expect(math).toBe('Power[x,2] - 5*x + 6 = 0');
+
+      const convertedBack = toNaturalModeFormat(math);
+      expect(convertedBack).toBe('x^2 - 5*x + 6 = 0');
+    });
+
+    it('normalizeForSolver normalizes math input to backend grammar', () => {
+      expect(normalizeForSolver('Power[x,2] - 5*x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
+      expect(normalizeForSolver('2*x² − 4*x + 2 = 0')).toBe('2*x^2 - 4*x + 2 = 0');
+    });
+
     it('serializePaletteAction maps math operators deterministically', () => {
       expect(serializePaletteAction('', 'VAR_X').newQuery).toBe('x');
       expect(serializePaletteAction('', 'SQUARE').newQuery).toBe('x^2');
@@ -59,6 +76,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
 
     it('toVisualLatex formats raw strings into LaTeX for KaTeX preview', () => {
       expect(toVisualLatex('x^2 - 5*x + 6 = 0')).toBe('x^{2} - 5x + 6 = 0');
+      expect(toVisualLatex('Power[x,2] - 5*x + 6 = 0')).toBe('x^{2} - 5x + 6 = 0');
       expect(toVisualLatex('3/4*x^2')).toBe('\\frac{3}{4} \\cdot x^{2}');
       expect(toVisualLatex('(2/3)*x')).toBe('(\\frac{2}{3}) \\cdot x');
     });
@@ -72,7 +90,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
   });
 
   describe('<EquationInputShell /> Dual-Mode Composer UI', () => {
-    it('renders Quick Input mode by default with tabs and input box', () => {
+    it('renders Natural Language mode by default with tabs and input box', () => {
       const onQueryChange = vi.fn();
       const onSubmit = vi.fn();
       const onClear = vi.fn();
@@ -94,7 +112,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(screen.queryByTestId('math-preview-box')).not.toBeInTheDocument();
     });
 
-    it('switches to Math Input mode and shows preview box and Math Palette without losing input', () => {
+    it('switches to Math Input mode, converts to Power[x,2] format and shows preview box & Math Palette', () => {
       const onQueryChange = vi.fn();
       const onSubmit = vi.fn();
       const onClear = vi.fn();
@@ -117,10 +135,10 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(screen.getByTestId('mode-quick-btn')).toHaveAttribute('aria-selected', 'false');
       expect(screen.getByTestId('math-palette')).toBeInTheDocument();
       expect(screen.getByTestId('math-preview-box')).toBeInTheDocument();
-      expect(screen.getByTestId('equation-input')).toHaveValue('x^2 - 5*x + 6 = 0');
+      expect(onQueryChange).toHaveBeenCalledWith('Power[x,2] - 5*x + 6 = 0');
     });
 
-    it('clicking palette buttons inserts deterministic symbols and updates query', () => {
+    it('clicking palette category tabs and buttons inserts deterministic symbols and updates query', () => {
       let queryValue = '';
       const onQueryChange = vi.fn((val: string) => {
         queryValue = val;
@@ -141,6 +159,10 @@ describe('MathInputComposer & Serialization Utilities', () => {
 
       // Switch to Math mode
       fireEvent.click(screen.getByTestId('mode-math-btn'));
+
+      // Click the Algebra category tab (√)
+      const algebraCategoryBtn = screen.getByTitle('Đại số & Căn thức');
+      fireEvent.click(algebraCategoryBtn);
 
       // Click 'x'
       const btnX = screen.getByTestId('palette-btn-VAR_X');
@@ -211,8 +233,8 @@ describe('MathInputComposer & Serialization Utilities', () => {
       // Switch to math mode
       fireEvent.click(screen.getByTestId('mode-math-btn'));
 
-      const btnX = screen.getByTestId('palette-btn-VAR_X');
-      expect(btnX).toBeDisabled();
+      const btnFraction = screen.getByTestId('palette-btn-FRACTION');
+      expect(btnFraction).toBeDisabled();
       const btnCompute = screen.getByTestId('compute-btn');
       expect(btnCompute).toBeDisabled();
     });

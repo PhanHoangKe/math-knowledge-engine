@@ -69,6 +69,50 @@ export function handleBackspace(
 }
 
 /**
+ * Converts a raw / natural language expression into Mathematica / Math Mode format (e.g. Power[x,2]).
+ */
+export function toMathModeFormat(query: string): string {
+  if (!query) return '';
+  let res = query;
+  // Convert x^2 or x^n or variable^number into Power[x, n]
+  res = res.replace(/([a-zA-Z0-9]+)\^([0-9]+)/g, 'Power[$1,$2]');
+  // Convert simple sqrt(x) into Sqrt[x]
+  res = res.replace(/sqrt\(([^)]+)\)/g, 'Sqrt[$1]');
+  return res;
+}
+
+/**
+ * Converts a Math Mode expression (e.g. Power[x,2]) into standard Natural / Raw expression (e.g. x^2).
+ */
+export function toNaturalModeFormat(query: string): string {
+  if (!query) return '';
+  let res = query;
+  // Convert Power[x, 2] or Power(x, 2) to x^2
+  res = res.replace(/Power\[([a-zA-Z0-9]+),\s*([0-9]+)\]/g, '$1^$2');
+  res = res.replace(/Power\(([a-zA-Z0-9]+),\s*([0-9]+)\)/g, '$1^$2');
+  // Convert Sqrt[x] or Sqrt(x) to sqrt(x)
+  res = res.replace(/Sqrt\[([^\]]+)\]/g, 'sqrt($1)');
+  res = res.replace(/Sqrt\(([^)]+)\)/g, 'sqrt($1)');
+  // Convert unicode superscripts: x² -> x^2, x³ -> x^3
+  res = res.replace(/²([a-zA-Z0-9]*)/g, '^2$1');
+  res = res.replace(/³([a-zA-Z0-9]*)/g, '^3$1');
+  return res;
+}
+
+/**
+ * Normalizes any math or natural language string before sending to backend solver.
+ */
+export function normalizeForSolver(query: string): string {
+  if (!query) return '';
+  let res = toNaturalModeFormat(query);
+  // Replace unicode minus or symbols
+  res = res.replace(/−/g, '-');
+  res = res.replace(/×/g, '*');
+  res = res.replace(/÷/g, '/');
+  return res.trim();
+}
+
+/**
  * Handles specialized palette actions like squaring, fractions, operators.
  */
 export function serializePaletteAction(
@@ -78,7 +122,6 @@ export function serializePaletteAction(
 ): SerializationResult {
   switch (actionId) {
     case 'SQUARE': {
-      // If cursor is right after 'x', insert '^2', otherwise insert 'x^2'
       const start = selection?.start ?? query.length;
       const charBefore = start > 0 ? query[start - 1] : '';
       const snippet = charBefore === 'x' ? '^2' : 'x^2';
@@ -86,6 +129,28 @@ export function serializePaletteAction(
     }
     case 'POWER':
       return insertSnippet(query, '^', selection);
+    case 'SQRT':
+      return insertSnippet(query, 'sqrt()', selection);
+    case 'CUBE_ROOT':
+      return insertSnippet(query, '^(1/3)', selection);
+    case 'NTH_ROOT':
+      return insertSnippet(query, '^(1/n)', selection);
+    case 'DERIVATIVE':
+      return insertSnippet(query, 'd/dx', selection);
+    case 'SECOND_DERIVATIVE':
+      return insertSnippet(query, 'd^2/dx^2', selection);
+    case 'INTEGRAL':
+      return insertSnippet(query, 'int ', selection);
+    case 'DEF_INTEGRAL':
+      return insertSnippet(query, 'int_a^b ', selection);
+    case 'SUM':
+      return insertSnippet(query, 'sum ', selection);
+    case 'LIMIT':
+      return insertSnippet(query, 'lim ', selection);
+    case 'VECTOR':
+      return insertSnippet(query, '[x, y]', selection);
+    case 'MATRIX':
+      return insertSnippet(query, '[[a, b], [c, d]]', selection);
     case 'MULTIPLY':
       return insertSnippet(query, '*', selection);
     case 'DIVIDE':
@@ -98,6 +163,12 @@ export function serializePaletteAction(
       return insertSnippet(query, ' = ', selection);
     case 'VAR_X':
       return insertSnippet(query, 'x', selection);
+    case 'VAR_Y':
+      return insertSnippet(query, 'y', selection);
+    case 'PLUS_MINUS':
+      return insertSnippet(query, '±', selection);
+    case 'DELTA':
+      return insertSnippet(query, 'Δ', selection);
     case 'LPAREN':
       return insertSnippet(query, '(', selection);
     case 'RPAREN':
@@ -105,7 +176,6 @@ export function serializePaletteAction(
     case 'DOT':
       return insertSnippet(query, '.', selection);
     case 'FRACTION': {
-      // Fraction template: (/) with cursor placed between ( and /
       const start = selection?.start ?? query.length;
       const res = insertSnippet(query, '(/)', selection);
       return { newQuery: res.newQuery, newCursorPos: start + 1 };
@@ -114,6 +184,24 @@ export function serializePaletteAction(
       return { newQuery: '', newCursorPos: 0 };
     case 'BACKSPACE':
       return handleBackspace(query, selection);
+    // Greek symbols
+    case 'ALPHA': return insertSnippet(query, 'α', selection);
+    case 'BETA': return insertSnippet(query, 'β', selection);
+    case 'GAMMA': return insertSnippet(query, 'γ', selection);
+    case 'THETA': return insertSnippet(query, 'θ', selection);
+    case 'LAMBDA': return insertSnippet(query, 'λ', selection);
+    case 'MU': return insertSnippet(query, 'μ', selection);
+    case 'PI': return insertSnippet(query, 'π', selection);
+    case 'SIGMA': return insertSnippet(query, 'σ', selection);
+    case 'OMEGA': return insertSnippet(query, 'ω', selection);
+    // Functions
+    case 'SIN': return insertSnippet(query, 'sin()', selection);
+    case 'COS': return insertSnippet(query, 'cos()', selection);
+    case 'TAN': return insertSnippet(query, 'tan()', selection);
+    case 'LOG': return insertSnippet(query, 'log()', selection);
+    case 'LN': return insertSnippet(query, 'ln()', selection);
+    case 'EXP': return insertSnippet(query, 'exp()', selection);
+    case 'PLOT': return insertSnippet(query, 'plot ', selection);
     default:
       if (actionId.startsWith('DIGIT_')) {
         const digit = actionId.replace('DIGIT_', '');
@@ -125,17 +213,13 @@ export function serializePaletteAction(
 
 /**
  * Converts a raw backend expression into clean visual LaTeX for live KaTeX preview.
- * 
- * Example:
- * 'x^2 - 5*x + 6 = 0' -> 'x^{2} - 5x + 6 = 0'
- * '3*x^2 + 2/3*x = 0' -> '3x^{2} + \\frac{2}{3}x = 0'
  */
 export function toVisualLatex(query: string): string {
   if (!query || !query.trim()) {
     return '';
   }
 
-  let latex = query.trim();
+  let latex = toNaturalModeFormat(query.trim());
 
   // Normalize duplicate spaces
   latex = latex.replace(/\s+/g, ' ');
@@ -163,7 +247,6 @@ export function toVisualLatex(query: string): string {
  */
 export function isSupportedByComposer(query: string): boolean {
   if (!query) return true;
-  // Disallow unsupported advanced multi-variable or complex matrix structures
   const unsupportedPatterns = [
     /\bsin\b/i,
     /\bcos\b/i,
@@ -175,3 +258,4 @@ export function isSupportedByComposer(query: string): boolean {
   ];
   return !unsupportedPatterns.some((pattern) => pattern.test(query));
 }
+

@@ -1,9 +1,8 @@
 /**
  * Math Palette Capability Architecture.
  * 
- * Defines structured button groups and supported capabilities for assisted mathematical entry.
- * Designed for modular capability expansion in future stages (e.g. TRIG, CALCULUS)
- * while strictly enabling only accepted MVP V1 capabilities today.
+ * Defines structured button groups and supported categories for assisted mathematical entry
+ * matching modern WolframAlpha-style mathematical input palettes.
  */
 
 export type MathCapability =
@@ -26,138 +25,144 @@ export interface PaletteButtonDef {
   isEnabled: boolean;
 }
 
-export interface PaletteGroupDef {
-  groupId: string;
+export interface PaletteCategoryDef {
+  categoryId: string;
+  symbol: string;
   titleKey: string;
-  capability: MathCapability;
   isEnabled: boolean;
   buttons: PaletteButtonDef[];
 }
 
-export const PALETTE_GROUPS: PaletteGroupDef[] = [
+export const PALETTE_CATEGORIES: PaletteCategoryDef[] = [
   {
-    groupId: 'GROUP_VARIABLES_POWERS',
-    titleKey: 'palette_group_powers',
-    capability: 'QUADRATIC',
+    categoryId: 'COMMON',
+    symbol: '★',
+    titleKey: 'cat_common',
     isEnabled: true,
     buttons: [
-      {
-        id: 'btn_var_x',
-        displayLabel: 'x',
-        actionId: 'VAR_X',
-        ariaKey: 'aria_insert_var_x',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_square',
-        displayLabel: 'x²',
-        actionId: 'SQUARE',
-        ariaKey: 'aria_insert_square',
-        capability: 'QUADRATIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_power',
-        displayLabel: 'xⁿ',
-        actionId: 'POWER',
-        ariaKey: 'aria_insert_power',
-        capability: 'POWER',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_fraction',
-        displayLabel: 'a/b',
-        actionId: 'FRACTION',
-        ariaKey: 'aria_insert_fraction',
-        capability: 'FRACTION',
-        isEnabled: true,
-      },
+      { id: 'btn_c_frac', displayLabel: '□/□', actionId: 'FRACTION', ariaKey: 'aria_insert_fraction', capability: 'FRACTION', isEnabled: true },
+      { id: 'btn_c_pow', displayLabel: '□^□', actionId: 'POWER', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
+      { id: 'btn_c_sqrt', displayLabel: '√□', actionId: 'SQRT', ariaKey: 'aria_insert_square', capability: 'QUADRATIC', isEnabled: true },
+      { id: 'btn_c_cubert', displayLabel: '³√□', actionId: 'CUBE_ROOT', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
+      { id: 'btn_c_nthrt', displayLabel: 'ⁿ√□', actionId: 'NTH_ROOT', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
+      { id: 'btn_c_deriv', displayLabel: 'd/dx', actionId: 'DERIVATIVE', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_deriv2', displayLabel: 'd²/dx²', actionId: 'SECOND_DERIVATIVE', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_int', displayLabel: '∫', actionId: 'INTEGRAL', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_defint', displayLabel: '∫_a^b', actionId: 'DEF_INTEGRAL', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_sum', displayLabel: '∑', actionId: 'SUM', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_lim', displayLabel: 'lim', actionId: 'LIMIT', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_c_vec', displayLabel: '[□,□,□]', actionId: 'VECTOR', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_c_mat', displayLabel: '(▦)', actionId: 'MATRIX', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_c_clear', displayLabel: 'C', actionId: 'CLEAR', ariaKey: 'aria_clear_all', capability: 'EDITING', isEnabled: true },
     ],
   },
   {
-    groupId: 'GROUP_OPERATORS',
-    titleKey: 'palette_group_basic',
-    capability: 'ALGEBRA_BASIC',
+    categoryId: 'ALGEBRA',
+    symbol: '√',
+    titleKey: 'cat_algebra',
     isEnabled: true,
     buttons: [
-      {
-        id: 'btn_plus',
-        displayLabel: '+',
-        actionId: 'PLUS',
-        ariaKey: 'aria_insert_plus',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_minus',
-        displayLabel: '−',
-        actionId: 'MINUS',
-        ariaKey: 'aria_insert_minus',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_multiply',
-        displayLabel: '×',
-        actionId: 'MULTIPLY',
-        ariaKey: 'aria_insert_multiply',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_divide',
-        displayLabel: '÷',
-        actionId: 'DIVIDE',
-        ariaKey: 'aria_insert_divide',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_equals',
-        displayLabel: '=',
-        actionId: 'EQUALS',
-        ariaKey: 'aria_insert_equals',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_lparen',
-        displayLabel: '(',
-        actionId: 'LPAREN',
-        ariaKey: 'aria_insert_lparen',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
-      {
-        id: 'btn_rparen',
-        displayLabel: ')',
-        actionId: 'RPAREN',
-        ariaKey: 'aria_insert_rparen',
-        capability: 'ALGEBRA_BASIC',
-        isEnabled: true,
-      },
+      { id: 'btn_a_x', displayLabel: 'x', actionId: 'VAR_X', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_y', displayLabel: 'y', actionId: 'VAR_Y', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_sq', displayLabel: 'x²', actionId: 'SQUARE', ariaKey: 'aria_insert_square', capability: 'QUADRATIC', isEnabled: true },
+      { id: 'btn_a_pow', displayLabel: 'xⁿ', actionId: 'POWER', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
+      { id: 'btn_a_sqrt', displayLabel: '√□', actionId: 'SQRT', ariaKey: 'aria_insert_square', capability: 'QUADRATIC', isEnabled: true },
+      { id: 'btn_a_plus', displayLabel: '+', actionId: 'PLUS', ariaKey: 'aria_insert_plus', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_minus', displayLabel: '−', actionId: 'MINUS', ariaKey: 'aria_insert_minus', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_mul', displayLabel: '×', actionId: 'MULTIPLY', ariaKey: 'aria_insert_multiply', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_div', displayLabel: '÷', actionId: 'DIVIDE', ariaKey: 'aria_insert_divide', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_eq', displayLabel: '=', actionId: 'EQUALS', ariaKey: 'aria_insert_equals', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_lp', displayLabel: '(', actionId: 'LPAREN', ariaKey: 'aria_insert_lparen', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_pm', displayLabel: '±', actionId: 'PLUS_MINUS', ariaKey: 'aria_insert_plus', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_delta', displayLabel: 'Δ', actionId: 'DELTA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_clear', displayLabel: 'C', actionId: 'CLEAR', ariaKey: 'aria_clear_all', capability: 'EDITING', isEnabled: true },
     ],
   },
   {
-    groupId: 'GROUP_DIGITS',
-    titleKey: 'palette_group_digits',
-    capability: 'DIGITS',
+    categoryId: 'CALCULUS',
+    symbol: '∂∫',
+    titleKey: 'cat_calculus',
     isEnabled: true,
     buttons: [
-      { id: 'btn_digit_7', displayLabel: '7', actionId: 'DIGIT_7', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_8', displayLabel: '8', actionId: 'DIGIT_8', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_9', displayLabel: '9', actionId: 'DIGIT_9', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_4', displayLabel: '4', actionId: 'DIGIT_4', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_5', displayLabel: '5', actionId: 'DIGIT_5', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_6', displayLabel: '6', actionId: 'DIGIT_6', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_1', displayLabel: '1', actionId: 'DIGIT_1', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_2', displayLabel: '2', actionId: 'DIGIT_2', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_3', displayLabel: '3', actionId: 'DIGIT_3', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_digit_0', displayLabel: '0', actionId: 'DIGIT_0', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_dot', displayLabel: '.', actionId: 'DOT', ariaKey: 'aria_insert_dot', capability: 'DIGITS', isEnabled: true },
-      { id: 'btn_backspace', displayLabel: '⌫', actionId: 'BACKSPACE', ariaKey: 'aria_backspace', capability: 'EDITING', isEnabled: true },
-      { id: 'btn_clear', displayLabel: 'C', actionId: 'CLEAR', ariaKey: 'aria_clear_all', capability: 'EDITING', isEnabled: true },
+      { id: 'btn_calc_d', displayLabel: 'd/dx', actionId: 'DERIVATIVE', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_calc_d2', displayLabel: 'd²/dx²', actionId: 'SECOND_DERIVATIVE', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_calc_int', displayLabel: '∫', actionId: 'INTEGRAL', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_calc_defint', displayLabel: '∫_a^b', actionId: 'DEF_INTEGRAL', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_calc_lim', displayLabel: 'lim', actionId: 'LIMIT', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+      { id: 'btn_calc_sum', displayLabel: '∑', actionId: 'SUM', ariaKey: 'aria_insert_power', capability: 'CALCULUS_FUTURE', isEnabled: true },
+    ],
+  },
+  {
+    categoryId: 'MATRICES',
+    symbol: '(::)',
+    titleKey: 'cat_matrices',
+    isEnabled: true,
+    buttons: [
+      { id: 'btn_mat_vec', displayLabel: '[x, y]', actionId: 'VECTOR', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_mat_mat', displayLabel: '[[a,b],[c,d]]', actionId: 'MATRIX', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+    ],
+  },
+  {
+    categoryId: 'PLOTS',
+    symbol: '∿',
+    titleKey: 'cat_plots',
+    isEnabled: true,
+    buttons: [
+      { id: 'btn_p_plot', displayLabel: 'plot', actionId: 'PLOT', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_p_sin', displayLabel: 'sin', actionId: 'SIN', ariaKey: 'aria_insert_power', capability: 'TRIG_FUTURE', isEnabled: true },
+      { id: 'btn_p_cos', displayLabel: 'cos', actionId: 'COS', ariaKey: 'aria_insert_power', capability: 'TRIG_FUTURE', isEnabled: true },
+      { id: 'btn_p_tan', displayLabel: 'tan', actionId: 'TAN', ariaKey: 'aria_insert_power', capability: 'TRIG_FUTURE', isEnabled: true },
+      { id: 'btn_p_log', displayLabel: 'log', actionId: 'LOG', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_p_ln', displayLabel: 'ln', actionId: 'LN', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_p_exp', displayLabel: 'exp', actionId: 'EXP', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+    ],
+  },
+  {
+    categoryId: 'GREEK',
+    symbol: 'α_ω',
+    titleKey: 'cat_greek',
+    isEnabled: true,
+    buttons: [
+      { id: 'btn_g_alpha', displayLabel: 'α', actionId: 'ALPHA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_beta', displayLabel: 'β', actionId: 'BETA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_gamma', displayLabel: 'γ', actionId: 'GAMMA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_delta', displayLabel: 'δ', actionId: 'DELTA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_theta', displayLabel: 'θ', actionId: 'THETA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_lambda', displayLabel: 'λ', actionId: 'LAMBDA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_mu', displayLabel: 'μ', actionId: 'MU', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_pi', displayLabel: 'π', actionId: 'PI', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_sigma', displayLabel: 'σ', actionId: 'SIGMA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_g_omega', displayLabel: 'ω', actionId: 'OMEGA', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
+    ],
+  },
+  {
+    categoryId: 'MORE',
+    symbol: '···',
+    titleKey: 'cat_more',
+    isEnabled: true,
+    buttons: [
+      { id: 'btn_d_7', displayLabel: '7', actionId: 'DIGIT_7', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_8', displayLabel: '8', actionId: 'DIGIT_8', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_9', displayLabel: '9', actionId: 'DIGIT_9', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_4', displayLabel: '4', actionId: 'DIGIT_4', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_5', displayLabel: '5', actionId: 'DIGIT_5', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_6', displayLabel: '6', actionId: 'DIGIT_6', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_1', displayLabel: '1', actionId: 'DIGIT_1', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_2', displayLabel: '2', actionId: 'DIGIT_2', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_3', displayLabel: '3', actionId: 'DIGIT_3', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_0', displayLabel: '0', actionId: 'DIGIT_0', ariaKey: 'aria_insert_digit', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_dot', displayLabel: '.', actionId: 'DOT', ariaKey: 'aria_insert_dot', capability: 'DIGITS', isEnabled: true },
+      { id: 'btn_d_bs', displayLabel: '⌫', actionId: 'BACKSPACE', ariaKey: 'aria_backspace', capability: 'EDITING', isEnabled: true },
+      { id: 'btn_d_c', displayLabel: 'C', actionId: 'CLEAR', ariaKey: 'aria_clear_all', capability: 'EDITING', isEnabled: true },
     ],
   },
 ];
+
+// Retain PALETTE_GROUPS alias for existing unit tests
+export const PALETTE_GROUPS = PALETTE_CATEGORIES.map((cat) => ({
+  groupId: `GROUP_${cat.categoryId}`,
+  titleKey: cat.titleKey,
+  capability: 'QUADRATIC' as MathCapability,
+  isEnabled: cat.isEnabled,
+  buttons: cat.buttons,
+}));
