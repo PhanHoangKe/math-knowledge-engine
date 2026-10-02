@@ -3,11 +3,11 @@
   align-items: center;
   flex-wrap: nowrap;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   flex: 1;
   min-height: 48px;
   height: auto;
-  padding: 4px 4px;
+  padding: 6px 6px;
   gap: 0px;
   font-family: Arial, Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 1rem;
@@ -28,7 +28,7 @@
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: inherit;
   font-weight: 400;
   color: inherit;
   padding: 0;
@@ -88,11 +88,23 @@
   vertical-align: middle;
 }
 
+.nestingLevel1 {
+  font-size: 0.92rem;
+}
+
+.nestingLevel2 {
+  font-size: 0.84rem;
+}
+
+.nestingLevel3 {
+  font-size: 0.78rem;
+}
+
 /* Universal WolframAlpha Math Slot Styling */
 .mathSlot {
   display: inline-block;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: inherit;
   font-weight: 400;
   color: #111827;
   border-radius: 2px;
@@ -132,7 +144,7 @@
   box-shadow: none !important;
 }
 
-/* Power Block */
+/* Power Block with small raised exponent slot */
 .powerBlock {
   display: inline-flex;
   align-items: baseline;
@@ -153,24 +165,30 @@
   vertical-align: super;
   margin-bottom: 6px;
   margin-left: 1px;
-  font-size: 0.85em;
+  font-size: 0.75em;
 }
 
-.slotExponent {
-  display: inline-block;
+.powerExpWrap .mathSlot {
+  min-width: 12px;
+  height: 14px;
+  line-height: 12px;
+  font-size: 0.72rem;
+  padding: 0 1px;
+}
+
+.powerExpWrap .emptySlot {
+  min-width: 12px;
+  height: 14px;
+}
+
+.powerSuperText {
+  font-size: 0.82rem;
+  font-weight: 500;
   vertical-align: super;
+  margin-bottom: 6px;
+  margin-left: 1px;
+  user-select: none;
   font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: #111827;
-  border-radius: 2px;
-  padding: 0 2px;
-  min-width: 14px;
-  height: 15px;
-  line-height: 13px;
-  text-align: center;
-  outline: none;
-  box-shadow: none;
 }
 
 .slotSuper {
@@ -247,7 +265,7 @@
   border-radius: 1px;
 }
 
-/* Square Root / Radical Block */
+/* Square Root / Radical Block with stretching overline */
 .sqrtBlock {
   display: inline-flex;
   align-items: stretch;

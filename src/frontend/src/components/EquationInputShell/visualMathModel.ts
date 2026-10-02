@@ -221,9 +221,87 @@ export function findNodeAndParent(
 }
 
 /**
+ * Recursively finds the enclosing composite template block that contains a given child text/slot ID.
+ */
+export function findEnclosingBlockAndParent(
+  tree: MathBlock[],
+  childId: string,
+  parentArray: MathBlock[] = tree
+): { enclosingBlock: MathBlock; parent: MathBlock[]; index: number } | null {
+  for (let i = 0; i < tree.length; i++) {
+    const block = tree[i]!;
+
+    if (block.type === 'fraction') {
+      if (findNodeAndParent(block.num, childId) || findNodeAndParent(block.den, childId)) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'power') {
+      if (findNodeAndParent(block.base, childId) || findNodeAndParent(block.exponent, childId)) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'sqrt') {
+      if (findNodeAndParent(block.radicand, childId)) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'nth_root') {
+      if (findNodeAndParent(block.index, childId) || findNodeAndParent(block.radicand, childId)) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'derivative') {
+      if (findNodeAndParent(block.wrt, childId) || findNodeAndParent(block.expr, childId)) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'integral') {
+      if (
+        findNodeAndParent(block.expr, childId) ||
+        findNodeAndParent(block.wrt, childId) ||
+        (block.lower && findNodeAndParent(block.lower, childId)) ||
+        (block.upper && findNodeAndParent(block.upper, childId))
+      ) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'sum') {
+      if (
+        findNodeAndParent(block.expr, childId) ||
+        (block.variable && findNodeAndParent(block.variable, childId)) ||
+        (block.from && findNodeAndParent(block.from, childId)) ||
+        (block.to && findNodeAndParent(block.to, childId))
+      ) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'limit') {
+      if (
+        findNodeAndParent(block.expr, childId) ||
+        (block.variable && findNodeAndParent(block.variable, childId)) ||
+        (block.target && findNodeAndParent(block.target, childId))
+      ) {
+        return { enclosingBlock: block, parent: parentArray, index: i };
+      }
+    } else if (block.type === 'vector') {
+      for (const it of block.items) {
+        if (findNodeAndParent(it, childId)) {
+          return { enclosingBlock: block, parent: parentArray, index: i };
+        }
+      }
+    } else if (block.type === 'matrix') {
+      for (const row of block.cells) {
+        for (const cell of row) {
+          if (findNodeAndParent(cell, childId)) {
+            return { enclosingBlock: block, parent: parentArray, index: i };
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Finds the first editable text node inside a MathBlock tree/subtree.
  */
 export function findFirstTextNodeId(block: MathBlock | MathBlock[]): string | null {
+
   const list = Array.isArray(block) ? block : [block];
   for (const b of list) {
     if (b.type === 'text') return b.id;

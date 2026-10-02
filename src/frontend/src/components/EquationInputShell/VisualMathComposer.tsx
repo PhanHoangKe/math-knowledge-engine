@@ -4,6 +4,7 @@ import {
   parseStringToBlocks,
   blocksToVisualString,
   findNodeAndParent,
+  findEnclosingBlockAndParent,
   findFirstTextNodeId,
   createEmptyTextNode,
   createDefaultFraction,
@@ -112,6 +113,8 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       }
 
       let templateToInsert: MathBlock | null = null;
+      let preferBaseFocus = false;
+
       switch (actionId) {
         case 'FRACTION':
           templateToInsert = createDefaultFraction();
@@ -121,20 +124,35 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           const targetId = focusedNodeId || findFirstTextNodeId(cloned) || '';
           const res = findNodeAndParent(cloned, targetId);
           if (res && res.node.type === 'text') {
-            if (!res.node.value || res.node.value.endsWith(' ') || res.node.value.endsWith('+') || res.node.value.endsWith('-') || res.node.value.endsWith('−') || res.node.value.endsWith('=')) {
-              res.node.value += 'x²';
-            } else {
+            if (res.node.value && !res.node.value.endsWith(' ') && !res.node.value.endsWith('+') && !res.node.value.endsWith('-') && !res.node.value.endsWith('−') && !res.node.value.endsWith('=')) {
               res.node.value += '²';
+              notifyChange(cloned);
+              return;
             }
-            notifyChange(cloned);
-            return;
           }
-          templateToInsert = createDefaultPower('x', '2');
+          // Empty base with exponent 2
+          templateToInsert = createDefaultPower('', '2');
+          preferBaseFocus = true;
           break;
         }
-        case 'POWER':
+        case 'POWER': {
+          const cloned = JSON.parse(JSON.stringify(blocks)) as MathBlock[];
+          const targetId = focusedNodeId || findFirstTextNodeId(cloned) || '';
+          const res = findNodeAndParent(cloned, targetId);
+          if (res && res.node.type === 'text' && res.node.value) {
+            const match = res.node.value.match(/([a-zA-Z0-9_]+)$/);
+            if (match) {
+              const baseStr = match[1]!;
+              res.node.value = res.node.value.slice(0, res.node.value.length - baseStr.length);
+              templateToInsert = createDefaultPower(baseStr, '');
+              insertBlockAtFocus(templateToInsert);
+              return;
+            }
+          }
           templateToInsert = createDefaultPower('', '');
+          preferBaseFocus = true;
           break;
+        }
         case 'EXP_POW':
           templateToInsert = createDefaultPower('e', '');
           break;
@@ -178,7 +196,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       }
 
       if (templateToInsert) {
-        insertBlockAtFocus(templateToInsert);
+        insertBlockAtFocus(templateToInsert, preferBaseFocus);
         return;
       }
 
@@ -241,7 +259,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       insertTextAtFocus(snippet);
     };
 
-    const insertBlockAtFocus = (newBlock: MathBlock) => {
+    const insertBlockAtFocus = (newBlock: MathBlock, preferBase = false) => {
       const cloned = JSON.parse(JSON.stringify(blocks)) as MathBlock[];
       const targetId = focusedNodeId || findFirstTextNodeId(cloned) || '';
       const res = findNodeAndParent(cloned, targetId);
@@ -260,11 +278,14 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
 
       notifyChange(cloned);
 
-      const firstTextId = findFirstTextNodeId(newBlock);
-      if (firstTextId) {
-        setFocusedNodeId(firstTextId);
+      let focusTargetId = findFirstTextNodeId(newBlock);
+      if (preferBase && newBlock.type === 'power') {
+        focusTargetId = findFirstTextNodeId(newBlock.base) || focusTargetId;
+      }
+      if (focusTargetId) {
+        setFocusedNodeId(focusTargetId);
         requestAnimationFrame(() => {
-          inputRefs.current.get(firstTextId)?.focus();
+          inputRefs.current.get(focusTargetId)?.focus();
         });
       }
     };
@@ -301,6 +322,23 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
             res.parent.push(createEmptyTextNode(''));
           }
           notifyChange(cloned);
+        } else {
+          // res.index === 0: delete enclosing template block!
+          const enclosing = findEnclosingBlockAndParent(cloned, focusedNodeId);
+          if (enclosing) {
+            enclosing.parent.splice(enclosing.index, 1);
+            if (enclosing.parent.length === 0) {
+              enclosing.parent.push(createEmptyTextNode(''));
+            }
+            const focusTarget = findFirstTextNodeId(enclosing.parent) || findFirstTextNodeId(cloned);
+            if (focusTarget) {
+              setFocusedNodeId(focusTarget);
+              requestAnimationFrame(() => {
+                inputRefs.current.get(focusTarget)?.focus();
+              });
+            }
+            notifyChange(cloned);
+          }
         }
       }
     };
@@ -321,13 +359,33 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           const cloned = JSON.parse(JSON.stringify(blocks)) as MathBlock[];
           const res = findNodeAndParent(cloned, nodeId);
           if (res) {
-            if (res.node.type === 'text' && !res.node.value && res.index > 0) {
-              e.preventDefault();
-              res.parent.splice(res.index - 1, 1);
-              if (res.parent.length === 0) {
-                res.parent.push(createEmptyTextNode(''));
+            if (res.node.type === 'text' && !res.node.value) {
+              if (res.index > 0) {
+                e.preventDefault();
+                res.parent.splice(res.index - 1, 1);
+                if (res.parent.length === 0) {
+                  res.parent.push(createEmptyTextNode(''));
+                }
+                notifyChange(cloned);
+              } else {
+                // Delete enclosing template block
+                const enclosing = findEnclosingBlockAndParent(cloned, nodeId);
+                if (enclosing) {
+                  e.preventDefault();
+                  enclosing.parent.splice(enclosing.index, 1);
+                  if (enclosing.parent.length === 0) {
+                    enclosing.parent.push(createEmptyTextNode(''));
+                  }
+                  const focusTarget = findFirstTextNodeId(enclosing.parent) || findFirstTextNodeId(cloned);
+                  if (focusTarget) {
+                    setFocusedNodeId(focusTarget);
+                    requestAnimationFrame(() => {
+                      inputRefs.current.get(focusTarget)?.focus();
+                    });
+                  }
+                  notifyChange(cloned);
+                }
               }
-              notifyChange(cloned);
             }
           }
         }
@@ -335,15 +393,25 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
     };
 
     /**
-     * Recursive Slot List Renderer.
+     * Recursive Slot List Renderer with progressive depth font-scaling.
      */
     const renderSlotList = (
       slotNodes: MathBlock[],
       isRoot = false,
+      depth = 0,
       slotLabel = ''
     ): React.ReactNode => {
+      const depthClass =
+        depth === 1
+          ? styles.nestingLevel1
+          : depth === 2
+          ? styles.nestingLevel2
+          : depth >= 3
+          ? styles.nestingLevel3
+          : '';
+
       return (
-        <span className={styles.slotWrap}>
+        <span className={`${styles.slotWrap} ${depthClass}`}>
           {slotNodes.map((b, idx) => {
             if (b.type === 'text') {
               const isOnlyChild = slotNodes.length === 1 && !b.value;
@@ -397,24 +465,33 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
               return (
                 <span key={b.id} className={styles.fractionBlock}>
                   <div className={styles.fractionNumWrap}>
-                    {renderSlotList(b.num, false, 'Tử số')}
+                    {renderSlotList(b.num, false, depth + 1, 'Tử số')}
                   </div>
                   <div className={styles.fractionBar} />
                   <div className={styles.fractionDenWrap}>
-                    {renderSlotList(b.den, false, 'Mẫu số')}
+                    {renderSlotList(b.den, false, depth + 1, 'Mẫu số')}
                   </div>
                 </span>
               );
             }
 
             if (b.type === 'power') {
+              const isFixedSquare =
+                b.exponent.length === 1 &&
+                b.exponent[0]?.type === 'text' &&
+                b.exponent[0].value === '2';
+
               return (
                 <span key={b.id} className={styles.powerBlock}>
                   <div className={styles.powerBaseWrap}>
-                    {renderSlotList(b.base, false, 'Cơ số')}
+                    {renderSlotList(b.base, false, depth, 'Cơ số')}
                   </div>
                   <div className={styles.powerExpWrap}>
-                    {renderSlotList(b.exponent, false, 'Số mũ')}
+                    {isFixedSquare ? (
+                      <span className={styles.powerSuperText}>2</span>
+                    ) : (
+                      renderSlotList(b.exponent, false, depth + 1, 'Số mũ')
+                    )}
                   </div>
                 </span>
               );
@@ -425,7 +502,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <span key={b.id} className={styles.sqrtBlock}>
                   <span className={styles.sqrtSymbol}>√</span>
                   <div className={styles.slotRadicandWrap}>
-                    {renderSlotList(b.radicand, false, 'Biểu thức dưới căn')}
+                    {renderSlotList(b.radicand, false, depth + 1, 'Biểu thức dưới căn')}
                   </div>
                 </span>
               );
@@ -435,11 +512,11 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
               return (
                 <span key={b.id} className={styles.nthRootBlock}>
                   <div className={styles.slotNthIndexWrap}>
-                    {renderSlotList(b.index, false, 'Bậc căn')}
+                    {renderSlotList(b.index, false, depth + 1, 'Bậc căn')}
                   </div>
                   <span className={styles.sqrtSymbol}>√</span>
                   <div className={styles.slotRadicandWrap}>
-                    {renderSlotList(b.radicand, false, 'Biểu thức dưới căn')}
+                    {renderSlotList(b.radicand, false, depth + 1, 'Biểu thức dưới căn')}
                   </div>
                 </span>
               );
@@ -453,11 +530,11 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <div className={styles.fractionBar} />
                     <span className={styles.derivativeDenRow}>
                       <span className={styles.fractionSymbol}>d</span>
-                      {renderSlotList(b.wrt, false, 'Biến vi phân')}
+                      {renderSlotList(b.wrt, false, depth + 1, 'Biến vi phân')}
                       {b.order === 2 && <span className={styles.fractionSymbol}>²</span>}
                     </span>
                   </span>
-                  {renderSlotList(b.expr, false, 'Hàm số vi phân')}
+                  {renderSlotList(b.expr, false, depth + 1, 'Hàm số vi phân')}
                 </span>
               );
             }
@@ -468,19 +545,19 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   {b.isDefinite ? (
                     <span className={styles.defIntegralSymbolWrap}>
                       <div className={styles.slotSuper}>
-                        {renderSlotList(b.upper || [], false, 'Cận trên')}
+                        {renderSlotList(b.upper || [], false, depth + 1, 'Cận trên')}
                       </div>
                       <span className={styles.integralSymbol}>∫</span>
                       <div className={styles.slotSub}>
-                        {renderSlotList(b.lower || [], false, 'Cận dưới')}
+                        {renderSlotList(b.lower || [], false, depth + 1, 'Cận dưới')}
                       </div>
                     </span>
                   ) : (
                     <span className={styles.integralSymbol}>∫</span>
                   )}
-                  {renderSlotList(b.expr, false, 'Hàm số tích phân')}
+                  {renderSlotList(b.expr, false, depth + 1, 'Hàm số tích phân')}
                   <span className={styles.differentialD}>d</span>
-                  {renderSlotList(b.wrt, false, 'Biến tích phân')}
+                  {renderSlotList(b.wrt, false, depth + 1, 'Biến tích phân')}
                 </span>
               );
             }
@@ -490,16 +567,16 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <span key={b.id} className={styles.sumBlock}>
                   <span className={styles.sumSymbolWrap}>
                     <div className={styles.slotSuper}>
-                      {renderSlotList(b.to || [], false, 'Giới hạn trên')}
+                      {renderSlotList(b.to || [], false, depth + 1, 'Giới hạn trên')}
                     </div>
                     <span className={styles.sumSymbol}>∑</span>
                     <span className={styles.sumLowerRow}>
-                      {renderSlotList(b.variable || [], false, 'Biến tổng')}
+                      {renderSlotList(b.variable || [], false, depth + 1, 'Biến tổng')}
                       <span style={{ fontSize: '0.75rem' }}>=</span>
-                      {renderSlotList(b.from || [], false, 'Giá trị đầu')}
+                      {renderSlotList(b.from || [], false, depth + 1, 'Giá trị đầu')}
                     </span>
                   </span>
-                  {renderSlotList(b.expr, false, 'Biểu thức tổng')}
+                  {renderSlotList(b.expr, false, depth + 1, 'Biểu thức tổng')}
                 </span>
               );
             }
@@ -510,12 +587,12 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   <span className={styles.limitSymbolWrap}>
                     <span className={styles.limitText}>lim</span>
                     <span className={styles.limitSubRow}>
-                      {renderSlotList(b.variable || [], false, 'Biến giới hạn')}
+                      {renderSlotList(b.variable || [], false, depth + 1, 'Biến giới hạn')}
                       <span style={{ fontSize: '0.75rem' }}>→</span>
-                      {renderSlotList(b.target || [], false, 'Điểm giới hạn')}
+                      {renderSlotList(b.target || [], false, depth + 1, 'Điểm giới hạn')}
                     </span>
                   </span>
-                  {renderSlotList(b.expr, false, 'Biểu thức')}
+                  {renderSlotList(b.expr, false, depth + 1, 'Biểu thức')}
                 </span>
               );
             }
@@ -529,7 +606,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   {b.items.map((item, itIdx) => (
                     <React.Fragment key={itIdx}>
                       {itIdx > 0 && <span className={styles.vectorComma}>,</span>}
-                      {renderSlotList(item, false, `Thành phần ${itIdx + 1}`)}
+                      {renderSlotList(item, false, depth + 1, `Thành phần ${itIdx + 1}`)}
                     </React.Fragment>
                   ))}
                   <svg className={styles.vectorBracketSvg} viewBox="0 0 6 24" fill="none" preserveAspectRatio="none" aria-hidden="true">
@@ -550,7 +627,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                       <div key={rIdx} className={styles.matrixRow}>
                         {row.map((cell, cIdx) => (
                           <React.Fragment key={cIdx}>
-                            {renderSlotList(cell, false, `Phần tử [${rIdx + 1},${cIdx + 1}]`)}
+                            {renderSlotList(cell, false, depth + 1, `Phần tử [${rIdx + 1},${cIdx + 1}]`)}
                           </React.Fragment>
                         ))}
                       </div>
@@ -588,7 +665,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           }
         }}
       >
-        {renderSlotList(blocks, true)}
+        {renderSlotList(blocks, true, 0)}
       </div>
     );
   }
