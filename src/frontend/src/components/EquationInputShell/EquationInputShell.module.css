@@ -82,10 +82,17 @@
   font-size: 1.05rem;
   font-family: 'KaTeX_Math', 'Cambria Math', var(--font-sans), sans-serif;
   color: var(--text-primary, #333333);
-  background: transparent;
-  border: none;
-  outline: none;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   padding: 0 8px 0 0;
+}
+
+.inputField:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .inputField::placeholder {

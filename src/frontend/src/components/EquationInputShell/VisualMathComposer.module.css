@@ -1,13 +1,13 @@
 .composerContainer {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
   min-height: 40px;
   height: auto;
-  padding: 4px 4px;
+  padding: 6px 4px;
   gap: 1px;
   font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
   font-size: 1.25rem;
@@ -32,8 +32,9 @@
   padding: 0;
   margin: 0;
   min-width: 4px;
-  min-height: 36px;
-  line-height: 36px;
+  height: 28px;
+  line-height: 28px;
+  vertical-align: baseline;
 }
 
 .textInput:focus {
@@ -54,9 +55,10 @@
   margin: 0;
   flex: 1;
   min-width: 24px;
-  min-height: 36px;
-  line-height: 36px;
+  height: 28px;
+  line-height: 28px;
   cursor: text;
+  vertical-align: baseline;
 }
 
 .trailingTextInput:focus {
@@ -79,6 +81,7 @@
   align-items: baseline;
   position: relative;
   margin: 0 1px;
+  vertical-align: baseline;
 }
 
 .powerBase {
@@ -90,7 +93,8 @@
   outline: none;
   min-width: 8px;
   text-align: right;
-  line-height: 1;
+  line-height: 28px;
+  vertical-align: baseline;
 }
 
 /* Universal WolframAlpha Math Slot Styling */
