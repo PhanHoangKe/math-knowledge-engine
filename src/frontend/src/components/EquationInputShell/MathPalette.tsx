@@ -417,6 +417,12 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             <span className={styles.btnBox} />
           </span>
         );
+      case 'VEC_2':
+        return (
+          <span className={styles.btnVec}>
+            [<span className={styles.btnMicroBox} />,<span className={styles.btnMicroBox} />]
+          </span>
+        );
       case 'VEC_3':
       case 'VECTOR':
         return (
@@ -424,17 +430,51 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             [<span className={styles.btnMicroBox} />,<span className={styles.btnMicroBox} />,<span className={styles.btnMicroBox} />]
           </span>
         );
+      case 'VEC_4':
+        return (
+          <span className={styles.btnVec}>
+            [<span className={styles.btnNanoBox} />,<span className={styles.btnNanoBox} />,<span className={styles.btnNanoBox} />,<span className={styles.btnNanoBox} />]
+          </span>
+        );
+      case 'COL_VEC_2':
+        return (
+          <span className={styles.btnVec}>
+            [<span className={styles.btnColGrid}>
+              <span className={styles.btnMicroBox} />
+              <span className={styles.btnMicroBox} />
+            </span>]
+          </span>
+        );
+      case 'COL_VEC_3':
+        return (
+          <span className={styles.btnVec}>
+            [<span className={styles.btnColGrid}>
+              <span className={styles.btnMicroBox} />
+              <span className={styles.btnMicroBox} />
+              <span className={styles.btnMicroBox} />
+            </span>]
+          </span>
+        );
+      case 'COL_VEC_4':
+        return (
+          <span className={styles.btnVec}>
+            [<span className={styles.btnColGrid}>
+              <span className={styles.btnNanoBox} />
+              <span className={styles.btnNanoBox} />
+              <span className={styles.btnNanoBox} />
+              <span className={styles.btnNanoBox} />
+            </span>]
+          </span>
+        );
       case 'MAT_2X2':
         return (
           <span className={styles.btnMat}>
             (<span className={styles.btnMatGrid}>
               <span className={styles.btnMatRow}>
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
               </span>
               <span className={styles.btnMatRow}>
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
               </span>
             </span>)
           </span>
@@ -445,19 +485,83 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
           <span className={styles.btnMat}>
             (<span className={styles.btnMatGrid}>
               <span className={styles.btnMatRow}>
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
               </span>
               <span className={styles.btnMatRow}>
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
               </span>
               <span className={styles.btnMatRow}>
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
-                <span className={styles.btnMicroBox} />
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
+              </span>
+            </span>)
+          </span>
+        );
+      case 'MAT_2X3':
+        return (
+          <span className={styles.btnMat}>
+            (<span className={styles.btnMatGrid}>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} /><span className={styles.btnMicroBox} />
+              </span>
+            </span>)
+          </span>
+        );
+      case 'MAT_3X4':
+        return (
+          <span className={styles.btnMat}>
+            (<span className={styles.btnMatGrid}>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+            </span>)
+          </span>
+        );
+      case 'MAT_4X4':
+        return (
+          <span className={styles.btnMat}>
+            (<span className={styles.btnMatGrid}>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+            </span>)
+          </span>
+        );
+      case 'MAT_5X5':
+        return (
+          <span className={styles.btnMat}>
+            (<span className={styles.btnMatGrid}>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
+              </span>
+              <span className={styles.btnMatRow}>
+                <span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} /><span className={styles.btnNanoBox} />
               </span>
             </span>)
           </span>

@@ -254,16 +254,43 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         case 'INV_FOURIER':
           templateToInsert = createDefaultTransform('inv_fourier');
           break;
-        case 'MAT_2X2':
-          templateToInsert = createDefaultMatrix(2, 2);
+        case 'VEC_2':
+          templateToInsert = createDefaultVector(2);
           break;
         case 'VEC_3':
         case 'VECTOR':
           templateToInsert = createDefaultVector(3);
           break;
+        case 'VEC_4':
+          templateToInsert = createDefaultVector(4);
+          break;
+        case 'COL_VEC_2':
+          templateToInsert = createDefaultMatrix(2, 1);
+          break;
+        case 'COL_VEC_3':
+          templateToInsert = createDefaultMatrix(3, 1);
+          break;
+        case 'COL_VEC_4':
+          templateToInsert = createDefaultMatrix(4, 1);
+          break;
+        case 'MAT_2X2':
+          templateToInsert = createDefaultMatrix(2, 2);
+          break;
         case 'MAT_3X3':
         case 'MATRIX':
           templateToInsert = createDefaultMatrix(3, 3);
+          break;
+        case 'MAT_2X3':
+          templateToInsert = createDefaultMatrix(2, 3);
+          break;
+        case 'MAT_3X4':
+          templateToInsert = createDefaultMatrix(3, 4);
+          break;
+        case 'MAT_4X4':
+          templateToInsert = createDefaultMatrix(4, 4);
+          break;
+        case 'MAT_5X5':
+          templateToInsert = createDefaultMatrix(5, 5);
           break;
         default:
           break;
