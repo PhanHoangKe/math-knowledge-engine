@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { usePreferences } from '../../state/preferences';
 import { MathPalette } from './MathPalette';
+import { AllMathInputsModal } from './AllMathInputsModal';
 import { PALETTE_CATEGORIES } from './mathPaletteCapabilities';
 import {
   VisualMathComposer,
@@ -72,9 +73,12 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   const [showQuickKeys, setShowQuickKeys] = useState<boolean>(false);
   const [sampleIdx, setSampleIdx] = useState<number>(0);
   const [cameraNote, setCameraNote] = useState<string | null>(null);
+  const [isAllMathModalOpen, setIsAllMathModalOpen] = useState<boolean>(false);
+  const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
 
   const mainInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<VisualMathComposerHandle>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
@@ -125,6 +129,11 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   };
 
   const toggleCategory = (catId: string) => {
+    if (catId === 'MORE') {
+      setShowMoreMenu((prev) => !prev);
+      return;
+    }
+    setShowMoreMenu(false);
     if (activeCategory === catId) {
       setActiveCategory(null);
     } else {
@@ -355,29 +364,135 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         <div className={styles.toolbarRight}>
           {mode === 'math' ? (
             <div className={styles.mathCategoriesBar} role="tablist">
-              {PALETTE_CATEGORIES.map((cat, idx) => (
-                <React.Fragment key={cat.categoryId}>
-                  {idx === PALETTE_CATEGORIES.length - 1 && (
-                    <span className={styles.categoryDivider} aria-hidden="true">|</span>
-                  )}
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeCategory === cat.categoryId}
-                    className={`${styles.categoryTabBtn} ${
-                      activeCategory === cat.categoryId ? styles.categoryTabActive : ''
-                    }`}
-                    onClick={() => toggleCategory(cat.categoryId)}
-                    title={t(cat.titleKey as any)}
-                    aria-label={t(cat.titleKey as any)}
-                  >
-                    {renderCategoryIcon(cat.categoryId)}
-                    {activeCategory === cat.categoryId && (
-                      <span className={styles.tabMarkerArrow} aria-hidden="true" />
+              {PALETTE_CATEGORIES.map((cat, idx) => {
+                const isMore = cat.categoryId === 'MORE';
+                return (
+                  <React.Fragment key={cat.categoryId}>
+                    {idx === PALETTE_CATEGORIES.length - 1 && (
+                      <span className={styles.categoryDivider} aria-hidden="true">|</span>
                     )}
-                  </button>
-                </React.Fragment>
-              ))}
+                    {isMore ? (
+                      <div className={styles.moreMenuWrapper} ref={moreMenuRef}>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={showMoreMenu}
+                          className={`${styles.categoryTabBtn} ${showMoreMenu ? styles.categoryTabActive : ''}`}
+                          onClick={() => toggleCategory('MORE')}
+                          title={t('cat_more')}
+                          aria-label={t('cat_more')}
+                        >
+                          {renderCategoryIcon(cat.categoryId)}
+                          {showMoreMenu && (
+                            <span className={styles.tabMarkerArrow} aria-hidden="true" />
+                          )}
+                        </button>
+                        {showMoreMenu && (
+                          <div className={styles.moreMenuPopover} role="menu">
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                setIsAllMathModalOpen(true);
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <GridIcon size={14} />
+                              </span>
+                              <span>{t('all_math_inputs_title')}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleRandomSample();
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <StarIcon size={14} />
+                              </span>
+                              <span>Ví Dụ</span>
+                            </button>
+                            <div className={styles.moreMenuSectionHeader}>TẢI LÊN VÀ PHÂN TÍCH</div>
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleCameraClick();
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <CameraIcon size={14} />
+                              </span>
+                              <span>Đầu Vào Hình Ảnh</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                setCameraNote('Nhập dữ liệu bảng / file khả dụng ở các bản phát hành tiếp theo.');
+                                setTimeout(() => setCameraNote(null), 3500);
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <MatrixIcon size={14} />
+                              </span>
+                              <span>Nhập Dữ Liệu</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleCameraClick();
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <UploadIcon size={14} />
+                              </span>
+                              <span>Tải Lên Tệp</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.moreMenuItem}
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleRandomSample();
+                              }}
+                            >
+                              <span className={styles.moreMenuItemIcon}>
+                                <ShuffleIcon size={14} />
+                              </span>
+                              <span>Ngẫu Nhiên</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeCategory === cat.categoryId}
+                        className={`${styles.categoryTabBtn} ${
+                          activeCategory === cat.categoryId ? styles.categoryTabActive : ''
+                        }`}
+                        onClick={() => toggleCategory(cat.categoryId)}
+                        title={t(cat.titleKey as any)}
+                        aria-label={t(cat.titleKey as any)}
+                      >
+                        {renderCategoryIcon(cat.categoryId)}
+                        {activeCategory === cat.categoryId && (
+                          <span className={styles.tabMarkerArrow} aria-hidden="true" />
+                        )}
+                      </button>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           ) : (
             <div className={styles.naturalActionsBar}>
@@ -423,7 +538,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
       </div>
 
       {/* Expanded Math Palette Bar */}
-      {mode === 'math' && activeCategory && (
+      {mode === 'math' && activeCategory && activeCategory !== 'MORE' && (
         <div className={styles.paletteDrawerWrapper}>
           <MathPalette
             selectedCategory={activeCategory}
@@ -461,6 +576,14 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
           {statusText || (isLoading ? t('shell_status_loading') : t('shell_status_idle'))}
         </span>
       </div>
+
+      {/* All Math Inputs Modal */}
+      <AllMathInputsModal
+        isOpen={isAllMathModalOpen}
+        onClose={() => setIsAllMathModalOpen(false)}
+        onSelectAction={handlePaletteAction}
+      />
     </section>
   );
 };
+

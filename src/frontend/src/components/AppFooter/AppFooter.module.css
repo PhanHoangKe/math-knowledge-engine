@@ -1,0 +1,143 @@
+.footerContainer {
+  width: 100%;
+  max-width: 1040px;
+  margin: 3rem auto 2rem auto;
+  padding: 1.5rem 1rem 0 1rem;
+  border-top: 1px solid var(--border-subtle, #dfdfdf);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.85rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--text-muted, #777777);
+}
+
+.topNavRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.footerLink {
+  color: var(--text-muted, #666666);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footerLink:hover {
+  color: #cb1000;
+  text-decoration: underline;
+}
+
+.linkDivider {
+  color: #d1d5db;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.middleRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.resourcesLinks {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.connectLabel {
+  color: var(--text-muted, #777777);
+}
+
+.socialIcons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.35rem;
+}
+
+.socialBtn {
+  color: var(--text-muted, #777777);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.socialBtn:hover {
+  color: #111827;
+  transform: translateY(-1px);
+}
+
+.copyrightRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #888888);
+}
+
+.ecosystemRow {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.ecosystemBrand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spikeyIcon {
+  animation: spinSlow 30s linear infinite;
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ecosystemTitle {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #cb1000;
+  letter-spacing: 0.05em;
+}
+
+.ecosystemLinks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.subLink {
+  color: var(--text-muted, #666666);
+  text-decoration: none;
+}
+
+.subLink:hover {
+  color: #cb1000;
+  text-decoration: underline;
+}
+
+.subDivider {
+  color: #e5e7eb;
+  font-size: 0.7rem;
+}

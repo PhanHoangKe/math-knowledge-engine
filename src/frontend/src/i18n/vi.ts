@@ -330,7 +330,30 @@ export const vi = {
   btn_hide_coeff_editor: 'Ẩn bộ chỉnh sửa hệ số',
   btn_show_revision_history: 'Xem lịch sử phiên làm việc ({count})',
   btn_hide_revision_history: 'Ẩn lịch sử phiên làm việc',
+
+  // --- Modal & Footer Translations ---
+  modal_group_basic: 'TOÁN CƠ BẢN',
+  modal_group_calculus: 'GIẢI TÍCH VÀ PHÉP TÍNH TỔNG',
+  modal_group_matrices: 'VECTƠ VÀ MA TRẬN',
+  modal_group_trig: 'LƯỢNG GIÁC',
+  modal_group_symbols: 'BIỂU TƯỢNG',
+  all_math_inputs_title: 'TẤT CẢ CÁC ĐẦU VÀO TOÁN HỌC',
+  close_modal_aria: 'Đóng bảng đầu vào toán học',
+  more_topics: 'Các chủ đề khác »',
+  footer_pro: 'Nâng cấp Pro',
+  footer_mobile: 'Ứng dụng Di động',
+  footer_products: 'Sản phẩm & Giải pháp',
+  footer_business: 'Doanh nghiệp',
+  footer_api: 'API & Tích hợp',
+  footer_llm: 'Mô hình LLM & Toán học',
+  footer_resources: 'Tài nguyên & Tài liệu',
+  footer_about: 'Giới thiệu MKE',
+  footer_contact: 'Liên hệ Hỗ trợ',
+  footer_connect: 'Kết nối & Cộng đồng',
+  footer_terms: 'Điều khoản sử dụng',
+  footer_privacy: 'Chính sách bảo mật',
 } as const;
 
 export type TranslationKey = keyof typeof vi;
 export type Translations = Record<TranslationKey, string>;
+

@@ -252,6 +252,27 @@ export const WorkspaceEmptyState: React.FC<WorkspaceEmptyStateProps> = ({ onSele
                   <span className={styles.cardTitle}>{t(item.titleKey as any)}</span>
                 </button>
               ))}
+              <button
+                type="button"
+                className={styles.moreTopicsCard}
+                onClick={() => handleCardClick(col.items[0]?.sampleEquation ?? 'x^2 - 5*x + 6 = 0')}
+                title={t('more_topics')}
+                style={{ borderColor: col.colorVar }}
+              >
+                <span className={styles.cardIconWrapper} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill={col.colorVar}>
+                    <circle cx="6" cy="6" r="2" />
+                    <circle cx="12" cy="6" r="2" />
+                    <circle cx="18" cy="6" r="2" />
+                    <circle cx="6" cy="18" r="2" />
+                    <circle cx="12" cy="18" r="2" />
+                    <circle cx="18" cy="18" r="2" />
+                  </svg>
+                </span>
+                <span className={styles.moreCardTitle} style={{ color: col.colorVar }}>
+                  {t('more_topics')}
+                </span>
+              </button>
             </div>
           </div>
         ))}

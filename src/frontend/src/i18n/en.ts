@@ -332,4 +332,27 @@ export const en: Translations = {
   btn_hide_coeff_editor: 'Hide coefficient editor',
   btn_show_revision_history: 'View session revision history ({count})',
   btn_hide_revision_history: 'Hide session revision history',
+
+  // --- Modal & Footer Translations ---
+  modal_group_basic: 'BASIC MATH',
+  modal_group_calculus: 'CALCULUS AND SUMS',
+  modal_group_matrices: 'VECTORS AND MATRICES',
+  modal_group_trig: 'TRIGONOMETRY',
+  modal_group_symbols: 'SYMBOLS',
+  all_math_inputs_title: 'ALL MATH INPUTS',
+  close_modal_aria: 'Close math inputs modal',
+  more_topics: 'More topics »',
+  footer_pro: 'Upgrade Pro',
+  footer_mobile: 'Mobile Apps',
+  footer_products: 'Products & Solutions',
+  footer_business: 'Business',
+  footer_api: 'API & Integrations',
+  footer_llm: 'LLMs & Mathematics',
+  footer_resources: 'Resources & Documentation',
+  footer_about: 'About MKE',
+  footer_contact: 'Contact Support',
+  footer_connect: 'Connect & Community',
+  footer_terms: 'Terms of Use',
+  footer_privacy: 'Privacy Policy',
 };
+

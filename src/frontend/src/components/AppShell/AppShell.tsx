@@ -17,6 +17,7 @@ import { RevisionHistoryPanel } from '../RevisionHistoryPanel/RevisionHistoryPan
 import { ApplicationErrorPanel } from '../ApplicationErrorPanel/ApplicationErrorPanel';
 import { TransportErrorPanel } from '../TransportErrorPanel/TransportErrorPanel';
 import { NetworkErrorPanel } from '../NetworkErrorPanel/NetworkErrorPanel';
+import { AppFooter } from '../AppFooter/AppFooter';
 import type {
   SolvedResponse,
   AnalyzedNoExecutionResponse,
@@ -435,12 +436,8 @@ export const AppShell: React.FC = () => {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className={styles.appFooter}>
-        <div className={styles.footerContainer}>
-          <p className={styles.copyright}>{t('footer_copyright')}</p>
-        </div>
-      </footer>
+      {/* Full WolframAlpha Style Multi-Tier Footer */}
+      <AppFooter />
     </div>
   );
 };
