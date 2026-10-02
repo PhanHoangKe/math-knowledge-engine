@@ -1,10 +1,22 @@
 """MKE Product Knowledge Layer.
 
 Provides static pedagogical knowledge models, dataset loaders,
-and referential integrity verification for mathematical methods, concepts,
-formulas, theorems, and source provenances.
+in-memory repository, and graph exporters for mathematical methods,
+concepts, formulas, theorems, and reactive dependency projections.
 """
 
+from mke_product.knowledge.graph_models import (
+    GraphEdge,
+    GraphEdgeType,
+    GraphKind,
+    GraphModel,
+    GraphNode,
+    GraphNodeType,
+)
+from mke_product.knowledge.graph_service import (
+    KnowledgeGraphService,
+    UnsupportedReactiveProjectionError,
+)
 from mke_product.knowledge.loader import (
     compute_dataset_content_hash,
     load_concepts,
@@ -14,6 +26,12 @@ from mke_product.knowledge.loader import (
     load_provenances,
     load_theorems,
     validate_knowledge_dataset,
+)
+from mke_product.knowledge.repository import (
+    EntityNotFoundError,
+    KnowledgeRepository,
+    KnowledgeRepositoryError,
+    PrerequisiteCycleError,
 )
 from mke_product.knowledge.schemas import (
     ConceptKnowledge,
@@ -45,4 +63,16 @@ __all__ = [
     "load_knowledge_dataset",
     "validate_knowledge_dataset",
     "compute_dataset_content_hash",
+    "GraphNodeType",
+    "GraphEdgeType",
+    "GraphKind",
+    "GraphNode",
+    "GraphEdge",
+    "GraphModel",
+    "KnowledgeRepository",
+    "KnowledgeRepositoryError",
+    "EntityNotFoundError",
+    "PrerequisiteCycleError",
+    "KnowledgeGraphService",
+    "UnsupportedReactiveProjectionError",
 ]
