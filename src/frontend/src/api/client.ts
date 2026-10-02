@@ -10,6 +10,13 @@ import type {
   SolveResponse200,
   TransportErrorResponse,
   TransportErrorCode,
+  MethodKnowledge,
+  ConceptKnowledge,
+  FormulaKnowledge,
+  TheoremKnowledge,
+  GraphModel,
+  KnowledgeApiErrorResponse,
+  KnowledgeApiErrorCode,
 } from './contract';
 
 export type ApiSolveResult =
@@ -29,6 +36,20 @@ export class NetworkError extends Error {
   constructor(message: string = 'Network unavailable') {
     super(message);
     this.name = 'NetworkError';
+  }
+}
+
+export class KnowledgeApiError extends Error {
+  public readonly status: number;
+  public readonly errorCode: KnowledgeApiErrorCode;
+  public readonly errorResponse: KnowledgeApiErrorResponse;
+
+  constructor(errorResponse: KnowledgeApiErrorResponse, status: number = 404) {
+    super(errorResponse.message_en);
+    this.name = 'KnowledgeApiError';
+    this.status = status;
+    this.errorCode = errorResponse.error_code;
+    this.errorResponse = errorResponse;
   }
 }
 
@@ -158,4 +179,129 @@ export async function solveEquation(
     `Unrecognized response schema from server with HTTP status ${response.status}`,
     response.status
   );
+}
+
+/**
+ * Hardened structural runtime discriminator for KnowledgeApiErrorResponse.
+ */
+export function isKnowledgeApiErrorResponse(data: unknown): data is KnowledgeApiErrorResponse {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const obj = data as Record<string, unknown>;
+  return (
+    obj.status === 'error' &&
+    obj.error_code === 'KNOWLEDGE_ENTITY_NOT_FOUND' &&
+    typeof obj.entity_type === 'string' &&
+    typeof obj.entity_id === 'string' &&
+    typeof obj.message_vi === 'string' &&
+    typeof obj.message_en === 'string'
+  );
+}
+
+/**
+ * Generic internal fetch helper for immutable knowledge endpoints.
+ */
+async function fetchKnowledgeEntity<T>(url: string, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
+    }
+    throw new NetworkError('Network request failed');
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ProtocolError('Invalid JSON response received from server', response.status);
+  }
+
+  if (response.ok && typeof data === 'object' && data !== null) {
+    return data as T;
+  }
+
+  if (response.status === 404 && isKnowledgeApiErrorResponse(data)) {
+    throw new KnowledgeApiError(data, response.status);
+  }
+
+  if (isTransportErrorResponse(data)) {
+    throw new ProtocolError(
+      `Transport error: ${data.transport_error_code} (${data.message_en})`,
+      response.status
+    );
+  }
+
+  throw new ProtocolError(
+    `Unrecognized response from ${url} with HTTP status ${response.status}`,
+    response.status
+  );
+}
+
+/**
+ * Fetch immutable MethodKnowledge by canonical method ID.
+ */
+export async function getMethodKnowledge(
+  methodId: string,
+  signal?: AbortSignal
+): Promise<MethodKnowledge> {
+  return fetchKnowledgeEntity<MethodKnowledge>(
+    `/api/v1/knowledge/methods/${encodeURIComponent(methodId)}`,
+    signal
+  );
+}
+
+/**
+ * Fetch immutable ConceptKnowledge by canonical concept ID.
+ */
+export async function getConceptKnowledge(
+  conceptId: string,
+  signal?: AbortSignal
+): Promise<ConceptKnowledge> {
+  return fetchKnowledgeEntity<ConceptKnowledge>(
+    `/api/v1/knowledge/concepts/${encodeURIComponent(conceptId)}`,
+    signal
+  );
+}
+
+/**
+ * Fetch immutable FormulaKnowledge by canonical formula ID.
+ */
+export async function getFormulaKnowledge(
+  formulaId: string,
+  signal?: AbortSignal
+): Promise<FormulaKnowledge> {
+  return fetchKnowledgeEntity<FormulaKnowledge>(
+    `/api/v1/knowledge/formulas/${encodeURIComponent(formulaId)}`,
+    signal
+  );
+}
+
+/**
+ * Fetch immutable TheoremKnowledge by canonical theorem ID.
+ */
+export async function getTheoremKnowledge(
+  theoremId: string,
+  signal?: AbortSignal
+): Promise<TheoremKnowledge> {
+  return fetchKnowledgeEntity<TheoremKnowledge>(
+    `/api/v1/knowledge/theorems/${encodeURIComponent(theoremId)}`,
+    signal
+  );
+}
+
+/**
+ * Fetch full immutable mathematical GraphModel.
+ */
+export async function getKnowledgeGraph(signal?: AbortSignal): Promise<GraphModel> {
+  return fetchKnowledgeEntity<GraphModel>('/api/v1/knowledge/graph', signal);
 }

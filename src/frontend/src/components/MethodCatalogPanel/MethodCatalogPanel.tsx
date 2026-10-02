@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { MethodOptionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import {
@@ -7,6 +7,7 @@ import {
   PEDAGOGICAL_RECOMMENDATION_I18N,
   VERIFICATION_CAPABILITY_I18N,
 } from '../../i18n/enumMappings';
+import { MethodKnowledgeSurface } from '../MethodKnowledgeSurface/MethodKnowledgeSurface';
 import styles from './MethodCatalogPanel.module.css';
 
 export interface MethodCatalogPanelProps {
@@ -23,6 +24,19 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
   isLoading = false,
 }) => {
   const { t } = usePreferences();
+  const [expandedMethodIds, setExpandedMethodIds] = useState<Set<string>>(new Set());
+
+  const toggleKnowledge = (methodId: string) => {
+    setExpandedMethodIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(methodId)) {
+        next.delete(methodId);
+      } else {
+        next.add(methodId);
+      }
+      return next;
+    });
+  };
 
   if (!methods || methods.length === 0) {
     return null;
@@ -42,6 +56,7 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
           const isSelected = selectedMethodId === method.method_id;
           const isApplicable = method.mathematical_applicability === 'APPLICABLE';
           const isAvailable = method.execution_availability === 'AVAILABLE';
+          const isKnowledgeExpanded = expandedMethodIds.has(method.method_id);
 
           return (
             <div
@@ -115,18 +130,40 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
                 </div>
               )}
 
-              {/* Action Button */}
+              {/* Action Buttons */}
               <div className={styles.actionRow}>
-                <button
-                  type="button"
-                  className={`${styles.selectBtn} ${isSelected ? styles.btnActive : ''}`}
-                  onClick={() => onSelectMethod?.(method.method_id)}
-                  disabled={isLoading || isSelected}
-                  aria-pressed={isSelected}
-                >
-                  {isSelected ? t('btn_selected_method') : t('btn_switch_method')}
-                </button>
+                <div className={styles.buttonGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.selectBtn} ${isSelected ? styles.btnActive : ''}`}
+                    onClick={() => onSelectMethod?.(method.method_id)}
+                    disabled={isLoading || isSelected}
+                    aria-pressed={isSelected}
+                    data-testid={`select-method-btn-${method.method_id}`}
+                  >
+                    {isSelected ? t('btn_selected_method') : t('btn_switch_method')}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.whyMethodBtn}
+                    onClick={() => toggleKnowledge(method.method_id)}
+                    aria-expanded={isKnowledgeExpanded}
+                    aria-controls={`knowledge-surface-${method.method_id}`}
+                    data-testid={`why-method-btn-${method.method_id}`}
+                  >
+                    {isKnowledgeExpanded ? t('btn_hide_knowledge') : t('btn_why_method')}
+                  </button>
+                </div>
               </div>
+
+              {/* Method Knowledge Surface Drawer */}
+              {isKnowledgeExpanded && (
+                <MethodKnowledgeSurface
+                  methodId={method.method_id}
+                  isOpen={isKnowledgeExpanded}
+                  onClose={() => toggleKnowledge(method.method_id)}
+                />
+              )}
             </div>
           );
         })}

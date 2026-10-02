@@ -64,3 +64,29 @@ export type Span = components['schemas']['Span'];
 // --- Rational Numbers & Health ---
 export type RationalFraction = components['schemas']['RationalFraction'];
 export type HealthResponse = components['schemas']['HealthResponse'];
+
+// --- S3 Knowledge Core Entities & Operations ---
+export type LocalizedText = components['schemas']['LocalizedText'];
+export type CurriculumRef = components['schemas']['CurriculumRef'];
+export type CurriculumMappingStatus = components['schemas']['CurriculumMappingStatus'];
+
+export type MethodKnowledge = components['schemas']['MethodKnowledge'];
+export type ConceptKnowledge = components['schemas']['ConceptKnowledge'];
+export type FormulaKnowledge = components['schemas']['FormulaKnowledge'];
+export type TheoremKnowledge = components['schemas']['TheoremKnowledge'];
+
+export type KnowledgeApiErrorResponse = components['schemas']['KnowledgeApiErrorResponse'];
+export type KnowledgeApiErrorCode = components['schemas']['KnowledgeApiErrorCode'];
+
+export type GraphModel = components['schemas']['GraphModel'];
+export type GraphNode = components['schemas']['GraphNode'];
+export type GraphEdge = components['schemas']['GraphEdge'];
+export type GraphNodeType = components['schemas']['GraphNodeType'];
+export type GraphEdgeType = components['schemas']['GraphEdgeType'];
+export type GraphKind = components['schemas']['GraphKind'];
+
+export type GetMethodKnowledgeOperation = operations['get_knowledge_method_v1'];
+export type GetConceptKnowledgeOperation = operations['get_knowledge_concept_v1'];
+export type GetFormulaKnowledgeOperation = operations['get_knowledge_formula_v1'];
+export type GetTheoremKnowledgeOperation = operations['get_knowledge_theorem_v1'];
+export type GetKnowledgeGraphOperation = operations['get_knowledge_graph_v1'];

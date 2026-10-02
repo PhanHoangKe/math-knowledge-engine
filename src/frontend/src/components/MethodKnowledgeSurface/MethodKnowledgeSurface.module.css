@@ -1,0 +1,534 @@
+.surfaceContainer {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+[data-theme='dark'] .surfaceContainer {
+  background: var(--bg-surface-elevated, #1e293b);
+  border-color: var(--border-subtle, #334155);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.surfaceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+[data-theme='dark'] .surfaceHeader {
+  border-color: var(--border-subtle, #334155);
+}
+
+.surfaceTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.surfaceHeading {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .surfaceHeading {
+  color: var(--text-primary, #f8fafc);
+}
+
+.methodBadge {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: var(--badge-bg, #e0e7ff);
+  color: var(--badge-text, #3730a3);
+  font-weight: 600;
+}
+
+[data-theme='dark'] .methodBadge {
+  background: #312e81;
+  color: #c7d2fe;
+}
+
+.closeBtn {
+  background: transparent;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  color: var(--text-secondary, #64748b);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.closeBtn:hover {
+  background: var(--bg-hover, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .closeBtn {
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .closeBtn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.loadingContainer,
+.conceptCardLoading,
+.formulaCardLoading,
+.theoremCardLoading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+  font-style: italic;
+}
+
+.loadingSpinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border-subtle, #cbd5e1);
+  border-top-color: var(--primary, #3b82f6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorContainer,
+.conceptCardError,
+.formulaCardError,
+.theoremCardError {
+  padding: 0.75rem;
+  background: var(--error-bg, #fef2f2);
+  border: 1px solid var(--error-border, #fecaca);
+  border-radius: 6px;
+  color: var(--error-text, #b91c1c);
+  font-size: 0.875rem;
+}
+
+[data-theme='dark'] .errorContainer,
+[data-theme='dark'] .conceptCardError,
+[data-theme='dark'] .formulaCardError,
+[data-theme='dark'] .theoremCardError {
+  background: #450a0a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+}
+
+.surfaceBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.summaryBlock {
+  padding: 0.75rem 1rem;
+  background: var(--bg-card, #ffffff);
+  border-radius: 6px;
+  border-left: 4px solid var(--primary, #3b82f6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] .summaryBlock {
+  background: var(--bg-card, #0f172a);
+  border-left-color: #60a5fa;
+}
+
+.methodFullTitle {
+  margin: 0 0 0.35rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .methodFullTitle {
+  color: var(--text-primary, #f8fafc);
+}
+
+.summaryText {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #334155);
+}
+
+[data-theme='dark'] .summaryText {
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.gridRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.infoCard,
+.guidanceCard,
+.warningCard,
+.tipCard {
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+[data-theme='dark'] .infoCard,
+[data-theme='dark'] .guidanceCard,
+[data-theme='dark'] .warningCard,
+[data-theme='dark'] .tipCard {
+  background: var(--bg-card, #0f172a);
+  border-color: var(--border-subtle, #334155);
+}
+
+.warningCard {
+  border-left: 4px solid #f59e0b;
+}
+
+.tipCard {
+  border-left: 4px solid #10b981;
+}
+
+.guidanceCard {
+  border-left: 4px solid #6366f1;
+}
+
+.sectionLabel {
+  display: block;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 0.4rem;
+}
+
+[data-theme='dark'] .sectionLabel {
+  color: #94a3b8;
+}
+
+.cardText {
+  margin: 0;
+  color: var(--text-primary, #1e293b);
+}
+
+[data-theme='dark'] .cardText {
+  color: var(--text-primary, #e2e8f0);
+}
+
+.guidanceList,
+.variablesList,
+.hypothesesList,
+.conclusionsList {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary, #334155);
+}
+
+[data-theme='dark'] .guidanceList,
+[data-theme='dark'] .variablesList,
+[data-theme='dark'] .hypothesesList,
+[data-theme='dark'] .conclusionsList {
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.guidanceList li,
+.variablesList li,
+.hypothesesList li,
+.conclusionsList li {
+  margin-bottom: 0.35rem;
+}
+
+.knowledgeSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .sectionHeading {
+  color: var(--text-primary, #f8fafc);
+}
+
+.emptyNotice {
+  font-size: 0.85rem;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.conceptList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.conceptCard {
+  padding: 0.75rem;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 6px;
+}
+
+[data-theme='dark'] .conceptCard {
+  background: var(--bg-card, #0f172a);
+  border-color: var(--border-subtle, #334155);
+}
+
+.conceptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.conceptTitle {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .conceptTitle {
+  color: var(--text-primary, #f8fafc);
+}
+
+.entityId {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: 0.1rem 0.35rem;
+  background: var(--code-bg, #f1f5f9);
+  color: var(--code-text, #475569);
+  border-radius: 3px;
+}
+
+[data-theme='dark'] .entityId {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.conceptDefinition {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #334155);
+}
+
+[data-theme='dark'] .conceptDefinition {
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.formulaCard,
+.theoremCard {
+  padding: 1rem;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+[data-theme='dark'] .formulaCard,
+[data-theme='dark'] .theoremCard {
+  background: var(--bg-card, #0f172a);
+  border-color: var(--border-subtle, #334155);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme='dark'] .cardTitle {
+  color: var(--text-primary, #f8fafc);
+}
+
+.latexContainer {
+  padding: 0.75rem;
+  background: var(--math-bg, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  text-align: center;
+  overflow-x: auto;
+}
+
+[data-theme='dark'] .latexContainer {
+  background: #020617;
+  border-color: #1e293b;
+}
+
+.cardSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.domainConditions,
+.theoremStatement {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #334155);
+}
+
+[data-theme='dark'] .domainConditions,
+[data-theme='dark'] .theoremStatement {
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.curriculumGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.curriculumCard {
+  padding: 0.75rem;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+[data-theme='dark'] .curriculumCard {
+  background: var(--bg-card, #0f172a);
+  border-color: var(--border-subtle, #334155);
+}
+
+.curriculumHeader {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.frameworkBadge,
+.gradeBadge,
+.statusBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.frameworkBadge {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+[data-theme='dark'] .frameworkBadge {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+.gradeBadge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+[data-theme='dark'] .gradeBadge {
+  background: #78350f;
+  color: #fde68a;
+}
+
+.statusBadge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+[data-theme='dark'] .statusBadge {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+.curriculumDetails p {
+  margin: 0.2rem 0;
+  color: var(--text-secondary, #475569);
+}
+
+[data-theme='dark'] .curriculumDetails p {
+  color: var(--text-secondary, #94a3b8);
+}
+
+.provenanceSection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-subtle, #e2e8f0);
+}
+
+[data-theme='dark'] .provenanceSection {
+  border-top-color: #334155;
+}
+
+.provenanceTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.provenanceTag {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--code-bg, #f1f5f9);
+  color: var(--code-text, #475569);
+  border-radius: 3px;
+}
+
+[data-theme='dark'] .provenanceTag {
+  background: #1e293b;
+  color: #94a3b8;
+}

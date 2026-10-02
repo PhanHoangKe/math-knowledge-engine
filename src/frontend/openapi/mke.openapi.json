@@ -284,6 +284,149 @@
         "title": "CanonicalQuadraticProblemView",
         "type": "object"
       },
+      "ConceptKnowledge": {
+        "additionalProperties": false,
+        "description": "Mathematical concept definition across algebra, geometry, and calculus.",
+        "properties": {
+          "concept_id": {
+            "description": "Stable snake_case concept identifier, e.g. 'concept_discriminant'",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "curriculum_refs": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumRef"
+            },
+            "title": "Curriculum Refs",
+            "type": "array"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "formula_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formula Refs",
+            "type": "array"
+          },
+          "method_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Method Refs",
+            "type": "array"
+          },
+          "prerequisite_concept_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prerequisite Concept Ids",
+            "type": "array"
+          },
+          "provenance_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provenance Refs",
+            "type": "array"
+          },
+          "related_concept_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Concept Ids",
+            "type": "array"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "version": {
+            "default": "1.0.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept_id",
+          "title",
+          "definition"
+        ],
+        "title": "ConceptKnowledge",
+        "type": "object"
+      },
+      "CurriculumMappingStatus": {
+        "description": "Verification status of curriculum alignment mapping.",
+        "enum": [
+          "VERIFIED_MAPPING",
+          "PROVISIONAL_MAPPING"
+        ],
+        "title": "CurriculumMappingStatus",
+        "type": "string"
+      },
+      "CurriculumRef": {
+        "additionalProperties": false,
+        "description": "Authoritative curriculum standard reference with explicit verification status.",
+        "properties": {
+          "competency_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Specific standard code if verified",
+            "title": "Competency Ref"
+          },
+          "framework": {
+            "description": "Curriculum framework code, e.g. 'GDPT_2018', 'CCSS', 'IB'",
+            "title": "Framework",
+            "type": "string"
+          },
+          "grade_band": {
+            "description": "Grade level identifier, e.g. 'GRADE_9'",
+            "title": "Grade Band",
+            "type": "string"
+          },
+          "source_document": {
+            "description": "Authoritative document title or circular",
+            "title": "Source Document",
+            "type": "string"
+          },
+          "source_locator": {
+            "description": "Chapter, section, or article locator",
+            "title": "Source Locator",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumMappingStatus",
+            "description": "Explicit mapping verification status"
+          },
+          "subject": {
+            "description": "Subject identifier, e.g. 'TOAN'",
+            "title": "Subject",
+            "type": "string"
+          },
+          "topic": {
+            "description": "Curriculum topic code, e.g. 'PHUONG_TRINH_BAC_HAI_MOT_AN'",
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "framework",
+          "subject",
+          "grade_band",
+          "topic",
+          "source_document",
+          "source_locator",
+          "status"
+        ],
+        "title": "CurriculumRef",
+        "type": "object"
+      },
       "DegenerateSolutionView": {
         "additionalProperties": false,
         "description": "Immutable verified solution presentation for degenerate equations (a == 0).",
@@ -395,6 +538,302 @@
         "title": "ExecutionAvailability",
         "type": "string"
       },
+      "FormulaKnowledge": {
+        "additionalProperties": false,
+        "description": "Canonical mathematical formula entity with exact LaTeX template.",
+        "properties": {
+          "domain_conditions": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "formula_id": {
+            "description": "Stable unique formula identifier, e.g. 'FORMULA_QUADRATIC_STANDARD'",
+            "title": "Formula Id",
+            "type": "string"
+          },
+          "latex_template": {
+            "description": "LaTeX representation of formula",
+            "title": "Latex Template",
+            "type": "string"
+          },
+          "provenance_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provenance Refs",
+            "type": "array"
+          },
+          "related_concept_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Concept Ids",
+            "type": "array"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "variables_description": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Variables Description",
+            "type": "object"
+          },
+          "version": {
+            "default": "1.0.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "formula_id",
+          "title",
+          "latex_template",
+          "domain_conditions"
+        ],
+        "title": "FormulaKnowledge",
+        "type": "object"
+      },
+      "GraphEdge": {
+        "additionalProperties": false,
+        "description": "Immutable directed or canonical symmetric relationship between graph nodes.",
+        "properties": {
+          "is_directed": {
+            "default": true,
+            "description": "Whether the edge is directed",
+            "title": "Is Directed",
+            "type": "boolean"
+          },
+          "is_symmetric": {
+            "default": false,
+            "description": "Whether the edge represents a symmetric bidirectional relationship",
+            "title": "Is Symmetric",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalizedText"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional localized edge label"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "description": "Arbitrary metadata dictionary",
+            "title": "Metadata",
+            "type": "object"
+          },
+          "relation_type": {
+            "$ref": "#/components/schemas/GraphEdgeType",
+            "description": "Semantic relation type"
+          },
+          "source": {
+            "description": "Source node identifier",
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "description": "Target node identifier",
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "relation_type"
+        ],
+        "title": "GraphEdge",
+        "type": "object"
+      },
+      "GraphEdgeType": {
+        "description": "Semantic relation types for edges in MKE graph representations.",
+        "enum": [
+          "REQUIRES",
+          "USES_FORMULA",
+          "USES_THEOREM",
+          "ALTERNATIVE_TO",
+          "SPECIAL_CASE_OF",
+          "RELATED_TO",
+          "LEARN_BEFORE",
+          "COMPUTATIONAL_DEPENDENCY"
+        ],
+        "title": "GraphEdgeType",
+        "type": "string"
+      },
+      "GraphKind": {
+        "description": "Structural classification of graph models.",
+        "enum": [
+          "KNOWLEDGE_GRAPH",
+          "PREREQUISITE_DAG",
+          "REACTIVE_DEPENDENCY_DAG"
+        ],
+        "title": "GraphKind",
+        "type": "string"
+      },
+      "GraphModel": {
+        "additionalProperties": false,
+        "description": "Top-level container for a validated mathematical knowledge graph or DAG.",
+        "properties": {
+          "edges": {
+            "description": "Ordered list of graph edges",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "graph_id": {
+            "description": "Deterministic unique graph identifier",
+            "title": "Graph Id",
+            "type": "string"
+          },
+          "graph_kind": {
+            "$ref": "#/components/schemas/GraphKind",
+            "description": "Graph category"
+          },
+          "is_acyclic": {
+            "description": "Whether the graph is guaranteed to be a Directed Acyclic Graph",
+            "title": "Is Acyclic",
+            "type": "boolean"
+          },
+          "nodes": {
+            "description": "Ordered list of graph nodes",
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText",
+            "description": "Bilingual title of the graph"
+          },
+          "version": {
+            "default": "1.0.0",
+            "description": "Graph contract version",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "graph_id",
+          "graph_kind",
+          "title",
+          "is_acyclic"
+        ],
+        "title": "GraphModel",
+        "type": "object"
+      },
+      "GraphNode": {
+        "additionalProperties": false,
+        "description": "Immutable graph node with strict typing and localized label.",
+        "properties": {
+          "dependency_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional reference to reactive computation/parameter ID",
+            "title": "Dependency Ref"
+          },
+          "knowledge_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional reference to underlying knowledge entity ID",
+            "title": "Knowledge Ref"
+          },
+          "label": {
+            "$ref": "#/components/schemas/LocalizedText",
+            "description": "Bilingual display label"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "description": "Arbitrary metadata dictionary",
+            "title": "Metadata",
+            "type": "object"
+          },
+          "node_id": {
+            "description": "Deterministic unique prefixed identifier, e.g. 'concept:concept_discriminant'",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_type": {
+            "$ref": "#/components/schemas/GraphNodeType",
+            "description": "Categorical node type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional node status",
+            "title": "Status"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalizedText"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional subtitle or explanatory snippet"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_type",
+          "label"
+        ],
+        "title": "GraphNode",
+        "type": "object"
+      },
+      "GraphNodeType": {
+        "description": "Categorical taxonomy for nodes in MKE graph representations.",
+        "enum": [
+          "CONCEPT",
+          "METHOD",
+          "FORMULA",
+          "THEOREM",
+          "PARAMETER",
+          "COMPUTATION"
+        ],
+        "title": "GraphNodeType",
+        "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "additionalProperties": false,
         "description": "Observational system health response schema.",
@@ -443,6 +882,76 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "KnowledgeApiErrorCode": {
+        "description": "Specific error codes for knowledge API operations.",
+        "enum": [
+          "KNOWLEDGE_ENTITY_NOT_FOUND"
+        ],
+        "title": "KnowledgeApiErrorCode",
+        "type": "string"
+      },
+      "KnowledgeApiErrorResponse": {
+        "additionalProperties": false,
+        "description": "Strict, immutable knowledge API entity error envelope.",
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "error_code": {
+            "$ref": "#/components/schemas/KnowledgeApiErrorCode",
+            "default": "KNOWLEDGE_ENTITY_NOT_FOUND"
+          },
+          "message_en": {
+            "title": "Message En",
+            "type": "string"
+          },
+          "message_vi": {
+            "title": "Message Vi",
+            "type": "string"
+          },
+          "status": {
+            "const": "error",
+            "default": "error",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "message_vi",
+          "message_en"
+        ],
+        "title": "KnowledgeApiErrorResponse",
+        "type": "object"
+      },
+      "LocalizedText": {
+        "additionalProperties": false,
+        "description": "Symmetric bilingual text container requiring explicit non-empty VI and EN content.",
+        "properties": {
+          "en": {
+            "description": "English text content",
+            "title": "En",
+            "type": "string"
+          },
+          "vi": {
+            "description": "Vietnamese text content",
+            "title": "Vi",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vi",
+          "en"
+        ],
+        "title": "LocalizedText",
+        "type": "object"
+      },
       "MathematicalApplicability": {
         "description": "Whether the method is mathematically sound and valid for this problem instance.",
         "enum": [
@@ -452,6 +961,113 @@
         ],
         "title": "MathematicalApplicability",
         "type": "string"
+      },
+      "MethodKnowledge": {
+        "additionalProperties": false,
+        "description": "Static epistemological and pedagogical definition of a solution method.\n\nContains zero equation-specific state (no discriminant, no roots, no runtime applicability).",
+        "properties": {
+          "applicability_guidance": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Applicability Guidance",
+            "type": "array"
+          },
+          "common_mistakes": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Common Mistakes",
+            "type": "array"
+          },
+          "curriculum_refs": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumRef"
+            },
+            "title": "Curriculum Refs",
+            "type": "array"
+          },
+          "diagnostic_tips": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Diagnostic Tips",
+            "type": "array"
+          },
+          "formal_description": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "formula_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formula Refs",
+            "type": "array"
+          },
+          "learning_objective": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "method_id": {
+            "description": "Foreign key matching canonical string method_id in MethodRegistry",
+            "title": "Method Id",
+            "type": "string"
+          },
+          "non_applicability_guidance": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Non Applicability Guidance",
+            "type": "array"
+          },
+          "prerequisite_concept_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prerequisite Concept Ids",
+            "type": "array"
+          },
+          "provenance_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provenance Refs",
+            "type": "array"
+          },
+          "related_method_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Method Ids",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "theorem_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Theorem Refs",
+            "type": "array"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "version": {
+            "default": "1.0.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method_id",
+          "title",
+          "summary",
+          "learning_objective",
+          "formal_description"
+        ],
+        "title": "MethodKnowledge",
+        "type": "object"
       },
       "MethodOptionView": {
         "additionalProperties": false,
@@ -997,6 +1613,69 @@
         "title": "SupportStatus",
         "type": "string"
       },
+      "TheoremKnowledge": {
+        "additionalProperties": false,
+        "description": "Mathematical theorem entity with formal hypotheses and conclusions.",
+        "properties": {
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "formal_statement_latex": {
+            "description": "Formal mathematical statement in LaTeX",
+            "title": "Formal Statement Latex",
+            "type": "string"
+          },
+          "hypotheses": {
+            "items": {
+              "$ref": "#/components/schemas/LocalizedText"
+            },
+            "title": "Hypotheses",
+            "type": "array"
+          },
+          "provenance_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provenance Refs",
+            "type": "array"
+          },
+          "related_concept_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Concept Ids",
+            "type": "array"
+          },
+          "statement": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "theorem_id": {
+            "description": "Stable unique theorem identifier, e.g. 'THEOREM_VIETA_RELATIONS'",
+            "title": "Theorem Id",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "version": {
+            "default": "1.0.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theorem_id",
+          "title",
+          "statement",
+          "formal_statement_latex"
+        ],
+        "title": "TheoremKnowledge",
+        "type": "object"
+      },
       "TransportErrorCode": {
         "description": "Specific error codes for transport/HTTP failures occurring prior to or around application execution.",
         "enum": [
@@ -1043,6 +1722,46 @@
           "message_en"
         ],
         "title": "TransportErrorResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
         "type": "object"
       },
       "VerificationCapability": {
@@ -1199,8 +1918,8 @@
     }
   },
   "info": {
-    "description": "Production FastAPI transport adapter for MKE MVP V1 Algebra Workspace",
-    "title": "Math Knowledge Engine - Algebra Transport API",
+    "description": "Production FastAPI transport adapter for MKE MVP V1 Algebra Workspace & Static Knowledge",
+    "title": "Math Knowledge Engine - Algebra & Knowledge Transport API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",
@@ -1333,6 +2052,290 @@
         "summary": "Health Check Endpoint",
         "tags": [
           "Algebra"
+        ]
+      }
+    },
+    "/api/v1/knowledge/concepts/{concept_id}": {
+      "get": {
+        "description": "Retrieves an immutable ConceptKnowledge definition by its canonical ID.",
+        "operationId": "get_knowledge_concept_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "title": "Concept Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptKnowledge"
+                }
+              }
+            },
+            "description": "Concept knowledge details"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeApiErrorResponse"
+                }
+              }
+            },
+            "description": "Knowledge concept entity not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Internal transport failure"
+          }
+        },
+        "summary": "Get Concept Endpoint",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/formulas/{formula_id}": {
+      "get": {
+        "description": "Retrieves an immutable FormulaKnowledge definition by its canonical ID.",
+        "operationId": "get_knowledge_formula_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formula_id",
+            "required": true,
+            "schema": {
+              "title": "Formula Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormulaKnowledge"
+                }
+              }
+            },
+            "description": "Formula knowledge details"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeApiErrorResponse"
+                }
+              }
+            },
+            "description": "Knowledge formula entity not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Internal transport failure"
+          }
+        },
+        "summary": "Get Formula Endpoint",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/graph": {
+      "get": {
+        "description": "Exports the complete 29-node / 84-edge mathematical knowledge graph.",
+        "operationId": "get_knowledge_graph_v1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphModel"
+                }
+              }
+            },
+            "description": "Full mathematical knowledge graph"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Internal transport failure"
+          }
+        },
+        "summary": "Get Knowledge Graph Endpoint",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/methods/{method_id}": {
+      "get": {
+        "description": "Retrieves an immutable MethodKnowledge definition by its canonical ID.",
+        "operationId": "get_knowledge_method_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "method_id",
+            "required": true,
+            "schema": {
+              "title": "Method Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MethodKnowledge"
+                }
+              }
+            },
+            "description": "Method knowledge details"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeApiErrorResponse"
+                }
+              }
+            },
+            "description": "Knowledge method entity not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Internal transport failure"
+          }
+        },
+        "summary": "Get Method Endpoint",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/theorems/{theorem_id}": {
+      "get": {
+        "description": "Retrieves an immutable TheoremKnowledge definition by its canonical ID.",
+        "operationId": "get_knowledge_theorem_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "theorem_id",
+            "required": true,
+            "schema": {
+              "title": "Theorem Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TheoremKnowledge"
+                }
+              }
+            },
+            "description": "Theorem knowledge details"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeApiErrorResponse"
+                }
+              }
+            },
+            "description": "Knowledge theorem entity not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportErrorResponse"
+                }
+              }
+            },
+            "description": "Internal transport failure"
+          }
+        },
+        "summary": "Get Theorem Endpoint",
+        "tags": [
+          "Knowledge"
         ]
       }
     }

@@ -7,6 +7,11 @@ import type {
   ApplicationErrorResponse,
   TransportErrorResponse,
   HealthResponse,
+  MethodKnowledge,
+  ConceptKnowledge,
+  FormulaKnowledge,
+  TheoremKnowledge,
+  GraphModel,
 } from '../api/contract';
 
 describe('OpenAPI TypeScript Type Contracts', () => {
@@ -140,5 +145,72 @@ describe('OpenAPI TypeScript Type Contracts', () => {
 
     expect(transportErr.transport_status).toBe('ERROR');
     expect(health.status).toBe('HEALTHY');
+  });
+
+  it('compiles S3 Knowledge entity and GraphModel contracts', () => {
+    const method: MethodKnowledge = {
+      method_id: 'QUAD_FORMULA_STANDARD',
+      version: '1.0.0',
+      title: { vi: 'Tiêu đề', en: 'Title' },
+      summary: { vi: 'Tóm tắt', en: 'Summary' },
+      learning_objective: { vi: 'Mục tiêu', en: 'Objective' },
+      formal_description: { vi: 'Mô tả', en: 'Description' },
+      prerequisite_concept_ids: ['concept_discriminant'],
+      formula_refs: ['FORMULA_QUADRATIC_STANDARD'],
+      theorem_refs: ['THEOREM_QUADRATIC_ROOTS'],
+    };
+
+    const concept: ConceptKnowledge = {
+      concept_id: 'concept_discriminant',
+      version: '1.0.0',
+      title: { vi: 'Biệt thức', en: 'Discriminant' },
+      definition: { vi: 'Định nghĩa', en: 'Definition' },
+    };
+
+    const formula: FormulaKnowledge = {
+      formula_id: 'FORMULA_QUADRATIC_STANDARD',
+      version: '1.0.0',
+      title: { vi: 'Công thức', en: 'Formula' },
+      latex_template: 'x = \\frac{-b \\pm \\sqrt{\\Delta}}{2a}',
+      domain_conditions: { vi: 'a != 0', en: 'a != 0' },
+    };
+
+    const theorem: TheoremKnowledge = {
+      theorem_id: 'THEOREM_QUADRATIC_ROOTS',
+      version: '1.0.0',
+      title: { vi: 'Định lý', en: 'Theorem' },
+      statement: { vi: 'Phát biểu', en: 'Statement' },
+      formal_statement_latex: '\\Delta > 0 \\implies |S|=2',
+    };
+
+    const graph: GraphModel = {
+      graph_id: 'mke_knowledge_graph_v1',
+      graph_kind: 'KNOWLEDGE_GRAPH',
+      title: { vi: 'Đồ thị', en: 'Graph' },
+      version: '1.0.0',
+      is_acyclic: false,
+      nodes: [
+        {
+          node_id: 'concept:concept_discriminant',
+          node_type: 'CONCEPT',
+          label: { vi: 'Biệt thức', en: 'Discriminant' },
+        },
+      ],
+      edges: [
+        {
+          source: 'method:QUAD_FORMULA_STANDARD',
+          target: 'concept:concept_discriminant',
+          relation_type: 'REQUIRES',
+          is_directed: true,
+          is_symmetric: false,
+        },
+      ],
+    };
+
+    expect(method.method_id).toBe('QUAD_FORMULA_STANDARD');
+    expect(concept.concept_id).toBe('concept_discriminant');
+    expect(formula.formula_id).toBe('FORMULA_QUADRATIC_STANDARD');
+    expect(theorem.theorem_id).toBe('THEOREM_QUADRATIC_ROOTS');
+    expect(graph.graph_kind).toBe('KNOWLEDGE_GRAPH');
   });
 });

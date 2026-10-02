@@ -44,6 +44,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/concepts/{concept_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Endpoint
+         * @description Retrieves an immutable ConceptKnowledge definition by its canonical ID.
+         */
+        get: operations["get_knowledge_concept_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/formulas/{formula_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Formula Endpoint
+         * @description Retrieves an immutable FormulaKnowledge definition by its canonical ID.
+         */
+        get: operations["get_knowledge_formula_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knowledge Graph Endpoint
+         * @description Exports the complete 29-node / 84-edge mathematical knowledge graph.
+         */
+        get: operations["get_knowledge_graph_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/methods/{method_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Method Endpoint
+         * @description Retrieves an immutable MethodKnowledge definition by its canonical ID.
+         */
+        get: operations["get_knowledge_method_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/theorems/{theorem_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Theorem Endpoint
+         * @description Retrieves an immutable TheoremKnowledge definition by its canonical ID.
+         */
+        get: operations["get_knowledge_theorem_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -174,6 +274,85 @@ export interface components {
             semantic_revision_hash: string;
         };
         /**
+         * ConceptKnowledge
+         * @description Mathematical concept definition across algebra, geometry, and calculus.
+         */
+        ConceptKnowledge: {
+            /**
+             * Concept Id
+             * @description Stable snake_case concept identifier, e.g. 'concept_discriminant'
+             */
+            concept_id: string;
+            /** Curriculum Refs */
+            curriculum_refs?: components["schemas"]["CurriculumRef"][];
+            definition: components["schemas"]["LocalizedText"];
+            /** Formula Refs */
+            formula_refs?: string[];
+            /** Method Refs */
+            method_refs?: string[];
+            /** Prerequisite Concept Ids */
+            prerequisite_concept_ids?: string[];
+            /** Provenance Refs */
+            provenance_refs?: string[];
+            /** Related Concept Ids */
+            related_concept_ids?: string[];
+            title: components["schemas"]["LocalizedText"];
+            /**
+             * Version
+             * @default 1.0.0
+             */
+            version: string;
+        };
+        /**
+         * CurriculumMappingStatus
+         * @description Verification status of curriculum alignment mapping.
+         * @enum {string}
+         */
+        CurriculumMappingStatus: "VERIFIED_MAPPING" | "PROVISIONAL_MAPPING";
+        /**
+         * CurriculumRef
+         * @description Authoritative curriculum standard reference with explicit verification status.
+         */
+        CurriculumRef: {
+            /**
+             * Competency Ref
+             * @description Specific standard code if verified
+             */
+            competency_ref?: string | null;
+            /**
+             * Framework
+             * @description Curriculum framework code, e.g. 'GDPT_2018', 'CCSS', 'IB'
+             */
+            framework: string;
+            /**
+             * Grade Band
+             * @description Grade level identifier, e.g. 'GRADE_9'
+             */
+            grade_band: string;
+            /**
+             * Source Document
+             * @description Authoritative document title or circular
+             */
+            source_document: string;
+            /**
+             * Source Locator
+             * @description Chapter, section, or article locator
+             */
+            source_locator: string;
+            /** @description Explicit mapping verification status */
+            status: components["schemas"]["CurriculumMappingStatus"];
+            /**
+             * Subject
+             * @description Subject identifier, e.g. 'TOAN'
+             */
+            subject: string;
+            /**
+             * Topic
+             * @description Curriculum topic code, e.g. 'PHUONG_TRINH_BAC_HAI_MOT_AN'
+             */
+            topic: string;
+        };
+        /**
          * DegenerateSolutionView
          * @description Immutable verified solution presentation for degenerate equations (a == 0).
          */
@@ -231,6 +410,174 @@ export interface components {
          */
         ExecutionAvailability: "AVAILABLE" | "UNAVAILABLE";
         /**
+         * FormulaKnowledge
+         * @description Canonical mathematical formula entity with exact LaTeX template.
+         */
+        FormulaKnowledge: {
+            domain_conditions: components["schemas"]["LocalizedText"];
+            /**
+             * Formula Id
+             * @description Stable unique formula identifier, e.g. 'FORMULA_QUADRATIC_STANDARD'
+             */
+            formula_id: string;
+            /**
+             * Latex Template
+             * @description LaTeX representation of formula
+             */
+            latex_template: string;
+            /** Provenance Refs */
+            provenance_refs?: string[];
+            /** Related Concept Ids */
+            related_concept_ids?: string[];
+            title: components["schemas"]["LocalizedText"];
+            /** Variables Description */
+            variables_description?: {
+                [key: string]: components["schemas"]["LocalizedText"];
+            };
+            /**
+             * Version
+             * @default 1.0.0
+             */
+            version: string;
+        };
+        /**
+         * GraphEdge
+         * @description Immutable directed or canonical symmetric relationship between graph nodes.
+         */
+        GraphEdge: {
+            /**
+             * Is Directed
+             * @description Whether the edge is directed
+             * @default true
+             */
+            is_directed: boolean;
+            /**
+             * Is Symmetric
+             * @description Whether the edge represents a symmetric bidirectional relationship
+             * @default false
+             */
+            is_symmetric: boolean;
+            /** @description Optional localized edge label */
+            label?: components["schemas"]["LocalizedText"] | null;
+            /**
+             * Metadata
+             * @description Arbitrary metadata dictionary
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** @description Semantic relation type */
+            relation_type: components["schemas"]["GraphEdgeType"];
+            /**
+             * Source
+             * @description Source node identifier
+             */
+            source: string;
+            /**
+             * Target
+             * @description Target node identifier
+             */
+            target: string;
+        };
+        /**
+         * GraphEdgeType
+         * @description Semantic relation types for edges in MKE graph representations.
+         * @enum {string}
+         */
+        GraphEdgeType: "REQUIRES" | "USES_FORMULA" | "USES_THEOREM" | "ALTERNATIVE_TO" | "SPECIAL_CASE_OF" | "RELATED_TO" | "LEARN_BEFORE" | "COMPUTATIONAL_DEPENDENCY";
+        /**
+         * GraphKind
+         * @description Structural classification of graph models.
+         * @enum {string}
+         */
+        GraphKind: "KNOWLEDGE_GRAPH" | "PREREQUISITE_DAG" | "REACTIVE_DEPENDENCY_DAG";
+        /**
+         * GraphModel
+         * @description Top-level container for a validated mathematical knowledge graph or DAG.
+         */
+        GraphModel: {
+            /**
+             * Edges
+             * @description Ordered list of graph edges
+             */
+            edges?: components["schemas"]["GraphEdge"][];
+            /**
+             * Graph Id
+             * @description Deterministic unique graph identifier
+             */
+            graph_id: string;
+            /** @description Graph category */
+            graph_kind: components["schemas"]["GraphKind"];
+            /**
+             * Is Acyclic
+             * @description Whether the graph is guaranteed to be a Directed Acyclic Graph
+             */
+            is_acyclic: boolean;
+            /**
+             * Nodes
+             * @description Ordered list of graph nodes
+             */
+            nodes?: components["schemas"]["GraphNode"][];
+            /** @description Bilingual title of the graph */
+            title: components["schemas"]["LocalizedText"];
+            /**
+             * Version
+             * @description Graph contract version
+             * @default 1.0.0
+             */
+            version: string;
+        };
+        /**
+         * GraphNode
+         * @description Immutable graph node with strict typing and localized label.
+         */
+        GraphNode: {
+            /**
+             * Dependency Ref
+             * @description Optional reference to reactive computation/parameter ID
+             */
+            dependency_ref?: string | null;
+            /**
+             * Knowledge Ref
+             * @description Optional reference to underlying knowledge entity ID
+             */
+            knowledge_ref?: string | null;
+            /** @description Bilingual display label */
+            label: components["schemas"]["LocalizedText"];
+            /**
+             * Metadata
+             * @description Arbitrary metadata dictionary
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Node Id
+             * @description Deterministic unique prefixed identifier, e.g. 'concept:concept_discriminant'
+             */
+            node_id: string;
+            /** @description Categorical node type */
+            node_type: components["schemas"]["GraphNodeType"];
+            /**
+             * Status
+             * @description Optional node status
+             */
+            status?: string | null;
+            /** @description Optional subtitle or explanatory snippet */
+            subtitle?: components["schemas"]["LocalizedText"] | null;
+        };
+        /**
+         * GraphNodeType
+         * @description Categorical taxonomy for nodes in MKE graph representations.
+         * @enum {string}
+         */
+        GraphNodeType: "CONCEPT" | "METHOD" | "FORMULA" | "THEOREM" | "PARAMETER" | "COMPUTATION";
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
          * HealthResponse
          * @description Observational system health response schema.
          */
@@ -251,11 +598,97 @@ export interface components {
             version: string;
         };
         /**
+         * KnowledgeApiErrorCode
+         * @description Specific error codes for knowledge API operations.
+         * @enum {string}
+         */
+        KnowledgeApiErrorCode: "KNOWLEDGE_ENTITY_NOT_FOUND";
+        /**
+         * KnowledgeApiErrorResponse
+         * @description Strict, immutable knowledge API entity error envelope.
+         */
+        KnowledgeApiErrorResponse: {
+            /** Entity Id */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** @default KNOWLEDGE_ENTITY_NOT_FOUND */
+            error_code: components["schemas"]["KnowledgeApiErrorCode"];
+            /** Message En */
+            message_en: string;
+            /** Message Vi */
+            message_vi: string;
+            /**
+             * Status
+             * @default error
+             * @constant
+             */
+            status: "error";
+        };
+        /**
+         * LocalizedText
+         * @description Symmetric bilingual text container requiring explicit non-empty VI and EN content.
+         */
+        LocalizedText: {
+            /**
+             * En
+             * @description English text content
+             */
+            en: string;
+            /**
+             * Vi
+             * @description Vietnamese text content
+             */
+            vi: string;
+        };
+        /**
          * MathematicalApplicability
          * @description Whether the method is mathematically sound and valid for this problem instance.
          * @enum {string}
          */
         MathematicalApplicability: "APPLICABLE" | "NOT_APPLICABLE" | "UNKNOWN";
+        /**
+         * MethodKnowledge
+         * @description Static epistemological and pedagogical definition of a solution method.
+         *
+         *     Contains zero equation-specific state (no discriminant, no roots, no runtime applicability).
+         */
+        MethodKnowledge: {
+            /** Applicability Guidance */
+            applicability_guidance?: components["schemas"]["LocalizedText"][];
+            /** Common Mistakes */
+            common_mistakes?: components["schemas"]["LocalizedText"][];
+            /** Curriculum Refs */
+            curriculum_refs?: components["schemas"]["CurriculumRef"][];
+            /** Diagnostic Tips */
+            diagnostic_tips?: components["schemas"]["LocalizedText"][];
+            formal_description: components["schemas"]["LocalizedText"];
+            /** Formula Refs */
+            formula_refs?: string[];
+            learning_objective: components["schemas"]["LocalizedText"];
+            /**
+             * Method Id
+             * @description Foreign key matching canonical string method_id in MethodRegistry
+             */
+            method_id: string;
+            /** Non Applicability Guidance */
+            non_applicability_guidance?: components["schemas"]["LocalizedText"][];
+            /** Prerequisite Concept Ids */
+            prerequisite_concept_ids?: string[];
+            /** Provenance Refs */
+            provenance_refs?: string[];
+            /** Related Method Ids */
+            related_method_ids?: string[];
+            summary: components["schemas"]["LocalizedText"];
+            /** Theorem Refs */
+            theorem_refs?: string[];
+            title: components["schemas"]["LocalizedText"];
+            /**
+             * Version
+             * @default 1.0.0
+             */
+            version: string;
+        };
         /**
          * MethodOptionView
          * @description Orthogonal assessment profile of a single registered mathematical method.
@@ -512,6 +945,37 @@ export interface components {
          */
         SupportStatus: "SUPPORTED" | "UNSUPPORTED";
         /**
+         * TheoremKnowledge
+         * @description Mathematical theorem entity with formal hypotheses and conclusions.
+         */
+        TheoremKnowledge: {
+            /** Conclusions */
+            conclusions?: components["schemas"]["LocalizedText"][];
+            /**
+             * Formal Statement Latex
+             * @description Formal mathematical statement in LaTeX
+             */
+            formal_statement_latex: string;
+            /** Hypotheses */
+            hypotheses?: components["schemas"]["LocalizedText"][];
+            /** Provenance Refs */
+            provenance_refs?: string[];
+            /** Related Concept Ids */
+            related_concept_ids?: string[];
+            statement: components["schemas"]["LocalizedText"];
+            /**
+             * Theorem Id
+             * @description Stable unique theorem identifier, e.g. 'THEOREM_VIETA_RELATIONS'
+             */
+            theorem_id: string;
+            title: components["schemas"]["LocalizedText"];
+            /**
+             * Version
+             * @default 1.0.0
+             */
+            version: string;
+        };
+        /**
          * TransportErrorCode
          * @description Specific error codes for transport/HTTP failures occurring prior to or around application execution.
          * @enum {string}
@@ -537,6 +1001,19 @@ export interface components {
              * @constant
              */
             transport_status: "ERROR";
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
         };
         /**
          * VerificationCapability
@@ -720,6 +1197,231 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_knowledge_concept_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Concept knowledge details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptKnowledge"];
+                };
+            };
+            /** @description Knowledge concept entity not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal transport failure */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransportErrorResponse"];
+                };
+            };
+        };
+    };
+    get_knowledge_formula_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formula_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Formula knowledge details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormulaKnowledge"];
+                };
+            };
+            /** @description Knowledge formula entity not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal transport failure */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransportErrorResponse"];
+                };
+            };
+        };
+    };
+    get_knowledge_graph_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full mathematical knowledge graph */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphModel"];
+                };
+            };
+            /** @description Internal transport failure */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransportErrorResponse"];
+                };
+            };
+        };
+    };
+    get_knowledge_method_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                method_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Method knowledge details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MethodKnowledge"];
+                };
+            };
+            /** @description Knowledge method entity not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal transport failure */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransportErrorResponse"];
+                };
+            };
+        };
+    };
+    get_knowledge_theorem_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theorem_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theorem knowledge details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TheoremKnowledge"];
+                };
+            };
+            /** @description Knowledge theorem entity not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal transport failure */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransportErrorResponse"];
                 };
             };
         };
