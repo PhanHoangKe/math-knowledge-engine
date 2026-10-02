@@ -136,6 +136,13 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     fireEvent.click(screen.getByTestId('compute-btn'));
 
     await waitFor(() => {
+      expect(screen.getByTestId('selected-method-summary-pod')).toBeInTheDocument();
+    });
+
+    // Expand method catalog
+    fireEvent.click(screen.getByTestId('toggle-methods-btn'));
+
+    await waitFor(() => {
       expect(screen.getByTestId('method-catalog-panel')).toBeInTheDocument();
     });
 
@@ -175,6 +182,13 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     const input = screen.getByTestId('equation-input');
     fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
     fireEvent.click(screen.getByTestId('compute-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selected-method-summary-pod')).toBeInTheDocument();
+    });
+
+    // Expand method catalog
+    fireEvent.click(screen.getByTestId('toggle-methods-btn'));
 
     await waitFor(() => {
       expect(screen.getByTestId('method-card-QUAD_COMPLETE_SQUARE')).toBeInTheDocument();
@@ -406,7 +420,7 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     fireEvent.click(screen.getByTestId('compute-btn'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('verification-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('verification-summary-pod')).toBeInTheDocument();
     });
 
     expect(screen.getByTestId('verification-outcome-badge')).toHaveTextContent(
@@ -437,7 +451,7 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     fireEvent.click(screen.getByTestId('compute-btn'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('trace-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('trace-summary-pod')).toBeInTheDocument();
     });
 
     const disclaimer = screen.getByTestId('trace-disclaimer');
@@ -466,6 +480,9 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
       await vi.waitFor(() => {
         expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
       });
+
+      // Open coefficient editor
+      fireEvent.click(screen.getByTestId('toggle-coeff-editor-btn'));
 
       // Find coefficient c numerator input and change 6 -> 7
       const cNumeratorInput = screen.getByDisplayValue('6');
@@ -540,6 +557,9 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
         expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
       });
 
+      // Open coefficient editor
+      fireEvent.click(screen.getByTestId('toggle-coeff-editor-btn'));
+
       const cNumeratorInput = screen.getByDisplayValue('6');
       fireEvent.change(cNumeratorInput, { target: { value: '7' } });
 
@@ -589,6 +609,9 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
         expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
       });
 
+      // Open coefficient editor
+      fireEvent.click(screen.getByTestId('toggle-coeff-editor-btn'));
+
       const cNumeratorInput = screen.getByDisplayValue('6');
       fireEvent.change(cNumeratorInput, { target: { value: '7' } });
 
@@ -633,6 +656,9 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
       await vi.waitFor(() => {
         expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
       });
+
+      // Open coefficient editor
+      fireEvent.click(screen.getByTestId('toggle-coeff-editor-btn'));
 
       const cNumeratorInput = screen.getByDisplayValue('6');
       fireEvent.change(cNumeratorInput, { target: { value: '7' } });

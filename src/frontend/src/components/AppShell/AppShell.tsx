@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePreferences } from '../../state/preferences';
 import { useAlgebraWorkspace } from '../../state/useAlgebraWorkspace';
 import { HeaderBar } from '../HeaderBar/HeaderBar';
@@ -7,8 +7,9 @@ import { WorkspaceEmptyState } from '../WorkspaceEmptyState/WorkspaceEmptyState'
 import { CanonicalProblemPanel } from '../CanonicalProblemPanel/CanonicalProblemPanel';
 import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
 import { SolutionSummaryPanel } from '../SolutionSummaryPanel/SolutionSummaryPanel';
-import { TracePanel } from '../TracePanel/TracePanel';
-import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
+import { SelectedMethodPod } from '../SelectedMethodPod/SelectedMethodPod';
+import { VerificationSummaryPod } from '../VerificationSummaryPod/VerificationSummaryPod';
+import { TraceSummaryPod } from '../TraceSummaryPod/TraceSummaryPod';
 import { DegenerateSolutionPanel } from '../DegenerateSolutionPanel/DegenerateSolutionPanel';
 import { MethodNotExecutablePanel } from '../MethodNotExecutablePanel/MethodNotExecutablePanel';
 import { CoefficientEditorPanel } from '../CoefficientEditorPanel/CoefficientEditorPanel';
@@ -46,6 +47,10 @@ export const AppShell: React.FC = () => {
     retryLastRequest,
     clearWorkspace,
   } = useAlgebraWorkspace();
+
+  const [showAllMethods, setShowAllMethods] = useState(false);
+  const [showCoeffEditor, setShowCoeffEditor] = useState(false);
+  const [showRevisionHistory, setShowRevisionHistory] = useState(false);
 
   const isFailedCoeffEdit = Boolean(
     lastAcceptedResponse &&
@@ -156,17 +161,20 @@ export const AppShell: React.FC = () => {
                   <div className={styles.solvedLayout} data-testid="solved-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
                     <SolutionSummaryPanel solution={resp.solution} />
-                    <MethodCatalogPanel
-                      methods={resp.available_methods}
-                      selectedMethodId={resp.selected_method_id}
-                      onSelectMethod={switchMethod}
-                    />
-                    <TracePanel trace={resp.solution.trace} />
-                    <VerificationPanel
+                    <VerificationSummaryPod
                       certificate={resp.solution.certificate}
                       verificationScope={resp.solution.verification_scope}
                       solutionOutcome={resp.solution.outcome}
                     />
+                    <SelectedMethodPod
+                      methods={resp.available_methods}
+                      selectedMethodId={resp.selected_method_id}
+                      onSelectMethod={switchMethod}
+                      showAllMethods={showAllMethods}
+                      onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
+                      isLoading={reactiveStatus === 'recomputing'}
+                    />
+                    <TraceSummaryPod trace={resp.solution.trace} />
                   </div>
                 );
               })()}
@@ -232,29 +240,59 @@ export const AppShell: React.FC = () => {
                     const resp = result.response as SolvedResponse;
                     return (
                       <div className={styles.solvedLayout} data-testid="solved-workspace">
+                        {/* Pod 1: Canonical Problem / Input */}
                         <CanonicalProblemPanel problem={resp.problem} />
-                        <CoefficientEditorPanel
-                          draft={coeffDraft}
-                          errors={coeffValidationErrors}
-                          reactiveStatus={reactiveStatus}
-                          sourceMode={sourceMode}
-                          isLoading={reactiveStatus === 'recomputing'}
-                          isDegenerate={false}
-                          onUpdateField={updateCoefficientField}
-                          onReset={resetCoefficientsToBackend}
-                        />
+
+                        {/* Pod 2: Solution Summary & Roots */}
                         <SolutionSummaryPanel solution={resp.solution} />
-                        <MethodCatalogPanel
-                          methods={resp.available_methods}
-                          selectedMethodId={resp.selected_method_id}
-                          onSelectMethod={switchMethod}
-                        />
-                        <TracePanel trace={resp.solution.trace} />
-                        <VerificationPanel
+
+                        {/* Pod 3: Independent Verification Summary */}
+                        <VerificationSummaryPod
                           certificate={resp.solution.certificate}
                           verificationScope={resp.solution.verification_scope}
                           solutionOutcome={resp.solution.outcome}
                         />
+
+                        {/* Pod 4: Selected Method Summary + Expandable Catalog */}
+                        <SelectedMethodPod
+                          methods={resp.available_methods}
+                          selectedMethodId={resp.selected_method_id}
+                          onSelectMethod={switchMethod}
+                          showAllMethods={showAllMethods}
+                          onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
+                          isLoading={reactiveStatus === 'recomputing'}
+                        />
+
+                        {/* Pod 5: Step-by-Step Solution Trace */}
+                        <TraceSummaryPod trace={resp.solution.trace} />
+
+                        {/* Pod 6: Reactive Coefficient Editor (Collapsible) */}
+                        <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
+                          <button
+                            type="button"
+                            className={styles.disclosureBtn}
+                            onClick={() => setShowCoeffEditor(!showCoeffEditor)}
+                            aria-expanded={showCoeffEditor}
+                            data-testid="toggle-coeff-editor-btn"
+                          >
+                            <span className={styles.disclosureIcon} aria-hidden="true">⚙️</span>
+                            <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
+                          </button>
+                          {showCoeffEditor && (
+                            <div className={styles.disclosureContent}>
+                              <CoefficientEditorPanel
+                                draft={coeffDraft}
+                                errors={coeffValidationErrors}
+                                reactiveStatus={reactiveStatus}
+                                sourceMode={sourceMode}
+                                isLoading={reactiveStatus === 'recomputing'}
+                                isDegenerate={false}
+                                onUpdateField={updateCoefficientField}
+                                onReset={resetCoefficientsToBackend}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -325,11 +363,27 @@ export const AppShell: React.FC = () => {
             </>
           )}
 
-          {/* Session Revision History */}
+          {/* Session Revision History (Pod 7: Collapsible) */}
           {revisionHistory.length > 0 && (
-            <RevisionHistoryPanel
-              history={revisionHistory}
-            />
+            <div className={styles.disclosurePod} data-testid="revision-history-disclosure">
+              <button
+                type="button"
+                className={styles.disclosureBtn}
+                onClick={() => setShowRevisionHistory(!showRevisionHistory)}
+                aria-expanded={showRevisionHistory}
+                data-testid="toggle-revision-history-btn"
+              >
+                <span className={styles.disclosureIcon} aria-hidden="true">📜</span>
+                <span>{showRevisionHistory ? t('btn_hide_revision_history') : t('btn_show_revision_history').replace('{count}', revisionHistory.length.toString())}</span>
+              </button>
+              {showRevisionHistory && (
+                <div className={styles.disclosureContent}>
+                  <RevisionHistoryPanel
+                    history={revisionHistory}
+                  />
+                </div>
+              )}
+            </div>
           )}
         </section>
 

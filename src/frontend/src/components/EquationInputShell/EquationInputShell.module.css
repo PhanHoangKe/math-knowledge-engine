@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .heroSection {
@@ -40,6 +40,93 @@
   line-height: 1.45;
 }
 
+/* Mode Switcher Tabs */
+.modeSwitcher {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-capsule);
+  padding: 0.2rem;
+  gap: 0.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.modeTab {
+  padding: 0.35rem 1rem;
+  border-radius: var(--radius-capsule);
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+.modeTab:hover:not(.modeTabActive) {
+  color: var(--text-primary);
+  background-color: var(--bg-subtle);
+}
+
+.modeTabActive {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(142, 108, 217, 0.3);
+}
+
+.modeTab:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+/* Visual Math Preview Box */
+.mathPreviewBox {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.previewLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+}
+
+.previewDisplay {
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  overflow-x: auto;
+}
+
+.previewPlaceholder {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.unsupportedNotice {
+  font-size: 0.8rem;
+  color: #b45309;
+  background-color: rgba(245, 158, 11, 0.1);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Capsule Box */
 .capsuleBox {
   width: 100%;
   display: flex;

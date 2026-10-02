@@ -60,6 +60,45 @@
 .analyzedLayout {
   display: flex;
   flex-direction: column;
+  gap: var(--space-md, 1rem);
+}
+
+.disclosurePod {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+  width: 100%;
+}
+
+.disclosureBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-md, 8px);
+  border: 1px dashed var(--color-border, #cbd5e1);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-secondary, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: fit-content;
+}
+
+.disclosureBtn:hover {
+  background: var(--color-surface-hover, #f8fafc);
+  color: var(--color-text-primary, #0f172a);
+  border-color: var(--color-primary, #1976d2);
+}
+
+.disclosureIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.disclosureContent {
+  width: 100%;
 }
 
 .lastAcceptedBanner {
