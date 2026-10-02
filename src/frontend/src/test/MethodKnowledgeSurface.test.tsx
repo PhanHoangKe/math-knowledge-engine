@@ -297,7 +297,7 @@ describe('MethodKnowledgeSurface Component', () => {
     expect(methodFetchCount).toBe(2);
   });
 
-  it('handles out-of-order responses with activeRequestIdRef (latest-request-wins token guard)', async () => {
+  it('handles remote-A -> remote-B out-of-order responses with activeRequestIdRef (latest-request-wins token guard)', async () => {
     let resolveFirstRequest: ((value: Response) => void) | null = null;
 
     const methodAData: MethodKnowledge = {
@@ -368,7 +368,73 @@ describe('MethodKnowledgeSurface Component', () => {
     expect(screen.queryByText('Phương pháp chậm A')).not.toBeInTheDocument();
   });
 
-  it('reactively updates language switch (VI -> EN) on already mounted component', async () => {
+  it('invalidates pending remote fetch when switching to initialData (stale-request race safety)', async () => {
+    let resolveFirstRequest: ((value: Response) => void) | null = null;
+
+    const methodAData: MethodKnowledge = {
+      ...mockMethodKnowledgeStandard,
+      method_id: 'METHOD_PENDING_A',
+      title: { vi: 'Phương pháp chờ A', en: 'Pending Method A' },
+    };
+
+    const methodBInitialData: MethodKnowledge = {
+      ...mockMethodKnowledgeStandard,
+      method_id: 'METHOD_INITIAL_B',
+      title: { vi: 'Phương pháp khởi tạo B', en: 'Initial Method B' },
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('METHOD_PENDING_A')) {
+        // Pending promise that deliberately ignores abort signals
+        return new Promise<Response>((resolve) => {
+          resolveFirstRequest = resolve;
+        });
+      }
+      return Promise.resolve(new Response('Not Found', { status: 404 }));
+    });
+
+    const { rerender } = render(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodKnowledgeSurface methodId="METHOD_PENDING_A" isOpen={true} />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('knowledge-loading-METHOD_PENDING_A')).toBeInTheDocument();
+
+    // Rerender same component with initialData for METHOD_INITIAL_B
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodKnowledgeSurface
+          methodId="METHOD_INITIAL_B"
+          isOpen={true}
+          initialData={methodBInitialData}
+        />
+      </PreferencesProvider>
+    );
+
+    // InitialData renders immediately
+    expect(screen.getByText('Phương pháp khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByTestId('knowledge-loading-METHOD_PENDING_A')).not.toBeInTheDocument();
+
+    // Now resolve request A late
+    act(() => {
+      if (resolveFirstRequest) {
+        resolveFirstRequest(
+          new Response(JSON.stringify(methodAData), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+    });
+
+    // Wait a tick and verify METHOD_INITIAL_B is NOT overwritten by late METHOD_PENDING_A
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText('Phương pháp khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByText('Phương pháp chờ A')).not.toBeInTheDocument();
+  });
+
+  it('reactively updates language switch (VI -> EN) on mounted method and loaded child entities', async () => {
     setupMockFetch();
 
     // Helper component with a language toggle button
@@ -394,7 +460,7 @@ describe('MethodKnowledgeSurface Component', () => {
       </PreferencesProvider>
     );
 
-    // Starts in Vietnamese
+    // 1. Starts in Vietnamese — wait for parent method and children to load
     await waitFor(() => {
       expect(screen.getByText('Công thức nghiệm chuẩn tắc (Biệt thức Delta)')).toBeInTheDocument();
     });
@@ -402,11 +468,26 @@ describe('MethodKnowledgeSurface Component', () => {
       screen.getByText(/Phương pháp giải tổng quát cho mọi phương trình bậc hai/)
     ).toBeInTheDocument();
 
-    // Trigger reactive language switch
+    // Child concept in Vietnamese
+    await waitFor(() => {
+      expect(screen.getByText('Biệt thức Delta')).toBeInTheDocument();
+    });
+
+    // Child formula in Vietnamese
+    await waitFor(() => {
+      expect(screen.getByText('Công thức nghiệm bậc hai')).toBeInTheDocument();
+    });
+
+    // Child theorem in Vietnamese
+    await waitFor(() => {
+      expect(screen.getByText('Định lý về số nghiệm của phương trình bậc hai')).toBeInTheDocument();
+    });
+
+    // 2. Trigger reactive language switch WITHOUT remounting
     const toggleBtn = screen.getByTestId('toggle-en-btn');
     fireEvent.click(toggleBtn);
 
-    // Immediately reflects English text without remounting or breaking
+    // 3. Immediately reflects English text across parent and all loaded children
     await waitFor(() => {
       expect(
         screen.getByText('Standard Quadratic Formula (Discriminant Delta)')
@@ -415,6 +496,15 @@ describe('MethodKnowledgeSurface Component', () => {
     expect(
       screen.getByText(/General solution method for any quadratic equation/)
     ).toBeInTheDocument();
+
+    // Child concept switched reactively to English
+    expect(screen.getByText('Discriminant Delta')).toBeInTheDocument();
+
+    // Child formula switched reactively to English
+    expect(screen.getByText('Quadratic formula')).toBeInTheDocument();
+
+    // Child theorem switched reactively to English
+    expect(screen.getByText('Theorem on Number of Quadratic Roots')).toBeInTheDocument();
   });
 
   it('renders safely when prerequisite_concept_ids, formula_refs, or theorem_refs are empty or omitted', async () => {

@@ -23,6 +23,9 @@ export const FormulaCard: React.FC<FormulaCardProps> = ({ formulaId, initialData
   const activeRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
+    // Invalidate any existing in-flight request on every state transition
+    const requestId = ++activeRequestIdRef.current;
+
     if (initialData) {
       setData(initialData);
       setLoading(false);
@@ -30,7 +33,6 @@ export const FormulaCard: React.FC<FormulaCardProps> = ({ formulaId, initialData
       return;
     }
 
-    const requestId = ++activeRequestIdRef.current;
     const abortController = new AbortController();
     setLoading(true);
     setErrorKind(null);

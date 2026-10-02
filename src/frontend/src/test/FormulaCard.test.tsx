@@ -72,7 +72,7 @@ describe('FormulaCard Component', () => {
     expect(screen.getByText(/Quadratic coefficient/)).toBeInTheDocument();
   });
 
-  it('handles race conditions / out-of-order responses with activeRequestIdRef', async () => {
+  it('handles remote-A -> remote-B race conditions / out-of-order responses with activeRequestIdRef', async () => {
     let resolveFirstRequest: ((value: Response) => void) | null = null;
 
     const formulaA: FormulaKnowledge = {
@@ -138,5 +138,67 @@ describe('FormulaCard Component', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByText('Công thức nhanh B')).toBeInTheDocument();
     expect(screen.queryByText('Công thức chậm A')).not.toBeInTheDocument();
+  });
+
+  it('invalidates pending remote fetch when switching to initialData (stale-request race safety)', async () => {
+    let resolveFirstRequest: ((value: Response) => void) | null = null;
+
+    const formulaA: FormulaKnowledge = {
+      ...mockFormulaStandard,
+      formula_id: 'FORMULA_PENDING_A',
+      title: { vi: 'Công thức chờ A', en: 'Pending Formula A' },
+    };
+
+    const formulaBInitial: FormulaKnowledge = {
+      ...mockFormulaStandard,
+      formula_id: 'FORMULA_INITIAL_B',
+      title: { vi: 'Công thức khởi tạo B', en: 'Initial Formula B' },
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('FORMULA_PENDING_A')) {
+        return new Promise<Response>((resolve) => {
+          resolveFirstRequest = resolve;
+        });
+      }
+      return Promise.resolve(new Response('Not Found', { status: 404 }));
+    });
+
+    const { rerender } = render(
+      <PreferencesProvider initialLanguage="vi">
+        <FormulaCard formulaId="FORMULA_PENDING_A" />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('formula-loading-FORMULA_PENDING_A')).toBeInTheDocument();
+
+    // Rerender with initialData for FORMULA_INITIAL_B
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <FormulaCard
+          formulaId="FORMULA_INITIAL_B"
+          initialData={formulaBInitial}
+        />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByText('Công thức khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByTestId('formula-loading-FORMULA_PENDING_A')).not.toBeInTheDocument();
+
+    // Late resolve request A
+    act(() => {
+      if (resolveFirstRequest) {
+        resolveFirstRequest(
+          new Response(JSON.stringify(formulaA), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText('Công thức khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByText('Công thức chờ A')).not.toBeInTheDocument();
   });
 });

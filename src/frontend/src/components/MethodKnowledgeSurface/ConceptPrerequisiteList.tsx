@@ -25,12 +25,14 @@ export const ConceptPrerequisiteList: React.FC<ConceptPrerequisiteListProps> = (
   const activeRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
+    // Invalidate any existing in-flight request on every state transition
+    const requestId = ++activeRequestIdRef.current;
+
     if (!conceptIds || conceptIds.length === 0) {
       setConcepts({});
       return;
     }
 
-    const requestId = ++activeRequestIdRef.current;
     const abortController = new AbortController();
 
     // Initialize loading states

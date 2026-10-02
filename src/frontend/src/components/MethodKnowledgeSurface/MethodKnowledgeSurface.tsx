@@ -29,7 +29,7 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
 }) => {
   const { language, t } = usePreferences();
   const [data, setData] = useState<MethodKnowledge | undefined>(initialData);
-  const [loading, setLoading] = useState<boolean>(!initialData);
+  const [loading, setLoading] = useState<boolean>(!initialData && isOpen);
   const [errorKind, setErrorKind] = useState<KnowledgeErrorKind | null>(null);
   const activeRequestIdRef = useRef<number>(0);
 
@@ -65,7 +65,13 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
   };
 
   useEffect(() => {
-    if (!isOpen) return;
+    // Invalidate any existing in-flight request on every state transition
+    const requestId = ++activeRequestIdRef.current;
+
+    if (!isOpen) {
+      setLoading(false);
+      return;
+    }
 
     if (initialData) {
       setData(initialData);
@@ -74,10 +80,33 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
       return;
     }
 
-    const abortController = loadKnowledge(methodId);
+    setLoading(true);
+    setErrorKind(null);
+    const abortController = new AbortController();
+
+    getMethodKnowledge(methodId, abortController.signal)
+      .then((knowledge) => {
+        if (activeRequestIdRef.current !== requestId) return;
+        setData(knowledge);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (activeRequestIdRef.current !== requestId) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (err instanceof KnowledgeApiError) {
+          setErrorKind('not_found');
+        } else if (err instanceof NetworkError) {
+          setErrorKind('network');
+        } else if (err instanceof ProtocolError) {
+          setErrorKind('protocol');
+        } else {
+          setErrorKind('generic');
+        }
+        setLoading(false);
+      });
 
     return () => {
-      abortController?.abort();
+      abortController.abort();
     };
   }, [methodId, isOpen, initialData]);
 

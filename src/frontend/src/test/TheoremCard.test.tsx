@@ -80,7 +80,7 @@ describe('TheoremCard Component', () => {
     ).toBeInTheDocument();
   });
 
-  it('handles race conditions / out-of-order responses with activeRequestIdRef', async () => {
+  it('handles remote-A -> remote-B race conditions / out-of-order responses with activeRequestIdRef', async () => {
     let resolveFirstRequest: ((value: Response) => void) | null = null;
 
     const theoremA: TheoremKnowledge = {
@@ -146,5 +146,67 @@ describe('TheoremCard Component', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByText('Định lý nhanh B')).toBeInTheDocument();
     expect(screen.queryByText('Định lý chậm A')).not.toBeInTheDocument();
+  });
+
+  it('invalidates pending remote fetch when switching to initialData (stale-request race safety)', async () => {
+    let resolveFirstRequest: ((value: Response) => void) | null = null;
+
+    const theoremA: TheoremKnowledge = {
+      ...mockTheoremQuadraticRoots,
+      theorem_id: 'THEOREM_PENDING_A',
+      title: { vi: 'Định lý chờ A', en: 'Pending Theorem A' },
+    };
+
+    const theoremBInitial: TheoremKnowledge = {
+      ...mockTheoremQuadraticRoots,
+      theorem_id: 'THEOREM_INITIAL_B',
+      title: { vi: 'Định lý khởi tạo B', en: 'Initial Theorem B' },
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('THEOREM_PENDING_A')) {
+        return new Promise<Response>((resolve) => {
+          resolveFirstRequest = resolve;
+        });
+      }
+      return Promise.resolve(new Response('Not Found', { status: 404 }));
+    });
+
+    const { rerender } = render(
+      <PreferencesProvider initialLanguage="vi">
+        <TheoremCard theoremId="THEOREM_PENDING_A" />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('theorem-loading-THEOREM_PENDING_A')).toBeInTheDocument();
+
+    // Rerender with initialData for THEOREM_INITIAL_B
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <TheoremCard
+          theoremId="THEOREM_INITIAL_B"
+          initialData={theoremBInitial}
+        />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByText('Định lý khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByTestId('theorem-loading-THEOREM_PENDING_A')).not.toBeInTheDocument();
+
+    // Late resolve request A
+    act(() => {
+      if (resolveFirstRequest) {
+        resolveFirstRequest(
+          new Response(JSON.stringify(theoremA), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText('Định lý khởi tạo B')).toBeInTheDocument();
+    expect(screen.queryByText('Định lý chờ A')).not.toBeInTheDocument();
   });
 });
