@@ -199,9 +199,18 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
 
   const handleCameraClick = () => {
     setCameraNote(
-      t('tooltip_camera') + ' — Tính năng nhận diện hình ảnh/OCR sẵn sàng ở các phiên bản tiếp theo.'
+      'Tính năng Tải lên tệp / OCR nhận diện đang được phát triển ở các phiên bản tiếp theo.'
     );
     setTimeout(() => setCameraNote(null), 3500);
+  };
+
+  const handleScrollToTopics = () => {
+    const elem = document.querySelector('[data-testid="workspace-empty-state"]');
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      handleRandomSample();
+    }
   };
 
   const handleClearAll = () => {
@@ -517,7 +526,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
               <button
                 type="button"
                 className={styles.naturalActionIconBtn}
-                onClick={handleRandomSample}
+                onClick={handleScrollToTopics}
                 title={t('tooltip_samples')}
                 aria-label={t('tooltip_samples')}
               >
