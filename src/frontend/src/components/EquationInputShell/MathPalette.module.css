@@ -101,6 +101,7 @@
   border: 1.2px solid #ffffff;
   border-radius: 1px;
   box-sizing: border-box;
+  margin-bottom: 1px;
 }
 
 .btnTinyBox {
@@ -128,8 +129,8 @@
   border: 1px solid #ffffff;
   border-radius: 1px;
   box-sizing: border-box;
-  vertical-align: super;
-  margin-bottom: 6px;
+  align-self: flex-start;
+  margin-top: 1px;
   margin-left: 1px;
 }
 
@@ -150,9 +151,11 @@
 
 .btnPower {
   display: inline-flex;
-  align-items: baseline;
-  gap: 1px;
+  align-items: flex-end;
+  height: 18px;
+  gap: 1.5px;
 }
+
 
 .btnSqrt {
   display: inline-flex;
