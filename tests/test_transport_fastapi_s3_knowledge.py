@@ -2,12 +2,14 @@
 
 Verifies:
 1. HTTP 200 success matrix across all accepted knowledge entities (9 methods, 14 concepts, 5 formulas, 1 theorem, graph).
-2. Exact payload equivalence with underlying KnowledgeRepository and KnowledgeGraphService models.
-3. Graph export endpoint parity (29 nodes, 84 edges, KNOWLEDGE_GRAPH kind).
-4. Semantic distinction between known-route/unknown-entity (404 KnowledgeApiErrorResponse) and unknown-route (404 TransportErrorResponse).
-5. Read-only API guarantee (zero POST/PUT/PATCH/DELETE endpoints under /api/v1/knowledge).
-6. OpenAPI contract adherence (exact 200/404/500 schema refs, stable operation IDs, extra=forbid schemas).
-7. Determinism across repeated requests and sanitized HTTP 500 on unexpected internal errors.
+2. Exact Cache-Control: public, max-age=3600 header policy on all successful static knowledge responses.
+3. Strict non-caching / exclusion of public success cache headers on error responses (404 entity, 404 unknown route, 500 internal).
+4. Exact payload equivalence with underlying KnowledgeRepository and KnowledgeGraphService models.
+5. Graph export endpoint parity (29 nodes, 84 edges, KNOWLEDGE_GRAPH kind).
+6. Semantic distinction between known-route/unknown-entity (404 KnowledgeApiErrorResponse) and unknown-route (404 TransportErrorResponse).
+7. Read-only API guarantee (zero POST/PUT/PATCH/DELETE endpoints under /api/v1/knowledge).
+8. OpenAPI contract adherence (exact 200/404/500 schema refs, stable operation IDs, extra=forbid schemas).
+9. Determinism across repeated requests and sanitized HTTP 500 on unexpected internal errors.
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ from mke_product.transport.models import (
     TransportErrorResponse,
 )
 
+EXPECTED_CACHE_CONTROL = "public, max-age=3600"
+
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
@@ -52,7 +56,7 @@ def graph_service() -> KnowledgeGraphService:
 
 
 # ============================================================================
-# 1. HTTP 200 SUCCESS MATRIX (ALL ACCEPTED ENTITIES & GRAPH)
+# 1. HTTP 200 SUCCESS MATRIX (ALL ACCEPTED ENTITIES & GRAPH WITH CACHE-CONTROL)
 # ============================================================================
 
 def test_http_get_all_methods_success(client: TestClient, repo: KnowledgeRepository) -> None:
@@ -62,6 +66,7 @@ def test_http_get_all_methods_success(client: TestClient, repo: KnowledgeReposit
     for m in methods:
         resp = client.get(f"/api/v1/knowledge/methods/{m.method_id}")
         assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == EXPECTED_CACHE_CONTROL
         data = resp.json()
 
         # Strict validation through Pydantic model
@@ -79,6 +84,7 @@ def test_http_get_all_concepts_success(client: TestClient, repo: KnowledgeReposi
     for c in concepts:
         resp = client.get(f"/api/v1/knowledge/concepts/{c.concept_id}")
         assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == EXPECTED_CACHE_CONTROL
         data = resp.json()
 
         # Strict validation through Pydantic model
@@ -96,6 +102,7 @@ def test_http_get_all_formulas_success(client: TestClient, repo: KnowledgeReposi
     for f in formulas:
         resp = client.get(f"/api/v1/knowledge/formulas/{f.formula_id}")
         assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == EXPECTED_CACHE_CONTROL
         data = resp.json()
 
         # Strict validation through Pydantic model
@@ -113,6 +120,7 @@ def test_http_get_all_theorems_success(client: TestClient, repo: KnowledgeReposi
     for t in theorems:
         resp = client.get(f"/api/v1/knowledge/theorems/{t.theorem_id}")
         assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == EXPECTED_CACHE_CONTROL
         data = resp.json()
 
         # Strict validation through Pydantic model
@@ -126,6 +134,7 @@ def test_http_get_all_theorems_success(client: TestClient, repo: KnowledgeReposi
 def test_http_get_knowledge_graph_success(client: TestClient, graph_service: KnowledgeGraphService) -> None:
     resp = client.get("/api/v1/knowledge/graph")
     assert resp.status_code == 200
+    assert resp.headers.get("cache-control") == EXPECTED_CACHE_CONTROL
     data = resp.json()
 
     # Validate GraphModel
@@ -230,7 +239,29 @@ def test_unknown_route_returns_transport_api_not_found(client: TestClient) -> No
 
 
 # ============================================================================
-# 5. READ-ONLY API GUARANTEE
+# 5. ERROR RESPONSES DO NOT ADVERTISE PUBLIC CACHE HEADER
+# ============================================================================
+
+def test_error_responses_do_not_have_public_success_cache_header(client: TestClient) -> None:
+    # 1. Unknown entity 404
+    resp_entity_404 = client.get("/api/v1/knowledge/methods/UNKNOWN_METHOD")
+    assert resp_entity_404.status_code == 404
+    assert resp_entity_404.headers.get("cache-control") != EXPECTED_CACHE_CONTROL
+
+    # 2. Unknown route 404
+    resp_route_404 = client.get("/api/v1/knowledge/not-a-real-endpoint/whatever")
+    assert resp_route_404.status_code == 404
+    assert resp_route_404.headers.get("cache-control") != EXPECTED_CACHE_CONTROL
+
+    # 3. Internal service failure 500
+    with patch.object(KnowledgeRepository, "get_method", side_effect=RuntimeError("Test error")):
+        resp_500 = client.get("/api/v1/knowledge/methods/QUAD_FORMULA_STANDARD")
+        assert resp_500.status_code == 500
+        assert resp_500.headers.get("cache-control") != EXPECTED_CACHE_CONTROL
+
+
+# ============================================================================
+# 6. READ-ONLY API GUARANTEE
 # ============================================================================
 
 def test_knowledge_api_is_strictly_read_only(client: TestClient) -> None:
@@ -250,7 +281,7 @@ def test_knowledge_api_is_strictly_read_only(client: TestClient) -> None:
 
 
 # ============================================================================
-# 6. OPENAPI CONTRACT & OPERATION IDS
+# 7. OPENAPI CONTRACT & OPERATION IDS
 # ============================================================================
 
 def test_openapi_knowledge_operation_ids(client: TestClient) -> None:
@@ -366,7 +397,7 @@ def test_openapi_knowledge_api_error_code_enum(client: TestClient) -> None:
 
 
 # ============================================================================
-# 7. INTERNAL FAILURE SANITIZATION (HTTP 500)
+# 8. INTERNAL FAILURE SANITIZATION (HTTP 500)
 # ============================================================================
 
 def test_internal_service_failure_is_sanitized_500(client: TestClient) -> None:
