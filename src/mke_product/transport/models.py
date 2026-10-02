@@ -32,6 +32,29 @@ class TransportErrorResponse(BaseModel):
     details: Dict[str, Any] = Field(default_factory=dict)
 
 
+class KnowledgeApiErrorCode(str, Enum):
+    """Specific error codes for knowledge API operations."""
+
+    KNOWLEDGE_ENTITY_NOT_FOUND = "KNOWLEDGE_ENTITY_NOT_FOUND"
+
+
+class KnowledgeApiErrorResponse(BaseModel):
+    """Strict, immutable knowledge API entity error envelope."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        frozen=True,
+    )
+
+    status: Literal["error"] = "error"
+    error_code: KnowledgeApiErrorCode = KnowledgeApiErrorCode.KNOWLEDGE_ENTITY_NOT_FOUND
+    entity_type: str
+    entity_id: str
+    message_vi: str
+    message_en: str
+
+
 class HealthResponse(BaseModel):
     """Observational system health response schema."""
 

@@ -3,8 +3,11 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from mke_product.knowledge.repository import EntityNotFoundError
 from mke_product.transport.routers.algebra import router as algebra_router
+from mke_product.transport.routers.knowledge import router as knowledge_router
 from mke_product.transport.handlers import (
+    entity_not_found_exception_handler,
     validation_exception_handler,
     http_exception_handler,
     unhandled_exception_handler,
@@ -18,9 +21,9 @@ from mke_product.transport.middleware import (
 def create_app() -> FastAPI:
     """Create and configure the production FastAPI transport application."""
     fastapi_app = FastAPI(
-        title="Math Knowledge Engine - Algebra Transport API",
+        title="Math Knowledge Engine - Algebra & Knowledge Transport API",
         version="1.0.0",
-        description="Production FastAPI transport adapter for MKE MVP V1 Algebra Workspace",
+        description="Production FastAPI transport adapter for MKE MVP V1 Algebra Workspace & Static Knowledge",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
@@ -28,8 +31,10 @@ def create_app() -> FastAPI:
 
     # Register API routers
     fastapi_app.include_router(algebra_router)
+    fastapi_app.include_router(knowledge_router)
 
     # Register centralized exception handlers
+    fastapi_app.add_exception_handler(EntityNotFoundError, entity_not_found_exception_handler)
     fastapi_app.add_exception_handler(RequestValidationError, validation_exception_handler)
     fastapi_app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     fastapi_app.add_exception_handler(Exception, unhandled_exception_handler)

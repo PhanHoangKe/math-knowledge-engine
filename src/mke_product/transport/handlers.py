@@ -5,7 +5,13 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from mke_product.transport.models import TransportErrorCode, TransportErrorResponse
+from mke_product.knowledge.repository import EntityNotFoundError
+from mke_product.transport.models import (
+    KnowledgeApiErrorCode,
+    KnowledgeApiErrorResponse,
+    TransportErrorCode,
+    TransportErrorResponse,
+)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -70,6 +76,22 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     )
     return JSONResponse(
         status_code=exc.status_code,
+        content=error_response.model_dump(mode="json"),
+    )
+
+
+async def entity_not_found_exception_handler(request: Request, exc: EntityNotFoundError) -> JSONResponse:
+    """Handle KnowledgeRepository EntityNotFoundError returning typed KnowledgeApiErrorResponse with HTTP 404."""
+    error_response = KnowledgeApiErrorResponse(
+        status="error",
+        error_code=KnowledgeApiErrorCode.KNOWLEDGE_ENTITY_NOT_FOUND,
+        entity_type=exc.entity_type,
+        entity_id=exc.entity_id,
+        message_vi=f"Không tìm thấy thực thể {exc.entity_type} với mã '{exc.entity_id}'.",
+        message_en=f"{exc.entity_type} with ID '{exc.entity_id}' not found.",
+    )
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
         content=error_response.model_dump(mode="json"),
     )
 
