@@ -3,6 +3,8 @@ import type { VerificationCertificate, SolutionOutcome } from '../../api/contrac
 import { usePreferences } from '../../state/preferences';
 import { VERIFICATION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShieldHalved, faSliders, faCircleCheck, faCircleXmark, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 import styles from './VerificationSummaryPod.module.css';
 
 export interface VerificationSummaryPodProps {
@@ -75,20 +77,9 @@ export const VerificationSummaryPod: React.FC<VerificationSummaryPodProps> = ({
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <svg
-              className={styles.shieldIcon}
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              width="20"
-              height="20"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <span className={styles.shieldIcon}>
+              <FontAwesomeIcon icon={faShieldHalved} />
+            </span>
             <div>
               <h2 className={styles.podTitle}>{t('pod_verification_title')}</h2>
               <span className={styles.verifierName}>
@@ -138,7 +129,10 @@ export const VerificationSummaryPod: React.FC<VerificationSummaryPodProps> = ({
 
         {/* Technical Details Disclosure */}
         <details className={styles.technicalDetails} data-testid="verification-technical-details">
-          <summary className={styles.technicalSummary}>{t('lbl_technical_details')}</summary>
+          <summary className={styles.technicalSummary}>
+            <FontAwesomeIcon icon={faSliders} style={{ marginRight: 6 }} />
+            {t('lbl_technical_details')}
+          </summary>
           <div className={styles.metaGrid}>
             <div className={styles.metaRow}>
               <span className={styles.metaLabel}>{t('lbl_cert_id')}:</span>

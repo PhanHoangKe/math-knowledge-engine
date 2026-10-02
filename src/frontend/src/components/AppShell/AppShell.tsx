@@ -5,6 +5,11 @@ import { HeaderBar } from '../HeaderBar/HeaderBar';
 import { EquationInputShell } from '../EquationInputShell/EquationInputShell';
 import { WorkspaceEmptyState } from '../WorkspaceEmptyState/WorkspaceEmptyState';
 import { CanonicalProblemPanel } from '../CanonicalProblemPanel/CanonicalProblemPanel';
+import { RootPlotPod } from '../RootPlotPod/RootPlotPod';
+import { AlternateFormsPod } from '../AlternateFormsPod/AlternateFormsPod';
+import { NumberLinePod } from '../NumberLinePod/NumberLinePod';
+import { RootPropertiesPod } from '../RootPropertiesPod/RootPropertiesPod';
+import { ProBannerWidget } from '../ProBannerWidget/ProBannerWidget';
 import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
 import { SolutionSummaryPanel } from '../SolutionSummaryPanel/SolutionSummaryPanel';
 import { SelectedMethodPod } from '../SelectedMethodPod/SelectedMethodPod';
@@ -18,11 +23,14 @@ import { ApplicationErrorPanel } from '../ApplicationErrorPanel/ApplicationError
 import { TransportErrorPanel } from '../TransportErrorPanel/TransportErrorPanel';
 import { NetworkErrorPanel } from '../NetworkErrorPanel/NetworkErrorPanel';
 import { AppFooter } from '../AppFooter/AppFooter';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGear, faHistory, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import type {
   SolvedResponse,
   AnalyzedNoExecutionResponse,
   ApplicationErrorResponse,
   TransportErrorResponse,
+  CanonicalQuadraticProblemView,
 } from '../../api/contract';
 import styles from './AppShell.module.css';
 
@@ -159,7 +167,7 @@ export const AppShell: React.FC = () => {
               />
 
               <div className={styles.lastAcceptedBanner} data-testid="last-accepted-revision-banner">
-                <span className={styles.lastAcceptedIcon} aria-hidden="true">ℹ️</span>
+                <FontAwesomeIcon icon={faCircleInfo} className={styles.lastAcceptedIcon} />
                 <span>{t('lbl_last_accepted_revision')}</span>
               </div>
 
@@ -246,60 +254,99 @@ export const AppShell: React.FC = () => {
                   {/* SOLVED Response */}
                   {result.response.response_status === 'SOLVED' && (() => {
                     const resp = result.response as SolvedResponse;
+                    const isQuadratic = resp.problem.problem_type === 'QUADRATIC';
+                    const quad = isQuadratic ? (resp.problem as CanonicalQuadraticProblemView) : null;
+
+                    const scrollToTrace = () => {
+                      const el = document.getElementById('step-by-step-trace-section');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    };
+
                     return (
-                      <div className={styles.solvedLayout} data-testid="solved-workspace">
-                        {/* Pod 1: Canonical Problem / Input */}
-                        <CanonicalProblemPanel problem={resp.problem} />
+                      <div className={styles.workspaceSplit}>
+                        <div className={styles.podsMainColumn}>
+                          <div className={styles.solvedLayout} data-testid="solved-workspace">
+                            {/* Pod 1: Canonical Problem / Input */}
+                            <CanonicalProblemPanel problem={resp.problem} />
 
-                        {/* Pod 2: Solution Summary & Roots */}
-                        <SolutionSummaryPanel solution={resp.solution} />
+                            {/* Pod 2: Root Plot (if quadratic) */}
+                            {quad && <RootPlotPod quad={quad} roots={resp.solution.roots} />}
 
-                        {/* Pod 3: Independent Verification Summary */}
-                        <VerificationSummaryPod
-                          certificate={resp.solution.certificate}
-                          verificationScope={resp.solution.verification_scope}
-                          solutionOutcome={resp.solution.outcome}
-                        />
+                            {/* Pod 3: Alternate forms (if quadratic) */}
+                            {quad && <AlternateFormsPod quad={quad} roots={resp.solution.roots} />}
 
-                        {/* Pod 4: Selected Method Summary + Expandable Catalog */}
-                        <SelectedMethodPod
-                          methods={resp.available_methods}
-                          selectedMethodId={resp.selected_method_id}
-                          onSelectMethod={switchMethod}
-                          showAllMethods={showAllMethods}
-                          onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
-                          isLoading={reactiveStatus === 'recomputing'}
-                        />
+                            {/* Pod 4: Number line (if quadratic) */}
+                            {quad && <NumberLinePod quad={quad} roots={resp.solution.roots} />}
 
-                        {/* Pod 5: Step-by-Step Solution Trace */}
-                        <TraceSummaryPod trace={resp.solution.trace} />
+                            {/* Pod 5: Solution Summary & Roots */}
+                            <SolutionSummaryPanel
+                              solution={resp.solution}
+                              onOpenStepByStep={scrollToTrace}
+                            />
 
-                        {/* Pod 6: Reactive Coefficient Editor (Collapsible) */}
-                        <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
-                          <button
-                            type="button"
-                            className={styles.disclosureBtn}
-                            onClick={() => setShowCoeffEditor(!showCoeffEditor)}
-                            aria-expanded={showCoeffEditor}
-                            data-testid="toggle-coeff-editor-btn"
-                          >
-                            <span className={styles.disclosureIcon} aria-hidden="true">⚙️</span>
-                            <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
-                          </button>
-                          {showCoeffEditor && (
-                            <div className={styles.disclosureContent}>
-                              <CoefficientEditorPanel
-                                draft={coeffDraft}
-                                errors={coeffValidationErrors}
-                                reactiveStatus={reactiveStatus}
-                                sourceMode={sourceMode}
-                                isLoading={reactiveStatus === 'recomputing'}
-                                isDegenerate={false}
-                                onUpdateField={updateCoefficientField}
-                                onReset={resetCoefficientsToBackend}
-                              />
+                            {/* Pod 6: Sum & Product of roots (if quadratic) */}
+                            {quad && <RootPropertiesPod quad={quad} />}
+
+                            {/* Pod 7: Independent Verification Summary */}
+                            <VerificationSummaryPod
+                              certificate={resp.solution.certificate}
+                              verificationScope={resp.solution.verification_scope}
+                              solutionOutcome={resp.solution.outcome}
+                            />
+
+                            {/* Pod 8: Selected Method Summary + Expandable Catalog */}
+                            <SelectedMethodPod
+                              methods={resp.available_methods}
+                              selectedMethodId={resp.selected_method_id}
+                              onSelectMethod={switchMethod}
+                              showAllMethods={showAllMethods}
+                              onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
+                              isLoading={reactiveStatus === 'recomputing'}
+                            />
+
+                            {/* Pod 9: Step-by-Step Solution Trace */}
+                            <div id="step-by-step-trace-section">
+                              <TraceSummaryPod trace={resp.solution.trace} />
                             </div>
-                          )}
+
+                            {/* Pod 10: Reactive Coefficient Editor (Collapsible) */}
+                            <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
+                              <button
+                                type="button"
+                                className={styles.disclosureBtn}
+                                onClick={() => setShowCoeffEditor(!showCoeffEditor)}
+                                aria-expanded={showCoeffEditor}
+                                data-testid="toggle-coeff-editor-btn"
+                              >
+                                <FontAwesomeIcon icon={faGear} className={styles.disclosureIcon} />
+                                <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
+                              </button>
+                              {showCoeffEditor && (
+                                <div className={styles.disclosureContent}>
+                                  <CoefficientEditorPanel
+                                    draft={coeffDraft}
+                                    errors={coeffValidationErrors}
+                                    reactiveStatus={reactiveStatus}
+                                    sourceMode={sourceMode}
+                                    isLoading={reactiveStatus === 'recomputing'}
+                                    isDegenerate={false}
+                                    onUpdateField={updateCoefficientField}
+                                    onReset={resetCoefficientsToBackend}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Powered by Engine Watermark */}
+                            <div className={styles.engineWatermark}>
+                              <span>POWERED BY THE MATH KNOWLEDGE ENGINE (MKE)</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Wolfram-style Pro / Step-by-step Sidebar */}
+                        <div className={styles.proSidebarColumn}>
+                          <ProBannerWidget onOpenStepByStep={scrollToTrace} />
                         </div>
                       </div>
                     );
@@ -381,7 +428,7 @@ export const AppShell: React.FC = () => {
                 aria-expanded={showRevisionHistory}
                 data-testid="toggle-revision-history-btn"
               >
-                <span className={styles.disclosureIcon} aria-hidden="true">📜</span>
+                <FontAwesomeIcon icon={faHistory} className={styles.disclosureIcon} />
                 <span>{showRevisionHistory ? t('btn_hide_revision_history') : t('btn_show_revision_history').replace('{count}', revisionHistory.length.toString())}</span>
               </button>
               {showRevisionHistory && (

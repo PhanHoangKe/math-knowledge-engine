@@ -1,0 +1,45 @@
+.podCard {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  margin-bottom: 1rem;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.podHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--bg-subtle, #f4f6f9);
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.podTitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted, #555555);
+  letter-spacing: 0.01em;
+}
+
+.podBody {
+  padding: 14px 18px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.plotSvg {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.axisLabel {
+  font-size: 11px;
+  fill: var(--text-muted, #718096);
+  user-select: none;
+}

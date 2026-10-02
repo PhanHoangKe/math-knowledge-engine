@@ -3,55 +3,59 @@ import type { VerifiedSolutionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { SOLUTION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { MathLatex } from '../MathLatex/MathLatex';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSquareCheck, faListCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SolutionSummaryPanel.module.css';
 
 export interface SolutionSummaryPanelProps {
   solution: VerifiedSolutionView;
+  onOpenStepByStep?: () => void;
 }
 
-export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({ solution }) => {
+export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({
+  solution,
+  onOpenStepByStep,
+}) => {
   const { t } = usePreferences();
 
   return (
     <div className={styles.card} data-testid="solution-summary-panel">
       <div className={styles.cardHeader}>
         <div className={styles.headerLeft}>
-          <h2 className={styles.cardTitle}>{t('panel_solution_summary')}</h2>
+          <span className={styles.podTitle}>
+            {t('lbl_solutions') || 'Solutions:'}
+          </span>
+          <span className={styles.outcomeBadge} data-testid="solution-outcome-badge">
+            {t(SOLUTION_OUTCOME_I18N[solution.outcome])}
+          </span>
         </div>
-        <span className={styles.outcomeBadge} data-testid="solution-outcome-badge">
-          {t(SOLUTION_OUTCOME_I18N[solution.outcome])}
-        </span>
+        {onOpenStepByStep && (
+          <button
+            type="button"
+            className={styles.stepByStepBtn}
+            onClick={onOpenStepByStep}
+            data-testid="solution-step-by-step-btn"
+          >
+            <FontAwesomeIcon icon={faSquareCheck} className={styles.stepBtnIcon} />
+            <span>{t('lbl_step_by_step_solution') || 'Step-by-step solution'}</span>
+          </button>
+        )}
       </div>
 
       <div className={styles.cardBody}>
-        {/* Final Solution Set Latex */}
-        <div className={styles.finalAnswerSection}>
-          <span className={styles.sectionLabel}>{t('lbl_final_answer')}:</span>
-          <div className={styles.finalAnswerDisplay} data-testid="final-answer-latex">
-            <MathLatex latex={solution.final_answer_latex} displayMode />
-          </div>
-        </div>
-
-        {/* Real Roots List (if present) */}
+        {/* Real Roots List (Clean rows matching WolframAlpha) */}
         {solution.roots && solution.roots.length > 0 && (
           <div className={styles.rootsSection} data-testid="roots-list">
-            <span className={styles.sectionLabel}>{t('lbl_roots_list')}:</span>
-            <div className={styles.rootsGrid}>
+            <div className={styles.rootsList}>
               {solution.roots.map((root, idx) => (
-                <div key={idx} className={styles.rootCard} data-testid={`root-item-${idx}`}>
-                  <div className={styles.rootHeader}>
-                    <span className={styles.rootIndex}>
-                      <MathLatex latex={`x_{${idx + 1}}`} />
-                    </span>
-                    <span className={styles.rootTypeBadge}>{root.root_type}</span>
-                  </div>
+                <div key={idx} className={styles.rootRow} data-testid={`root-item-${idx}`}>
                   <div className={styles.rootLatex} data-testid={`root-latex-${idx}`}>
-                    <MathLatex latex={`x_${idx + 1} = ${root.latex_str}`} />
+                    <MathLatex latex={`x_${idx + 1} = ${root.latex_str}`} displayMode />
                   </div>
                   {root.approximate_float !== undefined && root.approximate_float !== null && (
                     <div className={styles.rootApprox} data-testid={`root-approx-${idx}`}>
-                      <span className={styles.approxLabel}>{t('lbl_root_approx')}:</span>
-                      <code className={styles.approxValue}>≈ {root.approximate_float}</code>
+                      <span className={styles.approxLabel}>≈</span>
+                      <code className={styles.approxValue}>{root.approximate_float}</code>
                     </div>
                   )}
                 </div>
@@ -59,6 +63,14 @@ export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({ solu
             </div>
           </div>
         )}
+
+        {/* Final Solution Set Latex */}
+        <div className={styles.finalAnswerSection}>
+          <span className={styles.sectionLabel}>{t('lbl_final_answer')}:</span>
+          <div className={styles.finalAnswerDisplay} data-testid="final-answer-latex">
+            <MathLatex latex={solution.final_answer_latex} displayMode />
+          </div>
+        </div>
 
         {solution.outcome === 'NO_REAL_ROOTS' && (
           <div className={styles.noRootsNotice} data-testid="no-real-roots-notice">

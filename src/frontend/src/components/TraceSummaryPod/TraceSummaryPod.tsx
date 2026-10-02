@@ -3,6 +3,8 @@ import type { SolutionTrace, SolutionStep } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { TracePanel } from '../TracePanel/TracePanel';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faListCheck, faCircleInfo, faListOl } from '@fortawesome/free-solid-svg-icons';
 import styles from './TraceSummaryPod.module.css';
 
 export interface TraceSummaryPodProps {
@@ -21,7 +23,9 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <span className={styles.podIcon} aria-hidden="true">📝</span>
+            <span className={styles.podIcon}>
+              <FontAwesomeIcon icon={faListCheck} />
+            </span>
             <div>
               <h2 className={styles.podTitle}>{t('pod_trace_title')}</h2>
               <span className={styles.stepCount}>
@@ -34,20 +38,7 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
 
         {/* Disclaimer */}
         <div className={styles.disclaimerBox} data-testid="trace-disclaimer">
-          <svg
-            className={styles.infoIcon}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            width="16"
-            height="16"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <FontAwesomeIcon icon={faCircleInfo} className={styles.infoIcon} />
           <span className={styles.disclaimerText}>{t('lbl_trace_disclaimer')}</span>
         </div>
 
@@ -88,6 +79,7 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
             aria-expanded={isExpanded}
             data-testid="toggle-trace-btn"
           >
+            <FontAwesomeIcon icon={faListOl} style={{ marginRight: 6 }} />
             {isExpanded
               ? t('btn_hide_full_trace')
               : t('btn_show_full_trace').replace('{count}', stepsCount.toString())}

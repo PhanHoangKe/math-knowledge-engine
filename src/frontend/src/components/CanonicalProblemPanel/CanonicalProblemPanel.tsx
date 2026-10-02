@@ -6,6 +6,8 @@ import type {
 import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { formatRational } from '../../utils/formatters';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSliders, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import styles from './CanonicalProblemPanel.module.css';
 
 export interface CanonicalProblemPanelProps {
@@ -22,8 +24,8 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
     <div className={styles.card} data-testid="canonical-problem-panel">
       <div className={styles.cardHeader}>
         <div className={styles.headerLeft}>
+          <span className={styles.podTitle}>Input:</span>
           <span className={styles.categoryBadge}>{problem.category}</span>
-          <h2 className={styles.cardTitle}>{t('panel_canonical_problem')}</h2>
         </div>
         <span className={styles.classificationBadge}>
           {problem.classification}
@@ -36,7 +38,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
           <MathLatex latex={problem.equation_latex} displayMode />
         </div>
 
-        {/* Coefficients Grid */}
+        {/* Coefficients & Metadata Details (Collapsible / Subtle) */}
         <div className={styles.metaGrid}>
           <div className={styles.metaItem}>
             <span className={styles.metaLabel}>{t('lbl_coefficients')}:</span>
@@ -66,7 +68,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
             </div>
           </div>
 
-          {/* Discriminant (Quadratic only - purely backend returned) */}
+          {/* Discriminant (Quadratic only) */}
           {isQuadratic && quad && (
             <div className={styles.metaItem} data-testid="discriminant-display">
               <span className={styles.metaLabel}>{t('lbl_discriminant')}:</span>
@@ -100,9 +102,12 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
             </div>
           )}
 
-          {/* Problem & Revision Identifiers (Collapsible Technical Details) */}
+          {/* Technical Details Disclosure */}
           <details className={styles.technicalDetails} data-testid="canonical-technical-details">
-            <summary className={styles.technicalSummary}>{t('lbl_technical_details')}</summary>
+            <summary className={styles.technicalSummary}>
+              <FontAwesomeIcon icon={faSliders} style={{ marginRight: 6 }} />
+              {t('lbl_technical_details')}
+            </summary>
             <div className={styles.idRow}>
               <div className={styles.idGroup}>
                 <span className={styles.idLabel}>{t('lbl_problem_id')}:</span>

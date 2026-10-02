@@ -159,6 +159,14 @@ export const en: Translations = {
   lbl_roots_list: 'Real Roots List',
   lbl_root_approx: 'Decimal Approximation',
   lbl_no_roots: 'Equation has no real roots in ℝ',
+  lbl_root_plot: 'Root plot:',
+  lbl_alternate_forms: 'Alternate forms:',
+  lbl_number_line: 'Number line:',
+  lbl_solutions: 'Solutions:',
+  lbl_sum_of_roots: 'Sum of roots:',
+  lbl_product_of_roots: 'Product of roots:',
+  lbl_step_by_step_solution: 'Step-by-step solution',
+
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 Distinct Real Roots',
   enum_out_ONE_REPEATED_REAL_ROOT: '1 Repeated Real Root',
