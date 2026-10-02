@@ -15,6 +15,21 @@
   color: var(--color-text-primary, #111827);
   user-select: text;
   cursor: text;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.composerContainer::-webkit-scrollbar {
+  height: 4px;
+}
+
+.composerContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.composerContainer::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
 }
 
 .composerContainer:focus-within {
@@ -144,11 +159,10 @@
   box-shadow: none !important;
 }
 
-/* Power Block with small raised exponent slot */
+/* Power Block: Base on baseline, Exponent elevated above baseline */
 .powerBlock {
   display: inline-flex;
-  align-items: baseline;
-  align-self: center;
+  align-items: flex-end;
   position: relative;
   margin: 0 1px;
   vertical-align: middle;
@@ -161,27 +175,28 @@
 
 .powerExpWrap {
   display: inline-flex;
-  align-items: baseline;
-  vertical-align: super;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-bottom: 10px;
   margin-left: 1px;
 }
 
+.powerExpWrap input,
 .powerExpWrap .emptySlot,
-.powerExpWrap input {
+.powerExpWrap .mathSlot {
   min-width: 11px !important;
-  height: 13px !important;
-  line-height: 11px !important;
-  font-size: 0.72rem !important;
+  width: 11px !important;
+  height: 12px !important;
+  line-height: 10px !important;
+  font-size: 0.7rem !important;
   padding: 0 1px !important;
   margin: 0 !important;
+  border-radius: 1.5px !important;
 }
 
 .powerSuperText {
   font-size: 0.82rem;
   font-weight: 500;
-  vertical-align: super;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
   margin-left: 1px;
   user-select: none;
   font-family: inherit;
@@ -202,7 +217,6 @@
   text-align: center;
   outline: none;
   box-shadow: none;
-  margin-bottom: 2px;
 }
 
 .slotSub {
@@ -220,7 +234,6 @@
   text-align: center;
   outline: none;
   box-shadow: none;
-  margin-top: 2px;
 }
 
 /* Fraction 2-Tier Stacked Block */
@@ -268,6 +281,7 @@
   align-self: center;
   vertical-align: middle;
   margin: 0 2px;
+  padding: 2px 0;
 }
 
 .sqrtRadicalSvg {
@@ -285,9 +299,9 @@
   align-items: center;
   border-top: 1.5px solid #1e293b;
   margin-left: -1px;
-  padding-top: 2px;
-  padding-left: 2px;
-  padding-right: 2px;
+  padding-top: 4px;
+  padding-left: 3px;
+  padding-right: 3px;
   min-height: 20px;
 }
 
@@ -298,6 +312,7 @@
   align-self: center;
   vertical-align: middle;
   margin: 0 2px;
+  padding: 2px 0;
 }
 
 .slotNthIndexWrap {
@@ -352,17 +367,17 @@
   display: inline-flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 100%;
-  min-height: 32px;
+  height: 28px;
   margin-left: -3px;
   margin-right: 3px;
 }
 
 .integralSymbol {
-  font-size: 1.65rem;
+  font-size: 1.75rem;
   line-height: 1;
   color: inherit;
   user-select: none;
+  font-family: serif;
 }
 
 .differentialD {
@@ -379,7 +394,7 @@
   align-items: center;
   align-self: center;
   gap: 3px;
-  margin: 0 2px;
+  margin: 0 3px;
   vertical-align: middle;
 }
 
@@ -388,16 +403,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  margin-right: 2px;
+}
+
+.sumUpperWrap {
+  font-size: 0.72rem;
+  margin-bottom: 1px;
 }
 
 .sumSymbol {
-  font-size: 1.45rem;
+  font-size: 1.55rem;
   line-height: 1;
   color: inherit;
   user-select: none;
 }
 
-.sumLowerRow {
+.sumLowerWrap {
+  font-size: 0.72rem;
+  margin-top: 1px;
   display: inline-flex;
   align-items: center;
   gap: 1px;
@@ -409,7 +432,7 @@
   align-items: center;
   align-self: center;
   gap: 3px;
-  margin: 0 2px;
+  margin: 0 3px;
   vertical-align: middle;
 }
 
@@ -418,6 +441,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  margin-right: 2px;
 }
 
 .limitText {
@@ -431,6 +455,8 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
+  font-size: 0.72rem;
+  margin-top: 1px;
 }
 
 /* Vector Block */
