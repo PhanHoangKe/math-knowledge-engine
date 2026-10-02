@@ -167,6 +167,39 @@ export const vi = {
   lbl_validation_error_loc: 'Vị trí',
   lbl_validation_error_msg: 'Nội dung',
   lbl_validation_error_type: 'Quy tắc',
+
+  // --- S2-05 Reactive Coefficient Workspace ---
+  panel_coefficient_editor: 'Chỉnh sửa Hệ số Trực tiếp',
+  badge_source_coefficients: 'Phiên bản đang chỉnh sửa theo hệ số',
+  badge_source_raw: 'Truy vấn văn bản gốc',
+  btn_reset_coefficients: 'Khôi phục hệ số máy chủ',
+  lbl_coeff_a: 'Hệ số bậc hai (a)',
+  lbl_coeff_b: 'Hệ số bậc nhất (b)',
+  lbl_coeff_c: 'Hệ số tự do (c)',
+  lbl_numerator: 'Tử số',
+  lbl_denominator: 'Mẫu số',
+  lbl_draft_editor_notice: 'Hệ số a = 0 được lưu dưới dạng bản nháp cục bộ của trình chỉnh sửa, không đại diện cho dạng chuẩn tắc của phương trình suy biến.',
+
+  err_coeff_empty: 'Không được để trống',
+  err_coeff_invalid_int: 'Phải là số nguyên hợp lệ',
+  err_coeff_invalid_positive_int: 'Phải là số nguyên dương hợp lệ',
+  err_coeff_unsafe_integer: 'Vượt quá giới hạn số nguyên an toàn',
+  err_coeff_denominator_positive: 'Mẫu số phải lớn hơn hoặc bằng 1',
+
+  status_coeff_idle: 'Đã đồng bộ với máy chủ',
+  status_coeff_debouncing: 'Đang đợi hoàn tất nhập liệu (350ms)...',
+  status_coeff_recomputing: 'Đang tính toán lại bài toán theo hệ số mới...',
+  status_coeff_updated: 'Bài toán đã được cập nhật từ máy chủ',
+  status_coeff_invalid: 'Dữ liệu hệ số không hợp lệ - đã dừng gửi yêu cầu',
+
+  panel_revision_history: 'Lịch sử Phiên bản Phiên làm việc',
+  lbl_history_empty: 'Chưa có phiên bản tính toán nào trong phiên làm việc.',
+  lbl_history_revision: 'Phiên bản',
+  lbl_history_time: 'Thời điểm',
+  lbl_history_type: 'Phân loại',
+  lbl_history_hash: 'Mã băm ngữ nghĩa',
+  lbl_history_source: 'Nguồn gốc',
+  btn_restore_revision: 'Khôi phục phiên bản',
 } as const;
 
 export type TranslationKey = keyof typeof vi;

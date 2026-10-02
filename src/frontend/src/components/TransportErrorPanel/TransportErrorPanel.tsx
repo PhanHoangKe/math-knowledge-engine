@@ -9,17 +9,13 @@ export interface TransportErrorPanelProps {
 }
 
 const SAFE_WHITELIST_KEYS = new Set([
-  'detail',
-  'message',
-  'msg',
-  'type',
-  'error',
-  'code',
-  'field',
   'expected_content_type',
   'max_bytes',
   'actual_bytes',
   'safe_expected_field',
+  'field',
+  'reason',
+  'path',
 ]);
 
 interface SafeValidationError {

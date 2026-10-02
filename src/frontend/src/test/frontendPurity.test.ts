@@ -42,6 +42,8 @@ describe('Frontend Mathematical Authority Static Purity Audit (Section 36)', () 
       { name: 'Client SHA-256 Hash Implementation', pattern: /crypto\.subtle\.digest|createHash\s*\(\s*['"]sha256/i },
       { name: 'Certificate Fabrication', pattern: /certificate_id\s*:\s*[`'"]cert_/i },
       { name: 'SymPy or CAS execution', pattern: /sympy|mathjs|nerdamer|algebrite/i },
+      { name: 'Client-side GCD Computation', pattern: /function\s+gcd\s*\(|const\s+gcd\s*=|let\s+gcd\s*=/i },
+      { name: 'Client-side Fraction Simplification', pattern: /simplifyFraction|reduceFraction/i },
     ];
 
     for (const file of prodFiles) {

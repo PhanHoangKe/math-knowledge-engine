@@ -11,6 +11,8 @@ import { TracePanel } from '../TracePanel/TracePanel';
 import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
 import { DegenerateSolutionPanel } from '../DegenerateSolutionPanel/DegenerateSolutionPanel';
 import { MethodNotExecutablePanel } from '../MethodNotExecutablePanel/MethodNotExecutablePanel';
+import { CoefficientEditorPanel } from '../CoefficientEditorPanel/CoefficientEditorPanel';
+import { RevisionHistoryPanel } from '../RevisionHistoryPanel/RevisionHistoryPanel';
 import { ApplicationErrorPanel } from '../ApplicationErrorPanel/ApplicationErrorPanel';
 import { TransportErrorPanel } from '../TransportErrorPanel/TransportErrorPanel';
 import { NetworkErrorPanel } from '../NetworkErrorPanel/NetworkErrorPanel';
@@ -30,8 +32,17 @@ export const AppShell: React.FC = () => {
     status,
     result,
     httpStatus,
+    sourceMode,
+    coeffDraft,
+    coeffValidationErrors,
+    reactiveStatus,
+    revisionHistory,
+    updateCoefficientField,
+    resetCoefficientsToBackend,
     submitRawSolve,
     switchMethod,
+    retryLastRequest,
+    restoreRevision,
     clearWorkspace,
   } = useAlgebraWorkspace();
 
@@ -93,11 +104,11 @@ export const AppShell: React.FC = () => {
           )}
 
           {status === 'network-error' && (
-            <NetworkErrorPanel onRetry={() => submitRawSolve()} />
+            <NetworkErrorPanel onRetry={() => retryLastRequest()} />
           )}
 
           {status === 'protocol-error' && (
-            <NetworkErrorPanel isProtocolError onRetry={() => submitRawSolve()} />
+            <NetworkErrorPanel isProtocolError onRetry={() => retryLastRequest()} />
           )}
 
           {status === 'transport-error' && result && result.kind === 'transport-error' && (
@@ -115,6 +126,16 @@ export const AppShell: React.FC = () => {
                 return (
                   <div className={styles.solvedLayout} data-testid="solved-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
+                    <CoefficientEditorPanel
+                      draft={coeffDraft}
+                      errors={coeffValidationErrors}
+                      reactiveStatus={reactiveStatus}
+                      sourceMode={sourceMode}
+                      isLoading={reactiveStatus === 'recomputing'}
+                      isDegenerate={false}
+                      onUpdateField={updateCoefficientField}
+                      onReset={resetCoefficientsToBackend}
+                    />
                     <SolutionSummaryPanel solution={resp.solution} />
                     <MethodCatalogPanel
                       methods={resp.available_methods}
@@ -141,6 +162,16 @@ export const AppShell: React.FC = () => {
                   return (
                     <div className={styles.degenerateLayout} data-testid="degenerate-workspace">
                       <CanonicalProblemPanel problem={resp.problem} />
+                      <CoefficientEditorPanel
+                        draft={coeffDraft}
+                        errors={coeffValidationErrors}
+                        reactiveStatus={reactiveStatus}
+                        sourceMode={sourceMode}
+                        isLoading={reactiveStatus === 'recomputing'}
+                        isDegenerate={true}
+                        onUpdateField={updateCoefficientField}
+                        onReset={resetCoefficientsToBackend}
+                      />
                       <DegenerateSolutionPanel solution={resp.degenerate_solution} />
                     </div>
                   );
@@ -149,6 +180,16 @@ export const AppShell: React.FC = () => {
                 return (
                   <div className={styles.analyzedLayout} data-testid="analyzed-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
+                    <CoefficientEditorPanel
+                      draft={coeffDraft}
+                      errors={coeffValidationErrors}
+                      reactiveStatus={reactiveStatus}
+                      sourceMode={sourceMode}
+                      isLoading={reactiveStatus === 'recomputing'}
+                      isDegenerate={resp.problem.problem_type === 'DEGENERATE'}
+                      onUpdateField={updateCoefficientField}
+                      onReset={resetCoefficientsToBackend}
+                    />
                     <MethodNotExecutablePanel
                       reasonCode={resp.reason_code}
                       analysisMessageVi={resp.analysis_message_vi}
@@ -172,6 +213,14 @@ export const AppShell: React.FC = () => {
                 />
               )}
             </>
+          )}
+
+          {/* Session Revision History */}
+          {revisionHistory.length > 0 && (
+            <RevisionHistoryPanel
+              history={revisionHistory}
+              onRestoreRevision={restoreRevision}
+            />
           )}
         </section>
 

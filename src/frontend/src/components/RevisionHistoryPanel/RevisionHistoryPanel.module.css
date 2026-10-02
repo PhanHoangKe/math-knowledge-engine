@@ -1,0 +1,157 @@
+.card {
+  background: var(--surface-bg, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.titleIcon {
+  color: var(--primary-600, #2563eb);
+}
+
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #0f172a);
+}
+
+.countBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-secondary, #f1f5f9);
+  color: var(--text-secondary, #64748b);
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color, #cbd5e1);
+}
+
+.emptyMessage {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+  font-style: italic;
+  margin: 0.5rem 0 0 0;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--surface-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  transition: border-color 0.2s, background-color 0.2s;
+  gap: 1rem;
+}
+
+.historyItem:hover {
+  border-color: var(--primary-400, #60a5fa);
+  background: var(--surface-hover, #f1f5f9);
+}
+
+.itemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.provenanceBadge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+}
+
+.badgeRaw {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.badgeCoeff {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.problemTypeBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background: var(--surface-secondary, #e2e8f0);
+  color: var(--text-secondary, #475569);
+}
+
+.classificationText {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.equationPreview {
+  font-size: 0.95rem;
+  color: var(--text-primary, #1e293b);
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0.15rem 0;
+}
+
+.restoreButton {
+  background: var(--surface-bg, #ffffff);
+  border: 1px solid var(--primary-500, #3b82f6);
+  color: var(--primary-600, #2563eb);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.restoreButton:hover {
+  background: var(--primary-600, #2563eb);
+  color: #ffffff;
+}
+
+.restoreButton:focus-visible {
+  outline: 2px solid var(--primary-500, #3b82f6);
+  outline-offset: 2px;
+}

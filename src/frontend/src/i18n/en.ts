@@ -169,4 +169,37 @@ export const en: Translations = {
   lbl_validation_error_loc: 'Location',
   lbl_validation_error_msg: 'Message',
   lbl_validation_error_type: 'Rule',
+
+  // --- S2-05 Reactive Coefficient Workspace ---
+  panel_coefficient_editor: 'Direct Coefficient Editor',
+  badge_source_coefficients: 'Coefficient-edited revision',
+  badge_source_raw: 'Raw query origin',
+  btn_reset_coefficients: 'Reset to backend coefficients',
+  lbl_coeff_a: 'Quadratic coefficient (a)',
+  lbl_coeff_b: 'Linear coefficient (b)',
+  lbl_coeff_c: 'Constant term (c)',
+  lbl_numerator: 'Numerator',
+  lbl_denominator: 'Denominator',
+  lbl_draft_editor_notice: 'Coefficient a = 0 is retained as editor draft input, not a backend canonical representation.',
+
+  err_coeff_empty: 'Cannot be empty',
+  err_coeff_invalid_int: 'Must be a valid integer',
+  err_coeff_invalid_positive_int: 'Must be a valid positive integer',
+  err_coeff_unsafe_integer: 'Exceeds browser safe integer range',
+  err_coeff_denominator_positive: 'Denominator must be ≥ 1',
+
+  status_coeff_idle: 'Synchronized with server',
+  status_coeff_debouncing: 'Waiting for stable input (350ms)...',
+  status_coeff_recomputing: 'Recomputing mathematical problem with new coefficients...',
+  status_coeff_updated: 'Problem updated from server',
+  status_coeff_invalid: 'Invalid coefficient input — recomputation paused',
+
+  panel_revision_history: 'Session Revision History',
+  lbl_history_empty: 'No revisions recorded in current session.',
+  lbl_history_revision: 'Revision',
+  lbl_history_time: 'Timestamp',
+  lbl_history_type: 'Classification',
+  lbl_history_hash: 'Semantic Hash',
+  lbl_history_source: 'Origin',
+  btn_restore_revision: 'Restore revision',
 };
