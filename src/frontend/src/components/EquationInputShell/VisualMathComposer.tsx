@@ -923,6 +923,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                         updateBlock(b.id, { items: newItems });
                       }}
                       onFocus={() => setFocusedTarget({ blockId: b.id, slot: `item_${itIdx}` })}
+                      onKeyDown={(e) => handleSlotKeyDown(e, b, `item_${itIdx}`, idx)}
                       disabled={disabled}
                     />
                   </React.Fragment>
@@ -955,6 +956,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                             updateBlock(b.id, { cells: newCells });
                           }}
                           onFocus={() => setFocusedTarget({ blockId: b.id, slot: `cell_${rIdx}_${cIdx}` })}
+                          onKeyDown={(e) => handleSlotKeyDown(e, b, `cell_${rIdx}_${cIdx}`, idx)}
                           disabled={disabled}
                         />
                       ))}

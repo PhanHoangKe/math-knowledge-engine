@@ -46,16 +46,17 @@
   align-items: center;
   width: 100%;
   max-width: 840px;
-  height: 46px;
+  min-height: 48px;
+  height: auto;
   background: var(--bg-surface, #ffffff);
   border-radius: 14px;
-  padding: 0 5px 0 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  padding: 4px 6px 4px 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .capsuleNatural {
-  border: 1px solid #f96932;
+  border: 1.5px solid #f96932;
 }
 
 .capsuleNatural:focus-within {
@@ -63,11 +64,12 @@
 }
 
 .capsuleMath {
-  border: 1px solid #9371b5;
+  border: 1.5px solid #a855f7;
 }
 
 .capsuleMath:focus-within {
-  box-shadow: 0 0 0 3px rgba(147, 113, 181, 0.28), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: #9333ea;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.22), 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 
 .capsuleLoading {

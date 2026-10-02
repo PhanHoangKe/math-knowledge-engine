@@ -5,8 +5,9 @@
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
-  height: 100%;
-  padding: 0 4px;
+  min-height: 40px;
+  height: auto;
+  padding: 4px 4px;
   gap: 1px;
   font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
   font-size: 1.25rem;
@@ -31,8 +32,8 @@
   padding: 0;
   margin: 0;
   min-width: 4px;
-  height: 38px;
-  line-height: 38px;
+  min-height: 36px;
+  line-height: 36px;
 }
 
 .textInput:focus {
@@ -53,8 +54,8 @@
   margin: 0;
   flex: 1;
   min-width: 24px;
-  height: 38px;
-  line-height: 38px;
+  min-height: 36px;
+  line-height: 36px;
   cursor: text;
 }
 
@@ -97,10 +98,10 @@
   display: inline-block;
   font-family: inherit;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3; /* Light Yellow when unfocused */
-  border: 1px dashed #ca8a04; /* Gold/yellow dashed border when unfocused */
+  background-color: #fefce8; /* Soft pale yellow */
+  border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 3px;
   min-width: 18px;
@@ -109,25 +110,24 @@
   text-align: center;
   outline: none;
   box-shadow: none;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
   vertical-align: middle;
   margin: 0 1px;
 }
 
 .mathSlot:focus {
-  background-color: #e0f2fe !important; /* Light Sky Blue when focused */
-  border: 1px solid #38bdf8 !important; /* Sky Blue border */
+  background-color: #e0f2fe !important; /* Soft sky blue */
+  border: 1px solid #38bdf8 !important;
   outline: none !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  box-shadow: none !important;
 }
 
 .slotExponent {
   display: inline-block;
   vertical-align: super;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 2px;
@@ -136,23 +136,24 @@
   line-height: 14px;
   text-align: center;
   outline: none;
+  box-shadow: none;
   margin-left: 2px;
   margin-bottom: 8px;
-  transition: all 0.12s ease;
 }
 
 .slotExponent:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .slotSuper {
   display: inline-block;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 2px;
@@ -161,21 +162,23 @@
   line-height: 13px;
   text-align: center;
   outline: none;
+  box-shadow: none;
   margin-bottom: 2px;
 }
 
 .slotSuper:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .slotSub {
   display: inline-block;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 2px;
@@ -184,13 +187,15 @@
   line-height: 13px;
   text-align: center;
   outline: none;
+  box-shadow: none;
   margin-top: 2px;
 }
 
 .slotSub:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Fraction 2-Tier Stacked Block */
@@ -214,9 +219,9 @@
 .slotNumerator {
   display: block;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 3px;
@@ -225,13 +230,14 @@
   line-height: 16px;
   text-align: center;
   outline: none;
-  transition: all 0.12s ease;
+  box-shadow: none;
 }
 
 .slotNumerator:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .fractionBar {
@@ -246,9 +252,9 @@
 .slotDenominator {
   display: block;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   padding: 0 3px;
@@ -257,13 +263,14 @@
   line-height: 16px;
   text-align: center;
   outline: none;
-  transition: all 0.12s ease;
+  box-shadow: none;
 }
 
 .slotDenominator:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Square Root / Radical Block */
@@ -285,9 +292,9 @@
 .slotRadicand {
   display: inline-block;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-top: 1.5px solid #111827;
   border-radius: 2px;
@@ -297,14 +304,15 @@
   line-height: 20px;
   text-align: center;
   outline: none;
-  transition: all 0.12s ease;
+  box-shadow: none;
 }
 
 .slotRadicand:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
   border-top: 1.5px solid #111827 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Nth Root Block */
@@ -316,9 +324,9 @@
 
 .slotNthIndex {
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 400;
   color: #111827;
-  background-color: #fef9c3;
+  background-color: #fefce8;
   border: 1px dashed #ca8a04;
   border-radius: 2px;
   width: 15px;
@@ -328,12 +336,14 @@
   vertical-align: super;
   margin-right: -2px;
   outline: none;
+  box-shadow: none;
 }
 
 .slotNthIndex:focus {
   background-color: #e0f2fe !important;
   border: 1px solid #38bdf8 !important;
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Derivative Block */
@@ -471,17 +481,19 @@
 }
 
 .matrixBracket {
-  font-size: 2.2rem;
-  font-weight: 300;
+  font-size: 2.3rem;
+  font-weight: 200;
   line-height: 1;
-  color: inherit;
+  color: #4b5563;
   user-select: none;
+  font-family: 'KaTeX_Main', 'Cambria Math', sans-serif;
 }
 
 .matrixGrid {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  padding: 2px 0;
 }
 
 .matrixRow {
