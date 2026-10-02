@@ -517,3 +517,106 @@
   align-items: center;
   gap: 4px;
 }
+
+/* Absolute Value Block */
+.absBlock {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 1px;
+  margin: 0 1px;
+  vertical-align: middle;
+}
+
+.absBar {
+  font-size: 1.3rem;
+  font-weight: 300;
+  line-height: 1;
+  color: #64748b;
+  user-select: none;
+  margin: 0 1px;
+}
+
+/* Log Base Block */
+.logBaseBlock {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 1px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.logBaseText {
+  font-size: 0.95rem;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.logBaseSubWrap {
+  font-size: 0.72rem;
+  margin-top: 6px;
+  margin-right: 1px;
+}
+
+.parenSymbol {
+  font-size: 1.15rem;
+  color: #64748b;
+  user-select: none;
+}
+
+/* Piecewise Block */
+.piecewiseBlock {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 3px;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+
+.piecewiseBrace {
+  font-size: 2.2rem;
+  font-weight: 300;
+  line-height: 1;
+  font-family: 'Cambria Math', 'STIX Two Math', 'KaTeX_Math', serif;
+  color: #64748b;
+  user-select: none;
+}
+
+.piecewiseGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 0;
+}
+
+.piecewiseRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.piecewiseIfText {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #64748b;
+  user-select: none;
+}
+
+/* Transform Block */
+.transformBlock {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 1px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.transformSymbol {
+  font-size: 1.25rem;
+  font-family: 'Cambria Math', 'STIX Two Math', 'KaTeX_Math', 'Lucida Calligraphy', cursive, serif;
+  margin-right: 1px;
+  user-select: none;
+}

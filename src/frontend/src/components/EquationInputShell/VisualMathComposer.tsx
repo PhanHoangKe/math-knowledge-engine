@@ -169,41 +169,91 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           templateToInsert = createDefaultNthRoot('3');
           break;
         case 'NTH_ROOT':
-          templateToInsert = createDefaultNthRoot('n');
+          templateToInsert = createDefaultNthRoot('');
+          preferBaseFocus = true;
+          break;
+        case 'ABS':
+          templateToInsert = createDefaultAbs();
+          break;
+        case 'LN':
+          templateToInsert = createDefaultLogBase('');
+          break;
+        case 'LOG_10':
+          templateToInsert = createDefaultLogBase('10');
+          break;
+        case 'LOG_BASE':
+          templateToInsert = createDefaultLogBase('');
+          preferBaseFocus = true;
           break;
         case 'DERIVATIVE':
-          templateToInsert = createDefaultDerivative(1);
+          templateToInsert = createDefaultDerivative(1, false, false);
           break;
         case 'SECOND_DERIVATIVE':
-          templateToInsert = createDefaultDerivative(2);
+          templateToInsert = createDefaultDerivative(2, false, false);
           break;
         case 'PARTIAL':
+          templateToInsert = createDefaultDerivative(1, true, false);
+          break;
         case 'SECOND_PARTIAL':
+          templateToInsert = createDefaultDerivative(2, true, false);
+          break;
         case 'MIXED_PARTIAL':
-          templateToInsert = createDefaultDerivative(1);
+          templateToInsert = createDefaultDerivative(2, true, true);
           break;
         case 'INTEGRAL':
+          templateToInsert = createDefaultIntegral(false, 1);
+          break;
         case 'DOUBLE_INT':
+          templateToInsert = createDefaultIntegral(false, 2);
+          break;
         case 'TRIPLE_INT':
-          templateToInsert = createDefaultIntegral(false);
+          templateToInsert = createDefaultIntegral(false, 3);
           break;
         case 'DEF_INTEGRAL':
+          templateToInsert = createDefaultIntegral(true, 1);
+          break;
         case 'DEF_DOUBLE_INT':
+          templateToInsert = createDefaultIntegral(true, 2);
+          break;
         case 'DEF_TRIPLE_INT':
-          templateToInsert = createDefaultIntegral(true);
+          templateToInsert = createDefaultIntegral(true, 3);
           break;
         case 'SUM':
+          templateToInsert = createDefaultSum(false);
+          break;
         case 'PRODUCT':
-          templateToInsert = createDefaultSum();
+          templateToInsert = createDefaultSum(true);
           break;
         case 'LIMIT':
+          templateToInsert = createDefaultLimit('both', false);
+          break;
         case 'LIMIT_LEFT':
+          templateToInsert = createDefaultLimit('left', false);
+          break;
         case 'LIMIT_RIGHT':
+          templateToInsert = createDefaultLimit('right', false);
+          break;
         case 'LIMIT_2D':
-          templateToInsert = createDefaultLimit();
+          templateToInsert = createDefaultLimit('both', true);
           break;
         case 'PIECEWISE_2':
+          templateToInsert = createDefaultPiecewise(2);
+          break;
         case 'PIECEWISE_3':
+          templateToInsert = createDefaultPiecewise(3);
+          break;
+        case 'LAPLACE':
+          templateToInsert = createDefaultTransform('laplace');
+          break;
+        case 'INV_LAPLACE':
+          templateToInsert = createDefaultTransform('inv_laplace');
+          break;
+        case 'FOURIER':
+          templateToInsert = createDefaultTransform('fourier');
+          break;
+        case 'INV_FOURIER':
+          templateToInsert = createDefaultTransform('inv_fourier');
+          break;
         case 'MAT_2X2':
           templateToInsert = createDefaultMatrix(2, 2);
           break;
@@ -232,21 +282,16 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         case 'EXP_E': snippet = 'e'; break;
         case 'INFINITY': snippet = '∞'; break;
         case 'NEG_INFINITY': snippet = '-∞'; break;
-        case 'STEP_FUNC': snippet = 'UnitStep('; break;
-        case 'DELTA_FUNC': snippet = 'DiracDelta('; break;
-        case 'LAPLACE': snippet = 'LaplaceTransform('; break;
-        case 'INV_LAPLACE': snippet = 'InverseLaplaceTransform('; break;
-        case 'FOURIER': snippet = 'FourierTransform('; break;
-        case 'INV_FOURIER': snippet = 'InverseFourierTransform('; break;
+        case 'STEP_FUNC': snippet = 'θ('; break;
+        case 'DELTA_FUNC': snippet = 'δ('; break;
         case 'PLUS': snippet = ' + '; break;
         case 'MINUS': snippet = ' − '; break;
         case 'MULTIPLY': snippet = '*'; break;
         case 'DIVIDE': snippet = '/'; break;
         case 'EQUALS': snippet = ' = '; break;
-        case 'LE': snippet = ' <= '; break;
-        case 'GE': snippet = ' >= '; break;
-        case 'NE': snippet = ' != '; break;
-        case 'ABS': snippet = '|'; break;
+        case 'LE': snippet = ' ≤ '; break;
+        case 'GE': snippet = ' ≥ '; break;
+        case 'NE': snippet = ' ≠ '; break;
         case 'LPAREN': snippet = '('; break;
         case 'RPAREN': snippet = ')'; break;
         case 'PLUS_MINUS': snippet = '±'; break;
@@ -554,15 +599,24 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
             }
 
             if (b.type === 'derivative') {
+              const sym = b.isPartial ? (b.order === 2 ? '∂²' : '∂') : (b.order === 2 ? 'd²' : 'd');
+              const denSym = b.isPartial ? '∂' : 'd';
               return (
                 <span key={b.id} className={styles.derivativeBlock}>
                   <span className={styles.fractionBlock}>
-                    <span className={styles.fractionSymbol}>{b.order === 2 ? 'd²' : 'd'}</span>
+                    <span className={styles.fractionSymbol}>{sym}</span>
                     <div className={styles.fractionBar} />
                     <span className={styles.derivativeDenRow}>
-                      <span className={styles.fractionSymbol}>d</span>
-                      {renderSlotList(b.wrt, false, depth + 1, 'Biến vi phân')}
-                      {b.order === 2 && <span className={styles.fractionSymbol}>²</span>}
+                      <span className={styles.fractionSymbol}>{denSym}</span>
+                      {renderSlotList(b.wrt, false, depth + 1, 'Biến vi phân 1')}
+                      {b.wrt2 ? (
+                        <>
+                          <span className={styles.fractionSymbol}>{denSym}</span>
+                          {renderSlotList(b.wrt2, false, depth + 1, 'Biến vi phân 2')}
+                        </>
+                      ) : (
+                        b.order === 2 && <span className={styles.fractionSymbol}>²</span>
+                      )}
                     </span>
                   </span>
                   {renderSlotList(b.expr, false, depth + 1, 'Hàm số vi phân')}
@@ -574,23 +628,65 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
               return (
                 <span key={b.id} className={styles.integralBlock}>
                   {b.isDefinite ? (
-                    <span className={styles.defIntegralSymbolWrap}>
-                      <span className={styles.integralSymbol}>∫</span>
-                      <div className={styles.integralLimitsCol}>
-                        <div className={styles.slotSuper}>
-                          {renderSlotList(b.upper || [], false, depth + 1, 'Cận trên')}
+                    <>
+                      <span className={styles.defIntegralSymbolWrap}>
+                        <span className={styles.integralSymbol}>∫</span>
+                        <div className={styles.integralLimitsCol}>
+                          <div className={styles.slotSuper}>
+                            {renderSlotList(b.upper || [], false, depth + 1, 'Cận trên')}
+                          </div>
+                          <div className={styles.slotSub}>
+                            {renderSlotList(b.lower || [], false, depth + 1, 'Cận dưới')}
+                          </div>
                         </div>
-                        <div className={styles.slotSub}>
-                          {renderSlotList(b.lower || [], false, depth + 1, 'Cận dưới')}
-                        </div>
-                      </div>
-                    </span>
+                      </span>
+                      {b.multiplicity && b.multiplicity >= 2 && (
+                        <span className={styles.defIntegralSymbolWrap}>
+                          <span className={styles.integralSymbol}>∫</span>
+                          <div className={styles.integralLimitsCol}>
+                            <div className={styles.slotSuper}>
+                              {renderSlotList(b.upper2 || [], false, depth + 1, 'Cận trên 2')}
+                            </div>
+                            <div className={styles.slotSub}>
+                              {renderSlotList(b.lower2 || [], false, depth + 1, 'Cận dưới 2')}
+                            </div>
+                          </div>
+                        </span>
+                      )}
+                      {b.multiplicity && b.multiplicity >= 3 && (
+                        <span className={styles.defIntegralSymbolWrap}>
+                          <span className={styles.integralSymbol}>∫</span>
+                          <div className={styles.integralLimitsCol}>
+                            <div className={styles.slotSuper}>
+                              {renderSlotList(b.upper3 || [], false, depth + 1, 'Cận trên 3')}
+                            </div>
+                            <div className={styles.slotSub}>
+                              {renderSlotList(b.lower3 || [], false, depth + 1, 'Cận dưới 3')}
+                            </div>
+                          </div>
+                        </span>
+                      )}
+                    </>
                   ) : (
-                    <span className={styles.integralSymbol}>∫</span>
+                    <span className={styles.integralSymbol}>
+                      {b.multiplicity === 3 ? '∭' : b.multiplicity === 2 ? '∬' : '∫'}
+                    </span>
                   )}
                   {renderSlotList(b.expr, false, depth + 1, 'Hàm số tích phân')}
                   <span className={styles.differentialD}>d</span>
-                  {renderSlotList(b.wrt, false, depth + 1, 'Biến tích phân')}
+                  {renderSlotList(b.wrt, false, depth + 1, 'Biến tích phân 1')}
+                  {b.wrt2 && (
+                    <>
+                      <span className={styles.differentialD}>d</span>
+                      {renderSlotList(b.wrt2, false, depth + 1, 'Biến tích phân 2')}
+                    </>
+                  )}
+                  {b.wrt3 && (
+                    <>
+                      <span className={styles.differentialD}>d</span>
+                      {renderSlotList(b.wrt3, false, depth + 1, 'Biến tích phân 3')}
+                    </>
+                  )}
                 </span>
               );
             }
@@ -602,7 +698,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     <div className={styles.slotSuper}>
                       {renderSlotList(b.to || [], false, depth + 1, 'Giới hạn trên')}
                     </div>
-                    <span className={styles.sumSymbol}>∑</span>
+                    <span className={styles.sumSymbol}>{b.isProduct ? '∏' : '∑'}</span>
                     <span className={styles.sumLowerRow}>
                       {renderSlotList(b.variable || [], false, depth + 1, 'Biến tổng')}
                       <span style={{ fontSize: '0.75rem' }}>=</span>
@@ -615,17 +711,88 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
             }
 
             if (b.type === 'limit') {
+              const dirSuffix = b.direction === 'left' ? '⁻' : b.direction === 'right' ? '⁺' : '';
               return (
                 <span key={b.id} className={styles.limitBlock}>
                   <span className={styles.limitSymbolWrap}>
                     <span className={styles.limitText}>lim</span>
-                    <span className={styles.limitSubRow}>
-                      {renderSlotList(b.variable || [], false, depth + 1, 'Biến giới hạn')}
-                      <span style={{ fontSize: '0.75rem' }}>→</span>
-                      {renderSlotList(b.target || [], false, depth + 1, 'Điểm giới hạn')}
-                    </span>
+                    {b.is2D ? (
+                      <span className={styles.limitSubRow}>
+                        ({renderSlotList(b.variable || [], false, depth + 1, 'Biến 1')},
+                        {renderSlotList(b.variable2 || [], false, depth + 1, 'Biến 2')})→(
+                        {renderSlotList(b.target || [], false, depth + 1, 'Điểm 1')},
+                        {renderSlotList(b.target2 || [], false, depth + 1, 'Điểm 2')})
+                      </span>
+                    ) : (
+                      <span className={styles.limitSubRow}>
+                        {renderSlotList(b.variable || [], false, depth + 1, 'Biến giới hạn')}
+                        <span style={{ fontSize: '0.75rem' }}>→</span>
+                        {renderSlotList(b.target || [], false, depth + 1, 'Điểm giới hạn')}
+                        {dirSuffix && <span style={{ fontSize: '0.8rem' }}>{dirSuffix}</span>}
+                      </span>
+                    )}
                   </span>
                   {renderSlotList(b.expr, false, depth + 1, 'Biểu thức')}
+                </span>
+              );
+            }
+
+            if (b.type === 'abs') {
+              return (
+                <span key={b.id} className={styles.absBlock}>
+                  <span className={styles.absBar}>|</span>
+                  {renderSlotList(b.content, false, depth + 1, 'Giá trị tuyệt đối')}
+                  <span className={styles.absBar}>|</span>
+                </span>
+              );
+            }
+
+            if (b.type === 'log_base') {
+              return (
+                <span key={b.id} className={styles.logBaseBlock}>
+                  <span className={styles.logBaseText}>log</span>
+                  <div className={styles.logBaseSubWrap}>
+                    {renderSlotList(b.base, false, depth + 1, 'Cơ số log')}
+                  </div>
+                  <span className={styles.parenSymbol}>(</span>
+                  {renderSlotList(b.expr, false, depth + 1, 'Biểu thức log')}
+                  <span className={styles.parenSymbol}>)</span>
+                </span>
+              );
+            }
+
+            if (b.type === 'piecewise') {
+              return (
+                <span key={b.id} className={styles.piecewiseBlock}>
+                  <span className={styles.piecewiseBrace}>{'{'}</span>
+                  <div className={styles.piecewiseGrid}>
+                    {b.cases.map((c, cIdx) => (
+                      <div key={cIdx} className={styles.piecewiseRow}>
+                        {renderSlotList(c.expr, false, depth + 1, `Trường hợp ${cIdx + 1}`)}
+                        <span className={styles.piecewiseIfText}>, nếu</span>
+                        {renderSlotList(c.condition, false, depth + 1, `Điều kiện ${cIdx + 1}`)}
+                      </div>
+                    ))}
+                  </div>
+                </span>
+              );
+            }
+
+            if (b.type === 'transform') {
+              const sym =
+                b.transformType === 'laplace'
+                  ? 'ℒ'
+                  : b.transformType === 'inv_laplace'
+                  ? 'ℒ⁻¹'
+                  : b.transformType === 'fourier'
+                  ? 'ℱ'
+                  : 'ℱ⁻¹';
+              return (
+                <span key={b.id} className={styles.transformBlock}>
+                  <span className={styles.transformSymbol}>{sym}</span>
+                  <span className={styles.parenSymbol}>{'{'}</span>
+                  {renderSlotList(b.expr, false, depth + 1, 'Hàm biến đổi')}
+                  <span className={styles.parenSymbol}>{'}'}</span>
                 </span>
               );
             }
