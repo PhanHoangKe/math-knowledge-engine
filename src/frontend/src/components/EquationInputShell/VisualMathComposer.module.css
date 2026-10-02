@@ -459,10 +459,14 @@
   margin: 0 2px;
 }
 
-.vectorBracket {
-  font-size: 1.35rem;
-  color: inherit;
+.vectorBracketSvg {
+  width: 6px;
+  height: 24px;
+  color: #64748b;
+  flex-shrink: 0;
   user-select: none;
+  pointer-events: none;
+  margin: 0 1px;
 }
 
 .vectorComma {
@@ -480,13 +484,14 @@
   vertical-align: middle;
 }
 
-.matrixBracket {
-  font-size: 2.3rem;
-  font-weight: 200;
-  line-height: 1;
-  color: #4b5563;
+.matrixBracketSvg {
+  width: 8px;
+  height: 72px;
+  color: #64748b;
+  flex-shrink: 0;
   user-select: none;
-  font-family: 'KaTeX_Main', 'Cambria Math', sans-serif;
+  pointer-events: none;
+  margin: 0 1px;
 }
 
 .matrixGrid {

@@ -906,7 +906,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           if (b.type === 'vector') {
             return (
               <span key={b.id} className={styles.vectorBlock}>
-                <span className={styles.vectorBracket}>(</span>
+                <svg className={styles.vectorBracketSvg} viewBox="0 0 6 24" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M 4.5 2 C 1.5 7 1.5 17 4.5 22" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
                 {b.items.map((item, itIdx) => (
                   <React.Fragment key={itIdx}>
                     {itIdx > 0 && <span className={styles.vectorComma}>,</span>}
@@ -928,7 +930,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     />
                   </React.Fragment>
                 ))}
-                <span className={styles.vectorBracket}>)</span>
+                <svg className={styles.vectorBracketSvg} viewBox="0 0 6 24" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M 1.5 2 C 4.5 7 4.5 17 1.5 22" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
               </span>
             );
           }
@@ -936,7 +940,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           if (b.type === 'matrix') {
             return (
               <span key={b.id} className={styles.matrixBlock}>
-                <span className={styles.matrixBracket}>(</span>
+                <svg className={styles.matrixBracketSvg} viewBox="0 0 8 72" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M 6.5 2 C 1 18 1 54 6.5 70" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
                 <div className={styles.matrixGrid}>
                   {b.cells.map((row, rIdx) => (
                     <div key={rIdx} className={styles.matrixRow}>
@@ -963,7 +969,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                     </div>
                   ))}
                 </div>
-                <span className={styles.matrixBracket}>)</span>
+                <svg className={styles.matrixBracketSvg} viewBox="0 0 8 72" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M 1.5 2 C 7 18 7 54 1.5 70" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
               </span>
             );
           }
