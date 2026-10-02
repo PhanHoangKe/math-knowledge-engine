@@ -5,6 +5,7 @@ import {
   blocksToVisualString,
   genId,
 } from './visualMathModel';
+import { toMathModeFormat } from '../../utils/mathInputSerialization';
 import styles from './VisualMathComposer.module.css';
 
 export interface VisualMathComposerHandle {
@@ -91,56 +92,36 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         return;
       }
 
-      if (actionId === 'POWER' || actionId === 'SQUARE') {
-        const exponentVal = actionId === 'SQUARE' ? '2' : '';
-        let baseVal = 'x';
+      if (actionId === 'SQUARE') {
         const updated = [...blocks];
-
-        let targetIdx = -1;
-        if (focusedTarget) {
-          targetIdx = updated.findIndex((b) => b.id === focusedTarget.blockId);
-        } else if (updated.length > 0) {
-          targetIdx = updated.length - 1;
-        }
-
-        if (targetIdx !== -1) {
-          const targetBlock = updated[targetIdx];
-          if (targetBlock && targetBlock.type === 'text') {
-            if (targetBlock.value.endsWith('x')) {
-              targetBlock.value = targetBlock.value.slice(0, -1);
-              baseVal = 'x';
-            } else if (targetBlock.value) {
-              baseVal = targetBlock.value.slice(-1);
-              targetBlock.value = targetBlock.value.slice(0, -1);
-            }
+        let targetBlock = focusedTarget ? updated.find((b) => b.id === focusedTarget.blockId) : null;
+        if (!targetBlock) {
+          const last = updated[updated.length - 1];
+          if (last && last.type === 'text') {
+            targetBlock = last;
+            setFocusedTarget({ blockId: last.id, slot: 'value' });
+          } else {
+            const newTextBlock: MathBlock = { type: 'text', id: genId(), value: '' };
+            updated.push(newTextBlock);
+            targetBlock = newTextBlock;
+            setFocusedTarget({ blockId: newTextBlock.id, slot: 'value' });
           }
         }
-
-        const newPow: MathBlock = { type: 'power', id: genId(), base: baseVal, exponent: exponentVal };
-        const insertIdx = targetIdx !== -1 ? targetIdx + 1 : updated.length;
-        updated.splice(insertIdx, 0, newPow);
-
-        if (actionId === 'SQUARE') {
-          // For square (x²), automatically append a trailing text slot so subsequent actions continue after x²
-          const trailingText: MathBlock = { type: 'text', id: genId(), value: '' };
-          updated.splice(insertIdx + 1, 0, trailingText);
-          const cleaned = updated.filter((b, i) => !(b.type === 'text' && !b.value && i < updated.length - 1));
-          notifyChange(cleaned);
-          setFocusedTarget({ blockId: trailingText.id, slot: 'value' });
-          requestAnimationFrame(() => {
-            const el = inputRefs.current.get(`${trailingText.id}_value`);
-            el?.focus();
-          });
-        } else {
-          // For power template (□^□), focus the exponent slot
-          const cleaned = updated.filter((b, i) => !(b.type === 'text' && !b.value && i < updated.length - 1));
-          notifyChange(cleaned);
-          setFocusedTarget({ blockId: newPow.id, slot: 'exponent' });
-          requestAnimationFrame(() => {
-            const el = inputRefs.current.get(`${newPow.id}_exponent`);
-            el?.focus();
-          });
+        if (targetBlock.type === 'text') {
+          if (!targetBlock.value || targetBlock.value.endsWith(' ') || targetBlock.value.endsWith('+') || targetBlock.value.endsWith('-') || targetBlock.value.endsWith('−') || targetBlock.value.endsWith('=')) {
+            targetBlock.value += 'x²';
+          } else {
+            targetBlock.value += '²';
+          }
+        } else if (targetBlock.type === 'power') {
+          targetBlock.exponent = '2';
         }
+        notifyChange(updated);
+        return;
+      }
+
+      if (actionId === 'POWER') {
+        insertTextAtFocus('^');
         return;
       }
 
@@ -592,7 +573,11 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 style={{ width: isTrailing && !b.value ? undefined : inputWidth }}
                 value={b.value}
                 placeholder={isSingleEmpty ? placeholder : ''}
-                onChange={(e) => updateBlock(b.id, { value: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const formatted = toMathModeFormat(val);
+                  updateBlock(b.id, { value: formatted });
+                }}
                 onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'value' })}
                 onKeyDown={(e) => handleSlotKeyDown(e, b, 'value', idx)}
                 disabled={disabled}

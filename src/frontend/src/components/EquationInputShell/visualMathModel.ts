@@ -1,6 +1,8 @@
-/**
- * Visual Math AST Model & Parser for WolframAlpha / Casio style interactive math editor.
- */
+import {
+  toMathModeFormat,
+  toNaturalModeFormat,
+  SUPERSCRIPT_MAP,
+} from '../../utils/mathInputSerialization';
 
 export type MathBlock =
   | { type: 'text'; id: string; value: string }
@@ -30,15 +32,11 @@ export function parseStringToBlocks(input: string): MathBlock[] {
     return [{ type: 'text', id: genId(), value: '' }];
   }
 
-  const blocks: MathBlock[] = [];
-  let remaining = input;
+  // Pre-format any powers (e.g. x^2 -> x², Power[x,2] -> x²) so single-line text remains seamless
+  const formatted = toMathModeFormat(input);
 
-  // Regex patterns
-  // Fraction: \frac{num}{den} or (num)/(den)
-  // Power: ([a-zA-Z0-9]+)\^([0-9a-zA-Z]+) or ([a-zA-Z0-9]+)²
-  // Sqrt: \sqrt{rad} or sqrt(rad) or √(rad)
-  // Derivative: d/dx(expr)
-  // Integral: int_a^b (expr) dx
+  const blocks: MathBlock[] = [];
+  let remaining = formatted;
 
   while (remaining.length > 0) {
     // 1. Check for fraction: \frac{num}{den} or (num)/(den)
@@ -55,14 +53,14 @@ export function parseStringToBlocks(input: string): MathBlock[] {
     }
 
     // 2. Check for derivative: d/dx(...) or d²/dx²(...)
-    const derivMatch = remaining.match(/^d(\^?2?)\/d([a-zA-Z0-9]+)\^?2?\(([^)]*)\)/);
+    const derivMatch = remaining.match(/^d(\^?2?|²?)\/d([a-zA-Z0-9]+)(\^?2?|²?)\(([^)]*)\)/);
     if (derivMatch) {
       blocks.push({
         type: 'derivative',
         id: genId(),
-        order: derivMatch[1] ? 2 : 1,
+        order: (derivMatch[1] === '2' || derivMatch[1] === '²') ? 2 : 1,
         wrt: derivMatch[2] ?? 'x',
-        expr: derivMatch[3] ?? '',
+        expr: derivMatch[4] ?? '',
       });
       remaining = remaining.slice(derivMatch[0].length);
       continue;
@@ -94,31 +92,8 @@ export function parseStringToBlocks(input: string): MathBlock[] {
       continue;
     }
 
-    // 5. Check for power: ([a-zA-Z0-9]+)\^([0-9a-zA-Z]+) or Power[x,2] or x²
-    const powerMatch =
-      remaining.match(/^Power\[([a-zA-Z0-9]+),\s*([0-9a-zA-Z]+)\]/) ||
-      remaining.match(/^([a-zA-Z0-9]+)\^([0-9a-zA-Z]+)/) ||
-      remaining.match(/^([a-zA-Z0-9]+)(²|³|⁰)/);
-
-    if (powerMatch) {
-      const base = powerMatch[1] ?? 'x';
-      let exponent = powerMatch[2] ?? '2';
-      if (exponent === '²') exponent = '2';
-      if (exponent === '³') exponent = '3';
-      if (exponent === '⁰') exponent = '0';
-
-      blocks.push({
-        type: 'power',
-        id: genId(),
-        base,
-        exponent,
-      });
-      remaining = remaining.slice(powerMatch[0].length);
-      continue;
-    }
-
-    // 6. Otherwise consume plain text up to next special block or end
-    const nextSpecial = remaining.search(/(\\frac|\(|\^|²|³|Power|\\sqrt|sqrt|√|d\/dx)/);
+    // 5. Otherwise consume plain text up to next special 2D block or end
+    const nextSpecial = remaining.search(/(\\frac|\\sqrt|sqrt\(|√\(|d\/dx|d²\/dx²)/);
     if (nextSpecial === -1) {
       // Consume all remaining text
       blocks.push({
@@ -167,7 +142,7 @@ export function blocksToRawSolverString(blocks: MathBlock[]): string {
   for (const b of blocks) {
     switch (b.type) {
       case 'text':
-        res += b.value;
+        res += toNaturalModeFormat(b.value);
         break;
       case 'power':
         res += b.exponent ? `${b.base}^${b.exponent}` : `${b.base}^2`;
@@ -206,8 +181,6 @@ export function blocksToRawSolverString(blocks: MathBlock[]): string {
 
   // Convert unicode minus − to -
   res = res.replace(/−/g, '-');
-  // Ensure explicit multiplication e.g. 5x -> 5*x
-  res = res.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
   return res.trim();
 }
 
@@ -222,10 +195,13 @@ export function blocksToVisualString(blocks: MathBlock[]): string {
         res += b.value;
         break;
       case 'power':
-        if (b.exponent === '2' || !b.exponent) res += `${b.base}²`;
-        else if (b.exponent === '3') res += `${b.base}³`;
-        else if (b.exponent === '0') res += `${b.base}⁰`;
-        else res += `${b.base}^${b.exponent}`;
+        if (b.exponent && SUPERSCRIPT_MAP[b.exponent]) {
+          res += `${b.base}${SUPERSCRIPT_MAP[b.exponent]}`;
+        } else if (!b.exponent) {
+          res += `${b.base}²`;
+        } else {
+          res += `${b.base}^${b.exponent}`;
+        }
         break;
       case 'fraction':
         res += `(${b.num})/(${b.den})`;

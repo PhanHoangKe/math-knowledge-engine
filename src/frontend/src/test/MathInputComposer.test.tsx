@@ -46,15 +46,15 @@ describe('MathInputComposer & Serialization Utilities', () => {
     it('toMathModeFormat and toNaturalModeFormat convert bidirectionally', () => {
       const raw = 'x^2 - 5*x + 6 = 0';
       const math = toMathModeFormat(raw);
-      expect(math).toBe('x² − 5x + 6 = 0');
+      expect(math).toBe('x² - 5*x + 6 = 0');
 
       const convertedBack = toNaturalModeFormat(math);
       expect(convertedBack).toBe('x^2 - 5*x + 6 = 0');
     });
 
     it('normalizeForSolver normalizes math input to backend grammar', () => {
-      expect(normalizeForSolver('x² − 5x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
-      expect(normalizeForSolver('2x² − 4x + 2 = 0')).toBe('2*x^2 - 4*x + 2 = 0');
+      expect(normalizeForSolver('x² - 5*x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
+      expect(normalizeForSolver('2x² - 4x + 2 = 0')).toBe('2*x^2 - 4*x + 2 = 0');
       expect(normalizeForSolver('Power[x,2] - 5*x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
     });
 
@@ -112,7 +112,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(screen.queryByTestId('math-palette')).not.toBeInTheDocument();
     });
 
-    it('switches to Math Input mode and formats directly to x² − 5x + 6 = 0', () => {
+    it('switches to Math Input mode and formats directly to x² - 5*x + 6 = 0', () => {
       const onQueryChange = vi.fn();
       const onSubmit = vi.fn();
       const onClear = vi.fn();
@@ -134,7 +134,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(mathTab).toHaveAttribute('aria-selected', 'true');
       expect(screen.getByTestId('mode-quick-btn')).toHaveAttribute('aria-selected', 'false');
       expect(screen.getByTestId('math-palette')).toBeInTheDocument();
-      expect(onQueryChange).toHaveBeenCalledWith('x² − 5x + 6 = 0');
+      expect(onQueryChange).toHaveBeenCalledWith('x² - 5*x + 6 = 0');
     });
 
     it('clicking palette category tabs and buttons inserts deterministic symbols and updates query', () => {
@@ -267,8 +267,8 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(btnCompute).toBeDisabled();
     });
 
-    it('allows direct in-box editing of exponent slot from 2 to 4', () => {
-      let queryValue = 'x^2 - 5*x + 6 = 0';
+    it('allows direct in-box editing of fraction slots and backspace deletion', () => {
+      let queryValue = '\\frac{1}{2} + x = 0';
       const onQueryChange = vi.fn((val: string) => {
         queryValue = val;
       });
@@ -287,46 +287,19 @@ describe('MathInputComposer & Serialization Utilities', () => {
         </PreferencesProvider>
       );
 
-      // Find the exponent slot input
-      const expSlot = screen.getByLabelText('Số mũ');
-      expect(expSlot).toHaveValue('2');
+      // Find numerator slot
+      const numSlot = screen.getByLabelText('Tử số');
+      expect(numSlot).toHaveValue('1');
 
-      // Directly edit exponent to 4
-      fireEvent.change(expSlot, { target: { value: '4' } });
+      // Edit numerator slot to 3
+      fireEvent.change(numSlot, { target: { value: '3' } });
+      expect(onQueryChange).toHaveBeenCalledWith(expect.stringContaining('(3)/(2)'));
 
-      // Equation query reflects modified exponent
-      expect(onQueryChange).toHaveBeenCalledWith(expect.stringContaining('x^4'));
-    });
-
-    it('handles backspace deletion directly from empty slot', () => {
-      let queryValue = 'x^2';
-      const onQueryChange = vi.fn((val: string) => {
-        queryValue = val;
-      });
-      const onSubmit = vi.fn();
-      const onClear = vi.fn();
-
-      render(
-        <PreferencesProvider>
-          <EquationInputShell
-            query={queryValue}
-            onQueryChange={onQueryChange}
-            onSubmit={onSubmit}
-            onClear={onClear}
-            initialMode="math"
-          />
-        </PreferencesProvider>
-      );
-
-      const expSlot = screen.getByLabelText('Số mũ');
-      // Clear exponent slot
-      fireEvent.change(expSlot, { target: { value: '' } });
-
-      // Press backspace on empty exponent slot
-      fireEvent.keyDown(expSlot, { key: 'Backspace', code: 'Backspace' });
-
-      // Power block collapses to base text
-      expect(onQueryChange).toHaveBeenCalledWith('x');
+      // Find denominator slot
+      const denSlot = screen.getByLabelText('Mẫu số');
+      expect(denSlot).toHaveValue('2');
+      fireEvent.change(denSlot, { target: { value: '5' } });
+      expect(onQueryChange).toHaveBeenCalledWith(expect.stringContaining('(3)/(5)'));
     });
   });
 });

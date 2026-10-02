@@ -10,7 +10,7 @@
   padding: 4px 2px;
   gap: 0px;
   font-family: Arial, Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 400;
   color: var(--color-text-primary, #111827);
   user-select: text;
@@ -28,7 +28,7 @@
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 400;
   color: inherit;
   padding: 0;
@@ -51,7 +51,7 @@
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 400;
   color: inherit;
   padding: 0;
@@ -74,7 +74,7 @@
 .trailingTextInput::placeholder {
   font-style: italic;
   color: #9ca3af;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-family: inherit;
 }
 
@@ -89,7 +89,7 @@
 
 .powerBase {
   font-family: inherit;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 400;
   color: inherit;
   border: none;

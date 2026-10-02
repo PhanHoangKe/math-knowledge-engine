@@ -62,44 +62,105 @@ export function handleBackspace(
   return { newQuery: before + after, newCursorPos: start - 1 };
 }
 
+export const SUPERSCRIPT_MAP: Record<string, string> = {
+  '0': '⁰',
+  '1': '¹',
+  '2': '²',
+  '3': '³',
+  '4': '⁴',
+  '5': '⁵',
+  '6': '⁶',
+  '7': '⁷',
+  '8': '⁸',
+  '9': '⁹',
+  '+': '⁺',
+  '-': '⁻',
+  '=': '⁼',
+  '(': '⁽',
+  ')': '⁾',
+  'n': 'ⁿ',
+  'i': 'ⁱ',
+  'x': 'ˣ',
+  'y': 'ʸ',
+};
+
+export const REVERSE_SUPERSCRIPT_MAP: Record<string, string> = {
+  '⁰': '0',
+  '¹': '1',
+  '²': '2',
+  '³': '3',
+  '⁴': '4',
+  '⁵': '5',
+  '⁶': '6',
+  '⁷': '7',
+  '⁸': '8',
+  '⁹': '9',
+  '⁺': '+',
+  '⁻': '-',
+  '⁼': '=',
+  '⁽': '(',
+  '⁾': ')',
+  'ⁿ': 'n',
+  'ⁱ': 'i',
+  'ˣ': 'x',
+  'ʸ': 'y',
+};
+
 /**
  * Converts a raw / natural language expression into clean Mathematical visual format.
- * Example: 'x^2 - 5*x + 6 = 0' -> 'x² − 5x + 6 = 0'
+ * Example: 'x^2 - 5*x + 6 = 0' -> 'x² - 5*x + 6 = 0'
  */
 export function toMathModeFormat(query: string): string {
   if (!query) return '';
   let res = query;
 
-  // Convert Power[x,2] or Power(x,2) to x²
-  res = res.replace(/Power\[([a-zA-Z0-9]+),\s*2\]/g, '$1²');
-  res = res.replace(/Power\(([a-zA-Z0-9]+),\s*2\)/g, '$1²');
+  // Convert Power[x, 2] or Power(x, 2) to x²
+  res = res.replace(/Power\[([a-zA-Z0-9]+),\s*([0-9]+)\]/g, (_match, base, exp) => {
+    const superExp = Array.from(exp as string).map((ch: string) => SUPERSCRIPT_MAP[ch] ?? ch).join('');
+    return `${base}${superExp}`;
+  });
+  res = res.replace(/Power\(([a-zA-Z0-9]+),\s*([0-9]+)\)/g, (_match, base, exp) => {
+    const superExp = Array.from(exp as string).map((ch: string) => SUPERSCRIPT_MAP[ch] ?? ch).join('');
+    return `${base}${superExp}`;
+  });
 
-  // Convert x^2 -> x², x^3 -> x³, x^0 -> x⁰
-  res = res.replace(/([a-zA-Z0-9]+)\^2/g, '$1²');
-  res = res.replace(/([a-zA-Z0-9]+)\^3/g, '$1³');
-  res = res.replace(/([a-zA-Z0-9]+)\^0/g, '$1⁰');
-
-  // Convert 5*x -> 5x
-  res = res.replace(/(\d+)\s*\*\s*([a-zA-Z])/g, '$1$2');
-
-  // Convert standard minus to mathematical minus −
-  res = res.replace(/\s+-\s+/g, ' − ');
-  res = res.replace(/^-\s*/g, '−');
+  // Convert ^0, ^1, ^2, ^3, ^4, etc. to unicode superscripts
+  res = res.replace(/\^([0-9nixy\+\-]+)/g, (_match, p1) => {
+    return Array.from(p1 as string).map((ch: string) => SUPERSCRIPT_MAP[ch] ?? ch).join('');
+  });
 
   return res;
 }
 
 /**
- * Converts a Math Mode expression (e.g. 'x² − 5x + 6 = 0') into standard Natural / Raw expression (e.g. 'x^2 - 5*x + 6 = 0').
+ * Converts a Math Mode expression (e.g. 'x² - 5*x + 6 = 0') into standard Natural / Raw expression (e.g. 'x^2 - 5*x + 6 = 0').
  */
 export function toNaturalModeFormat(query: string): string {
   if (!query) return '';
-  let res = query;
+  let res = '';
+  let inSuper = false;
+  let superBuf = '';
 
-  // Convert unicode superscripts: x² -> x^2, x³ -> x^3, x⁰ -> x^0
-  res = res.replace(/²([a-zA-Z0-9]*)/g, '^2$1');
-  res = res.replace(/³([a-zA-Z0-9]*)/g, '^3$1');
-  res = res.replace(/⁰([a-zA-Z0-9]*)/g, '^0$1');
+  for (const ch of query) {
+    if (REVERSE_SUPERSCRIPT_MAP[ch]) {
+      if (!inSuper) {
+        inSuper = true;
+        superBuf = REVERSE_SUPERSCRIPT_MAP[ch] ?? '';
+      } else {
+        superBuf += REVERSE_SUPERSCRIPT_MAP[ch] ?? '';
+      }
+    } else {
+      if (inSuper) {
+        res += `^${superBuf}`;
+        inSuper = false;
+        superBuf = '';
+      }
+      res += ch;
+    }
+  }
+  if (inSuper) {
+    res += `^${superBuf}`;
+  }
 
   // Convert mathematical minus − to standard minus -
   res = res.replace(/−/g, '-');
@@ -111,9 +172,6 @@ export function toNaturalModeFormat(query: string): string {
   // Convert Sqrt[x] or Sqrt(x) to sqrt(x)
   res = res.replace(/Sqrt\[([^\]]+)\]/g, 'sqrt($1)');
   res = res.replace(/Sqrt\(([^)]+)\)/g, 'sqrt($1)');
-
-  // Convert implicit multiplication 5x -> 5*x
-  res = res.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
 
   return res;
 }
@@ -128,7 +186,7 @@ export function normalizeForSolver(query: string): string {
   res = res.replace(/−/g, '-');
   res = res.replace(/×/g, '*');
   res = res.replace(/÷/g, '/');
-  // Ensure explicit multiplication 5x -> 5*x
+  // Ensure explicit multiplication 5x -> 5*x if not already explicit
   res = res.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
   // Clean up any double spaces
   res = res.replace(/\s+/g, ' ');
