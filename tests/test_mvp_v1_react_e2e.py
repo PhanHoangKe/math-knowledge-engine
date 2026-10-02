@@ -626,16 +626,13 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         time.sleep(0.3)
         assert math_tab.get_attribute("aria-selected") == "true"
 
-        # Verify Math Palette and KaTeX preview box are displayed
+        # Verify Math Palette is displayed
         palette = WebDriverWait(self.driver, 5.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='math-palette']"))
         )
         assert palette.is_displayed()
 
-        preview_box = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='math-preview-box']")
-        assert preview_box.is_displayed()
-
-        # 3. Enter equation using Math Palette buttons: x² - 5*x + 6 = 0
+        # 3. Enter equation using Math Palette buttons: x² − 5*x + 6 = 0
         # Click x²
         btn_square = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-SQUARE']")
         btn_square.click()
@@ -667,15 +664,17 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         # Verify input field content
         eq_input = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='equation-input']")
         val = eq_input.get_attribute("value") or ""
-        assert "x^2" in val
-        assert "5*x" in val
+        assert ("x²" in val or "x^2" in val)
+        assert ("5x" in val or "5*x" in val)
         assert "6" in val
         assert "= 0" in val
 
-        # 4. Verify switching back to Quick Input preserves equation string
+        # 4. Verify switching back to Quick Input converts equation to raw format
         quick_tab.click()
         time.sleep(0.2)
-        assert eq_input.get_attribute("value") == val
+        natural_val = eq_input.get_attribute("value") or ""
+        assert "x^2" in natural_val
+        assert "5*x" in natural_val
 
         # 5. Submit solve
         compute_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='compute-btn']")

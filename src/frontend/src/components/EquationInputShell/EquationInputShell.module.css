@@ -74,7 +74,7 @@
   flex: 1;
   height: 100%;
   font-size: 1.15rem;
-  font-family: inherit;
+  font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--color-text-primary, #111827);
   background: transparent;
   border: none;
@@ -86,6 +86,70 @@
   font-style: italic;
   color: #9ca3af;
   font-size: 1.05rem;
+  font-family: sans-serif;
+}
+
+/* Casio Visual 2-Tier Fraction Editor */
+.casioFractionContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  height: 100%;
+  padding-right: 12px;
+}
+
+.casioFractionColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 2px 0;
+}
+
+.casioSlot {
+  min-width: 28px;
+  max-width: 120px;
+  height: 20px;
+  padding: 1px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'KaTeX_Math', 'Cambria Math', monospace;
+  text-align: center;
+  border-radius: 4px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.casioNumerator {
+  background: #e0f2fe;
+  border: 1.5px dashed #38bdf8;
+  color: #0369a1;
+}
+
+.casioDenominator {
+  background: #fef9c3;
+  border: 1.5px dashed #facc15;
+  color: #854d0e;
+}
+
+.casioSlotActive {
+  border-style: solid;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+}
+
+.casioFractionBar {
+  width: 100%;
+  height: 2px;
+  background: #1e293b;
+  margin: 2px 0;
+}
+
+.casioAfterField {
+  flex: 1;
+  height: 100%;
+  font-size: 1.15rem;
 }
 
 /* Clear Circular Button */
@@ -93,21 +157,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: #9ca3af;
-  color: #ffffff;
+  background: transparent;
+  color: #9ca3af;
   border: none;
-  font-size: 14px;
-  font-weight: 700;
   cursor: pointer;
-  margin-right: 10px;
-  transition: background 0.15s ease;
+  margin-right: 8px;
+  transition: color 0.15s ease, transform 0.1s ease;
 }
 
 .clearCircleBtn:hover {
-  background: #6b7280;
+  color: #ef4444;
+  transform: scale(1.1);
 }
 
 /* Compute Button */
@@ -120,8 +183,6 @@
   border-radius: 8px;
   border: none;
   color: #ffffff;
-  font-size: 1.5rem;
-  font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
   user-select: none;
@@ -192,7 +253,9 @@
 }
 
 .modeIcon {
-  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modePillNaturalActive {
@@ -228,7 +291,6 @@
   border: none;
   border-radius: 6px;
   color: var(--color-text-muted, #4b5563);
-  font-size: 1rem;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -267,9 +329,6 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  font-family: 'KaTeX_Math', 'Cambria Math', monospace;
-  font-size: 0.95rem;
-  font-weight: 600;
   color: var(--color-text-muted, #6b7280);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -354,46 +413,6 @@
 .quickKeyBtn:hover:not(:disabled) {
   background: #fef9c3;
   border-color: #f59e0b;
-}
-
-/* Preview Box */
-.mathPreviewBox {
-  width: 100%;
-  max-width: 860px;
-  margin-top: 10px;
-  padding: 10px 14px;
-  background: var(--color-surface, #ffffff);
-  border: 1px dashed var(--color-border, #d1d5db);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.previewLabel {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--color-text-muted, #6b7280);
-  text-transform: uppercase;
-}
-
-.previewDisplay {
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.15rem;
-}
-
-.previewPlaceholder {
-  color: var(--color-text-muted, #9ca3af);
-  font-style: italic;
-  font-size: 0.88rem;
-}
-
-.unsupportedNotice {
-  font-size: 0.75rem;
-  color: #b45309;
 }
 
 /* Status Note */

@@ -3,12 +3,6 @@
  * 
  * Provides deterministic mapping between visual math representations
  * and backend-safe RAW_TEXT expressions.
- * 
- * Invariants:
- * - Deterministic serialization to standard MKE backend raw format (e.g. x^2 - 5*x + 6 = 0).
- * - Multiplications × serialize to * for the backend parser.
- * - Visual formatting creates clean LaTeX without altering mathematical semantics.
- * - Cursor-aware snippet insertion and deletion.
  */
 
 export interface CursorSelection {
@@ -62,40 +56,65 @@ export function handleBackspace(
     return { newQuery: query, newCursorPos: 0 };
   }
 
-  // Single character before cursor
+  // Check if character before cursor is part of a surrogate pair or multi-char token
   const before = query.slice(0, start - 1);
   const after = query.slice(start);
   return { newQuery: before + after, newCursorPos: start - 1 };
 }
 
 /**
- * Converts a raw / natural language expression into Mathematica / Math Mode format (e.g. Power[x,2]).
+ * Converts a raw / natural language expression into clean Mathematical visual format.
+ * Example: 'x^2 - 5*x + 6 = 0' -> 'x² − 5x + 6 = 0'
  */
 export function toMathModeFormat(query: string): string {
   if (!query) return '';
   let res = query;
-  // Convert x^2 or x^n or variable^number into Power[x, n]
-  res = res.replace(/([a-zA-Z0-9]+)\^([0-9]+)/g, 'Power[$1,$2]');
-  // Convert simple sqrt(x) into Sqrt[x]
-  res = res.replace(/sqrt\(([^)]+)\)/g, 'Sqrt[$1]');
+
+  // Convert Power[x,2] or Power(x,2) to x²
+  res = res.replace(/Power\[([a-zA-Z0-9]+),\s*2\]/g, '$1²');
+  res = res.replace(/Power\(([a-zA-Z0-9]+),\s*2\)/g, '$1²');
+
+  // Convert x^2 -> x², x^3 -> x³, x^0 -> x⁰
+  res = res.replace(/([a-zA-Z0-9]+)\^2/g, '$1²');
+  res = res.replace(/([a-zA-Z0-9]+)\^3/g, '$1³');
+  res = res.replace(/([a-zA-Z0-9]+)\^0/g, '$1⁰');
+
+  // Convert 5*x -> 5x
+  res = res.replace(/(\d+)\s*\*\s*([a-zA-Z])/g, '$1$2');
+
+  // Convert standard minus to mathematical minus −
+  res = res.replace(/\s+-\s+/g, ' − ');
+  res = res.replace(/^-\s*/g, '−');
+
   return res;
 }
 
 /**
- * Converts a Math Mode expression (e.g. Power[x,2]) into standard Natural / Raw expression (e.g. x^2).
+ * Converts a Math Mode expression (e.g. 'x² − 5x + 6 = 0') into standard Natural / Raw expression (e.g. 'x^2 - 5*x + 6 = 0').
  */
 export function toNaturalModeFormat(query: string): string {
   if (!query) return '';
   let res = query;
+
+  // Convert unicode superscripts: x² -> x^2, x³ -> x^3, x⁰ -> x^0
+  res = res.replace(/²([a-zA-Z0-9]*)/g, '^2$1');
+  res = res.replace(/³([a-zA-Z0-9]*)/g, '^3$1');
+  res = res.replace(/⁰([a-zA-Z0-9]*)/g, '^0$1');
+
+  // Convert mathematical minus − to standard minus -
+  res = res.replace(/−/g, '-');
+
   // Convert Power[x, 2] or Power(x, 2) to x^2
   res = res.replace(/Power\[([a-zA-Z0-9]+),\s*([0-9]+)\]/g, '$1^$2');
   res = res.replace(/Power\(([a-zA-Z0-9]+),\s*([0-9]+)\)/g, '$1^$2');
+
   // Convert Sqrt[x] or Sqrt(x) to sqrt(x)
   res = res.replace(/Sqrt\[([^\]]+)\]/g, 'sqrt($1)');
   res = res.replace(/Sqrt\(([^)]+)\)/g, 'sqrt($1)');
-  // Convert unicode superscripts: x² -> x^2, x³ -> x^3
-  res = res.replace(/²([a-zA-Z0-9]*)/g, '^2$1');
-  res = res.replace(/³([a-zA-Z0-9]*)/g, '^3$1');
+
+  // Convert implicit multiplication 5x -> 5*x
+  res = res.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
+
   return res;
 }
 
@@ -109,6 +128,10 @@ export function normalizeForSolver(query: string): string {
   res = res.replace(/−/g, '-');
   res = res.replace(/×/g, '*');
   res = res.replace(/÷/g, '/');
+  // Ensure explicit multiplication 5x -> 5*x
+  res = res.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
+  // Clean up any double spaces
+  res = res.replace(/\s+/g, ' ');
   return res.trim();
 }
 
@@ -124,27 +147,27 @@ export function serializePaletteAction(
     case 'SQUARE': {
       const start = selection?.start ?? query.length;
       const charBefore = start > 0 ? query[start - 1] : '';
-      const snippet = charBefore === 'x' ? '^2' : 'x^2';
+      const snippet = charBefore === 'x' ? '²' : 'x²';
       return insertSnippet(query, snippet, selection);
     }
     case 'POWER':
       return insertSnippet(query, '^', selection);
     case 'SQRT':
-      return insertSnippet(query, 'sqrt()', selection);
+      return insertSnippet(query, '√()', selection);
     case 'CUBE_ROOT':
-      return insertSnippet(query, '^(1/3)', selection);
+      return insertSnippet(query, '³√()', selection);
     case 'NTH_ROOT':
-      return insertSnippet(query, '^(1/n)', selection);
+      return insertSnippet(query, 'ⁿ√()', selection);
     case 'DERIVATIVE':
-      return insertSnippet(query, 'd/dx', selection);
+      return insertSnippet(query, 'd/dx()', selection);
     case 'SECOND_DERIVATIVE':
-      return insertSnippet(query, 'd^2/dx^2', selection);
+      return insertSnippet(query, 'd²/dx²()', selection);
     case 'INTEGRAL':
-      return insertSnippet(query, 'int ', selection);
+      return insertSnippet(query, '∫ ', selection);
     case 'DEF_INTEGRAL':
-      return insertSnippet(query, 'int_a^b ', selection);
+      return insertSnippet(query, '∫_a^b ', selection);
     case 'SUM':
-      return insertSnippet(query, 'sum ', selection);
+      return insertSnippet(query, '∑ ', selection);
     case 'LIMIT':
       return insertSnippet(query, 'lim ', selection);
     case 'VECTOR':
@@ -158,7 +181,7 @@ export function serializePaletteAction(
     case 'PLUS':
       return insertSnippet(query, ' + ', selection);
     case 'MINUS':
-      return insertSnippet(query, ' - ', selection);
+      return insertSnippet(query, ' − ', selection);
     case 'EQUALS':
       return insertSnippet(query, ' = ', selection);
     case 'VAR_X':
@@ -176,6 +199,7 @@ export function serializePaletteAction(
     case 'DOT':
       return insertSnippet(query, '.', selection);
     case 'FRACTION': {
+      // Fraction template: (/) with cursor placed between ( and /
       const start = selection?.start ?? query.length;
       const res = insertSnippet(query, '(/)', selection);
       return { newQuery: res.newQuery, newCursorPos: start + 1 };
@@ -212,7 +236,7 @@ export function serializePaletteAction(
 }
 
 /**
- * Converts a raw backend expression into clean visual LaTeX for live KaTeX preview.
+ * Converts a raw backend expression into clean visual LaTeX for rendering.
  */
 export function toVisualLatex(query: string): string {
   if (!query || !query.trim()) {
@@ -258,4 +282,3 @@ export function isSupportedByComposer(query: string): boolean {
   ];
   return !unsupportedPatterns.some((pattern) => pattern.test(query));
 }
-

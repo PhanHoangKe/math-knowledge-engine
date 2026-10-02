@@ -1,16 +1,31 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { usePreferences } from '../../state/preferences';
-import { MathLatex } from '../MathLatex/MathLatex';
 import { MathPalette } from './MathPalette';
 import { PALETTE_CATEGORIES } from './mathPaletteCapabilities';
 import {
   serializePaletteAction,
-  toVisualLatex,
   toMathModeFormat,
   toNaturalModeFormat,
   normalizeForSolver,
-  isSupportedByComposer,
 } from '../../utils/mathInputSerialization';
+import {
+  GearIcon,
+  MathSymbolsIcon,
+  CameraIcon,
+  StarIcon,
+  SquareRootIcon,
+  CalculusIcon,
+  MatrixIcon,
+  WaveIcon,
+  GreekIcon,
+  EllipsisIcon,
+  KeyboardIcon,
+  GridIcon,
+  UploadIcon,
+  ShuffleIcon,
+  TimesCircleIcon,
+  EqualsIcon,
+} from '../common/Icons';
 import styles from './EquationInputShell.module.css';
 
 export type InputMode = 'quick' | 'math' | 'natural';
@@ -34,6 +49,12 @@ const SAMPLE_EQUATIONS = [
   'x^2 - 2 = 0',
 ];
 
+interface FractionSlotState {
+  num: string;
+  den: string;
+  after: string;
+}
+
 export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   query,
   onQueryChange,
@@ -54,10 +75,36 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   const [sampleIdx, setSampleIdx] = useState<number>(0);
   const [cameraNote, setCameraNote] = useState<string | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Casio-style visual interactive fraction mode
+  const [isFractionActive, setIsFractionActive] = useState<boolean>(false);
+  const [fractionSlots, setFractionSlots] = useState<FractionSlotState>({
+    num: '',
+    den: '',
+    after: '',
+  });
+  const [activeSlot, setActiveSlot] = useState<'num' | 'den' | 'after'>('num');
+
+  const mainInputRef = useRef<HTMLInputElement>(null);
+  const numInputRef = useRef<HTMLInputElement>(null);
+  const denInputRef = useRef<HTMLInputElement>(null);
+  const afterInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync fraction slots with query when in fraction mode
+  const updateFractionQuery = (slots: FractionSlotState) => {
+    setFractionSlots(slots);
+    const numPart = slots.num || '';
+    const denPart = slots.den || '';
+    const combined = `(${numPart})/(${denPart})${slots.after ? ' ' + slots.after : ''}`;
+    onQueryChange(mode === 'math' ? toMathModeFormat(combined) : combined);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onQueryChange(e.target.value);
+    const rawVal = e.target.value;
+    if (mode === 'math') {
+      onQueryChange(toMathModeFormat(rawVal));
+    } else {
+      onQueryChange(rawVal);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -91,6 +138,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
       }
     } else {
       setMode('natural');
+      setIsFractionActive(false);
       const naturalFormatted = toNaturalModeFormat(query);
       if (naturalFormatted !== query) {
         onQueryChange(naturalFormatted);
@@ -110,6 +158,8 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   const handlePaletteAction = useCallback(
     (actionId: string) => {
       if (actionId === 'CLEAR') {
+        setIsFractionActive(false);
+        setFractionSlots({ num: '', den: '', after: '' });
         if (onClear) {
           onClear();
         } else {
@@ -118,13 +168,39 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         return;
       }
 
-      const input = inputRef.current;
+      if (actionId === 'FRACTION') {
+        // Activate visual Casio 2-tier fraction box (Picture 1 & 2)
+        setIsFractionActive(true);
+        setActiveSlot('num');
+        const initialSlots: FractionSlotState = { num: '', den: '', after: '' };
+        setFractionSlots(initialSlots);
+        updateFractionQuery(initialSlots);
+        requestAnimationFrame(() => {
+          numInputRef.current?.focus();
+        });
+        return;
+      }
+
+      if (isFractionActive) {
+        // Insert directly into active Casio slot
+        const currentSlotVal = fractionSlots[activeSlot];
+        const { newQuery } = serializePaletteAction(currentSlotVal, actionId);
+        const updated = {
+          ...fractionSlots,
+          [activeSlot]: mode === 'math' ? toMathModeFormat(newQuery) : newQuery,
+        };
+        updateFractionQuery(updated);
+        return;
+      }
+
+      const input = mainInputRef.current;
       const selection = input
         ? { start: input.selectionStart ?? query.length, end: input.selectionEnd ?? query.length }
         : { start: query.length, end: query.length };
 
       const { newQuery, newCursorPos } = serializePaletteAction(query, actionId, selection);
-      onQueryChange(newQuery);
+      const formatted = mode === 'math' ? toMathModeFormat(newQuery) : newQuery;
+      onQueryChange(formatted);
 
       requestAnimationFrame(() => {
         if (input) {
@@ -133,12 +209,13 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         }
       });
     },
-    [query, onQueryChange, onClear]
+    [query, onQueryChange, onClear, isFractionActive, fractionSlots, activeSlot, mode]
   );
 
   const handleRandomSample = () => {
     const nextEq = SAMPLE_EQUATIONS[sampleIdx % SAMPLE_EQUATIONS.length] ?? 'x^2 - 5*x + 6 = 0';
     setSampleIdx((prev) => prev + 1);
+    setIsFractionActive(false);
     if (mode === 'math') {
       onQueryChange(toMathModeFormat(nextEq));
     } else {
@@ -153,9 +230,26 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
     setTimeout(() => setCameraNote(null), 3500);
   };
 
+  const handleClearAll = () => {
+    setIsFractionActive(false);
+    setFractionSlots({ num: '', den: '', after: '' });
+    onClear();
+  };
+
   const isSubmitDisabled = !query.trim() || isLoading;
-  const isComposerSupported = isSupportedByComposer(query);
-  const visualLatex = toVisualLatex(query);
+
+  const renderCategoryIcon = (catId: string) => {
+    switch (catId) {
+      case 'COMMON': return <StarIcon size={14} />;
+      case 'ALGEBRA': return <SquareRootIcon size={14} />;
+      case 'CALCULUS': return <CalculusIcon size={14} />;
+      case 'MATRICES': return <MatrixIcon size={14} />;
+      case 'PLOTS': return <WaveIcon size={14} />;
+      case 'GREEK': return <GreekIcon size={14} />;
+      case 'MORE': return <EllipsisIcon size={14} />;
+      default: return <StarIcon size={14} />;
+    }
+  };
 
   return (
     <section className={styles.wrapper} aria-label={t('input_aria')}>
@@ -175,35 +269,94 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         <label htmlFor="equation-input" className="sr-only">
           {t('input_label')}
         </label>
-        <input
-          ref={inputRef}
-          id="equation-input"
-          type="text"
-          className={styles.inputField}
-          value={query}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={t('input_placeholder')}
-          autoComplete="off"
-          spellCheck="false"
-          disabled={isLoading}
-          data-testid="equation-input"
-        />
 
+        {isFractionActive && mode === 'math' ? (
+          /* Visual Casio 2-Tier Nested Fraction Editor (Picture 1 & 2) */
+          <div className={styles.casioFractionContainer}>
+            <div className={styles.casioFractionColumn}>
+              {/* Numerator Light Blue Dotted Box */}
+              <input
+                ref={numInputRef}
+                type="text"
+                className={`${styles.casioSlot} ${styles.casioNumerator} ${
+                  activeSlot === 'num' ? styles.casioSlotActive : ''
+                }`}
+                value={fractionSlots.num}
+                placeholder=""
+                onChange={(e) =>
+                  updateFractionQuery({ ...fractionSlots, num: e.target.value })
+                }
+                onFocus={() => setActiveSlot('num')}
+                onKeyDown={handleKeyDown}
+                disabled={isLoading}
+              />
+              {/* Horizontal Fraction Bar */}
+              <div className={styles.casioFractionBar} />
+              {/* Denominator Light Yellow Dotted Box */}
+              <input
+                ref={denInputRef}
+                type="text"
+                className={`${styles.casioSlot} ${styles.casioDenominator} ${
+                  activeSlot === 'den' ? styles.casioSlotActive : ''
+                }`}
+                value={fractionSlots.den}
+                placeholder=""
+                onChange={(e) =>
+                  updateFractionQuery({ ...fractionSlots, den: e.target.value })
+                }
+                onFocus={() => setActiveSlot('den')}
+                onKeyDown={handleKeyDown}
+                disabled={isLoading}
+              />
+            </div>
+            {/* After Fraction Inline Continuation */}
+            <input
+              ref={afterInputRef}
+              type="text"
+              className={`${styles.inputField} ${styles.casioAfterField}`}
+              value={fractionSlots.after}
+              placeholder=" + ... = 0"
+              onChange={(e) =>
+                updateFractionQuery({ ...fractionSlots, after: e.target.value })
+              }
+              onFocus={() => setActiveSlot('after')}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+          </div>
+        ) : (
+          /* Standard Direct Mathematical Visual Input (x² − 5x + 6 = 0) */
+          <input
+            ref={mainInputRef}
+            id="equation-input"
+            type="text"
+            className={styles.inputField}
+            value={query}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={t('input_placeholder')}
+            autoComplete="off"
+            spellCheck="false"
+            disabled={isLoading}
+            data-testid="equation-input"
+          />
+        )}
+
+        {/* Circular Clear Button (FontAwesome Circle Xmark) */}
         {query.length > 0 && !isLoading && (
           <button
             type="button"
             className={styles.clearCircleBtn}
-            onClick={onClear}
+            onClick={handleClearAll}
             aria-label={t('clear_btn_aria')}
             title={t('clear_btn_aria')}
             data-testid="clear-btn"
           >
-            ×
+            <TimesCircleIcon size={16} />
           </button>
         )}
 
-        {/* Square Compute Button */}
+        {/* Square Compute Button (FontAwesome Equals) */}
         <button
           type="button"
           className={`${styles.computeBtn} ${
@@ -219,7 +372,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
           {isLoading ? (
             <span className={styles.spinner} aria-hidden="true" />
           ) : (
-            t('compute_btn_text')
+            <EqualsIcon size={18} />
           )}
         </button>
       </div>
@@ -241,7 +394,9 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
             onClick={() => switchMode('natural')}
             data-testid="mode-quick-btn"
           >
-            <span className={styles.modeIcon} aria-hidden="true">⚙</span>
+            <span className={styles.modeIcon} aria-hidden="true">
+              <GearIcon size={14} />
+            </span>
             <span>{t('mode_natural_input')}</span>
           </button>
 
@@ -255,7 +410,9 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
             onClick={() => switchMode('math')}
             data-testid="mode-math-btn"
           >
-            <span className={styles.modeIcon} aria-hidden="true">∫∑∂</span>
+            <span className={styles.modeIcon} aria-hidden="true">
+              <MathSymbolsIcon size={15} />
+            </span>
             <span>{t('mode_math_input')}</span>
           </button>
 
@@ -266,7 +423,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
             aria-label={t('tooltip_camera')}
             title={t('tooltip_camera')}
           >
-            📷
+            <CameraIcon size={15} />
           </button>
         </div>
 
@@ -290,7 +447,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
                     title={t(cat.titleKey as any)}
                     aria-label={t(cat.titleKey as any)}
                   >
-                    {cat.symbol}
+                    {renderCategoryIcon(cat.categoryId)}
                     {activeCategory === cat.categoryId && (
                       <span className={styles.tabMarkerArrow} aria-hidden="true" />
                     )}
@@ -307,7 +464,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
                 title={t('tooltip_keyboard')}
                 aria-label={t('tooltip_keyboard')}
               >
-                ⌨
+                <KeyboardIcon size={15} />
               </button>
               <button
                 type="button"
@@ -316,7 +473,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
                 title={t('tooltip_samples')}
                 aria-label={t('tooltip_samples')}
               >
-                ▦
+                <GridIcon size={15} />
               </button>
               <button
                 type="button"
@@ -325,7 +482,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
                 title={t('tooltip_upload')}
                 aria-label={t('tooltip_upload')}
               >
-                ↑
+                <UploadIcon size={15} />
               </button>
               <button
                 type="button"
@@ -334,7 +491,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
                 title={t('tooltip_random')}
                 aria-label={t('tooltip_random')}
               >
-                🔀
+                <ShuffleIcon size={15} />
               </button>
             </div>
           )}
@@ -367,25 +524,6 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
               {keySymbol}
             </button>
           ))}
-        </div>
-      )}
-
-      {/* Visual Math Preview Box in Math Input Mode */}
-      {mode === 'math' && (
-        <div className={styles.mathPreviewBox} data-testid="math-preview-box">
-          <span className={styles.previewLabel}>{t('lbl_math_preview')}:</span>
-          <div className={styles.previewDisplay}>
-            {visualLatex ? (
-              <MathLatex latex={visualLatex} displayMode />
-            ) : (
-              <span className={styles.previewPlaceholder}>{t('math_preview_placeholder')}</span>
-            )}
-          </div>
-          {!isComposerSupported && (
-            <div className={styles.unsupportedNotice}>
-              <span>ℹ️ {t('lbl_unsupported_assisted_math')}</span>
-            </div>
-          )}
         </div>
       )}
 

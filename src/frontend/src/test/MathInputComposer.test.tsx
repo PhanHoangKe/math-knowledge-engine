@@ -32,8 +32,8 @@ describe('MathInputComposer & Serialization Utilities', () => {
     });
 
     it('handleBackspace deletes character before cursor', () => {
-      const res = handleBackspace('x^2 - 5', { start: 3, end: 3 });
-      expect(res.newQuery).toBe('x^ - 5');
+      const res = handleBackspace('x² − 5', { start: 3, end: 3 });
+      expect(res.newQuery).toBe('x²− 5');
       expect(res.newCursorPos).toBe(2);
     });
 
@@ -46,25 +46,26 @@ describe('MathInputComposer & Serialization Utilities', () => {
     it('toMathModeFormat and toNaturalModeFormat convert bidirectionally', () => {
       const raw = 'x^2 - 5*x + 6 = 0';
       const math = toMathModeFormat(raw);
-      expect(math).toBe('Power[x,2] - 5*x + 6 = 0');
+      expect(math).toBe('x² − 5x + 6 = 0');
 
       const convertedBack = toNaturalModeFormat(math);
       expect(convertedBack).toBe('x^2 - 5*x + 6 = 0');
     });
 
     it('normalizeForSolver normalizes math input to backend grammar', () => {
+      expect(normalizeForSolver('x² − 5x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
+      expect(normalizeForSolver('2x² − 4x + 2 = 0')).toBe('2*x^2 - 4*x + 2 = 0');
       expect(normalizeForSolver('Power[x,2] - 5*x + 6 = 0')).toBe('x^2 - 5*x + 6 = 0');
-      expect(normalizeForSolver('2*x² − 4*x + 2 = 0')).toBe('2*x^2 - 4*x + 2 = 0');
     });
 
     it('serializePaletteAction maps math operators deterministically', () => {
       expect(serializePaletteAction('', 'VAR_X').newQuery).toBe('x');
-      expect(serializePaletteAction('', 'SQUARE').newQuery).toBe('x^2');
-      expect(serializePaletteAction('x', 'SQUARE', { start: 1, end: 1 }).newQuery).toBe('x^2');
+      expect(serializePaletteAction('', 'SQUARE').newQuery).toBe('x²');
+      expect(serializePaletteAction('x', 'SQUARE', { start: 1, end: 1 }).newQuery).toBe('x²');
       expect(serializePaletteAction('', 'POWER').newQuery).toBe('^');
       expect(serializePaletteAction('', 'FRACTION').newQuery).toBe('(/)');
       expect(serializePaletteAction('', 'PLUS').newQuery).toBe(' + ');
-      expect(serializePaletteAction('', 'MINUS').newQuery).toBe(' - ');
+      expect(serializePaletteAction('', 'MINUS').newQuery).toBe(' − ');
       expect(serializePaletteAction('', 'MULTIPLY').newQuery).toBe('*');
       expect(serializePaletteAction('', 'DIVIDE').newQuery).toBe('/');
       expect(serializePaletteAction('', 'EQUALS').newQuery).toBe(' = ');
@@ -74,9 +75,9 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(serializePaletteAction('', 'DOT').newQuery).toBe('.');
     });
 
-    it('toVisualLatex formats raw strings into LaTeX for KaTeX preview', () => {
+    it('toVisualLatex formats raw strings into LaTeX', () => {
       expect(toVisualLatex('x^2 - 5*x + 6 = 0')).toBe('x^{2} - 5x + 6 = 0');
-      expect(toVisualLatex('Power[x,2] - 5*x + 6 = 0')).toBe('x^{2} - 5x + 6 = 0');
+      expect(toVisualLatex('x² − 5x + 6 = 0')).toBe('x^{2} - 5x + 6 = 0');
       expect(toVisualLatex('3/4*x^2')).toBe('\\frac{3}{4} \\cdot x^{2}');
       expect(toVisualLatex('(2/3)*x')).toBe('(\\frac{2}{3}) \\cdot x');
     });
@@ -109,10 +110,9 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(screen.getByTestId('mode-quick-btn')).toHaveAttribute('aria-selected', 'true');
       expect(screen.getByTestId('mode-math-btn')).toHaveAttribute('aria-selected', 'false');
       expect(screen.queryByTestId('math-palette')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('math-preview-box')).not.toBeInTheDocument();
     });
 
-    it('switches to Math Input mode, converts to Power[x,2] format and shows preview box & Math Palette', () => {
+    it('switches to Math Input mode and formats directly to x² − 5x + 6 = 0', () => {
       const onQueryChange = vi.fn();
       const onSubmit = vi.fn();
       const onClear = vi.fn();
@@ -134,8 +134,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
       expect(mathTab).toHaveAttribute('aria-selected', 'true');
       expect(screen.getByTestId('mode-quick-btn')).toHaveAttribute('aria-selected', 'false');
       expect(screen.getByTestId('math-palette')).toBeInTheDocument();
-      expect(screen.getByTestId('math-preview-box')).toBeInTheDocument();
-      expect(onQueryChange).toHaveBeenCalledWith('Power[x,2] - 5*x + 6 = 0');
+      expect(onQueryChange).toHaveBeenCalledWith('x² − 5x + 6 = 0');
     });
 
     it('clicking palette category tabs and buttons inserts deterministic symbols and updates query', () => {
@@ -184,7 +183,36 @@ describe('MathInputComposer & Serialization Utilities', () => {
 
       const btnSquare = screen.getByTestId('palette-btn-SQUARE');
       fireEvent.click(btnSquare);
-      expect(onQueryChange).toHaveBeenCalledWith('x^2');
+      expect(onQueryChange).toHaveBeenCalledWith('x²');
+    });
+
+    it('clicking fraction button creates Casio 2-tier interactive slots', () => {
+      let queryValue = '';
+      const onQueryChange = vi.fn((val: string) => {
+        queryValue = val;
+      });
+      const onSubmit = vi.fn();
+      const onClear = vi.fn();
+
+      render(
+        <PreferencesProvider>
+          <EquationInputShell
+            query={queryValue}
+            onQueryChange={onQueryChange}
+            onSubmit={onSubmit}
+            onClear={onClear}
+          />
+        </PreferencesProvider>
+      );
+
+      // Switch to Math mode
+      fireEvent.click(screen.getByTestId('mode-math-btn'));
+
+      // Click Fraction button (□/□)
+      const btnFraction = screen.getByTestId('palette-btn-FRACTION');
+      fireEvent.click(btnFraction);
+
+      expect(onQueryChange).toHaveBeenCalledWith('()/()');
     });
 
     it('clicking Clear button in palette or input shell calls onClear', () => {
