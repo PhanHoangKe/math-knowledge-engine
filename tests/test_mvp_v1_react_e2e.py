@@ -177,6 +177,10 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         cert_badge = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-outcome-badge']")
         assert "Xác thực Toàn diện Thành công" in cert_badge.text
 
+        # Open collapsible technical details to inspect certificate ID and fingerprint
+        tech_details = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-technical-details']")
+        tech_details.find_element(By.TAG_NAME, "summary").click()
+
         cert_id = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='certificate-id']")
         assert len(cert_id.text.strip()) > 0
 
@@ -223,7 +227,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert "9" in catalog_panel.text
 
     def test_04_method_switch_unexecutable_and_executable(self):
-        """Section 19: Switch to unexecutable method QUAD_COMPLETE_SQUARE then back to executable QUAD_FORMULA_STANDARD."""
+        """Section 19: Verify UNAVAILABLE method action is disabled, and switch between AVAILABLE methods."""
         self.driver.get(f"{self.base_url}/")
 
         equation_input = WebDriverWait(self.driver, 5.0).until(
@@ -237,24 +241,38 @@ class TestMVPV1ReactE2E(unittest.TestCase):
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='method-card-QUAD_COMPLETE_SQUARE']"))
         )
 
-        # 1. Switch to UNAVAILABLE method: QUAD_COMPLETE_SQUARE
+        # 1. Verify UNAVAILABLE method QUAD_COMPLETE_SQUARE has disabled solve button and openable knowledge surface
         card_complete_sq = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='method-card-QUAD_COMPLETE_SQUARE']")
-        switch_btn = card_complete_sq.find_element(By.TAG_NAME, "button")
-        switch_btn.click()
+        solve_btn_complete_sq = card_complete_sq.find_element(By.CSS_SELECTOR, "[data-testid='select-method-btn-QUAD_COMPLETE_SQUARE']")
+        assert not solve_btn_complete_sq.is_enabled()
+        assert "Chưa hỗ trợ giải" in solve_btn_complete_sq.text
 
-        # Wait for MethodNotExecutablePanel to appear
-        not_exec_panel = WebDriverWait(self.driver, 8.0).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='method-not-executable-panel']"))
+        why_btn_complete_sq = card_complete_sq.find_element(By.CSS_SELECTOR, "[data-testid='why-method-btn-QUAD_COMPLETE_SQUARE']")
+        why_btn_complete_sq.click()
+        surface = WebDriverWait(self.driver, 8.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='method-knowledge-surface-QUAD_COMPLETE_SQUARE']"))
         )
-        assert not_exec_panel.is_displayed()
-        assert "chưa hỗ trợ" in not_exec_panel.text or "Phương pháp" in not_exec_panel.text
+        assert surface.is_displayed()
 
-        # Ensure no fake solution panel is rendered
-        assert len(self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='solution-summary-panel']")) == 0
+        # 2. Switch to AVAILABLE method: QUAD_FORMULA_REDUCED
+        card_reduced = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='method-card-QUAD_FORMULA_REDUCED']")
+        switch_btn_reduced = card_reduced.find_element(By.CSS_SELECTOR, "[data-testid='select-method-btn-QUAD_FORMULA_REDUCED']")
+        assert switch_btn_reduced.is_enabled()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", switch_btn_reduced)
+        time.sleep(0.2)
+        self.driver.execute_script("arguments[0].click();", switch_btn_reduced)
 
-        # 2. Switch back to AVAILABLE method: QUAD_FORMULA_STANDARD
+        # Wait for SOLVED workspace with QUAD_FORMULA_REDUCED
+        WebDriverWait(self.driver, 8.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='solution-summary-panel']"))
+        )
+        outcome_badge = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='solution-outcome-badge']")
+        assert "2 nghiệm thực phân biệt" in outcome_badge.text
+
+        # 3. Switch back to AVAILABLE method: QUAD_FORMULA_STANDARD
         card_std = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='method-card-QUAD_FORMULA_STANDARD']")
-        std_btn = card_std.find_element(By.TAG_NAME, "button")
+        std_btn = card_std.find_element(By.CSS_SELECTOR, "[data-testid='select-method-btn-QUAD_FORMULA_STANDARD']")
+        assert std_btn.is_enabled()
         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", std_btn)
         time.sleep(0.2)
         self.driver.execute_script("arguments[0].click();", std_btn)

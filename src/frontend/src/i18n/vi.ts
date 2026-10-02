@@ -26,7 +26,7 @@ export const vi = {
 
   hero_super: 'HỆ THỐNG SUY LUẬN KÝ HIỆU HÌNH THỨC & TOÁN HỌC CHUẨN XÁC',
   hero_title: 'Math Knowledge Engine',
-  hero_tagline: '"Suy luận ký hiệu tất định trên miền số thực \\(\\mathbb{R}\\) với số học hữu tỉ chuẩn xác trên \\(\\mathbb{Q}\\)"',
+  hero_tagline: '"Suy luận ký hiệu tất định trên miền số thực ℝ với số học hữu tỉ chuẩn xác trên ℚ"',
 
   input_placeholder: 'Nhập phương trình đại số (ví dụ: x^2 - 5*x + 6 = 0)...',
   input_aria: 'Nhập phương trình đại số',
@@ -43,7 +43,7 @@ export const vi = {
   panel_skeleton_input_analysis: 'Phân tích Biểu thức Đầu vào (Chờ truy vấn)',
   panel_skeleton_canonical_form: 'Dạng Chuẩn tắc & Hệ số (Chờ truy vấn)',
   panel_skeleton_methods: 'Phương pháp Khả dụng (Chờ truy vấn)',
-  panel_skeleton_solution_trace: 'Minh chứng Lời giải Từng bước (Chờ truy vấn)',
+  panel_skeleton_solution_trace: 'Lời giải Từng bước (Chờ truy vấn)',
   
   shell_status_idle: 'Trạng thái: Sẵn sàng (Động cơ Toán học Tất định)',
   shell_status_loading: 'Đang gửi truy vấn và phân tích trên máy chủ toán học...',
@@ -53,8 +53,8 @@ export const vi = {
 
   flow_tagline: 'Kiến trúc Toán học Tất định MKE:',
   flow_ast: 'Cú pháp AST Tường minh',
-  flow_rational: 'Số học Hữu tỉ \\(\\mathbb{Q}\\)',
-  flow_symbolic: 'Suy luận Ký hiệu \\(\\mathbb{R}\\)',
+  flow_rational: 'Số học Hữu tỉ ℚ',
+  flow_symbolic: 'Suy luận Ký hiệu ℝ',
   flow_cert: 'Nghiệm & Minh chứng Tất định',
 
   footer_copyright: '© 2026 Math Knowledge Engine Project. Bản quyền thuộc về Kế Phan Hoàng.',
@@ -63,13 +63,15 @@ export const vi = {
   state_loading: 'Đang xử lý phân tích toán học trên máy chủ...',
   btn_retry: 'Thử lại',
   btn_clear: 'Xóa',
-  btn_switch_method: 'Giải phương pháp này',
+  btn_switch_method: 'Giải bằng phương pháp này',
   btn_selected_method: 'Đang chọn',
+  btn_method_unavailable: 'Chưa hỗ trợ giải',
+  btn_method_not_applicable: 'Không áp dụng cho bài này',
 
   panel_canonical_problem: 'Biểu thức Chuẩn tắc & Hệ số',
   panel_method_catalog: 'Danh mục Phương pháp Giải',
   panel_solution_summary: 'Kết luận & Nghiệm Thực',
-  panel_solution_trace: 'Minh chứng Lời giải Từng bước',
+  panel_solution_trace: 'Lời giải từng bước',
   panel_verification: 'Chứng chỉ Xác thực Độc lập',
   panel_degenerate_solution: 'Lời giải Phương trình Suy biến',
 
@@ -77,22 +79,23 @@ export const vi = {
   lbl_semantic_hash: 'Mã băm ngữ nghĩa (Semantic Revision Hash)',
   lbl_classification: 'Phân loại',
   lbl_coefficients: 'Hệ số chuẩn tắc',
-  lbl_discriminant: 'Biệt thức \\(\\Delta\\)',
-  lbl_discriminant_perfect_square: 'Chính phương trong \\(\\mathbb{Q}\\)',
-  lbl_discriminant_positive: 'Dương (\\(\\Delta > 0\\))',
-  lbl_discriminant_zero: 'Bằng 0 (\\(\\Delta = 0\\))',
-  lbl_discriminant_negative: 'Âm (\\(\\Delta < 0\\))',
+  lbl_discriminant: 'Biệt thức Δ',
+  lbl_discriminant_perfect_square: 'Chính phương trong ℚ',
+  lbl_discriminant_positive: 'Dương (Δ > 0)',
+  lbl_discriminant_zero: 'Bằng 0 (Δ = 0)',
+  lbl_discriminant_negative: 'Âm (Δ < 0)',
 
-  lbl_method_applicability: 'Khả dụng toán học',
+  lbl_method_applicability: 'Áp dụng cho bài này',
+  lbl_method_execution: 'Engine có thể giải',
   lbl_method_recommendation: 'Khuyến nghị sư phạm',
   lbl_method_verification: 'Khả năng xác thực',
   lbl_method_reasons: 'Lý do áp dụng',
   lbl_method_prerequisites: 'Điều kiện tiên quyết',
   lbl_method_trace_available: 'Có lời giải chi tiết',
 
-  enum_app_APPLICABLE: 'Khả dụng',
-  enum_app_NOT_APPLICABLE: 'Không khả dụng',
-  enum_app_UNKNOWN: 'Chưa xác định',
+  enum_app_APPLICABLE: 'Áp dụng: Có',
+  enum_app_NOT_APPLICABLE: 'Áp dụng: Không',
+  enum_app_UNKNOWN: 'Áp dụng: Chưa xác định',
 
   enum_rec_RECOMMENDED: 'Khuyến nghị',
   enum_rec_NEUTRAL: 'Trung tính',
@@ -105,18 +108,18 @@ export const vi = {
   enum_sup_SUPPORTED: 'Đã hỗ trợ',
   enum_sup_UNSUPPORTED: 'Chưa hỗ trợ',
 
-  enum_exec_AVAILABLE: 'Sẵn sàng giải',
-  enum_exec_UNAVAILABLE: 'Chưa khả dụng',
+  enum_exec_AVAILABLE: 'Engine: Có thể giải',
+  enum_exec_UNAVAILABLE: 'Engine: Chưa hỗ trợ',
 
   lbl_solution_outcome: 'Kết luận nghiệm',
-  lbl_final_answer: 'Tập nghiệm \\(S\\)',
+  lbl_final_answer: 'Tập nghiệm S',
   lbl_roots_list: 'Danh sách nghiệm thực',
   lbl_root_approx: 'Xấp xỉ thập phân',
-  lbl_no_roots: 'Phương trình vô nghiệm trên miền số thực \\(\\mathbb{R}\\)',
+  lbl_no_roots: 'Phương trình vô nghiệm trên miền số thực ℝ',
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 nghiệm thực phân biệt',
   enum_out_ONE_REPEATED_REAL_ROOT: '1 nghiệm thực kép',
-  enum_out_NO_REAL_ROOTS: 'Vô nghiệm trên \\(\\mathbb{R}\\)',
+  enum_out_NO_REAL_ROOTS: 'Vô nghiệm trên ℝ',
   enum_out_ONE_REAL_LINEAR_ROOT: '1 nghiệm bậc nhất duy nhất',
   enum_out_INFINITE_REAL_SOLUTIONS: 'Vô số nghiệm (Đồng nhất thức)',
   enum_out_NO_REAL_SOLUTIONS_CONTRADICTION: 'Vô nghiệm (Mâu thuẫn)',
@@ -124,7 +127,7 @@ export const vi = {
   lbl_trace_disclaimer: 'Lời giải từng bước mang tính diễn giải sư phạm tất định. Phạm vi xác thực toán học độc lập là kết quả nghiệm cuối cùng.',
   lbl_trace_step: 'Bước',
   lbl_trace_rule: 'Quy tắc / Định lý',
-  lbl_trace_why: 'Mục đích bước này',
+  lbl_trace_why: 'Vì sao làm bước này?',
 
   lbl_cert_id: 'Mã chứng chỉ (Certificate ID)',
   lbl_cert_outcome: 'Kết quả xác thực',
@@ -137,6 +140,11 @@ export const vi = {
   lbl_cert_vieta: 'Kiểm tra hệ thức Viète',
   lbl_cert_identities: 'Đồng nhất thức đại số đã qua',
   lbl_cert_residuals: 'Kiểm tra độ lệch dư',
+
+  lbl_status_verified: '✓ Đã kiểm tra',
+  lbl_status_not_applicable: 'Không áp dụng',
+  lbl_status_failed: '✗ Không đạt',
+  lbl_technical_details: 'Chi tiết kỹ thuật',
 
   enum_ver_out_VERIFIED_COMPLETE: 'Xác thực Toàn diện Thành công',
   enum_ver_out_VERIFICATION_FAILED: 'Xác thực Thất bại',
@@ -158,7 +166,7 @@ export const vi = {
   err_span_lbl: 'Vị trí lỗi trên chuỗi nhập',
   err_details_lbl: 'Chi tiết kỹ thuật',
 
-  lbl_methods_unit: 'phương thức',
+  lbl_methods_unit: 'phương pháp',
   lbl_verification_criteria: 'Các tiêu chí kiểm chứng toán học:',
   lbl_cert_no_real_roots: 'Xác thực không có nghiệm thực',
   lbl_trace_empty: 'Không có bước giải chi tiết nào.',
@@ -193,7 +201,7 @@ export const vi = {
   status_coeff_invalid: 'Dữ liệu hệ số không hợp lệ - đã dừng gửi yêu cầu',
   status_coeff_error: 'Tính toán lại thất bại - đã lưu bản nháp',
 
-  panel_revision_history: 'Lịch sử Phiên bản Phiên làm việc',
+  panel_revision_history: 'Lịch sử phiên làm việc',
   lbl_history_empty: 'Chưa có phiên bản tính toán nào trong phiên làm việc.',
   lbl_history_revision: 'Phiên bản',
   lbl_history_time: 'Thời điểm',

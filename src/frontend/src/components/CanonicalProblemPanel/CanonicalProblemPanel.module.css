@@ -145,12 +145,35 @@
   color: #4f46e5;
 }
 
+.technicalDetails {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.5rem;
+}
+
+.technicalSummary {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem 0;
+  transition: color var(--transition-fast);
+}
+
+.technicalSummary:hover {
+  color: var(--color-primary);
+}
+
+.technicalDetails[open] .technicalSummary {
+  margin-bottom: 0.5rem;
+}
+
 .idRow {
   display: flex;
   flex-wrap: wrap;
   gap: 1.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--color-border);
+  padding-top: 0.25rem;
 }
 
 .idGroup {

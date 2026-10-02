@@ -58,6 +58,23 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
           const isAvailable = method.execution_availability === 'AVAILABLE';
           const isKnowledgeExpanded = expandedMethodIds.has(method.method_id);
 
+          let solveBtnLabel = t('btn_switch_method');
+          let isSolveDisabled = isLoading;
+
+          if (!isApplicable) {
+            isSolveDisabled = true;
+            solveBtnLabel = t('btn_method_not_applicable');
+          } else if (!isAvailable) {
+            isSolveDisabled = true;
+            solveBtnLabel = t('btn_method_unavailable');
+          } else if (isSelected) {
+            isSolveDisabled = true;
+            solveBtnLabel = t('btn_selected_method');
+          } else {
+            isSolveDisabled = isLoading;
+            solveBtnLabel = t('btn_switch_method');
+          }
+
           return (
             <div
               key={method.method_id}
@@ -80,7 +97,7 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
                   {/* Execution Availability Badge */}
                   <span
                     className={`${styles.badge} ${isAvailable ? styles.badgeSuccess : styles.badgeMuted}`}
-                    title={t('enum_exec_AVAILABLE')}
+                    title={t('lbl_method_execution')}
                   >
                     {t(EXECUTION_AVAILABILITY_I18N[method.execution_availability])}
                   </span>
@@ -136,12 +153,16 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
                   <button
                     type="button"
                     className={`${styles.selectBtn} ${isSelected ? styles.btnActive : ''}`}
-                    onClick={() => onSelectMethod?.(method.method_id)}
-                    disabled={isLoading || isSelected}
+                    onClick={() => {
+                      if (!isSolveDisabled) {
+                        onSelectMethod?.(method.method_id);
+                      }
+                    }}
+                    disabled={isSolveDisabled}
                     aria-pressed={isSelected}
                     data-testid={`select-method-btn-${method.method_id}`}
                   >
-                    {isSelected ? t('btn_selected_method') : t('btn_switch_method')}
+                    {solveBtnLabel}
                   </button>
                   <button
                     type="button"

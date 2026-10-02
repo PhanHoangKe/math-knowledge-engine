@@ -28,7 +28,7 @@ export const en: Translations = {
 
   hero_super: 'FORMAL SYMBOLIC REASONING & EXACT MATHEMATICS SYSTEM',
   hero_title: 'Math Knowledge Engine',
-  hero_tagline: '"Deterministic symbolic reasoning over \\(\\mathbb{R}\\) with exact rational arithmetic over \\(\\mathbb{Q}\\)"',
+  hero_tagline: '"Deterministic symbolic reasoning over ℝ with exact rational arithmetic over ℚ"',
 
   input_placeholder: 'Enter algebraic equation (e.g., x^2 - 5*x + 6 = 0)...',
   input_aria: 'Enter algebraic equation',
@@ -45,7 +45,7 @@ export const en: Translations = {
   panel_skeleton_input_analysis: 'Input Expression Analysis (Awaiting Query)',
   panel_skeleton_canonical_form: 'Canonical Form & Coefficients (Awaiting Query)',
   panel_skeleton_methods: 'Applicable Methods (Awaiting Query)',
-  panel_skeleton_solution_trace: 'Step-by-Step Solution & Certificate (Awaiting Query)',
+  panel_skeleton_solution_trace: 'Step-by-Step Solution (Awaiting Query)',
 
   shell_status_idle: 'Status: Ready (Deterministic Mathematical Engine)',
   shell_status_loading: 'Submitting query and analyzing on mathematical server...',
@@ -55,8 +55,8 @@ export const en: Translations = {
 
   flow_tagline: 'MKE Deterministic Mathematical Architecture:',
   flow_ast: 'Explicit AST Syntax',
-  flow_rational: 'Exact Rational \\(\\mathbb{Q}\\)',
-  flow_symbolic: 'Symbolic Reasoning \\(\\mathbb{R}\\)',
+  flow_rational: 'Exact Rational ℚ',
+  flow_symbolic: 'Symbolic Reasoning ℝ',
   flow_cert: 'Deterministic Certification',
 
   footer_copyright: '© 2026 Math Knowledge Engine Project. Authored by Kế Phan Hoàng.',
@@ -67,11 +67,13 @@ export const en: Translations = {
   btn_clear: 'Clear',
   btn_switch_method: 'Solve with this method',
   btn_selected_method: 'Selected',
+  btn_method_unavailable: 'Execution not yet supported',
+  btn_method_not_applicable: 'Not applicable to this problem',
 
   panel_canonical_problem: 'Canonical Form & Coefficients',
   panel_method_catalog: 'Method Catalog',
   panel_solution_summary: 'Solution & Real Roots',
-  panel_solution_trace: 'Step-by-Step Solution Trace',
+  panel_solution_trace: 'Step-by-Step Solution',
   panel_verification: 'Independent Verification Certificate',
   panel_degenerate_solution: 'Degenerate Equation Solution',
 
@@ -79,22 +81,23 @@ export const en: Translations = {
   lbl_semantic_hash: 'Semantic Revision Hash',
   lbl_classification: 'Classification',
   lbl_coefficients: 'Canonical Coefficients',
-  lbl_discriminant: 'Discriminant \\(\\Delta\\)',
-  lbl_discriminant_perfect_square: 'Rational Square in \\(\\mathbb{Q}\\)',
-  lbl_discriminant_positive: 'Positive (\\(\\Delta > 0\\))',
-  lbl_discriminant_zero: 'Zero (\\(\\Delta = 0\\))',
-  lbl_discriminant_negative: 'Negative (\\(\\Delta < 0\\))',
+  lbl_discriminant: 'Discriminant Δ',
+  lbl_discriminant_perfect_square: 'Rational Square in ℚ',
+  lbl_discriminant_positive: 'Positive (Δ > 0)',
+  lbl_discriminant_zero: 'Zero (Δ = 0)',
+  lbl_discriminant_negative: 'Negative (Δ < 0)',
 
-  lbl_method_applicability: 'Mathematical Applicability',
+  lbl_method_applicability: 'Applicable to this problem',
+  lbl_method_execution: 'Engine can execute',
   lbl_method_recommendation: 'Pedagogical Recommendation',
   lbl_method_verification: 'Verification Capability',
   lbl_method_reasons: 'Applicability Reasons',
   lbl_method_prerequisites: 'Prerequisites',
   lbl_method_trace_available: 'Trace Available',
 
-  enum_app_APPLICABLE: 'Applicable',
-  enum_app_NOT_APPLICABLE: 'Not Applicable',
-  enum_app_UNKNOWN: 'Unknown',
+  enum_app_APPLICABLE: 'Applicable: Yes',
+  enum_app_NOT_APPLICABLE: 'Applicable: No',
+  enum_app_UNKNOWN: 'Applicable: Unknown',
 
   enum_rec_RECOMMENDED: 'Recommended',
   enum_rec_NEUTRAL: 'Neutral',
@@ -107,18 +110,18 @@ export const en: Translations = {
   enum_sup_SUPPORTED: 'Supported',
   enum_sup_UNSUPPORTED: 'Unsupported',
 
-  enum_exec_AVAILABLE: 'Available',
-  enum_exec_UNAVAILABLE: 'Unavailable',
+  enum_exec_AVAILABLE: 'Engine: Supported',
+  enum_exec_UNAVAILABLE: 'Engine: Not yet',
 
   lbl_solution_outcome: 'Solution Outcome',
-  lbl_final_answer: 'Solution Set \\(S\\)',
+  lbl_final_answer: 'Solution Set S',
   lbl_roots_list: 'Real Roots List',
   lbl_root_approx: 'Decimal Approximation',
-  lbl_no_roots: 'Equation has no real roots in \\(\\mathbb{R}\\)',
+  lbl_no_roots: 'Equation has no real roots in ℝ',
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 Distinct Real Roots',
   enum_out_ONE_REPEATED_REAL_ROOT: '1 Repeated Real Root',
-  enum_out_NO_REAL_ROOTS: 'No Real Roots in \\(\\mathbb{R}\\)',
+  enum_out_NO_REAL_ROOTS: 'No Real Roots in ℝ',
   enum_out_ONE_REAL_LINEAR_ROOT: '1 Linear Real Root',
   enum_out_INFINITE_REAL_SOLUTIONS: 'Infinite Real Solutions (Identity)',
   enum_out_NO_REAL_SOLUTIONS_CONTRADICTION: 'No Real Solutions (Contradiction)',
@@ -126,7 +129,7 @@ export const en: Translations = {
   lbl_trace_disclaimer: 'The step-by-step trace is a deterministic pedagogical explanation. The independent mathematical verification scope is the final solution.',
   lbl_trace_step: 'Step',
   lbl_trace_rule: 'Rule / Theorem',
-  lbl_trace_why: 'Why this step',
+  lbl_trace_why: 'Why this step?',
 
   lbl_cert_id: 'Certificate ID',
   lbl_cert_outcome: 'Verification Outcome',
@@ -139,6 +142,11 @@ export const en: Translations = {
   lbl_cert_vieta: 'Vieta Relations Checked',
   lbl_cert_identities: 'Algebraic Identities Passed',
   lbl_cert_residuals: 'Residual Checks',
+
+  lbl_status_verified: '✓ Verified',
+  lbl_status_not_applicable: 'Not applicable',
+  lbl_status_failed: '✗ Failed',
+  lbl_technical_details: 'Technical Details',
 
   enum_ver_out_VERIFIED_COMPLETE: 'Verified Complete',
   enum_ver_out_VERIFICATION_FAILED: 'Verification Failed',

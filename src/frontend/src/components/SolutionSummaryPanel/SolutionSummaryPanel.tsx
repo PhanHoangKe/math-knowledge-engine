@@ -40,7 +40,9 @@ export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({ solu
               {solution.roots.map((root, idx) => (
                 <div key={idx} className={styles.rootCard} data-testid={`root-item-${idx}`}>
                   <div className={styles.rootHeader}>
-                    <span className={styles.rootIndex}>\(x_{idx + 1}\)</span>
+                    <span className={styles.rootIndex}>
+                      <MathLatex latex={`x_{${idx + 1}}`} />
+                    </span>
                     <span className={styles.rootTypeBadge}>{root.root_type}</span>
                   </div>
                   <div className={styles.rootLatex} data-testid={`root-latex-${idx}`}>

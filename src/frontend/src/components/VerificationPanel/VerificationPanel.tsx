@@ -51,42 +51,6 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
       </div>
 
       <div className={styles.cardBody}>
-        {/* Certificate Metadata Grid */}
-        <div className={styles.metaGrid}>
-          <div className={styles.metaRow}>
-            <span className={styles.metaLabel}>{t('lbl_cert_id')}:</span>
-            <code className={styles.metaValue} data-testid="certificate-id">
-              {certificate.certificate_id}
-            </code>
-          </div>
-
-          <div className={styles.metaRow}>
-            <span className={styles.metaLabel}>{t('lbl_cert_fingerprint')}:</span>
-            <code className={styles.metaValue} data-testid="integrity-fingerprint">
-              {certificate.integrity_fingerprint}
-            </code>
-          </div>
-
-          <div className={styles.metaRow}>
-            <span className={styles.metaLabel}>{t('lbl_cert_verifier')}:</span>
-            <span className={styles.verifierText}>
-              {certificate.verifier_name} (v{certificate.verifier_version})
-            </span>
-          </div>
-
-          {certificate.verified_at_utc && (
-            <div className={styles.metaRow}>
-              <span className={styles.metaLabel}>{t('lbl_cert_timestamp')}:</span>
-              <span className={styles.metaText}>{certificate.verified_at_utc}</span>
-            </div>
-          )}
-
-          <div className={styles.metaRow}>
-            <span className={styles.metaLabel}>{t('lbl_cert_scope')}:</span>
-            <span className={styles.scopeBadge}>{verificationScope}</span>
-          </div>
-        </div>
-
         {/* Verification Check Badges */}
         <div className={styles.checksSection}>
           <h3 className={styles.checksTitle}>{t('lbl_verification_criteria')}</h3>
@@ -96,7 +60,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
               data-testid="check-multiplicity"
             >
               <span className={styles.checkIcon}>
-                {certificate.multiplicity_verified ? '✓' : '—'}
+                {certificate.multiplicity_verified ? t('lbl_status_verified') : t('lbl_status_not_applicable')}
               </span>
               <span>{t('lbl_cert_multiplicity')}</span>
             </div>
@@ -106,7 +70,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
               data-testid="check-vieta"
             >
               <span className={styles.checkIcon}>
-                {certificate.vieta_relations_checked ? '✓' : '—'}
+                {certificate.vieta_relations_checked ? t('lbl_status_verified') : t('lbl_status_not_applicable')}
               </span>
               <span>{t('lbl_cert_vieta')}</span>
             </div>
@@ -116,7 +80,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 className={`${styles.checkItem} ${styles.checkPass}`}
                 data-testid="check-no-real-roots"
               >
-                <span className={styles.checkIcon}>✓</span>
+                <span className={styles.checkIcon}>{t('lbl_status_verified')}</span>
                 <span>{t('lbl_cert_no_real_roots')}</span>
               </div>
             )}
@@ -151,6 +115,45 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
               </div>
             )}
         </div>
+
+        {/* Certificate Metadata (Collapsible Technical Details) */}
+        <details className={styles.technicalDetails} data-testid="verification-technical-details">
+          <summary className={styles.technicalSummary}>{t('lbl_technical_details')}</summary>
+          <div className={styles.metaGrid}>
+            <div className={styles.metaRow}>
+              <span className={styles.metaLabel}>{t('lbl_cert_id')}:</span>
+              <code className={styles.metaValue} data-testid="certificate-id">
+                {certificate.certificate_id}
+              </code>
+            </div>
+
+            <div className={styles.metaRow}>
+              <span className={styles.metaLabel}>{t('lbl_cert_fingerprint')}:</span>
+              <code className={styles.metaValue} data-testid="integrity-fingerprint">
+                {certificate.integrity_fingerprint}
+              </code>
+            </div>
+
+            <div className={styles.metaRow}>
+              <span className={styles.metaLabel}>{t('lbl_cert_verifier')}:</span>
+              <span className={styles.verifierText}>
+                {certificate.verifier_name} (v{certificate.verifier_version})
+              </span>
+            </div>
+
+            {certificate.verified_at_utc && (
+              <div className={styles.metaRow}>
+                <span className={styles.metaLabel}>{t('lbl_cert_timestamp')}:</span>
+                <span className={styles.metaText}>{certificate.verified_at_utc}</span>
+              </div>
+            )}
+
+            <div className={styles.metaRow}>
+              <span className={styles.metaLabel}>{t('lbl_cert_scope')}:</span>
+              <span className={styles.scopeBadge}>{verificationScope}</span>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../App';
 import * as clientModule from '../api/client';
+import type { SolvedResponse } from '../api/contract';
 import {
   mockSolvedTwoRoots,
   mockAnalyzedDegenerateLinear,
@@ -144,15 +145,24 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     expect(screen.getByTestId('method-card-QUAD_COMPLETE_SQUARE')).toBeInTheDocument();
 
     // Verify count badge
-    expect(screen.getByText('3 phương thức')).toBeInTheDocument();
+    expect(screen.getByText('3 phương pháp')).toBeInTheDocument();
   });
 
   it('H & I: switches method sending COEFFICIENTS mode with exact backend a/b/c without client math derivation', async () => {
+    const mockSolvedWithSwitchableMethod: SolvedResponse = {
+      ...mockSolvedTwoRoots,
+      available_methods: mockSolvedTwoRoots.available_methods.map((m) =>
+        m.method_id === 'QUAD_COMPLETE_SQUARE'
+          ? { ...m, execution_availability: 'AVAILABLE' as const }
+          : m
+      ),
+    };
+
     const solveSpy = vi.spyOn(clientModule, 'solveEquation')
       .mockResolvedValueOnce({
         kind: 'application',
         status: 200,
-        response: mockSolvedTwoRoots,
+        response: mockSolvedWithSwitchableMethod,
       })
       .mockResolvedValueOnce({
         kind: 'application',

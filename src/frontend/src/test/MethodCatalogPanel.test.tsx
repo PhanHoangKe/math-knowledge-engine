@@ -167,6 +167,116 @@ describe('MethodCatalogPanel Component with Knowledge Surfaces', () => {
     expect(screen.getByTestId('select-method-btn-QUAD_GRAPHICAL_ANALYSIS')).toBeInTheDocument();
   });
 
+  it('strictly enforces the Action Button Decision Matrix in Vietnamese', () => {
+    const onSelectMethodMock = vi.fn();
+
+    render(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodCatalogPanel
+          methods={mockMethods}
+          selectedMethodId="QUAD_FORMULA_STANDARD"
+          onSelectMethod={onSelectMethodMock}
+        />
+      </PreferencesProvider>
+    );
+
+    // 1. APPLICABLE + AVAILABLE + selected -> disabled, label "Đang chọn"
+    const selectedBtn = screen.getByTestId('select-method-btn-QUAD_FORMULA_STANDARD');
+    expect(selectedBtn).toBeDisabled();
+    expect(selectedBtn).toHaveTextContent('Đang chọn');
+    expect(selectedBtn).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(selectedBtn);
+    expect(onSelectMethodMock).not.toHaveBeenCalled();
+
+    // 2. APPLICABLE + UNAVAILABLE -> disabled, label "Chưa hỗ trợ giải"
+    const unavailableBtn = screen.getByTestId('select-method-btn-QUAD_COMPLETE_SQUARE');
+    expect(unavailableBtn).toBeDisabled();
+    expect(unavailableBtn).toHaveTextContent('Chưa hỗ trợ giải');
+    expect(unavailableBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(unavailableBtn);
+    expect(onSelectMethodMock).not.toHaveBeenCalled();
+
+    // 3. NOT_APPLICABLE -> disabled, label "Không áp dụng cho bài này"
+    const notApplicableBtn = screen.getByTestId('select-method-btn-QUAD_GRAPHICAL_ANALYSIS');
+    expect(notApplicableBtn).toBeDisabled();
+    expect(notApplicableBtn).toHaveTextContent('Không áp dụng cho bài này');
+    expect(notApplicableBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(notApplicableBtn);
+    expect(onSelectMethodMock).not.toHaveBeenCalled();
+  });
+
+  it('strictly enforces APPLICABLE + AVAILABLE + unselected enabled button in Vietnamese and English', () => {
+    const onSelectMethodMock = vi.fn();
+
+    // In Vietnamese when unselected
+    const { unmount } = render(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodCatalogPanel
+          methods={mockMethods}
+          selectedMethodId={null}
+          onSelectMethod={onSelectMethodMock}
+        />
+      </PreferencesProvider>
+    );
+
+    const standardBtnVi = screen.getByTestId('select-method-btn-QUAD_FORMULA_STANDARD');
+    expect(standardBtnVi).not.toBeDisabled();
+    expect(standardBtnVi).toHaveTextContent('Giải bằng phương pháp này');
+    expect(standardBtnVi).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(standardBtnVi);
+    expect(onSelectMethodMock).toHaveBeenCalledWith('QUAD_FORMULA_STANDARD');
+
+    unmount();
+    onSelectMethodMock.mockClear();
+
+    // In English
+    render(
+      <PreferencesProvider initialLanguage="en">
+        <MethodCatalogPanel
+          methods={mockMethods}
+          selectedMethodId="QUAD_FORMULA_STANDARD"
+          onSelectMethod={onSelectMethodMock}
+        />
+      </PreferencesProvider>
+    );
+
+    // Selected
+    const selectedBtnEn = screen.getByTestId('select-method-btn-QUAD_FORMULA_STANDARD');
+    expect(selectedBtnEn).toBeDisabled();
+    expect(selectedBtnEn).toHaveTextContent('Selected');
+
+    // Unavailable
+    const unavailableBtnEn = screen.getByTestId('select-method-btn-QUAD_COMPLETE_SQUARE');
+    expect(unavailableBtnEn).toBeDisabled();
+    expect(unavailableBtnEn).toHaveTextContent('Execution not yet supported');
+
+    // Not applicable
+    const notAppBtnEn = screen.getByTestId('select-method-btn-QUAD_GRAPHICAL_ANALYSIS');
+    expect(notAppBtnEn).toBeDisabled();
+    expect(notAppBtnEn).toHaveTextContent('Not applicable to this problem');
+  });
+
+  it('renders clarified applicability and execution badges with localized titles', () => {
+    render(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodCatalogPanel
+          methods={mockMethods}
+          selectedMethodId="QUAD_FORMULA_STANDARD"
+        />
+      </PreferencesProvider>
+    );
+
+    // Check badges on applicable + available card
+    const cardStandard = screen.getByTestId('method-card-QUAD_FORMULA_STANDARD');
+    expect(within(cardStandard).getByTitle('Áp dụng cho bài này')).toHaveTextContent('Áp dụng: Có');
+    expect(within(cardStandard).getByTitle('Engine có thể giải')).toHaveTextContent('Engine: Có thể giải');
+
+    // Check badges on inapplicable card
+    const cardGraphical = screen.getByTestId('method-card-QUAD_GRAPHICAL_ANALYSIS');
+    expect(within(cardGraphical).getByTitle('Áp dụng cho bài này')).toHaveTextContent('Áp dụng: Không');
+    expect(within(cardGraphical).getByTitle('Engine có thể giải')).toHaveTextContent('Engine: Chưa hỗ trợ');
+  });
+
   it('toggles knowledge surface when "Why this method?" is clicked without calling onSelectMethod', async () => {
     setupMockFetch();
     const onSelectMethodMock = vi.fn();

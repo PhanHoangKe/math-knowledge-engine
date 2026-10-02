@@ -69,11 +69,37 @@
   padding: 1.25rem;
 }
 
+.checksSection {
+  margin-bottom: 1.25rem;
+}
+
+.technicalDetails {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.technicalSummary {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem 0;
+  transition: color var(--transition-fast);
+}
+
+.technicalSummary:hover {
+  color: var(--color-primary);
+}
+
+.technicalDetails[open] .technicalSummary {
+  margin-bottom: 0.75rem;
+}
+
 .metaGrid {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-bottom: 1.25rem;
 }
 
 .metaRow {
@@ -118,11 +144,6 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-hover);
   color: var(--color-primary);
-}
-
-.checksSection {
-  border-top: 1px solid var(--color-border);
-  padding-top: 1rem;
 }
 
 .checksTitle {

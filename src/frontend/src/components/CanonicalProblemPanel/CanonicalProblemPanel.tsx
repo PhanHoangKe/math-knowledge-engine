@@ -72,7 +72,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
               <span className={styles.metaLabel}>{t('lbl_discriminant')}:</span>
               <div className={styles.discriminantValue}>
                 <span className={styles.deltaValue}>
-                  \(\Delta\) = {formatRational(quad.discriminant.value)}
+                  <MathLatex latex={`\\Delta = ${formatRational(quad.discriminant.value)}`} />
                 </span>
                 <div className={styles.deltaFlags}>
                   {quad.discriminant.is_positive && (
@@ -100,17 +100,20 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
             </div>
           )}
 
-          {/* Problem & Revision Identifiers */}
-          <div className={styles.idRow}>
-            <div className={styles.idGroup}>
-              <span className={styles.idLabel}>{t('lbl_problem_id')}:</span>
-              <code className={styles.idValue}>{problem.problem_id}</code>
+          {/* Problem & Revision Identifiers (Collapsible Technical Details) */}
+          <details className={styles.technicalDetails} data-testid="canonical-technical-details">
+            <summary className={styles.technicalSummary}>{t('lbl_technical_details')}</summary>
+            <div className={styles.idRow}>
+              <div className={styles.idGroup}>
+                <span className={styles.idLabel}>{t('lbl_problem_id')}:</span>
+                <code className={styles.idValue}>{problem.problem_id}</code>
+              </div>
+              <div className={styles.idGroup}>
+                <span className={styles.idLabel}>{t('lbl_semantic_hash')}:</span>
+                <code className={styles.idValue}>{problem.semantic_revision_hash}</code>
+              </div>
             </div>
-            <div className={styles.idGroup}>
-              <span className={styles.idLabel}>{t('lbl_semantic_hash')}:</span>
-              <code className={styles.idValue}>{problem.semantic_revision_hash}</code>
-            </div>
-          </div>
+          </details>
         </div>
       </div>
     </div>
