@@ -2,10 +2,10 @@
 
 Verifies:
 1. Pydantic v2 strict graph contracts (GraphNode, GraphEdge, GraphModel).
-2. Knowledge Graph export (29 static nodes, canonical symmetric edge deduplication).
-3. Prerequisite Learning DAG export (14 concept nodes, acyclic, topological compliance).
+2. Knowledge Graph export (29 static nodes, 84 edges with exact relation taxonomy and canonical symmetry).
+3. Prerequisite Learning DAG export (14 concept nodes, 17 LEARN_BEFORE edges, acyclic topological compliance).
 4. Reactive Dependency DAG projection over existing S1 solved responses for canonical fixtures.
-5. Determinism, immutability, and zero mutation of S1 mathematical truth.
+5. Determinism, immutability, zero mutation of S1 mathematical truth, and rejection of non-solved states.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from mke_product.application.dto import RawEquationInput, SolvedResponse, SolveRequest
+from mke_product.application.dto import AnalyzedNoExecutionResponse, RawEquationInput, SolvedResponse, SolveRequest
 from mke_product.application.orchestrator import solve_request
 from mke_product.knowledge.graph_models import (
     GraphEdge,
@@ -25,8 +25,10 @@ from mke_product.knowledge.graph_models import (
     GraphNodeType,
 )
 from mke_product.knowledge.graph_service import (
+    GraphIntegrityError,
     KnowledgeGraphService,
     UnsupportedReactiveProjectionError,
+    validate_graph_model,
 )
 from mke_product.knowledge.schemas import LocalizedText
 
@@ -48,6 +50,8 @@ def test_graph_models_strict_validation() -> None:
         label=LocalizedText(vi="Kiểm thử", en="Test"),
     )
     assert node.node_id == "concept:test"
+    assert node.knowledge_ref is None
+    assert node.metadata == {}
 
     # Extra fields rejected
     with pytest.raises(ValidationError):
@@ -64,23 +68,86 @@ def test_graph_models_strict_validation() -> None:
 
     # Valid Edge
     edge = GraphEdge(
-        source_id="method:QUAD_FORMULA_STANDARD",
-        target_id="concept:concept_discriminant",
-        edge_type=GraphEdgeType.REQUIRES,
+        source="method:QUAD_FORMULA_STANDARD",
+        target="concept:concept_discriminant",
+        relation_type=GraphEdgeType.REQUIRES,
     )
+    assert edge.is_directed is True
     assert edge.is_symmetric is False
+    assert edge.metadata == {}
 
     # Valid GraphModel
     graph = GraphModel(
         graph_id="test_graph",
         graph_kind=GraphKind.KNOWLEDGE_GRAPH,
         title=LocalizedText(vi="Đồ thị mẫu", en="Sample Graph"),
+        nodes=[
+            node,
+            GraphNode(
+                node_id="concept:concept_discriminant",
+                node_type=GraphNodeType.CONCEPT,
+                label=LocalizedText(vi="Biệt thức", en="Discriminant"),
+            ),
+        ],
+        edges=[
+            GraphEdge(
+                source="concept:test",
+                target="concept:concept_discriminant",
+                relation_type=GraphEdgeType.REQUIRES,
+            )
+        ],
+        is_acyclic=True,
+    )
+    assert len(graph.nodes) == 2
+    assert len(graph.edges) == 1
+    validate_graph_model(graph)
+
+
+def test_graph_validator_detects_violations() -> None:
+    # 1. Dangling edge target
+    node = GraphNode(
+        node_id="node_a",
+        node_type=GraphNodeType.CONCEPT,
+        label=LocalizedText(vi="A", en="A"),
+    )
+    bad_edge = GraphEdge(
+        source="node_a",
+        target="node_b",  # Missing
+        relation_type=GraphEdgeType.REQUIRES,
+    )
+    bad_graph = GraphModel(
+        graph_id="bad_graph",
+        graph_kind=GraphKind.KNOWLEDGE_GRAPH,
+        title=LocalizedText(vi="Lỗi", en="Error"),
         nodes=[node],
-        edges=[edge],
+        edges=[bad_edge],
         is_acyclic=False,
     )
-    assert len(graph.nodes) == 1
-    assert len(graph.edges) == 1
+    with pytest.raises(GraphIntegrityError) as exc_info:
+        validate_graph_model(bad_graph)
+    assert "Edge target 'node_b' not found" in str(exc_info.value)
+
+    # 2. Cycle in DAG
+    node_b = GraphNode(
+        node_id="node_b",
+        node_type=GraphNodeType.CONCEPT,
+        label=LocalizedText(vi="B", en="B"),
+    )
+    cyclic_edges = [
+        GraphEdge(source="node_a", target="node_b", relation_type=GraphEdgeType.LEARN_BEFORE),
+        GraphEdge(source="node_b", target="node_a", relation_type=GraphEdgeType.LEARN_BEFORE),
+    ]
+    cyclic_dag = GraphModel(
+        graph_id="cyclic_dag",
+        graph_kind=GraphKind.PREREQUISITE_DAG,
+        title=LocalizedText(vi="Chu trình", en="Cycle"),
+        nodes=[node, node_b],
+        edges=cyclic_edges,
+        is_acyclic=True,
+    )
+    with pytest.raises(GraphIntegrityError) as exc_info:
+        validate_graph_model(cyclic_dag)
+    assert "Cycle detected" in str(exc_info.value)
 
 
 # ============================================================================
@@ -103,6 +170,34 @@ def test_knowledge_graph_export_node_counts_and_types(service: KnowledgeGraphSer
     assert type_counts[GraphNodeType.THEOREM] == 1
 
 
+def test_knowledge_graph_exact_edge_breakdown_84(service: KnowledgeGraphService) -> None:
+    kg = service.export_knowledge_graph()
+    assert len(kg.edges) == 84
+
+    concept_requires = [e for e in kg.edges if e.source.startswith("concept:") and e.relation_type == GraphEdgeType.REQUIRES]
+    concept_related = [e for e in kg.edges if e.source.startswith("concept:") and e.relation_type == GraphEdgeType.RELATED_TO]
+    method_requires = [e for e in kg.edges if e.source.startswith("method:") and e.relation_type == GraphEdgeType.REQUIRES]
+    method_uses_formula = [e for e in kg.edges if e.source.startswith("method:") and e.relation_type == GraphEdgeType.USES_FORMULA]
+    method_uses_theorem = [e for e in kg.edges if e.source.startswith("method:") and e.relation_type == GraphEdgeType.USES_THEOREM]
+    method_alternative = [e for e in kg.edges if e.source.startswith("method:") and e.relation_type == GraphEdgeType.ALTERNATIVE_TO]
+
+    assert len(concept_requires) == 17
+    assert len(concept_related) == 18
+    assert len(method_requires) == 30
+    assert len(method_uses_formula) == 6
+    assert len(method_uses_theorem) == 3
+    assert len(method_alternative) == 10
+
+    assert (
+        len(concept_requires)
+        + len(concept_related)
+        + len(method_requires)
+        + len(method_uses_formula)
+        + len(method_uses_theorem)
+        + len(method_alternative)
+    ) == 84
+
+
 def test_knowledge_graph_edge_integrity_and_canonical_symmetry(service: KnowledgeGraphService) -> None:
     kg = service.export_knowledge_graph()
     node_ids = {n.node_id for n in kg.nodes}
@@ -110,18 +205,18 @@ def test_knowledge_graph_edge_integrity_and_canonical_symmetry(service: Knowledg
     seen_edges = set()
     for edge in kg.edges:
         # 1. No dangling endpoints
-        assert edge.source_id in node_ids, f"Unknown source node: {edge.source_id}"
-        assert edge.target_id in node_ids, f"Unknown target node: {edge.target_id}"
+        assert edge.source in node_ids, f"Unknown source node: {edge.source}"
+        assert edge.target in node_ids, f"Unknown target node: {edge.target}"
 
         # 2. No duplicate edges
-        edge_key = (edge.source_id, edge.target_id, edge.edge_type)
+        edge_key = (edge.source, edge.target, edge.relation_type)
         assert edge_key not in seen_edges, f"Duplicate edge: {edge_key}"
         seen_edges.add(edge_key)
 
         # 3. Canonical symmetric ordering: source < target and no inverse duplicate
         if edge.is_symmetric:
-            assert edge.source_id < edge.target_id, f"Symmetric edge must have source < target: {edge}"
-            inverse_key = (edge.target_id, edge.source_id, edge.edge_type)
+            assert edge.source < edge.target, f"Symmetric edge must have source < target: {edge}"
+            inverse_key = (edge.target, edge.source, edge.relation_type)
             assert inverse_key not in seen_edges, f"Inverse duplicate found for symmetric edge: {edge}"
 
 
@@ -143,15 +238,16 @@ def test_prerequisite_dag_export(service: KnowledgeGraphService) -> None:
     assert dag.graph_kind == GraphKind.PREREQUISITE_DAG
     assert dag.is_acyclic is True
     assert len(dag.nodes) == 14
+    assert len(dag.edges) == 17
 
     node_ids = {n.node_id for n in dag.nodes}
     assert all(n.node_type == GraphNodeType.CONCEPT for n in dag.nodes)
 
     # Check edges
     for edge in dag.edges:
-        assert edge.edge_type == GraphEdgeType.LEARN_BEFORE
-        assert edge.source_id in node_ids
-        assert edge.target_id in node_ids
+        assert edge.relation_type == GraphEdgeType.LEARN_BEFORE
+        assert edge.source in node_ids
+        assert edge.target in node_ids
 
 
 def test_prerequisite_dag_satisfies_learning_order(service: KnowledgeGraphService) -> None:
@@ -160,11 +256,11 @@ def test_prerequisite_dag_satisfies_learning_order(service: KnowledgeGraphServic
 
     # Every LEARN_BEFORE edge must point from lower index to higher index
     for edge in dag.edges:
-        src_idx = node_index[edge.source_id]
-        tgt_idx = node_index[edge.target_id]
+        src_idx = node_index[edge.source]
+        tgt_idx = node_index[edge.target]
         assert src_idx < tgt_idx, (
-            f"Prerequisite learning order violated: '{edge.source_id}' (idx {src_idx}) "
-            f"must appear before '{edge.target_id}' (idx {tgt_idx})."
+            f"Prerequisite learning order violated: '{edge.source}' (idx {src_idx}) "
+            f"must appear before '{edge.target}' (idx {tgt_idx})."
         )
 
 
@@ -197,8 +293,14 @@ def test_reactive_dag_projection_on_canonical_fixtures(
     assert isinstance(response, SolvedResponse)
     assert len(response.solution.roots) == expected_roots_count
 
+    # Capture snapshot before projection to verify zero mutation
+    snapshot_before = response.model_dump()
+
     # 2. Project Reactive DAG
     reactive_dag = service.project_reactive_dependency_dag(response)
+
+    # Verify zero mutation of S1 solved response
+    assert response.model_dump() == snapshot_before
 
     assert reactive_dag.graph_kind == GraphKind.REACTIVE_DEPENDENCY_DAG
     assert reactive_dag.is_acyclic is True
@@ -217,9 +319,9 @@ def test_reactive_dag_projection_on_canonical_fixtures(
 
     # Check edge types
     for edge in reactive_dag.edges:
-        assert edge.edge_type == GraphEdgeType.COMPUTATIONAL_DEPENDENCY
-        assert edge.source_id in node_map
-        assert edge.target_id in node_map
+        assert edge.relation_type == GraphEdgeType.COMPUTATIONAL_DEPENDENCY
+        assert edge.source in node_map
+        assert edge.target in node_map
 
     # 3. Repeated projection determinism
     repeated_dag = service.project_reactive_dependency_dag(response)
@@ -230,3 +332,14 @@ def test_reactive_dag_unsupported_state_raises_typed_error(service: KnowledgeGra
     with pytest.raises(UnsupportedReactiveProjectionError) as exc_info:
         service.project_reactive_dependency_dag("invalid_response_object")
     assert "UnsupportedReactiveProjectionError" in type(exc_info.value).__name__
+
+
+def test_reactive_dag_rejects_analyzed_no_execution_response(service: KnowledgeGraphService) -> None:
+    # Linear equation yields AnalyzedNoExecutionResponse in S1
+    req = SolveRequest(input_payload=RawEquationInput(raw_query="x + 1 = 0"))
+    response = solve_request(req)
+    assert isinstance(response, AnalyzedNoExecutionResponse)
+
+    with pytest.raises(UnsupportedReactiveProjectionError) as exc_info:
+        service.project_reactive_dependency_dag(response)
+    assert "AnalyzedNoExecutionResponse" in str(exc_info.value)

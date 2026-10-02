@@ -2,6 +2,7 @@
 
 Implements graph exporters for Knowledge Graph, Prerequisite Learning DAG,
 and read-only Reactive Dependency DAG projections from S1 application results.
+Enforces strict graph contract schemas and structural integrity validation.
 """
 
 from __future__ import annotations
@@ -25,6 +26,70 @@ class UnsupportedReactiveProjectionError(Exception):
     """Raised when attempting to project a Reactive DAG from an unsupported response state."""
 
 
+class GraphIntegrityError(Exception):
+    """Raised when a generated GraphModel violates internal referential or acyclicity constraints."""
+
+
+def validate_graph_model(graph: GraphModel) -> None:
+    """Validates structural integrity, referential completeness, and DAG acyclicity."""
+    # 1. Unique node IDs
+    node_ids: Set[str] = set()
+    for node in graph.nodes:
+        if node.node_id in node_ids:
+            raise GraphIntegrityError(f"Duplicate node_id '{node.node_id}' in graph '{graph.graph_id}'.")
+        node_ids.add(node.node_id)
+
+    # 2. Edge endpoints exist & symmetric ordering
+    seen_edges: Set[Tuple[str, str, str]] = set()
+    for edge in graph.edges:
+        if edge.source not in node_ids:
+            raise GraphIntegrityError(
+                f"Edge source '{edge.source}' not found in node set for graph '{graph.graph_id}'."
+            )
+        if edge.target not in node_ids:
+            raise GraphIntegrityError(
+                f"Edge target '{edge.target}' not found in node set for graph '{graph.graph_id}'."
+            )
+
+        edge_key = (edge.source, edge.target, edge.relation_type.value)
+        if edge_key in seen_edges:
+            raise GraphIntegrityError(
+                f"Duplicate edge '{edge_key}' detected in graph '{graph.graph_id}'."
+            )
+        seen_edges.add(edge_key)
+
+        if edge.is_symmetric:
+            if edge.source >= edge.target:
+                raise GraphIntegrityError(
+                    f"Symmetric edge must have canonical ordering source < target: got ({edge.source}, {edge.target})."
+                )
+
+    # 3. Acyclicity validation if marked acyclic
+    if graph.is_acyclic:
+        adj: Dict[str, List[str]] = {nid: [] for nid in node_ids}
+        in_degree: Dict[str, int] = {nid: 0 for nid in node_ids}
+
+        for edge in graph.edges:
+            if edge.is_directed:
+                adj[edge.source].append(edge.target)
+                in_degree[edge.target] += 1
+
+        queue = [nid for nid in node_ids if in_degree[nid] == 0]
+        visited_count = 0
+        while queue:
+            curr = queue.pop(0)
+            visited_count += 1
+            for neighbor in adj[curr]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if visited_count != len(node_ids):
+            raise GraphIntegrityError(
+                f"Cycle detected in graph '{graph.graph_id}' marked as acyclic."
+            )
+
+
 class KnowledgeGraphService:
     """Service providing graph exports and reactive projections for MKE."""
 
@@ -37,13 +102,14 @@ class KnowledgeGraphService:
         return self._repository
 
     # ------------------------------------------------------------------------
-    # 1. Knowledge Graph Exporter (All 29 Static Entities)
+    # 1. Knowledge Graph Exporter (All 29 Static Entities, 84 Edges)
     # ------------------------------------------------------------------------
 
     def export_knowledge_graph(self) -> GraphModel:
         """Exports the complete 29-node Knowledge Graph over concepts, methods, formulas, and theorems.
 
         Encodes canonical symmetric deduplication for associative and alternative relations.
+        Total edge count = 84 (17 Concept REQUIRES + 18 RELATED_TO + 30 Method REQUIRES + 6 USES_FORMULA + 3 USES_THEOREM + 10 ALTERNATIVE_TO).
         """
         nodes: List[GraphNode] = []
         edges: List[GraphEdge] = []
@@ -57,22 +123,24 @@ class KnowledgeGraphService:
                     node_id=c_node_id,
                     node_type=GraphNodeType.CONCEPT,
                     label=concept.title,
-                    properties={"concept_id": concept.concept_id, "version": concept.version},
+                    knowledge_ref=concept.concept_id,
+                    metadata={"version": concept.version},
                 )
             )
 
-            # Concept -> Prerequisite Concept (REQUIRES)
+            # Concept -> Prerequisite Concept (REQUIRES, 17 edges across dataset)
             for prereq_id in sorted(concept.prerequisite_concept_ids):
                 edges.append(
                     GraphEdge(
-                        source_id=c_node_id,
-                        target_id=f"concept:{prereq_id}",
-                        edge_type=GraphEdgeType.REQUIRES,
+                        source=c_node_id,
+                        target=f"concept:{prereq_id}",
+                        relation_type=GraphEdgeType.REQUIRES,
+                        is_directed=True,
                         is_symmetric=False,
                     )
                 )
 
-            # Concept <-> Related Concept (RELATED_TO, symmetric canonical serialization)
+            # Concept <-> Related Concept (RELATED_TO, 18 unique symmetric edges across dataset)
             for rel_id in sorted(concept.related_concept_ids):
                 target_node_id = f"concept:{rel_id}"
                 u, v = (c_node_id, target_node_id) if c_node_id < target_node_id else (target_node_id, c_node_id)
@@ -81,9 +149,10 @@ class KnowledgeGraphService:
                     seen_symmetric_edges.add(key)
                     edges.append(
                         GraphEdge(
-                            source_id=u,
-                            target_id=v,
-                            edge_type=GraphEdgeType.RELATED_TO,
+                            source=u,
+                            target=v,
+                            relation_type=GraphEdgeType.RELATED_TO,
+                            is_directed=False,
                             is_symmetric=True,
                         )
                     )
@@ -96,44 +165,48 @@ class KnowledgeGraphService:
                     node_id=m_node_id,
                     node_type=GraphNodeType.METHOD,
                     label=method.title,
-                    properties={"method_id": method.method_id, "version": method.version},
+                    knowledge_ref=method.method_id,
+                    metadata={"version": method.version},
                 )
             )
 
-            # Method -> Prerequisite Concept (REQUIRES)
+            # Method -> Prerequisite Concept (REQUIRES, 30 edges across dataset)
             for prereq_id in sorted(method.prerequisite_concept_ids):
                 edges.append(
                     GraphEdge(
-                        source_id=m_node_id,
-                        target_id=f"concept:{prereq_id}",
-                        edge_type=GraphEdgeType.REQUIRES,
+                        source=m_node_id,
+                        target=f"concept:{prereq_id}",
+                        relation_type=GraphEdgeType.REQUIRES,
+                        is_directed=True,
                         is_symmetric=False,
                     )
                 )
 
-            # Method -> Formula (USES_FORMULA)
+            # Method -> Formula (USES_FORMULA, 6 edges across dataset)
             for formula_id in sorted(method.formula_refs):
                 edges.append(
                     GraphEdge(
-                        source_id=m_node_id,
-                        target_id=f"formula:{formula_id}",
-                        edge_type=GraphEdgeType.USES_FORMULA,
+                        source=m_node_id,
+                        target=f"formula:{formula_id}",
+                        relation_type=GraphEdgeType.USES_FORMULA,
+                        is_directed=True,
                         is_symmetric=False,
                     )
                 )
 
-            # Method -> Theorem (USES_THEOREM)
+            # Method -> Theorem (USES_THEOREM, 3 edges across dataset)
             for theorem_id in sorted(method.theorem_refs):
                 edges.append(
                     GraphEdge(
-                        source_id=m_node_id,
-                        target_id=f"theorem:{theorem_id}",
-                        edge_type=GraphEdgeType.USES_THEOREM,
+                        source=m_node_id,
+                        target=f"theorem:{theorem_id}",
+                        relation_type=GraphEdgeType.USES_THEOREM,
+                        is_directed=True,
                         is_symmetric=False,
                     )
                 )
 
-            # Method <-> Related Method (ALTERNATIVE_TO, symmetric canonical serialization)
+            # Method <-> Related Method (ALTERNATIVE_TO, 10 unique symmetric edges across dataset)
             for rel_method_id in sorted(method.related_method_ids):
                 target_node_id = f"method:{rel_method_id}"
                 u, v = (m_node_id, target_node_id) if m_node_id < target_node_id else (target_node_id, m_node_id)
@@ -142,9 +215,10 @@ class KnowledgeGraphService:
                     seen_symmetric_edges.add(key)
                     edges.append(
                         GraphEdge(
-                            source_id=u,
-                            target_id=v,
-                            edge_type=GraphEdgeType.ALTERNATIVE_TO,
+                            source=u,
+                            target=v,
+                            relation_type=GraphEdgeType.ALTERNATIVE_TO,
+                            is_directed=False,
                             is_symmetric=True,
                         )
                     )
@@ -157,8 +231,8 @@ class KnowledgeGraphService:
                     node_id=f_node_id,
                     node_type=GraphNodeType.FORMULA,
                     label=formula.title,
-                    properties={
-                        "formula_id": formula.formula_id,
+                    knowledge_ref=formula.formula_id,
+                    metadata={
                         "latex_template": formula.latex_template,
                         "version": formula.version,
                     },
@@ -173,8 +247,8 @@ class KnowledgeGraphService:
                     node_id=t_node_id,
                     node_type=GraphNodeType.THEOREM,
                     label=theorem.title,
-                    properties={
-                        "theorem_id": theorem.theorem_id,
+                    knowledge_ref=theorem.theorem_id,
+                    metadata={
                         "formal_statement_latex": theorem.formal_statement_latex,
                         "version": theorem.version,
                     },
@@ -183,9 +257,9 @@ class KnowledgeGraphService:
 
         # Sort nodes and edges canonically for determinism
         nodes.sort(key=lambda n: n.node_id)
-        edges.sort(key=lambda e: (e.source_id, e.target_id, e.edge_type.value))
+        edges.sort(key=lambda e: (e.source, e.target, e.relation_type.value))
 
-        return GraphModel(
+        graph = GraphModel(
             graph_id="knowledge_graph_quadratics_v1",
             graph_kind=GraphKind.KNOWLEDGE_GRAPH,
             title=LocalizedText(
@@ -197,15 +271,17 @@ class KnowledgeGraphService:
             is_acyclic=False,
             version="1.0.0",
         )
+        validate_graph_model(graph)
+        return graph
 
     # ------------------------------------------------------------------------
-    # 2. Prerequisite Learning DAG Exporter (14 Concept Nodes)
+    # 2. Prerequisite Learning DAG Exporter (14 Concept Nodes, 17 Edges)
     # ------------------------------------------------------------------------
 
     def export_prerequisite_dag(self) -> GraphModel:
         """Exports the strict 14-node concept learning prerequisite DAG.
 
-        Edges point from prerequisite -> dependent concept with relation LEARN_BEFORE.
+        Edges point from prerequisite -> dependent concept with relation LEARN_BEFORE (17 edges).
         """
         topological_concepts = self._repository.get_topological_prerequisite_order()
         nodes: List[GraphNode] = [
@@ -213,7 +289,8 @@ class KnowledgeGraphService:
                 node_id=f"concept:{c.concept_id}",
                 node_type=GraphNodeType.CONCEPT,
                 label=c.title,
-                properties={"concept_id": c.concept_id, "version": c.version},
+                knowledge_ref=c.concept_id,
+                metadata={"version": c.version},
             )
             for c in topological_concepts
         ]
@@ -225,16 +302,17 @@ class KnowledgeGraphService:
                 prereq_node_id = f"concept:{prereq_id}"
                 edges.append(
                     GraphEdge(
-                        source_id=prereq_node_id,
-                        target_id=dependent_node_id,
-                        edge_type=GraphEdgeType.LEARN_BEFORE,
+                        source=prereq_node_id,
+                        target=dependent_node_id,
+                        relation_type=GraphEdgeType.LEARN_BEFORE,
+                        is_directed=True,
                         is_symmetric=False,
                     )
                 )
 
-        edges.sort(key=lambda e: (e.source_id, e.target_id, e.edge_type.value))
+        edges.sort(key=lambda e: (e.source, e.target, e.relation_type.value))
 
-        return GraphModel(
+        graph = GraphModel(
             graph_id="prerequisite_dag_concepts_v1",
             graph_kind=GraphKind.PREREQUISITE_DAG,
             title=LocalizedText(
@@ -246,6 +324,8 @@ class KnowledgeGraphService:
             is_acyclic=True,
             version="1.0.0",
         )
+        validate_graph_model(graph)
+        return graph
 
     # ------------------------------------------------------------------------
     # 3. Read-Only Reactive Dependency DAG Projection (from S1 SolveResponse)
@@ -270,7 +350,8 @@ class KnowledgeGraphService:
                 node_id="parameter:a",
                 node_type=GraphNodeType.PARAMETER,
                 label=LocalizedText(vi="Hệ số bậc hai a", en="Quadratic Coefficient a"),
-                properties={
+                dependency_ref="a",
+                metadata={
                     "numerator": problem.a.numerator,
                     "denominator": problem.a.denominator,
                     "latex": problem.a.to_latex(),
@@ -280,7 +361,8 @@ class KnowledgeGraphService:
                 node_id="parameter:b",
                 node_type=GraphNodeType.PARAMETER,
                 label=LocalizedText(vi="Hệ số bậc một b", en="Linear Coefficient b"),
-                properties={
+                dependency_ref="b",
+                metadata={
                     "numerator": problem.b.numerator,
                     "denominator": problem.b.denominator,
                     "latex": problem.b.to_latex(),
@@ -290,7 +372,8 @@ class KnowledgeGraphService:
                 node_id="parameter:c",
                 node_type=GraphNodeType.PARAMETER,
                 label=LocalizedText(vi="Hệ số tự do c", en="Constant Coefficient c"),
-                properties={
+                dependency_ref="c",
+                metadata={
                     "numerator": problem.c.numerator,
                     "denominator": problem.c.denominator,
                     "latex": problem.c.to_latex(),
@@ -301,7 +384,8 @@ class KnowledgeGraphService:
                 node_id="computation:discriminant",
                 node_type=GraphNodeType.COMPUTATION,
                 label=LocalizedText(vi="Tính toán biệt thức Delta", en="Discriminant Evaluation"),
-                properties={
+                dependency_ref="discriminant",
+                metadata={
                     "value": problem.discriminant.value.model_dump(),
                     "is_positive": problem.discriminant.is_positive,
                     "is_zero": problem.discriminant.is_zero,
@@ -324,7 +408,8 @@ class KnowledgeGraphService:
                 node_id="computation:selected_method",
                 node_type=GraphNodeType.COMPUTATION,
                 label=LocalizedText(vi="Lựa chọn phương pháp giải", en="Method Selection Resolution"),
-                properties={
+                dependency_ref="selected_method",
+                metadata={
                     "selected_method_id": response.selected_method_id,
                 },
             ),
@@ -332,7 +417,8 @@ class KnowledgeGraphService:
                 node_id="computation:solution_trace",
                 node_type=GraphNodeType.COMPUTATION,
                 label=LocalizedText(vi="Tiến trình lời giải và nghiệm", en="Solution Trace Execution"),
-                properties={
+                dependency_ref="solution_trace",
+                metadata={
                     "outcome": solution.outcome.value,
                     "roots_count": len(solution.roots),
                     "final_answer_latex": solution.final_answer_latex,
@@ -342,7 +428,8 @@ class KnowledgeGraphService:
                 node_id="computation:verification_certificate",
                 node_type=GraphNodeType.COMPUTATION,
                 label=LocalizedText(vi="Chứng chỉ xác minh độc lập", en="Host Verification Certificate"),
-                properties={
+                dependency_ref="verification_certificate",
+                metadata={
                     "certificate_id": solution.certificate.certificate_id,
                     "outcome": solution.certificate.outcome.value,
                     "problem_hash": solution.certificate.problem_hash,
@@ -354,86 +441,98 @@ class KnowledgeGraphService:
         edges: List[GraphEdge] = [
             # Parameters -> Discriminant
             GraphEdge(
-                source_id="parameter:a",
-                target_id="computation:discriminant",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:a",
+                target="computation:discriminant",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:b",
-                target_id="computation:discriminant",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:b",
+                target="computation:discriminant",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:c",
-                target_id="computation:discriminant",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:c",
+                target="computation:discriminant",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             # Discriminant & Parameters -> Method Selection
             GraphEdge(
-                source_id="computation:discriminant",
-                target_id="computation:selected_method",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="computation:discriminant",
+                target="computation:selected_method",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:a",
-                target_id="computation:selected_method",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:a",
+                target="computation:selected_method",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:b",
-                target_id="computation:selected_method",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:b",
+                target="computation:selected_method",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:c",
-                target_id="computation:selected_method",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:c",
+                target="computation:selected_method",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             # Method Selection -> Solution Trace
             GraphEdge(
-                source_id="computation:selected_method",
-                target_id="computation:solution_trace",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="computation:selected_method",
+                target="computation:solution_trace",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             # Solution Trace & Parameters -> Verification Certificate
             GraphEdge(
-                source_id="computation:solution_trace",
-                target_id="computation:verification_certificate",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="computation:solution_trace",
+                target="computation:verification_certificate",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:a",
-                target_id="computation:verification_certificate",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:a",
+                target="computation:verification_certificate",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:b",
-                target_id="computation:verification_certificate",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:b",
+                target="computation:verification_certificate",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
             GraphEdge(
-                source_id="parameter:c",
-                target_id="computation:verification_certificate",
-                edge_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                source="parameter:c",
+                target="computation:verification_certificate",
+                relation_type=GraphEdgeType.COMPUTATIONAL_DEPENDENCY,
+                is_directed=True,
                 is_symmetric=False,
             ),
         ]
 
         nodes.sort(key=lambda n: n.node_id)
-        edges.sort(key=lambda e: (e.source_id, e.target_id, e.edge_type.value))
+        edges.sort(key=lambda e: (e.source, e.target, e.relation_type.value))
 
-        return GraphModel(
+        graph = GraphModel(
             graph_id=f"reactive_dag_{problem.problem_id}",
             graph_kind=GraphKind.REACTIVE_DEPENDENCY_DAG,
             title=LocalizedText(
@@ -445,3 +544,5 @@ class KnowledgeGraphService:
             is_acyclic=True,
             version="1.0.0",
         )
+        validate_graph_model(graph)
+        return graph

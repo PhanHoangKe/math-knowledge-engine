@@ -9,7 +9,7 @@ and extra field rejection.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from mke_product.knowledge.schemas import LocalizedText
@@ -59,7 +59,11 @@ class GraphNode(BaseModel):
     node_id: str = Field(..., description="Deterministic unique prefixed identifier, e.g. 'concept:concept_discriminant'")
     node_type: GraphNodeType = Field(..., description="Categorical node type")
     label: LocalizedText = Field(..., description="Bilingual display label")
-    properties: Dict[str, Any] = Field(default_factory=dict, description="Optional metadata properties")
+    subtitle: Optional[LocalizedText] = Field(default=None, description="Optional subtitle or explanatory snippet")
+    status: Optional[str] = Field(default=None, description="Optional node status")
+    knowledge_ref: Optional[str] = Field(default=None, description="Optional reference to underlying knowledge entity ID")
+    dependency_ref: Optional[str] = Field(default=None, description="Optional reference to reactive computation/parameter ID")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary metadata dictionary")
 
 
 class GraphEdge(BaseModel):
@@ -71,11 +75,13 @@ class GraphEdge(BaseModel):
         frozen=True,
     )
 
-    source_id: str = Field(..., description="Source node ID")
-    target_id: str = Field(..., description="Target node ID")
-    edge_type: GraphEdgeType = Field(..., description="Semantic relation type")
+    source: str = Field(..., description="Source node identifier")
+    target: str = Field(..., description="Target node identifier")
+    relation_type: GraphEdgeType = Field(..., description="Semantic relation type")
+    label: Optional[LocalizedText] = Field(default=None, description="Optional localized edge label")
+    is_directed: bool = Field(default=True, description="Whether the edge is directed")
     is_symmetric: bool = Field(default=False, description="Whether the edge represents a symmetric bidirectional relationship")
-    properties: Dict[str, Any] = Field(default_factory=dict, description="Optional metadata properties")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary metadata dictionary")
 
 
 class GraphModel(BaseModel):

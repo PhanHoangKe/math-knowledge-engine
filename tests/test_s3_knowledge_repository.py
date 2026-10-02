@@ -1,7 +1,8 @@
 """Unit and integration tests for MKE S3 KnowledgeRepository.
 
-Verifies O(1) indexed lookups, immutability, entity counts, MethodRegistry 1:1 match,
-direct & transitive prerequisite traversal, cycle detection, and topological ordering.
+Verifies O(1) indexed lookups, immutability guarantees, defensive deep copying,
+custom dataset validation, MethodRegistry 1:1 match, direct & transitive prerequisite
+traversal, cycle detection, and deterministic topological ordering.
 """
 
 from __future__ import annotations
@@ -13,13 +14,17 @@ from mke_product.domain.registry import MethodRegistry
 from mke_product.knowledge.repository import (
     EntityNotFoundError,
     KnowledgeRepository,
+    KnowledgeRepositoryError,
     PrerequisiteCycleError,
 )
 from mke_product.knowledge.schemas import (
     ConceptKnowledge,
+    FormulaKnowledge,
     LocalizedText,
+    MethodKnowledge,
     ProvenanceStatus,
     SourceProvenance,
+    TheoremKnowledge,
 )
 
 
@@ -91,7 +96,8 @@ def test_unknown_id_fails_deterministically(repo: KnowledgeRepository) -> None:
         repo.get_provenance("SRC_UNKNOWN")
 
 
-def test_returned_entities_are_immutable(repo: KnowledgeRepository) -> None:
+def test_returned_entities_are_immutable_and_defensively_copied(repo: KnowledgeRepository) -> None:
+    # 1. Pydantic immutability assignment rejection
     method = repo.get_method("QUAD_FORMULA_STANDARD")
     with pytest.raises(ValidationError):
         method.method_id = "MUTATED"  # type: ignore[misc]
@@ -99,6 +105,113 @@ def test_returned_entities_are_immutable(repo: KnowledgeRepository) -> None:
     concept = repo.get_concept("concept_discriminant")
     with pytest.raises(ValidationError):
         concept.concept_id = "MUTATED"  # type: ignore[misc]
+
+    # 2. In-place list mutation on returned entity does NOT pollute repository internals
+    method.prerequisite_concept_ids.append("concept_injected_evil")
+    fresh_method = repo.get_method("QUAD_FORMULA_STANDARD")
+    assert "concept_injected_evil" not in fresh_method.prerequisite_concept_ids
+
+    concept.prerequisite_concept_ids.clear()
+    fresh_concept = repo.get_concept("concept_discriminant")
+    assert len(fresh_concept.prerequisite_concept_ids) > 0
+
+
+def test_custom_dataset_ingestion_defensive_isolation() -> None:
+    prov = SourceProvenance(
+        source_id="SRC_CUSTOM",
+        source_type="ENGINE_SPEC",
+        title="Custom Spec",
+        author_or_institution="Author",
+        locator="spec.py",
+        verification_status=ProvenanceStatus.VERIFIED,
+    )
+    concept_a = ConceptKnowledge(
+        concept_id="concept_isolated_a",
+        title=LocalizedText(vi="A", en="A"),
+        definition=LocalizedText(vi="A", en="A"),
+        prerequisite_concept_ids=[],
+        provenance_refs=["SRC_CUSTOM"],
+    )
+    dataset = {
+        "provenances": [prov],
+        "formulas": [],
+        "theorems": [],
+        "concepts": [concept_a],
+        "methods": [],
+    }
+
+    custom_repo = KnowledgeRepository(dataset=dataset)
+    # Mutate original object in outer scope
+    concept_a.prerequisite_concept_ids.append("concept_mutated_after_init")
+
+    # Verify repository copy is pristine
+    repo_concept = custom_repo.get_concept("concept_isolated_a")
+    assert repo_concept.prerequisite_concept_ids == []
+
+    # In-memory content hash
+    hash_str = custom_repo.get_dataset_content_hash()
+    assert isinstance(hash_str, str)
+    assert len(hash_str) == 64
+
+
+def test_custom_dataset_validation_detects_duplicates() -> None:
+    prov = SourceProvenance(
+        source_id="SRC_DUP",
+        source_type="ENGINE_SPEC",
+        title="Spec",
+        author_or_institution="Author",
+        locator="spec.py",
+        verification_status=ProvenanceStatus.VERIFIED,
+    )
+    concept = ConceptKnowledge(
+        concept_id="concept_dup",
+        title=LocalizedText(vi="A", en="A"),
+        definition=LocalizedText(vi="A", en="A"),
+        prerequisite_concept_ids=[],
+        provenance_refs=["SRC_DUP"],
+    )
+
+    duplicate_dataset = {
+        "provenances": [prov, prov],
+        "formulas": [],
+        "theorems": [],
+        "concepts": [concept],
+        "methods": [],
+    }
+
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(dataset=duplicate_dataset)
+    assert "Duplicate entity ID 'SRC_DUP'" in str(exc_info.value)
+
+
+def test_custom_dataset_validation_detects_dangling_foreign_keys() -> None:
+    prov = SourceProvenance(
+        source_id="SRC_OK",
+        source_type="ENGINE_SPEC",
+        title="Spec",
+        author_or_institution="Author",
+        locator="spec.py",
+        verification_status=ProvenanceStatus.VERIFIED,
+    )
+    concept = ConceptKnowledge(
+        concept_id="concept_valid",
+        title=LocalizedText(vi="A", en="A"),
+        definition=LocalizedText(vi="A", en="A"),
+        prerequisite_concept_ids=["concept_missing_parent"],
+        provenance_refs=["SRC_OK"],
+    )
+
+    dangling_dataset = {
+        "provenances": [prov],
+        "formulas": [],
+        "theorems": [],
+        "concepts": [concept],
+        "methods": [],
+    }
+
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(dataset=dangling_dataset)
+    assert "references missing prerequisite concept 'concept_missing_parent'" in str(exc_info.value)
 
 
 def test_direct_prerequisites_traversal(repo: KnowledgeRepository) -> None:
@@ -186,6 +299,6 @@ def test_o1_indexed_lookups_architecture(repo: KnowledgeRepository) -> None:
     assert isinstance(repo._theorems, dict)
     assert isinstance(repo._provenances, dict)
 
-    # Fast key lookups
+    # Fast key lookups verify correct retrieval of models
     for method in repo.list_methods():
-        assert repo.get_method(method.method_id) is method
+        assert repo.get_method(method.method_id).method_id == method.method_id
