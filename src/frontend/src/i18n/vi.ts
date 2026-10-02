@@ -28,7 +28,7 @@ export const vi = {
   hero_title: 'Math Knowledge Engine',
   hero_tagline: '"Suy luận ký hiệu tất định trên miền số thực ℝ với số học hữu tỉ chuẩn xác trên ℚ"',
 
-  input_placeholder: 'Nhập những gì bạn muốn tính toán',
+  input_placeholder: 'Nhập những gì bạn muốn tính toán hoặc tìm hiểu.',
   input_aria: 'Nhập phương trình đại số',
   input_label: 'Phương trình đại số:',
   clear_btn_aria: 'Xóa nội dung nhập',

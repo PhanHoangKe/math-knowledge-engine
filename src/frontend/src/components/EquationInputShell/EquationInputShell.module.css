@@ -1,6 +1,6 @@
 .wrapper {
   width: 100%;
-  margin: 0 auto 1.5rem auto;
+  margin: 0 auto 1.25rem auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -9,7 +9,7 @@
 /* Hero Section */
 .heroSection {
   text-align: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .heroSuper {
@@ -18,52 +18,52 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-primary-600, #7e22ce);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
 .heroTitle {
-  font-size: 2.1rem;
+  font-size: 1.85rem;
   font-weight: 800;
   color: var(--color-text-primary, #111827);
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.25rem 0;
   letter-spacing: -0.02em;
 }
 
 .heroTagline {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   color: var(--color-text-muted, #6b7280);
   margin: 0;
   font-style: italic;
 }
 
-/* Main Capsule Pill Container */
+/* Main Capsule Box - 100% WolframAlpha sleek rounded rectangle */
 .capsuleBox {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 860px;
-  height: 56px;
+  max-width: 840px;
+  height: 46px;
   background: var(--color-surface, #ffffff);
-  border-radius: 28px;
-  padding: 0 6px 0 20px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 0 5px 0 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .capsuleNatural {
-  border: 2.5px solid #f59e0b;
+  border: 2px solid #f59e0b;
 }
 
 .capsuleNatural:focus-within {
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18), 0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .capsuleMath {
-  border: 2.5px solid #a855f7;
+  border: 2px solid #a855f7;
 }
 
 .capsuleMath:focus-within {
-  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.2), 0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .capsuleLoading {
@@ -73,83 +73,20 @@
 .inputField {
   flex: 1;
   height: 100%;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--color-text-primary, #111827);
   background: transparent;
   border: none;
   outline: none;
-  padding: 0 12px 0 0;
+  padding: 0 8px 0 0;
 }
 
 .inputField::placeholder {
   font-style: italic;
   color: #9ca3af;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-family: sans-serif;
-}
-
-/* Casio Visual 2-Tier Fraction Editor */
-.casioFractionContainer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  height: 100%;
-  padding-right: 12px;
-}
-
-.casioFractionColumn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  padding: 2px 0;
-}
-
-.casioSlot {
-  min-width: 28px;
-  max-width: 120px;
-  height: 20px;
-  padding: 1px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: 'KaTeX_Math', 'Cambria Math', monospace;
-  text-align: center;
-  border-radius: 4px;
-  outline: none;
-  transition: all 0.15s ease;
-}
-
-.casioNumerator {
-  background: #e0f2fe;
-  border: 1.5px dashed #38bdf8;
-  color: #0369a1;
-}
-
-.casioDenominator {
-  background: #fef9c3;
-  border: 1.5px dashed #facc15;
-  color: #854d0e;
-}
-
-.casioSlotActive {
-  border-style: solid;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
-}
-
-.casioFractionBar {
-  width: 100%;
-  height: 2px;
-  background: #1e293b;
-  margin: 2px 0;
-}
-
-.casioAfterField {
-  flex: 1;
-  height: 100%;
-  font-size: 1.15rem;
 }
 
 /* Clear Circular Button */
@@ -157,14 +94,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: transparent;
   color: #9ca3af;
   border: none;
   cursor: pointer;
-  margin-right: 8px;
+  margin-right: 6px;
   transition: color 0.15s ease, transform 0.1s ease;
 }
 
@@ -173,14 +110,14 @@
   transform: scale(1.1);
 }
 
-/* Compute Button */
+/* Square Compute Button */
 .computeBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
   border: none;
   color: #ffffff;
   cursor: pointer;
@@ -213,12 +150,12 @@
 
 /* Camera toast */
 .cameraToast {
-  margin-top: 6px;
-  font-size: 0.82rem;
+  margin-top: 4px;
+  font-size: 0.8rem;
   color: #7e22ce;
   background: #f3e8ff;
-  padding: 4px 12px;
-  border-radius: 12px;
+  padding: 3px 10px;
+  border-radius: 10px;
   animation: fadeIn 0.2s ease;
 }
 
@@ -228,24 +165,24 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 860px;
-  margin-top: 8px;
+  max-width: 840px;
+  margin-top: 6px;
   padding: 0 4px;
 }
 
 .toolbarLeft {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .modePill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border-radius: 16px;
-  font-size: 0.88rem;
+  gap: 5px;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 0.82rem;
   border: none;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -261,13 +198,13 @@
 .modePillNaturalActive {
   background: #ffedd5;
   color: #ea580c;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .modePillMathActive {
   background: #f3e8ff;
   color: #7e22ce;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .modePillInactive {
@@ -277,7 +214,7 @@
 }
 
 .modePillInactive:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.04);
   color: var(--color-text-primary, #111827);
 }
 
@@ -285,18 +222,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--color-text-muted, #4b5563);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .iconActionBtn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.05);
   color: var(--color-text-primary, #111827);
 }
 
@@ -308,14 +245,14 @@
 .toolbarRight {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Category Tabs in Math Mode */
 .mathCategoriesBar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .categoryTabBtn {
@@ -323,13 +260,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 2px 6px;
+  min-width: 26px;
+  height: 26px;
+  padding: 2px 7px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--color-text-muted, #6b7280);
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -344,66 +283,72 @@
   color: #ffffff !important;
 }
 
-.tabMarkerArrow {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid #6b21a8;
-}
-
 .categoryDivider {
   color: #d1d5db;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   user-select: none;
 }
 
 .naturalActionsBar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.naturalIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #ea580c;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.naturalIconBtn:hover {
+  background: #ffedd5;
 }
 
 /* Drawer & Quick Keys */
 .paletteDrawerWrapper {
   width: 100%;
-  max-width: 860px;
-  margin-top: 8px;
+  max-width: 840px;
+  margin-top: 4px;
 }
 
 .quickKeysDrawer {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  max-width: 860px;
-  margin-top: 8px;
-  padding: 6px 12px;
+  max-width: 840px;
+  margin-top: 6px;
+  padding: 5px 10px;
   background: #fef3c7;
   border: 1px solid #fde68a;
-  border-radius: 8px;
+  border-radius: 7px;
   overflow-x: auto;
 }
 
 .quickKeysLabel {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #92400e;
   white-space: nowrap;
 }
 
 .quickKeyBtn {
-  min-width: 30px;
-  height: 30px;
-  padding: 2px 8px;
+  min-width: 28px;
+  height: 28px;
+  padding: 2px 6px;
   background: #ffffff;
   border: 1px solid #fcd34d;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: #78350f;
   cursor: pointer;
@@ -420,14 +365,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
-  font-size: 0.8rem;
+  margin-top: 8px;
+  font-size: 0.78rem;
   color: var(--color-text-muted, #6b7280);
 }
 
 .statusDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #10b981;
 }
@@ -439,8 +384,8 @@
 
 .spinner {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: #ffffff;
   border-radius: 50%;
@@ -465,7 +410,7 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
   to {
     opacity: 1;
