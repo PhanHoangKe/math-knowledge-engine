@@ -5,12 +5,13 @@
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
-  min-height: 40px;
+  min-height: 38px;
   height: auto;
-  padding: 6px 4px;
-  gap: 1px;
-  font-family: 'KaTeX_Math', 'Cambria Math', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
-  font-size: 1.25rem;
+  padding: 4px 2px;
+  gap: 0px;
+  font-family: Arial, Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 400;
   color: var(--color-text-primary, #111827);
   user-select: text;
   cursor: text;
@@ -27,13 +28,14 @@
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 400;
   color: inherit;
   padding: 0;
   margin: 0;
   min-width: 4px;
-  height: 28px;
-  line-height: 28px;
+  height: 26px;
+  line-height: 26px;
   vertical-align: baseline;
 }
 
@@ -49,14 +51,15 @@
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 400;
   color: inherit;
   padding: 0;
   margin: 0;
   flex: 1;
   min-width: 24px;
-  height: 28px;
-  line-height: 28px;
+  height: 26px;
+  line-height: 26px;
   cursor: text;
   vertical-align: baseline;
 }
@@ -71,8 +74,8 @@
 .trailingTextInput::placeholder {
   font-style: italic;
   color: #9ca3af;
-  font-size: 1.05rem;
-  font-family: sans-serif;
+  font-size: 1rem;
+  font-family: inherit;
 }
 
 /* Power Block with inline editable exponent box */
@@ -80,20 +83,21 @@
   display: inline-flex;
   align-items: baseline;
   position: relative;
-  margin: 0 1px;
+  margin: 0;
   vertical-align: baseline;
 }
 
 .powerBase {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 400;
   color: inherit;
   font-family: inherit;
   border: none;
   background: transparent;
   outline: none;
-  min-width: 8px;
+  min-width: 6px;
   text-align: right;
-  line-height: 28px;
+  line-height: 26px;
   vertical-align: baseline;
 }
 
