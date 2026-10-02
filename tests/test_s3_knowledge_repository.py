@@ -1,8 +1,9 @@
 """Unit and integration tests for MKE S3 KnowledgeRepository.
 
 Verifies O(1) indexed lookups, immutability guarantees, defensive deep copying,
-custom dataset validation, MethodRegistry 1:1 match, direct & transitive prerequisite
-traversal, cycle detection, and deterministic topological ordering.
+custom dataset validation (shape, types, duplicate IDs, complete foreign-key matrix),
+canonical in-memory dataset hashing equivalence, MethodRegistry 1:1 match, direct &
+transitive prerequisite traversal, cycle detection, and deterministic topological ordering.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from mke_product.domain.registry import MethodRegistry
+from mke_product.knowledge.loader import load_knowledge_dataset
 from mke_product.knowledge.repository import (
     EntityNotFoundError,
     KnowledgeRepository,
@@ -33,6 +35,10 @@ def repo() -> KnowledgeRepository:
     return KnowledgeRepository()
 
 
+# ============================================================================
+# 1. CORE REPOSITORY OPERATIONS & INDEXED LOOKUPS
+# ============================================================================
+
 def test_repository_loads_accepted_dataset(repo: KnowledgeRepository) -> None:
     counts = repo.get_entity_counts()
     assert counts["provenances"] == 3
@@ -44,6 +50,15 @@ def test_repository_loads_accepted_dataset(repo: KnowledgeRepository) -> None:
 
 def test_repository_dataset_content_hash(repo: KnowledgeRepository) -> None:
     assert repo.get_dataset_content_hash() == "e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66"
+
+
+def test_custom_in_memory_hash_matches_production_loader() -> None:
+    accepted_dataset = load_knowledge_dataset()
+    custom_repo = KnowledgeRepository(dataset=accepted_dataset)
+    assert (
+        custom_repo.get_dataset_content_hash()
+        == "e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66"
+    )
 
 
 def test_repository_matches_registry_one_to_one(repo: KnowledgeRepository) -> None:
@@ -96,6 +111,10 @@ def test_unknown_id_fails_deterministically(repo: KnowledgeRepository) -> None:
         repo.get_provenance("SRC_UNKNOWN")
 
 
+# ============================================================================
+# 2. DEFENSIVE ISOLATION & IMMUTABILITY
+# ============================================================================
+
 def test_returned_entities_are_immutable_and_defensively_copied(repo: KnowledgeRepository) -> None:
     # 1. Pydantic immutability assignment rejection
     method = repo.get_method("QUAD_FORMULA_STANDARD")
@@ -141,6 +160,8 @@ def test_custom_dataset_ingestion_defensive_isolation() -> None:
     }
 
     custom_repo = KnowledgeRepository(dataset=dataset)
+    initial_hash = custom_repo.get_dataset_content_hash()
+
     # Mutate original object in outer scope
     concept_a.prerequisite_concept_ids.append("concept_mutated_after_init")
 
@@ -148,45 +169,76 @@ def test_custom_dataset_ingestion_defensive_isolation() -> None:
     repo_concept = custom_repo.get_concept("concept_isolated_a")
     assert repo_concept.prerequisite_concept_ids == []
 
-    # In-memory content hash
-    hash_str = custom_repo.get_dataset_content_hash()
-    assert isinstance(hash_str, str)
-    assert len(hash_str) == 64
+    # Verify hash remains completely stable
+    assert custom_repo.get_dataset_content_hash() == initial_hash
 
 
-def test_custom_dataset_validation_detects_duplicates() -> None:
-    prov = SourceProvenance(
-        source_id="SRC_DUP",
-        source_type="ENGINE_SPEC",
-        title="Spec",
-        author_or_institution="Author",
-        locator="spec.py",
-        verification_status=ProvenanceStatus.VERIFIED,
-    )
-    concept = ConceptKnowledge(
-        concept_id="concept_dup",
-        title=LocalizedText(vi="A", en="A"),
-        definition=LocalizedText(vi="A", en="A"),
-        prerequisite_concept_ids=[],
-        provenance_refs=["SRC_DUP"],
-    )
+# ============================================================================
+# 3. CUSTOM DATASET SHAPE & TYPE VALIDATION
+# ============================================================================
 
-    duplicate_dataset = {
-        "provenances": [prov, prov],
-        "formulas": [],
-        "theorems": [],
-        "concepts": [concept],
-        "methods": [],
-    }
-
+def test_custom_dataset_rejects_non_mapping() -> None:
     with pytest.raises(KnowledgeRepositoryError) as exc_info:
-        KnowledgeRepository(dataset=duplicate_dataset)
-    assert "Duplicate entity ID 'SRC_DUP'" in str(exc_info.value)
+        KnowledgeRepository(dataset=["not_a_dict"])  # type: ignore[arg-type]
+    assert "Custom dataset must be a mapping/dict" in str(exc_info.value)
 
 
-def test_custom_dataset_validation_detects_dangling_foreign_keys() -> None:
+def test_custom_dataset_rejects_missing_or_unexpected_categories() -> None:
+    # Missing category
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(dataset={"provenances": [], "formulas": [], "theorems": [], "concepts": []})
+    assert "missing required categories" in str(exc_info.value)
+
+    # Unexpected category
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(
+            dataset={
+                "provenances": [],
+                "formulas": [],
+                "theorems": [],
+                "concepts": [],
+                "methods": [],
+                "extra_cat": [],
+            }
+        )
+    assert "unexpected categories" in str(exc_info.value)
+
+
+def test_custom_dataset_rejects_non_list_or_raw_dict_entities() -> None:
+    # Non-list collection
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(
+            dataset={
+                "provenances": "not_a_list",  # type: ignore[dict-item]
+                "formulas": [],
+                "theorems": [],
+                "concepts": [],
+                "methods": [],
+            }
+        )
+    assert "must be a list" in str(exc_info.value)
+
+    # Raw dict instead of Pydantic model
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(
+            dataset={
+                "provenances": [{"source_id": "SRC_RAW"}],  # type: ignore[list-item]
+                "formulas": [],
+                "theorems": [],
+                "concepts": [],
+                "methods": [],
+            }
+        )
+    assert "must be an instance of SourceProvenance" in str(exc_info.value)
+
+
+# ============================================================================
+# 4. COMPLETE DUPLICATE-ID TEST COVERAGE
+# ============================================================================
+
+def _base_valid_dataset() -> dict:
     prov = SourceProvenance(
-        source_id="SRC_OK",
+        source_id="SRC_BASE",
         source_type="ENGINE_SPEC",
         title="Spec",
         author_or_institution="Author",
@@ -194,25 +246,314 @@ def test_custom_dataset_validation_detects_dangling_foreign_keys() -> None:
         verification_status=ProvenanceStatus.VERIFIED,
     )
     concept = ConceptKnowledge(
-        concept_id="concept_valid",
-        title=LocalizedText(vi="A", en="A"),
-        definition=LocalizedText(vi="A", en="A"),
-        prerequisite_concept_ids=["concept_missing_parent"],
-        provenance_refs=["SRC_OK"],
+        concept_id="concept_base",
+        title=LocalizedText(vi="Khái niệm gốc", en="Base Concept"),
+        definition=LocalizedText(vi="Định nghĩa", en="Definition"),
+        provenance_refs=["SRC_BASE"],
     )
-
-    dangling_dataset = {
+    formula = FormulaKnowledge(
+        formula_id="FORMULA_BASE",
+        title=LocalizedText(vi="Công thức gốc", en="Base Formula"),
+        latex_template="a = b",
+        domain_conditions=LocalizedText(vi="Đk", en="Cond"),
+        related_concept_ids=["concept_base"],
+        provenance_refs=["SRC_BASE"],
+    )
+    theorem = TheoremKnowledge(
+        theorem_id="THEOREM_BASE",
+        title=LocalizedText(vi="Định lý gốc", en="Base Theorem"),
+        statement=LocalizedText(vi="Phát biểu", en="Statement"),
+        formal_statement_latex="P \\implies Q",
+        related_concept_ids=["concept_base"],
+        provenance_refs=["SRC_BASE"],
+    )
+    method = MethodKnowledge(
+        method_id="METHOD_BASE",
+        title=LocalizedText(vi="Phương pháp gốc", en="Base Method"),
+        summary=LocalizedText(vi="Tóm tắt", en="Summary"),
+        learning_objective=LocalizedText(vi="Mục tiêu", en="Objective"),
+        formal_description=LocalizedText(vi="Mô tả", en="Description"),
+        prerequisite_concept_ids=["concept_base"],
+        formula_refs=["FORMULA_BASE"],
+        theorem_refs=["THEOREM_BASE"],
+        provenance_refs=["SRC_BASE"],
+    )
+    return {
         "provenances": [prov],
-        "formulas": [],
-        "theorems": [],
         "concepts": [concept],
-        "methods": [],
+        "formulas": [formula],
+        "theorems": [theorem],
+        "methods": [method],
     }
 
-    with pytest.raises(KnowledgeRepositoryError) as exc_info:
-        KnowledgeRepository(dataset=dangling_dataset)
-    assert "references missing prerequisite concept 'concept_missing_parent'" in str(exc_info.value)
 
+def test_custom_dataset_constructs_with_valid_theorem() -> None:
+    ds = _base_valid_dataset()
+    repo = KnowledgeRepository(dataset=ds)
+    assert repo.get_theorem("THEOREM_BASE").theorem_id == "THEOREM_BASE"
+    assert repo.get_entity_counts()["theorems"] == 1
+
+
+@pytest.mark.parametrize(
+    "category, duplicate_entity_fn, expected_field",
+    [
+        (
+            "provenances",
+            lambda ds: ds["provenances"][0].model_copy(deep=True),
+            "SRC_BASE",
+        ),
+        (
+            "formulas",
+            lambda ds: ds["formulas"][0].model_copy(deep=True),
+            "FORMULA_BASE",
+        ),
+        (
+            "theorems",
+            lambda ds: ds["theorems"][0].model_copy(deep=True),
+            "THEOREM_BASE",
+        ),
+        (
+            "concepts",
+            lambda ds: ds["concepts"][0].model_copy(deep=True),
+            "concept_base",
+        ),
+        (
+            "methods",
+            lambda ds: ds["methods"][0].model_copy(deep=True),
+            "METHOD_BASE",
+        ),
+    ],
+)
+def test_duplicate_id_detection_across_all_categories(
+    category: str, duplicate_entity_fn: Any, expected_field: str
+) -> None:
+    ds = _base_valid_dataset()
+    ds[category].append(duplicate_entity_fn(ds))
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(dataset=ds)
+    assert f"Duplicate entity ID '{expected_field}'" in str(exc_info.value)
+
+
+# ============================================================================
+# 5. COMPLETE DANGLING-REFERENCE TEST MATRIX (14 CASES)
+# ============================================================================
+
+@pytest.mark.parametrize(
+    "mutator_fn, expected_missing_ref",
+    [
+        # 1. Formula -> missing concept
+        (
+            lambda ds: ds["formulas"].append(
+                FormulaKnowledge(
+                    formula_id="FORMULA_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    latex_template="x=1",
+                    domain_conditions=LocalizedText(vi="A", en="A"),
+                    related_concept_ids=["concept_missing"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "concept_missing",
+        ),
+        # 2. Formula -> missing provenance
+        (
+            lambda ds: ds["formulas"].append(
+                FormulaKnowledge(
+                    formula_id="FORMULA_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    latex_template="x=1",
+                    domain_conditions=LocalizedText(vi="A", en="A"),
+                    related_concept_ids=["concept_base"],
+                    provenance_refs=["SRC_MISSING"],
+                )
+            ),
+            "SRC_MISSING",
+        ),
+        # 3. Theorem -> missing concept
+        (
+            lambda ds: ds["theorems"].append(
+                TheoremKnowledge(
+                    theorem_id="THEOREM_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    statement=LocalizedText(vi="A", en="A"),
+                    formal_statement_latex="P",
+                    related_concept_ids=["concept_missing"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "concept_missing",
+        ),
+        # 4. Theorem -> missing provenance
+        (
+            lambda ds: ds["theorems"].append(
+                TheoremKnowledge(
+                    theorem_id="THEOREM_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    statement=LocalizedText(vi="A", en="A"),
+                    formal_statement_latex="P",
+                    related_concept_ids=["concept_base"],
+                    provenance_refs=["SRC_MISSING"],
+                )
+            ),
+            "SRC_MISSING",
+        ),
+        # 5. Concept -> missing prerequisite concept
+        (
+            lambda ds: ds["concepts"].append(
+                ConceptKnowledge(
+                    concept_id="concept_dangling",
+                    title=LocalizedText(vi="A", en="A"),
+                    definition=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_missing"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "concept_missing",
+        ),
+        # 6. Concept -> missing related concept
+        (
+            lambda ds: ds["concepts"].append(
+                ConceptKnowledge(
+                    concept_id="concept_dangling",
+                    title=LocalizedText(vi="A", en="A"),
+                    definition=LocalizedText(vi="A", en="A"),
+                    related_concept_ids=["concept_missing"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "concept_missing",
+        ),
+        # 7. Concept -> missing formula
+        (
+            lambda ds: ds["concepts"].append(
+                ConceptKnowledge(
+                    concept_id="concept_dangling",
+                    title=LocalizedText(vi="A", en="A"),
+                    definition=LocalizedText(vi="A", en="A"),
+                    formula_refs=["FORMULA_MISSING"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "FORMULA_MISSING",
+        ),
+        # 8. Concept -> missing method
+        (
+            lambda ds: ds["concepts"].append(
+                ConceptKnowledge(
+                    concept_id="concept_dangling",
+                    title=LocalizedText(vi="A", en="A"),
+                    definition=LocalizedText(vi="A", en="A"),
+                    method_refs=["METHOD_MISSING"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "METHOD_MISSING",
+        ),
+        # 9. Concept -> missing provenance
+        (
+            lambda ds: ds["concepts"].append(
+                ConceptKnowledge(
+                    concept_id="concept_dangling",
+                    title=LocalizedText(vi="A", en="A"),
+                    definition=LocalizedText(vi="A", en="A"),
+                    provenance_refs=["SRC_MISSING"],
+                )
+            ),
+            "SRC_MISSING",
+        ),
+        # 10. Method -> missing prerequisite concept
+        (
+            lambda ds: ds["methods"].append(
+                MethodKnowledge(
+                    method_id="METHOD_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    summary=LocalizedText(vi="A", en="A"),
+                    learning_objective=LocalizedText(vi="A", en="A"),
+                    formal_description=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_missing"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "concept_missing",
+        ),
+        # 11. Method -> missing formula
+        (
+            lambda ds: ds["methods"].append(
+                MethodKnowledge(
+                    method_id="METHOD_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    summary=LocalizedText(vi="A", en="A"),
+                    learning_objective=LocalizedText(vi="A", en="A"),
+                    formal_description=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_base"],
+                    formula_refs=["FORMULA_MISSING"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "FORMULA_MISSING",
+        ),
+        # 12. Method -> missing theorem
+        (
+            lambda ds: ds["methods"].append(
+                MethodKnowledge(
+                    method_id="METHOD_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    summary=LocalizedText(vi="A", en="A"),
+                    learning_objective=LocalizedText(vi="A", en="A"),
+                    formal_description=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_base"],
+                    theorem_refs=["THEOREM_MISSING"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "THEOREM_MISSING",
+        ),
+        # 13. Method -> missing related method
+        (
+            lambda ds: ds["methods"].append(
+                MethodKnowledge(
+                    method_id="METHOD_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    summary=LocalizedText(vi="A", en="A"),
+                    learning_objective=LocalizedText(vi="A", en="A"),
+                    formal_description=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_base"],
+                    related_method_ids=["METHOD_MISSING"],
+                    provenance_refs=["SRC_BASE"],
+                )
+            ),
+            "METHOD_MISSING",
+        ),
+        # 14. Method -> missing provenance
+        (
+            lambda ds: ds["methods"].append(
+                MethodKnowledge(
+                    method_id="METHOD_DANGLING",
+                    title=LocalizedText(vi="A", en="A"),
+                    summary=LocalizedText(vi="A", en="A"),
+                    learning_objective=LocalizedText(vi="A", en="A"),
+                    formal_description=LocalizedText(vi="A", en="A"),
+                    prerequisite_concept_ids=["concept_base"],
+                    provenance_refs=["SRC_MISSING"],
+                )
+            ),
+            "SRC_MISSING",
+        ),
+    ],
+)
+def test_complete_dangling_reference_rejection_matrix(
+    mutator_fn: Any, expected_missing_ref: str
+) -> None:
+    ds = _base_valid_dataset()
+    mutator_fn(ds)
+    with pytest.raises(KnowledgeRepositoryError) as exc_info:
+        KnowledgeRepository(dataset=ds)
+    assert expected_missing_ref in str(exc_info.value)
+
+
+# ============================================================================
+# 6. PREREQUISITE TRAVERSAL & TOPOLOGICAL ORDER
+# ============================================================================
 
 def test_direct_prerequisites_traversal(repo: KnowledgeRepository) -> None:
     prereqs = repo.get_direct_prerequisites("concept_parabola_vertex")

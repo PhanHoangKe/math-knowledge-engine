@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -58,19 +59,19 @@ class KnowledgeRepository:
 
         # Build defensive copies for internal storage to prevent outer object mutation
         self._methods: Dict[str, MethodKnowledge] = {
-            m.method_id: m.model_copy(deep=True) for m in raw_dataset.get("methods", [])
+            m.method_id: m.model_copy(deep=True) for m in raw_dataset["methods"]
         }
         self._concepts: Dict[str, ConceptKnowledge] = {
-            c.concept_id: c.model_copy(deep=True) for c in raw_dataset.get("concepts", [])
+            c.concept_id: c.model_copy(deep=True) for c in raw_dataset["concepts"]
         }
         self._formulas: Dict[str, FormulaKnowledge] = {
-            f.formula_id: f.model_copy(deep=True) for f in raw_dataset.get("formulas", [])
+            f.formula_id: f.model_copy(deep=True) for f in raw_dataset["formulas"]
         }
         self._theorems: Dict[str, TheoremKnowledge] = {
-            t.theorem_id: t.model_copy(deep=True) for t in raw_dataset.get("theorems", [])
+            t.theorem_id: t.model_copy(deep=True) for t in raw_dataset["theorems"]
         }
         self._provenances: Dict[str, SourceProvenance] = {
-            p.source_id: p.model_copy(deep=True) for p in raw_dataset.get("provenances", [])
+            p.source_id: p.model_copy(deep=True) for p in raw_dataset["provenances"]
         }
 
         self._data_dir = data_dir
@@ -82,100 +83,160 @@ class KnowledgeRepository:
         # Validate prerequisite acyclicity on initialization
         self.get_topological_prerequisite_order()
 
-    def _validate_custom_dataset(self, dataset: Dict[str, Any]) -> None:
-        """Validates duplicate keys and referential integrity for custom injected datasets."""
-        # 1. Duplicate ID validation
-        categories = [
-            ("provenances", "source_id"),
-            ("formulas", "formula_id"),
-            ("theorems", "theorem_id"),
-            ("concepts", "concept_id"),
-            ("methods", "method_id"),
-        ]
+    def _validate_custom_dataset(self, dataset: Any) -> None:
+        """Strictly validates custom/injected dataset shape, model types, duplicate keys, and foreign-key integrity."""
+        # 1. Shape and mapping validation
+        if not isinstance(dataset, Mapping):
+            raise KnowledgeRepositoryError(
+                f"Custom dataset must be a mapping/dict, got {type(dataset).__name__}."
+            )
+
+        expected_categories = {
+            "provenances": (SourceProvenance, "source_id"),
+            "formulas": (FormulaKnowledge, "formula_id"),
+            "theorems": (TheoremKnowledge, "theorem_id"),
+            "concepts": (ConceptKnowledge, "concept_id"),
+            "methods": (MethodKnowledge, "method_id"),
+        }
+
+        dataset_keys = set(dataset.keys())
+        missing_categories = set(expected_categories.keys()) - dataset_keys
+        if missing_categories:
+            raise KnowledgeRepositoryError(
+                f"Custom dataset is missing required categories: {sorted(missing_categories)}."
+            )
+
+        unexpected_categories = dataset_keys - set(expected_categories.keys())
+        if unexpected_categories:
+            raise KnowledgeRepositoryError(
+                f"Custom dataset contains unexpected categories: {sorted(unexpected_categories)}."
+            )
+
+        # 2. Collection types and item model types validation
         id_sets: Dict[str, Set[str]] = {}
-        for cat_name, id_field in categories:
-            items = dataset.get(cat_name, [])
-            seen: Set[str] = set()
-            for item in items:
+        for cat_name, (expected_cls, id_field) in expected_categories.items():
+            collection = dataset[cat_name]
+            if not isinstance(collection, list):
+                raise KnowledgeRepositoryError(
+                    f"Category '{cat_name}' must be a list, got {type(collection).__name__}."
+                )
+
+            seen_ids: Set[str] = set()
+            for idx, item in enumerate(collection):
+                if not isinstance(item, expected_cls):
+                    raise KnowledgeRepositoryError(
+                        f"Item at index {idx} in category '{cat_name}' must be an instance of {expected_cls.__name__}, got {type(item).__name__}."
+                    )
                 eid = getattr(item, id_field)
-                if eid in seen:
+                if eid in seen_ids:
                     raise KnowledgeRepositoryError(
                         f"Duplicate entity ID '{eid}' found in custom dataset category '{cat_name}'."
                     )
-                seen.add(eid)
-            id_sets[cat_name] = seen
+                seen_ids.add(eid)
 
-        # 2. Referential integrity validation
-        # Provenance refs
-        for cat_name, items in [
-            ("concepts", dataset.get("concepts", [])),
-            ("methods", dataset.get("methods", [])),
-            ("formulas", dataset.get("formulas", [])),
-            ("theorems", dataset.get("theorems", [])),
-        ]:
-            for item in items:
-                for pref in getattr(item, "provenance_refs", []):
-                    if pref not in id_sets["provenances"]:
-                        raise KnowledgeRepositoryError(
-                            f"Entity '{getattr(item, cat_name[:-1] + '_id')}' references missing provenance '{pref}'."
-                        )
+            id_sets[cat_name] = seen_ids
 
-        # Concept prerequisites & related concepts
-        for c in dataset.get("concepts", []):
-            for prereq_id in c.prerequisite_concept_ids:
-                if prereq_id not in id_sets["concepts"]:
+        # 3. Complete Foreign-Key Integrity Matrix
+        # 3a. FormulaKnowledge
+        for f in dataset["formulas"]:
+            for pref in f.provenance_refs:
+                if pref not in id_sets["provenances"]:
                     raise KnowledgeRepositoryError(
-                        f"Concept '{c.concept_id}' references missing prerequisite concept '{prereq_id}'."
+                        f"Formula '{f.formula_id}' references missing provenance '{pref}'."
                     )
-            for rel_id in c.related_concept_ids:
-                if rel_id not in id_sets["concepts"]:
+            for cid in f.related_concept_ids:
+                if cid not in id_sets["concepts"]:
                     raise KnowledgeRepositoryError(
-                        f"Concept '{c.concept_id}' references missing related concept '{rel_id}'."
+                        f"Formula '{f.formula_id}' references missing concept '{cid}'."
                     )
 
-        # Method prerequisites, formulas, theorems, related methods
-        for m in dataset.get("methods", []):
-            for prereq_id in m.prerequisite_concept_ids:
-                if prereq_id not in id_sets["concepts"]:
+        # 3b. TheoremKnowledge
+        for t in dataset["theorems"]:
+            for pref in t.provenance_refs:
+                if pref not in id_sets["provenances"]:
                     raise KnowledgeRepositoryError(
-                        f"Method '{m.method_id}' references missing prerequisite concept '{prereq_id}'."
+                        f"Theorem '{t.theorem_id}' references missing provenance '{pref}'."
                     )
-            for f_id in m.formula_refs:
-                if f_id not in id_sets["formulas"]:
+            for cid in t.related_concept_ids:
+                if cid not in id_sets["concepts"]:
                     raise KnowledgeRepositoryError(
-                        f"Method '{m.method_id}' references missing formula '{f_id}'."
-                    )
-            for t_id in m.theorem_refs:
-                if t_id not in id_sets["theorems"]:
-                    raise KnowledgeRepositoryError(
-                        f"Method '{m.method_id}' references missing theorem '{t_id}'."
-                    )
-            for rel_m_id in m.related_method_ids:
-                if rel_m_id not in id_sets["methods"]:
-                    raise KnowledgeRepositoryError(
-                        f"Method '{m.method_id}' references missing related method '{rel_m_id}'."
+                        f"Theorem '{t.theorem_id}' references missing concept '{cid}'."
                     )
 
-        # Theorem related formulas
-        for t in dataset.get("theorems", []):
-            for f_id in t.related_formula_refs:
-                if f_id not in id_sets["formulas"]:
+        # 3c. ConceptKnowledge
+        for c in dataset["concepts"]:
+            for pref in c.provenance_refs:
+                if pref not in id_sets["provenances"]:
                     raise KnowledgeRepositoryError(
-                        f"Theorem '{t.theorem_id}' references missing related formula '{f_id}'."
+                        f"Concept '{c.concept_id}' references missing provenance '{pref}'."
+                    )
+            for pid in c.prerequisite_concept_ids:
+                if pid not in id_sets["concepts"]:
+                    raise KnowledgeRepositoryError(
+                        f"Concept '{c.concept_id}' references missing prerequisite concept '{pid}'."
+                    )
+            for rcid in c.related_concept_ids:
+                if rcid not in id_sets["concepts"]:
+                    raise KnowledgeRepositoryError(
+                        f"Concept '{c.concept_id}' references missing related concept '{rcid}'."
+                    )
+            for fid in c.formula_refs:
+                if fid not in id_sets["formulas"]:
+                    raise KnowledgeRepositoryError(
+                        f"Concept '{c.concept_id}' references missing formula '{fid}'."
+                    )
+            for mid in c.method_refs:
+                if mid not in id_sets["methods"]:
+                    raise KnowledgeRepositoryError(
+                        f"Concept '{c.concept_id}' references missing method '{mid}'."
+                    )
+
+        # 3d. MethodKnowledge
+        for m in dataset["methods"]:
+            for pref in m.provenance_refs:
+                if pref not in id_sets["provenances"]:
+                    raise KnowledgeRepositoryError(
+                        f"Method '{m.method_id}' references missing provenance '{pref}'."
+                    )
+            for pid in m.prerequisite_concept_ids:
+                if pid not in id_sets["concepts"]:
+                    raise KnowledgeRepositoryError(
+                        f"Method '{m.method_id}' references missing prerequisite concept '{pid}'."
+                    )
+            for fid in m.formula_refs:
+                if fid not in id_sets["formulas"]:
+                    raise KnowledgeRepositoryError(
+                        f"Method '{m.method_id}' references missing formula '{fid}'."
+                    )
+            for tid in m.theorem_refs:
+                if tid not in id_sets["theorems"]:
+                    raise KnowledgeRepositoryError(
+                        f"Method '{m.method_id}' references missing theorem '{tid}'."
+                    )
+            for rmid in m.related_method_ids:
+                if rmid not in id_sets["methods"]:
+                    raise KnowledgeRepositoryError(
+                        f"Method '{m.method_id}' references missing related method '{rmid}'."
                     )
 
     def _compute_in_memory_hash(self) -> str:
-        """Computes a deterministic SHA-256 hash across in-memory entities."""
-        hasher = hashlib.sha256()
-        canonical_data = {
-            "provenances": [p.model_dump(mode="json") for p in sorted(self._provenances.values(), key=lambda x: x.source_id)],
-            "formulas": [f.model_dump(mode="json") for f in sorted(self._formulas.values(), key=lambda x: x.formula_id)],
-            "theorems": [t.model_dump(mode="json") for t in sorted(self._theorems.values(), key=lambda x: x.theorem_id)],
-            "concepts": [c.model_dump(mode="json") for c in sorted(self._concepts.values(), key=lambda x: x.concept_id)],
-            "methods": [m.model_dump(mode="json") for m in sorted(self._methods.values(), key=lambda x: x.method_id)],
+        """Computes a deterministic unkeyed SHA-256 digest over in-memory entities matching production loader semantics."""
+        logical_files = {
+            "concepts.json": [c.model_dump(mode="json") for c in sorted(self._concepts.values(), key=lambda x: x.concept_id)],
+            "formulas.json": [f.model_dump(mode="json") for f in sorted(self._formulas.values(), key=lambda x: x.formula_id)],
+            "methods.json": [m.model_dump(mode="json") for m in sorted(self._methods.values(), key=lambda x: x.method_id)],
+            "provenance.json": [p.model_dump(mode="json") for p in sorted(self._provenances.values(), key=lambda x: x.source_id)],
+            "theorems.json": [t.model_dump(mode="json") for t in sorted(self._theorems.values(), key=lambda x: x.theorem_id)],
         }
-        encoded = json.dumps(canonical_data, sort_keys=True, ensure_ascii=False).encode("utf-8")
-        hasher.update(encoded)
+        target_files = sorted(["concepts.json", "formulas.json", "methods.json", "provenance.json", "theorems.json"])
+        hasher = hashlib.sha256()
+
+        for filename in target_files:
+            data = logical_files[filename]
+            canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+            hasher.update(filename.encode("utf-8"))
+            hasher.update(canonical_bytes)
+
         return hasher.hexdigest()
 
     # ------------------------------------------------------------------------
