@@ -62,34 +62,108 @@
   line-height: 1;
 }
 
+/* Universal WolframAlpha Math Slot Styling */
+.mathSlot {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #111827;
+  background-color: #fef9c3; /* Light Yellow when unfocused */
+  border: 1px dashed #ca8a04; /* Gold/yellow dashed border when unfocused */
+  border-radius: 2px;
+  padding: 0 3px;
+  min-width: 18px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  outline: none;
+  box-shadow: none;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  vertical-align: middle;
+  margin: 0 1px;
+}
+
+.mathSlot:focus {
+  background-color: #e0f2fe !important; /* Light Sky Blue when focused */
+  border: 1px solid #38bdf8 !important; /* Sky Blue border */
+  outline: none !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
 .slotExponent {
   display: inline-block;
   vertical-align: super;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #7e22ce;
-  background: #f3e8ff;
-  border: 1.5px dashed #a855f7;
-  border-radius: 3px;
-  padding: 0 3px;
-  min-width: 16px;
-  height: 18px;
-  line-height: 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
+  padding: 0 2px;
+  min-width: 15px;
+  height: 16px;
+  line-height: 14px;
   text-align: center;
   outline: none;
   margin-left: 2px;
   margin-bottom: 8px;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .slotExponent:focus {
-  border-style: solid;
-  border-color: #7e22ce;
-  background: #ede9fe;
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
 }
 
-/* Fraction 2-Tier Stacked Block - 100% WolframAlpha style */
+.slotSuper {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
+  padding: 0 2px;
+  min-width: 14px;
+  height: 15px;
+  line-height: 13px;
+  text-align: center;
+  outline: none;
+  margin-bottom: 2px;
+}
+
+.slotSuper:focus {
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
+.slotSub {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
+  padding: 0 2px;
+  min-width: 14px;
+  height: 15px;
+  line-height: 13px;
+  text-align: center;
+  outline: none;
+  margin-top: 2px;
+}
+
+.slotSub:focus {
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
+/* Fraction 2-Tier Stacked Block */
 .fractionBlock {
   display: inline-flex;
   flex-direction: column;
@@ -100,28 +174,34 @@
   min-width: 20px;
 }
 
+.fractionSymbol {
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: inherit;
+  user-select: none;
+}
+
 .slotNumerator {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #0369a1;
-  background: #e0f2fe;
-  border: 1.5px dashed #38bdf8;
-  border-radius: 3px;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
   padding: 0 3px;
   min-width: 18px;
   height: 18px;
   line-height: 16px;
   text-align: center;
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .slotNumerator:focus {
-  border-style: solid;
-  border-color: #0284c7;
-  background: #bae6fd;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
 }
 
 .fractionBar {
@@ -137,24 +217,23 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #854d0e;
-  background: #fef9c3;
-  border: 1.5px dashed #facc15;
-  border-radius: 3px;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
   padding: 0 3px;
   min-width: 18px;
   height: 18px;
   line-height: 16px;
   text-align: center;
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .slotDenominator:focus {
-  border-style: solid;
-  border-color: #ca8a04;
-  background: #fef08a;
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.35);
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
 }
 
 /* Square Root / Radical Block */
@@ -168,7 +247,7 @@
 .sqrtSymbol {
   font-size: 1.35rem;
   line-height: 1;
-  color: #047857;
+  color: inherit;
   margin-right: 1px;
   user-select: none;
 }
@@ -177,10 +256,10 @@
   display: inline-block;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #065f46;
-  background: #d1fae5;
-  border: 1.5px dashed #34d399;
-  border-top: 2px solid #047857;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-top: 1.5px solid #111827;
   border-radius: 2px;
   padding: 1px 4px;
   min-width: 20px;
@@ -188,14 +267,14 @@
   line-height: 20px;
   text-align: center;
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .slotRadicand:focus {
-  border-style: solid;
-  border-color: #059669;
-  background: #a7f3d0;
-  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.35);
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  border-top: 1.5px solid #111827 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
 }
 
 /* Nth Root Block */
@@ -208,50 +287,176 @@
 .slotNthIndex {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px dashed #6ee7b7;
-  border-radius: 3px;
-  width: 16px;
-  height: 16px;
+  color: #111827;
+  background-color: #fef9c3;
+  border: 1px dashed #ca8a04;
+  border-radius: 2px;
+  width: 15px;
+  height: 15px;
+  line-height: 13px;
   text-align: center;
   vertical-align: super;
   margin-right: -2px;
   outline: none;
 }
 
-/* Calculus / Vector / Generic Slots */
-.calculusBlock {
+.slotNthIndex:focus {
+  background-color: #e0f2fe !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
+/* Derivative Block */
+.derivativeBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.derivativeDenRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+/* Integral Block */
+.integralBlock {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   margin: 0 2px;
-  font-size: 0.95rem;
+  vertical-align: middle;
 }
 
-.calculusSymbol {
-  font-size: 1.25rem;
-  color: #6b21a8;
+.defIntegralSymbolWrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.integralSymbol {
+  font-size: 1.45rem;
+  line-height: 1;
+  color: inherit;
   user-select: none;
 }
 
-.slotGeneric {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #4338ca;
-  background: #e0e7ff;
-  border: 1.5px dashed #818cf8;
-  border-radius: 3px;
-  padding: 1px 4px;
-  min-width: 18px;
-  height: 20px;
-  line-height: 18px;
-  text-align: center;
-  outline: none;
+.differentialD {
+  font-size: 1.1rem;
+  font-style: italic;
+  font-family: serif;
+  margin: 0 1px;
+  user-select: none;
 }
 
-.slotGeneric:focus {
-  border-style: solid;
-  border-color: #4f46e5;
-  background: #c7d2fe;
+/* Summation Block */
+.sumBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  vertical-align: middle;
 }
+
+.sumSymbolWrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sumSymbol {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: inherit;
+  user-select: none;
+}
+
+.sumLowerRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+/* Limit Block */
+.limitBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.limitSymbolWrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.limitText {
+  font-size: 0.95rem;
+  font-style: italic;
+  font-family: serif;
+  user-select: none;
+}
+
+.limitSubRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+/* Vector Block */
+.vectorBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px;
+}
+
+.vectorBracket {
+  font-size: 1.35rem;
+  color: inherit;
+  user-select: none;
+}
+
+.vectorComma {
+  font-size: 1.1rem;
+  margin: 0 1px;
+  user-select: none;
+}
+
+/* Matrix Block */
+.matrixBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.matrixBracket {
+  font-size: 2.2rem;
+  font-weight: 300;
+  line-height: 1;
+  color: inherit;
+  user-select: none;
+}
+
+.matrixGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.matrixRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+

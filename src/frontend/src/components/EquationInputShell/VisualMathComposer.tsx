@@ -187,26 +187,36 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       }
 
       if (actionId === 'SUM') {
-        const newSum: MathBlock = { type: 'text', id: genId(), value: '∑(n, 1, k)' };
-        insertBlockAtFocus(newSum, 'value');
+        const newSum: MathBlock = { type: 'sum', id: genId(), variable: 'i', from: '1', to: 'n', expr: '' };
+        insertBlockAtFocus(newSum, 'expr');
         return;
       }
 
       if (actionId === 'LIMIT') {
-        const newLim: MathBlock = { type: 'text', id: genId(), value: 'lim(x->0)' };
-        insertBlockAtFocus(newLim, 'value');
+        const newLim: MathBlock = { type: 'limit', id: genId(), variable: 'x', target: '0', expr: '' };
+        insertBlockAtFocus(newLim, 'expr');
         return;
       }
 
       if (actionId === 'VEC_3' || actionId === 'VECTOR') {
-        const newVec: MathBlock = { type: 'text', id: genId(), value: '[x, y, z]' };
-        insertBlockAtFocus(newVec, 'value');
+        const newVec: MathBlock = { type: 'vector', id: genId(), items: ['', '', ''] };
+        insertBlockAtFocus(newVec, 'item_0');
         return;
       }
 
       if (actionId === 'MAT_3X3' || actionId === 'MATRIX') {
-        const newMat: MathBlock = { type: 'text', id: genId(), value: '[[a, b, c], [d, e, f], [g, h, i]]' };
-        insertBlockAtFocus(newMat, 'value');
+        const newMat: MathBlock = {
+          type: 'matrix',
+          id: genId(),
+          rows: 3,
+          cols: 3,
+          cells: [
+            ['', '', ''],
+            ['', '', ''],
+            ['', '', ''],
+          ],
+        };
+        insertBlockAtFocus(newMat, 'cell_0_0');
         return;
       }
 
@@ -608,63 +618,266 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
 
           if (b.type === 'derivative') {
             return (
-              <span key={b.id} className={styles.calculusBlock}>
-                <span className={styles.calculusSymbol}>
-                  {b.order === 2 ? 'd²/d' : 'd/d'}
+              <span key={b.id} className={styles.derivativeBlock}>
+                <span className={styles.fractionBlock}>
+                  <span className={styles.fractionSymbol}>{b.order === 2 ? 'd²' : 'd'}</span>
+                  <div className={styles.fractionBar} />
+                  <span className={styles.derivativeDenRow}>
+                    <span className={styles.fractionSymbol}>d</span>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_wrt`, el)}
+                      type="text"
+                      className={styles.mathSlot}
+                      style={{ width: `${Math.max(1, (b.wrt || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.wrt}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { wrt: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'wrt' })}
+                      disabled={disabled}
+                    />
+                    {b.order === 2 && <span className={styles.fractionSymbol}>²</span>}
+                  </span>
                 </span>
-                <input
-                  ref={(el) => setInputRef(`${b.id}_wrt`, el)}
-                  type="text"
-                  className={styles.slotGeneric}
-                  style={{ width: '22px' }}
-                  value={b.wrt}
-                  onChange={(e) => updateBlock(b.id, { wrt: e.target.value })}
-                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'wrt' })}
-                  disabled={disabled}
-                />
-                <span>(</span>
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.slotGeneric}
-                  style={{ width: `${Math.max(2, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  className={styles.mathSlot}
+                  style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
+                  placeholder=""
                   onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
                   onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
                   onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
                   disabled={disabled}
                 />
-                <span>)</span>
               </span>
             );
           }
 
           if (b.type === 'integral') {
             return (
-              <span key={b.id} className={styles.calculusBlock}>
-                <span className={styles.calculusSymbol}>∫</span>
+              <span key={b.id} className={styles.integralBlock}>
+                {b.isDefinite ? (
+                  <span className={styles.defIntegralSymbolWrap}>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_upper`, el)}
+                      type="text"
+                      className={styles.slotSuper}
+                      style={{ width: `${Math.max(1, (b.upper || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.upper ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { upper: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'upper' })}
+                      disabled={disabled}
+                    />
+                    <span className={styles.integralSymbol}>∫</span>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_lower`, el)}
+                      type="text"
+                      className={styles.slotSub}
+                      style={{ width: `${Math.max(1, (b.lower || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.lower ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { lower: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'lower' })}
+                      disabled={disabled}
+                    />
+                  </span>
+                ) : (
+                  <span className={styles.integralSymbol}>∫</span>
+                )}
                 <input
                   ref={(el) => setInputRef(`${b.id}_expr`, el)}
                   type="text"
-                  className={styles.slotGeneric}
-                  style={{ width: `${Math.max(2, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  className={styles.mathSlot}
+                  style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.expr}
+                  placeholder=""
                   onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
                   onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
                   onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
                   disabled={disabled}
                 />
-                <span>d</span>
+                <span className={styles.differentialD}>d</span>
                 <input
                   ref={(el) => setInputRef(`${b.id}_wrt`, el)}
                   type="text"
-                  className={styles.slotGeneric}
-                  style={{ width: '22px' }}
+                  className={styles.mathSlot}
+                  style={{ width: `${Math.max(1, (b.wrt || ' ').length) * 1.1 + 0.6}ch` }}
                   value={b.wrt}
+                  placeholder=""
                   onChange={(e) => updateBlock(b.id, { wrt: e.target.value })}
                   onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'wrt' })}
                   disabled={disabled}
                 />
+              </span>
+            );
+          }
+
+          if (b.type === 'sum') {
+            return (
+              <span key={b.id} className={styles.sumBlock}>
+                <span className={styles.sumSymbolWrap}>
+                  <input
+                    ref={(el) => setInputRef(`${b.id}_upper`, el)}
+                    type="text"
+                    className={styles.slotSuper}
+                    style={{ width: `${Math.max(1, (b.to || ' ').length) * 1.1 + 0.6}ch` }}
+                    value={b.to ?? ''}
+                    placeholder=""
+                    onChange={(e) => updateBlock(b.id, { to: e.target.value })}
+                    onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'upper' })}
+                    disabled={disabled}
+                  />
+                  <span className={styles.sumSymbol}>∑</span>
+                  <span className={styles.sumLowerRow}>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_var`, el)}
+                      type="text"
+                      className={styles.slotSub}
+                      style={{ width: `${Math.max(1, (b.variable || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.variable ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { variable: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'var' })}
+                      disabled={disabled}
+                    />
+                    <span style={{ fontSize: '0.75rem' }}>=</span>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_lower`, el)}
+                      type="text"
+                      className={styles.slotSub}
+                      style={{ width: `${Math.max(1, (b.from || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.from ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { from: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'lower' })}
+                      disabled={disabled}
+                    />
+                  </span>
+                </span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_expr`, el)}
+                  type="text"
+                  className={styles.mathSlot}
+                  style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  value={b.expr}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
+                  disabled={disabled}
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'limit') {
+            return (
+              <span key={b.id} className={styles.limitBlock}>
+                <span className={styles.limitSymbolWrap}>
+                  <span className={styles.limitText}>lim</span>
+                  <span className={styles.limitSubRow}>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_var`, el)}
+                      type="text"
+                      className={styles.slotSub}
+                      style={{ width: `${Math.max(1, (b.variable || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.variable ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { variable: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'var' })}
+                      disabled={disabled}
+                    />
+                    <span style={{ fontSize: '0.75rem' }}>→</span>
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_target`, el)}
+                      type="text"
+                      className={styles.slotSub}
+                      style={{ width: `${Math.max(1, (b.target || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={b.target ?? ''}
+                      placeholder=""
+                      onChange={(e) => updateBlock(b.id, { target: e.target.value })}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'target' })}
+                      disabled={disabled}
+                    />
+                  </span>
+                </span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_expr`, el)}
+                  type="text"
+                  className={styles.mathSlot}
+                  style={{ width: `${Math.max(1, (b.expr || ' ').length) * 1.1 + 0.6}ch` }}
+                  value={b.expr}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { expr: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'expr' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'expr', idx)}
+                  disabled={disabled}
+                />
+              </span>
+            );
+          }
+
+          if (b.type === 'vector') {
+            return (
+              <span key={b.id} className={styles.vectorBlock}>
+                <span className={styles.vectorBracket}>(</span>
+                {b.items.map((item, itIdx) => (
+                  <React.Fragment key={itIdx}>
+                    {itIdx > 0 && <span className={styles.vectorComma}>,</span>}
+                    <input
+                      ref={(el) => setInputRef(`${b.id}_item_${itIdx}`, el)}
+                      type="text"
+                      className={styles.mathSlot}
+                      style={{ width: `${Math.max(1, (item || ' ').length) * 1.1 + 0.6}ch` }}
+                      value={item}
+                      placeholder=""
+                      onChange={(e) => {
+                        const newItems = [...b.items];
+                        newItems[itIdx] = e.target.value;
+                        updateBlock(b.id, { items: newItems });
+                      }}
+                      onFocus={() => setFocusedTarget({ blockId: b.id, slot: `item_${itIdx}` })}
+                      disabled={disabled}
+                    />
+                  </React.Fragment>
+                ))}
+                <span className={styles.vectorBracket}>)</span>
+              </span>
+            );
+          }
+
+          if (b.type === 'matrix') {
+            return (
+              <span key={b.id} className={styles.matrixBlock}>
+                <span className={styles.matrixBracket}>(</span>
+                <div className={styles.matrixGrid}>
+                  {b.cells.map((row, rIdx) => (
+                    <div key={rIdx} className={styles.matrixRow}>
+                      {row.map((cell, cIdx) => (
+                        <input
+                          key={cIdx}
+                          ref={(el) => setInputRef(`${b.id}_cell_${rIdx}_${cIdx}`, el)}
+                          type="text"
+                          className={styles.mathSlot}
+                          style={{ width: `${Math.max(1, (cell || ' ').length) * 1.1 + 0.6}ch` }}
+                          value={cell}
+                          placeholder=""
+                          onChange={(e) => {
+                            const newCells = b.cells.map((r, ri) =>
+                              ri === rIdx ? r.map((c, ci) => (ci === cIdx ? e.target.value : c)) : r
+                            );
+                            updateBlock(b.id, { cells: newCells });
+                          }}
+                          onFocus={() => setFocusedTarget({ blockId: b.id, slot: `cell_${rIdx}_${cIdx}` })}
+                          disabled={disabled}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <span className={styles.matrixBracket}>)</span>
               </span>
             );
           }

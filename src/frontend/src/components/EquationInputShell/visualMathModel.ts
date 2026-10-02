@@ -10,9 +10,11 @@ export type MathBlock =
   | { type: 'nth_root'; id: string; index: string; radicand: string }
   | { type: 'derivative'; id: string; order: number; wrt: string; expr: string }
   | { type: 'integral'; id: string; isDefinite: boolean; lower?: string; upper?: string; expr: string; wrt: string }
-  | { type: 'sum'; id: string; variable: string; from: string; to: string; expr: string }
-  | { type: 'limit'; id: string; variable: string; target: string; expr: string }
-  | { type: 'vector'; id: string; items: string[] };
+  | { type: 'sum'; id: string; variable?: string; from?: string; to?: string; expr: string }
+  | { type: 'limit'; id: string; variable?: string; target?: string; expr: string }
+  | { type: 'vector'; id: string; items: string[] }
+  | { type: 'matrix'; id: string; rows: number; cols: number; cells: string[][] };
+
 
 let idCounter = 0;
 export function genId(): string {
@@ -196,6 +198,9 @@ export function blocksToRawSolverString(blocks: MathBlock[]): string {
       case 'vector':
         res += `[${b.items.join(', ')}]`;
         break;
+      case 'matrix':
+        res += `[${b.cells.map((row) => `[${row.join(', ')}]`).join(', ')}]`;
+        break;
     }
   }
 
@@ -245,6 +250,9 @@ export function blocksToVisualString(blocks: MathBlock[]): string {
         break;
       case 'vector':
         res += `[${b.items.join(', ')}]`;
+        break;
+      case 'matrix':
+        res += `[${b.cells.map((row) => `[${row.join(', ')}]`).join(', ')}]`;
         break;
     }
   }
