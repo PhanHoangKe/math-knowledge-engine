@@ -72,6 +72,33 @@ describe('MKE Production Frontend Shell (<App />)', () => {
     expect(localStorage.getItem('mke_pref_theme')).toBe('dark');
   });
 
+  it('exposes localized navigation aria-label in default Vietnamese and switches to English', () => {
+    render(<App />);
+
+    // Default Vietnamese navigation landmark
+    expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeInTheDocument();
+
+    // Switch to English
+    const settingsBtn = screen.getByRole('button', {
+      name: /Tùy chọn chủ đề & ngôn ngữ|Theme & Language/i,
+    });
+    fireEvent.click(settingsBtn);
+
+    const englishOption = screen.getByRole('button', { name: /English/i });
+    fireEvent.click(englishOption);
+
+    // English navigation landmark
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
+  });
+
+  it('renders brand title with Alpha accent badge via HeaderBar localization', () => {
+    render(<App />);
+
+    const alphaAccent = screen.getByText('Alpha');
+    expect(alphaAccent).toBeInTheDocument();
+    expect(alphaAccent.parentElement?.textContent).toContain('MKEAlpha');
+  });
+
   it('proves empty workspace contains ZERO mock roots, certificates, or fake solutions', () => {
     const { container } = render(<App />);
     const textContent = container.textContent ?? '';

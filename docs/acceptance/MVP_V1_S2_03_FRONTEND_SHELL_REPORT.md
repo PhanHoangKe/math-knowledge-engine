@@ -4,8 +4,8 @@
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
-**Date:** 2026-10-01  
-**Target Milestone:** S2-03 Production Frontend Shell & OpenAPI Type Pipeline  
+**Date:** 2026-10-02  
+**Target Milestone:** S2-03 Production Frontend Shell & OpenAPI Type Pipeline (Closeout R2)  
 **Branch:** `product/mvp-v1-s2-03-frontend-shell`  
 **Baseline Lineage:**
 - Accepted S2-02 Baseline: `6e96ebbe083677a69c69127bae6a57a24d11a674`
@@ -22,11 +22,12 @@ Stage S2-03 establishes the production React + TypeScript + Vite frontend founda
 ### Core Deliverables & Verification Outcomes:
 1. **Reproducible Toolchain & Locked Dependencies:** Pinned dependencies (`React 18.3.1`, `TypeScript 5.7.3`, `Vite 6.2.0`, `openapi-typescript 7.6.1`, `Vitest 3.0.7`) locked via `package-lock.json`.
 2. **Automated OpenAPI Pipeline:** `scripts/export_openapi.py` exports the canonical OpenAPI 3.1.0 schema directly from `mke_product.transport.app:create_app()` without requiring a running web server.
-3. **Automated Drift Detection:** `npm run check:api` (`scripts/check-api-drift.mjs`) provides cross-platform validation ensuring committed OpenAPI schemas and generated TypeScript interfaces never drift from backend reality.
+3. **Automated Drift Detection & Cleanup:** `npm run check:api` (`scripts/check-api-drift.mjs`) provides cross-platform validation ensuring committed OpenAPI schemas and generated TypeScript interfaces never drift from backend reality, with guaranteed temporary directory cleanup on both PASS and FAIL paths.
 4. **Preserved UI00 Visual Identity:** Full design token migration in `src/styles/tokens.css` preserving canvas, surface, signature violet capsule, dark charcoal, and 4 domain category colors.
-5. **Bilingual Foundation & Preference State:** Strict key parity between Vietnamese (`vi`) and English (`en`), with deterministic preference priority: **URL params** ➔ **localStorage** ➔ **Default (`vi` / `auto`)**.
+5. **Bilingual Foundation & Header Landmark Accessibility:** Strict key parity between Vietnamese (`vi`) and English (`en`), with deterministic preference priority: **URL params** ➔ **localStorage** ➔ **Default (`vi` / `auto`)**, along with localized `aria-label` navigation landmarks and `t('brand_alpha')` brand rendering.
 6. **Accessible Empty Algebra Workspace:** Clean, responsive shell presenting an inactive capsule search box and structural skeleton panels without faking mathematical results, roots, or verification certificates.
-7. **Production Authority Compliance:** Verified zero client-side mathematical solving logic across all production frontend source files.
+7. **Evidence Immutability & Namespace Isolation:** Historical `p03b` evidence files were restored byte-for-byte to their original baseline (`fcb45c12`), preserving milestone evidence boundaries.
+8. **Production Authority Compliance:** Verified zero client-side mathematical solving logic across all production frontend source files.
 
 ---
 
@@ -131,8 +132,8 @@ npx openapi-typescript openapi/mke.openapi.json -o src/types/api.generated.ts
 🚀 openapi/mke.openapi.json → src/types/api.generated.ts [98.4ms]
 ```
 
-### 3. API Drift Check & Cleanup Assurance (S2-03-R1)
-`scripts/check-api-drift.mjs` was refactored in S2-03-R1 to replace `process.exit(1)` within the `try` block with `throw new Error(...)`, ensuring that `finally { cleanTemp(); }` is guaranteed to execute and clean `.drift-temp/` under both success and failure conditions:
+### 3. API Drift Check & Cleanup Assurance
+`scripts/check-api-drift.mjs` guarantees that `finally { cleanTemp(); }` executes and cleans `.drift-temp/` under both success and failure conditions:
 - **PASS Validation:**
   ```text
   npm run check:api
@@ -185,15 +186,15 @@ npm run test
 
  RUN  v3.0.7 D:/Math Knowledge Engine/src/frontend
 
- ✓ src/test/apiContract.test.ts (3 tests) 14ms
- ✓ src/test/i18n.test.ts (4 tests) 23ms
- ✓ src/test/preferences.test.tsx (8 tests) 70ms
- ✓ src/test/App.test.tsx (5 tests) 305ms
+ ✓ src/test/apiContract.test.ts (3 tests) 11ms
+ ✓ src/test/i18n.test.ts (4 tests) 22ms
+ ✓ src/test/preferences.test.tsx (8 tests) 64ms
+ ✓ src/test/App.test.tsx (7 tests) 396ms
 
  Test Files  4 passed (4)
-      Tests  20 passed (20)
-   Start at  23:52:32
-   Duration  2.41s
+      Tests  22 passed (22)
+   Start at  07:45:29
+   Duration  2.85s
 ```
 
 ### 3. Production Vite Bundle Build
@@ -210,36 +211,41 @@ computing gzip size...
 dist/index.html                   0.73 kB │ gzip:  0.43 kB
 dist/assets/index-Cxw60kWi.css   14.46 kB │ gzip:  3.52 kB
 dist/assets/index-C9ij-N9E.js   162.54 kB │ gzip: 52.29 kB
-✓ built in 1.15s
+✓ built in 946ms
 ```
 
 ---
 
 ## 6. Regression & Isolation Evidence
 
-### 1. Legacy Browser UI Suite (`ui/ui00/`)
+### 1. Evidence Namespace Immutability Audit (S2-03-R2)
+- **Historical Evidence Scope:** Historical screenshots in `evidence/p03b/screenshots/` (`08_english_localization.png`, `09_charcoal_dark_theme.png`) were unintentionally updated during R1.
+- **Remediation:** S2-03-R2 restored both files to their exact baseline state from `fcb45c128b3ba218ee52f2e4aeb5e9ed21bb6547`.
+- **Integrity Proof:** `git diff fcb45c128b3ba218ee52f2e4aeb5e9ed21bb6547 -- evidence/p03b/screenshots/` returns **zero differences**. No prior milestone evidence namespace is mutated by the S2-03 branch.
+
+### 2. Legacy Browser UI Suite (`ui/ui00/`)
 ```text
 pytest -q tests/test_browser_canonical_ui.py
 .....................                                                    [100%]
-21 passed in 41.31s
+21 passed in 94.22s
 ```
 - Browser test suite: `tests/test_browser_canonical_ui.py` (21 tests).
 - Result: 21 passed (100%). Legacy `ui/ui00/` source code is completely unmodified.
 
-### 2. KaTeX Vendored Asset Integrity
+### 3. KaTeX Vendored Asset Integrity
 - Path: `src/frontend/public/vendor/katex/` vs `ui/ui00/vendor/katex/`.
 - File-by-file SHA-256 hash comparison confirms 100% byte-for-byte exact equality across all CSS, JS, license, and font files.
 
-### 3. Accepted S2 Transport Acceptance & Smoke Suites
+### 4. Accepted S2 Transport Acceptance & Smoke Suites
 ```text
 pytest -q tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py
-149 passed, 5 warnings in 3.24s
+149 passed, 5 warnings in 3.55s
 ```
 
-### 4. Accepted S1 & S0 Regression Suites
+### 5. Accepted S1 & S0 Regression Suites
 ```text
 pytest -q tests/test_application_s1_acceptance.py tests/test_application_orchestrator_s1.py tests/test_application_traces_s1.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_domain_core_s0.py
-278 passed in 0.98s
+278 passed in 1.04s
 ```
 
 ---
@@ -254,11 +260,11 @@ A comprehensive code scan of all production frontend files (`src/frontend/src/co
 
 ## 8. Unresolved Issues
 
-- **None.** All frontend shell requirements, OpenAPI generation pipelines, drift checkers, unit tests, responsive styling, KaTeX vendored asset parity, and backend regression suites passed without defect.
+- **None.** All frontend shell requirements, OpenAPI generation pipelines, drift checkers, unit tests, responsive styling, KaTeX vendored asset parity, evidence immutability safeguards, and backend regression suites passed without defect.
 
 ---
 
 ## 9. Audit Status
 
-**STATUS:** PENDING INDEPENDENT S2-03 AUDIT  
+**STATUS:** PENDING INDEPENDENT S2-03-R2 FINAL AUDIT  
 *(Implementation engineer will await authorization before proceeding to Stage S2-04 live workspace integration).*
