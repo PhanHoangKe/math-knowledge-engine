@@ -1,23 +1,23 @@
-# MKE PRODUCT — S3-P0-R1 METHOD KNOWLEDGE & GRAPH SURFACES PREFLIGHT REPORT
+# MKE PRODUCT — S3-P0-R2 FINAL SOURCE-TRUTH ALIGNMENT CLOSEOUT REPORT
 
 **Role:** Antigravity (“Anty”) — Implementation Engineer  
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
 **Date:** 2026-10-02  
-**Target Milestone:** S3-P0-R1 Method Knowledge & Graph Surfaces Preflight (Semantic Correction)  
+**Target Milestone:** S3-P0-R2 Final Source-Truth Alignment Closeout  
 **Branch:** `product/mvp-v1-s3-p0-method-knowledge-preflight`  
-**Parent Baseline Commit:** `2835996c085f168f7404eb198924da9d2c08b0bf` (Audited S3-P0 Head)  
+**Parent Baseline Commit:** `77de61d3f3498dc9c5b12719814ecd108017cf79` (Audited S3-P0-R1 Head)  
 **Accepted Algebra Baseline:** `e620c96470514f8bd7563efba25427c7a4764488`  
 **Baseline Acceptance Tag:** `mvp-v1-algebra-slice-accepted`  
 **Parked B3 Baseline:** `cdb73dd689eed30e326b6fd8ece2f7b8b4984a61` (100% Untouched)  
-**Preflight Status:** `PENDING INDEPENDENT S3-P0-R1 AUDIT`
+**Preflight Status:** `PENDING INDEPENDENT S3-P0-R2 FINAL AUDIT`
 
 ---
 
 ## 1. Executive Summary & Authorization Scope
 
-This preflight document establishes the corrected architectural blueprint, schema models, repository inventory, graph models, and staged implementation roadmap for **Milestone S3: Method Knowledge & Graph Surfaces**.
+This preflight document establishes the final reconciled architectural blueprint, schema models, repository inventory, graph models, and staged implementation roadmap for **Milestone S3: Method Knowledge & Graph Surfaces**.
 
 ### 1.1 Authorization & Non-Goals
 - **AUTHORIZED:** Preflight analysis, repository knowledge inventory, schema contracts design, graph distinction architecture, API exposure alternatives, and implementation staging.
@@ -53,7 +53,7 @@ A repository-wide inventory across `src/mke_product/**`, `src/mke/**`, `docs/**`
 | Category | Location | Content / Artifact | Production Reusability |
 | :--- | :--- | :--- | :--- |
 | **Production Safe** | `src/mke_product/domain/models.py` | `MethodDefinition`, `MethodAssessment`, `PrerequisiteStatus`, `DependencyNode` | **REUSE & EXTEND** (Strict Pydantic v2 foundation). |
-| **Production Safe** | `src/mke_product/domain/registry.py` | `MethodRegistry` with 9 frozen `MethodId`s and orthogonal capability matrix | **AUTHORITY BASELINE** (Stable foreign keys). |
+| **Production Safe** | `src/mke_product/domain/registry.py` | `MethodRegistry` with 9 canonical string method IDs and orthogonal capability matrix | **AUTHORITY BASELINE** (Stable foreign keys). |
 | **Production Safe** | `src/mke_product/domain/dag.py` | `DependencyGraph` (DAG engine, topological invalidation, cycle detection) | **REUSE AS REACTIVE DAG** (Preserve for parameter dependencies). |
 | **Production Safe** | `src/mke_product/application/traces/*` | Structured solution step traces with `rule_or_theorem_used`, `why_this_step_vi` | **INTEGRATE** (Link step rules to S3 Theorem/Formula IDs). |
 | **Research-Only** | `src/mke/g4p1/**` | Multi-CAS trust verification, Merkle batch manifests, relation judges | **RESEARCH ONLY** (Do not merge into S3 product). |
@@ -71,7 +71,7 @@ Historical DEV-02A (`753382a023835dbdbe6b074ca6101a3292d3474c`) provided an init
 DEV-02A used typed Pydantic research schemas (`MethodTemplate`, `MethodInstance`, `FamilyRecord`, `ProblemRecord`, `MethodAnnotation`, `TransferPairRecord`, `DatasetManifest`), but they were substantially more permissive than the production S3 target:
 - Lacked `strict=True` and `extra="forbid"`.
 - Relied heavily on untyped `Dict[str, Any]` and dynamic payload dictionaries.
-- Used a research-oriented M1–M5 method taxonomy that is incompatible with the product's 9 frozen quadratic `MethodId`s.
+- Used a research-oriented M1–M5 method taxonomy that is incompatible with the product's 9 canonical string `method_id` values.
 - Not suitable as production Single Source of Truth (SSOT) without clean adaptation.
 
 ### 4.2 Concept Classification
@@ -80,7 +80,7 @@ DEV-02A used typed Pydantic research schemas (`MethodTemplate`, `MethodInstance`
 | :--- | :--- | :--- | :--- |
 | **Mathematical Concepts** | Freeform research dictionaries | `ADAPT` | Formalize into strict Pydantic v2 `ConceptKnowledge` models with symmetric bilingual fields. |
 | **Prerequisite Links** | Ad-hoc string lists | `ADAPT` | Formalize as strictly validated typed edges with referential integrity. |
-| **Method Taxonomy** | Methods M1–M5 | `REIMPLEMENT_CLEANLY` | Product baseline strictly uses the 9 frozen quadratic method IDs (`QUAD_*`). |
+| **Method Taxonomy** | Methods M1–M5 | `REIMPLEMENT_CLEANLY` | Product baseline strictly uses the 9 canonical string method IDs (`QUAD_*`). |
 | **Dev01 Adapter & Dispatcher** | Heuristic AST pattern matcher | `REJECT` | Violates S1 exact polynomial normalizer and orthogonal assessment engine. |
 | **SQLite Indexer** | Dynamic SQLite database file | `REJECT` (for MVP S3) | Structured JSON files in Git provide superior determinism, auditability, zero-dependency deployment, and diffability. |
 | **Transfer Near-Miss Pairs** | Heuristic pedagogical discrepancies | `RESEARCH_ONLY` | Keep in research track; do not introduce pedagogical approximations into S3 product. |
@@ -93,7 +93,7 @@ We strictly separate the **Static `MethodDefinition`** fields from the **Dynamic
 
 ### 5.1 Static `MethodDefinition` Catalog (Invariant across all equations)
 
-| Method ID | Vietnamese Title | Problem Family | Relative Complexity | Prerequisite IDs | Verification Capability |
+| Canonical `method_id` (`str`) | Vietnamese Title | Problem Family | Relative Complexity | Prerequisite IDs | Verification Capability |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | `QUAD_FORMULA_STANDARD` | Công thức nghiệm tổng quát | `ALGEBRA_QUADRATIC` | 1 | `PREREQ_RADICALS`, `PREREQ_POLYNOMIAL_COEFF` | `HOST_VERIFIABLE` |
 | `QUAD_FORMULA_REDUCED` | Công thức nghiệm thu gọn | `ALGEBRA_QUADRATIC` | 1 | `PREREQ_RADICALS` | `HOST_VERIFIABLE` |
@@ -107,7 +107,7 @@ We strictly separate the **Static `MethodDefinition`** fields from the **Dynamic
 
 ### 5.2 Dynamic `MethodAssessment` Rules (Evaluated per equation instance on backend)
 
-| Method ID | Mathematical Applicability Rule | Execution Availability | Dynamic Recommendation Rule | Pedagogical Priority Rule |
+| Canonical `method_id` (`str`) | Mathematical Applicability Rule | Execution Availability | Dynamic Recommendation Rule | Pedagogical Priority Rule |
 | :--- | :--- | :--- | :--- | :--- |
 | `QUAD_FORMULA_STANDARD` | **APPLICABLE** always ($a \neq 0$) | `AVAILABLE` | `RECOMMENDED` if not Vieta special; `NEUTRAL` if $a+b+c=0$ or $a-b+c=0$ | 1 (or 2 if Vieta special applies) |
 | `QUAD_FORMULA_REDUCED` | **APPLICABLE** always ($a \neq 0, b \in \mathbb{Q}$) | `AVAILABLE` | `RECOMMENDED` if $b \in \mathbb{Z}$ and $b \pmod 2 == 0$; `NEUTRAL` otherwise | 1 if $b$ is even integer; 4 otherwise |
@@ -117,7 +117,7 @@ We strictly separate the **Static `MethodDefinition`** fields from the **Dynamic
 | `QUAD_VIETE_SPECIAL_SUM` | **APPLICABLE** if $a+b+c=0$; **NOT_APPLICABLE** if $a+b+c \neq 0$ | `AVAILABLE` | `RECOMMENDED` if $a+b+c=0$; `DISCOURAGED` if $a+b+c \neq 0$ | 1 if $a+b+c=0$; 9 otherwise |
 | `QUAD_VIETE_SPECIAL_DIF` | **APPLICABLE** if $a-b+c=0$; **NOT_APPLICABLE** if $a-b+c \neq 0$ | `AVAILABLE` | `RECOMMENDED` if $a-b+c=0$; `DISCOURAGED` if $a-b+c \neq 0$ | 1 if $a-b+c=0$; 9 otherwise |
 | `QUAD_VIETE_SUM_PRODUCT` | **APPLICABLE** if $\Delta$ is rational square; **NOT_APPLICABLE** otherwise | `UNAVAILABLE` | `RECOMMENDED` if applicable and $a=1$; `NEUTRAL` otherwise | 2 if applicable; 8 otherwise |
-| `QUAD_GRAPHICAL_ANALYSIS` | **APPLICABLE** always ($a \neq 0$) | `UNAVAILABLE` | `RECOMMENDED` always | 1 |
+| `QUAD_GRAPHICAL_ANALYSIS` | **APPLICABLE** always ($a \neq 0$) | `UNAVAILABLE` | `RECOMMENDED` always | **6** |
 
 ---
 
@@ -134,7 +134,7 @@ We freeze a strict boundary between static knowledge and dynamic runtime evaluat
 │  - What are common learner mistakes & diagnostic tips?  │
 │  - Invariant under coefficient edits (a, b, c)          │
 └────────────────────────────┬────────────────────────────┘
-                             │ Linked via method_id foreign key
+                             │ Linked via method_id string foreign key
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │             DYNAMIC PROBLEM ASSESSMENT (S1)             │
@@ -148,18 +148,18 @@ We freeze a strict boundary between static knowledge and dynamic runtime evaluat
 
 ### 6.1 Static vs. Dynamic Ownership Table
 
-| Field / Capability | Authority Layer | Dynamic Reactivity | Storage / Origin |
-| :--- | :--- | :--- | :--- |
-| `method_id` | Shared Contract | Static FK | Domain Enum (`MethodId`) |
-| `title`, `summary`, `learning_objective` | S3 Static Knowledge | Static | `MethodKnowledge` JSON |
-| `formal_description`, `common_mistakes` | S3 Static Knowledge | Static | `MethodKnowledge` JSON |
-| `prerequisite_concept_ids`, `formula_refs` | S3 Static Knowledge | Static | `MethodKnowledge` JSON |
-| `mathematical_applicability` | **S1 Symbolic Engine** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) |
-| `execution_availability` | **S1 Domain Matrix** | Static / Build Feature | `MethodAssessment` (Runtime) |
-| `pedagogical_recommendation` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) |
-| `reasons` (equation-specific) | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) |
-| `prerequisite_status.is_satisfied` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) |
-| `pedagogical_priority` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) |
+| Field / Capability | Authority Layer | Dynamic Reactivity | Storage / Origin | Type Contract |
+| :--- | :--- | :--- | :--- | :--- |
+| `method_id` | Shared Contract | Static FK | `MethodRegistry` | `str` |
+| `title`, `summary`, `learning_objective` | S3 Static Knowledge | Static | `MethodKnowledge` JSON | `LocalizedText` |
+| `formal_description`, `common_mistakes` | S3 Static Knowledge | Static | `MethodKnowledge` JSON | `LocalizedText` / `List[LocalizedText]` |
+| `prerequisite_concept_ids`, `formula_refs` | S3 Static Knowledge | Static | `MethodKnowledge` JSON | `List[str]` |
+| `mathematical_applicability` | **S1 Symbolic Engine** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) | `MathematicalApplicability` |
+| `execution_availability` | **S1 Domain Matrix** | Static / Build Feature | `MethodAssessment` (Runtime) | `ExecutionAvailability` |
+| `pedagogical_recommendation` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) | `PedagogicalRecommendation` |
+| `reasons` (equation-specific) | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) | `List[str]` |
+| `prerequisite_status.is_satisfied` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) | `bool` |
+| `pedagogical_priority` | **S1 Domain Registry** | **Dynamic (per equation)** | `MethodAssessment` (Runtime) | `int` |
 
 ---
 
@@ -181,7 +181,7 @@ class MethodKnowledge(BaseModel):
     """Static epistemological and pedagogical definition of a solution method."""
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
-    method_id: str = Field(..., description="Foreign key matching MethodId in domain registry")
+    method_id: str = Field(..., description="Foreign key matching canonical string method_id in MethodRegistry")
     title: LocalizedText
     summary: LocalizedText
     learning_objective: LocalizedText
@@ -378,11 +378,27 @@ class GraphModel(BaseModel):
 
 ### 9.1 Foreign Key Alignment with Accepted S2 Baseline
 - In the accepted S2 production contract (`POST /api/v1/algebra/solve`):
-  - Each item in `method_options` already contains `method_id: str` (e.g. `"QUAD_FORMULA_STANDARD"`).
-  - This existing `method_id` serves as the **immutable primary foreign key** to static `MethodKnowledge.method_id`.
+  - `SolvedResponse` and `AnalyzedNoExecutionResponse` expose `available_methods: List[MethodOptionView]`.
+  - Each item in `available_methods` contains `method_id: str` (e.g. `"QUAD_FORMULA_STANDARD"`).
+  - This existing `method_id` string serves as the **immutable primary foreign key** to static `MethodKnowledge.method_id`.
   - **Zero SolveResponse DTO mutation:** S3 does NOT add a redundant `knowledge_method_id` field to `SolveResponse`.
 
-### 9.2 Proposed Read-Only Knowledge Endpoints (Targeted for S3-03)
+### 9.2 Exact 1:1 Foreign-Key Test Contract (for Stage S3-01)
+- The S3-01 test suite will enforce exact set equality between the method IDs registered in backend `MethodRegistry` and the entities defined in static `methods.json`:
+  ```python
+  registry_method_ids = {m.method_id for m in MethodRegistry().list_all()}
+  knowledge_method_ids = {m.method_id for m in load_method_knowledge()}
+
+  assert len(registry_method_ids) == 9
+  assert len(knowledge_method_ids) == 9
+  assert knowledge_method_ids == registry_method_ids
+  ```
+  - Zero missing IDs.
+  - Zero extraneous IDs.
+  - Zero duplicate `MethodKnowledge.method_id` values.
+  - No `MethodId` enum introduced in S1 or S3.
+
+### 9.3 Proposed Read-Only Knowledge Endpoints (Targeted for S3-03)
 1. `GET /api/v1/knowledge/methods/{method_id}`: Returns static `MethodKnowledge`.
 2. `GET /api/v1/knowledge/concepts/{concept_id}`: Returns static `ConceptKnowledge`.
 3. `GET /api/v1/knowledge/formulas/{formula_id}`: Returns static `FormulaKnowledge`.
@@ -439,10 +455,11 @@ The acceptance dataset provides verified static metadata for all 9 registered me
 
 ## 12. Curriculum & Provenance Evidence Policy
 
-### 12.1 Curriculum Mapping Policy
-- In Stage S3-01, curriculum mappings must only be asserted if supported by an authoritative textbook or official curriculum circular with an exact chapter/section locator.
-- If an official mapping is not yet verified for an entity, `curriculum_refs` must be an empty list (`[]`) or explicitly marked `status = PROVISIONAL_MAPPING`.
+### 12.1 S3-01 Initial Curriculum Policy
+- For the initial S3-01 production acceptance dataset, **only independently verified curriculum mappings** with authoritative source and exact locator citations will be populated.
+- If an official mapping is not yet verified for an entity, `curriculum_refs = []`.
 - Zero manufactured competency codes permitted.
+- `PROVISIONAL_MAPPING` records will not be added merely to make dataset fields look populated.
 
 ### 12.2 Provenance Granularity Policy
 - Centralized `SourceProvenance` registry stored in `provenance.json`.
@@ -456,12 +473,12 @@ The acceptance dataset provides verified static metadata for all 9 registered me
 | Risk ID | Description | Severity | Mitigation Strategy |
 | :--- | :--- | :--- | :--- |
 | **R-01** | DEV-02A research schema mismatch contaminating production models. | **HIGH** | Strict boundary: zero code imported from DEV-02A; clean Pydantic v2 implementation. |
-| **R-02** | Knowledge IDs drifting from product `MethodId`. | **HIGH** | Static test asserting bidirectional 1:1 foreign key match between `MethodRegistry` and `MethodKnowledge`. |
+| **R-02** | Knowledge IDs drifting from product string `method_id`. | **HIGH** | Static CI test asserting exact 1:1 foreign key set equality between `MethodRegistry` and `MethodKnowledge`. |
 | **R-03** | Conflating static Knowledge Graph with dynamic Parameter DAG. | **MEDIUM** | Distinct `GraphKind` taxonomy (`KNOWLEDGE_GRAPH` vs `REACTIVE_DEPENDENCY_DAG`) and separate UI views. |
 | **R-04** | Large static knowledge payload bloating 350ms solve debounce. | **MEDIUM** | Option C Hybrid API architecture: solve returns existing `method_id`; static knowledge cached separately. |
 | **R-05** | Circular prerequisite definitions in concept graph. | **MEDIUM** | Automated DFS cycle detection test executed on `PREREQUISITE_DAG` during bundle build. |
 | **R-06** | Hardcoded Vietnamese-only content blocking bilingual parity. | **MEDIUM** | Strict model requirement for `LocalizedText` (symmetric `.vi` and `.en`) on all text fields. |
-| **R-07** | Inaccurate or unverified curriculum mapping claims. | **LOW** | `CurriculumRef` requires explicit `status` and locator; defaults to empty list if unverified. |
+| **R-07** | Inaccurate or unverified curriculum mapping claims. | **LOW** | `CurriculumRef` requires explicit `status` and locator; defaults to empty list in S3-01 initial dataset. |
 | **R-08** | Incompatibility with future geometry/calculus expansion. | **LOW** | Domain-neutral `ConceptKnowledge`, `FormulaKnowledge`, and `TheoremKnowledge` schemas. |
 
 ---
@@ -473,7 +490,7 @@ The acceptance dataset provides verified static metadata for all 9 registered me
 │ STAGE S3-01: KNOWLEDGE SCHEMAS & STATIC ACCEPTANCE DATASET                             │
 │ - Implement Pydantic v2 schemas: LocalizedText, MethodKnowledge, ConceptKnowledge, etc.│
 │ - Author verified JSON dataset for all 9 quadratic methods and core algebra concepts.  │
-│ - Tests: Strict schema validation, symmetric bilingual tests, referential integrity.   │
+│ - Tests: Strict schema validation, symmetric bilingual tests, 1:1 FK set equality.     │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                                            ▼
@@ -523,10 +540,10 @@ The acceptance dataset provides verified static metadata for all 9 registered me
 
 | Criterion | Evaluation Result | Evidence |
 | :--- | :--- | :--- |
-| **A. Stable Foreign Keys** | **PASS** | `MethodRegistry.list_all()` defines 9 frozen `MethodId`s matching mathematical engine. |
+| **A. Stable Foreign Keys** | **PASS** | `MethodRegistry.list_all()` exposes 9 canonical stable string method IDs suitable as S3 foreign keys. |
 | **B. Knowledge / Solver Separation** | **PASS** | Strict architectural boundary: S3 enriches S1; S1 remains sole execution authority. |
 | **C. Deterministic Offline Storage** | **PASS** | Repository-bundled structured JSON files provide 100% offline, zero-database execution. |
-| **D. DEV-02A Selective Adaptation** | **PASS** | DEV-02A evaluated as research input only; clean Pydantic v2 schemas defined. |
+| **D. DEV-02A Selective Adaptation** | **PASS** | DEV-02A evaluated as research input only; clean Pydantic v2 schemas defined without importing research code. |
 | **E. Two-Graph Distinction** | **PASS** | Knowledge Graph (associative, cycles allowed) and Reactive DAG / Prerequisite DAG (acyclic) formalized as distinct models. |
 
 ### Final Preflight Verdict: **`GO FOR S3 IMPLEMENTATION SEQUENCE`**
@@ -549,6 +566,6 @@ The acceptance dataset provides verified static metadata for all 9 registered me
 
 ## 17. Audit Conclusion & Handoff
 
-Milestone **S3-P0-R1** delivers a completely reconciled, semantically precise, and verified preflight architectural blueprint for S3 Method Knowledge & Graph Surfaces.
+Milestone **S3-P0-R2** delivers the finalized, source-truth aligned, and verified preflight architectural blueprint for S3 Method Knowledge & Graph Surfaces.
 
-**Formal Preflight Status:** `PENDING INDEPENDENT S3-P0-R1 AUDIT`
+**Formal Preflight Status:** `PENDING INDEPENDENT S3-P0-R2 FINAL AUDIT`
