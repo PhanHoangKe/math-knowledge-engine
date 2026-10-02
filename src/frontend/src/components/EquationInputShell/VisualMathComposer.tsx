@@ -603,7 +603,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           }
 
           if (b.type === 'power') {
-            const expWidth = Math.max(1, (b.exponent || ' ').length) * 1.1 + 0.4;
+            const expWidth = b.exponent ? `${Math.max(1, b.exponent.length) * 0.75}ch` : '16px';
             return (
               <span key={b.id} className={styles.powerBlock}>
                 <span className={styles.powerBase}>{b.base}</span>
@@ -611,7 +611,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   ref={(el) => setInputRef(`${b.id}_exponent`, el)}
                   type="text"
                   className={`${styles.slotExponent} ${!b.exponent ? styles.emptySlot : styles.filledSlot}`}
-                  style={{ width: `${expWidth}ch` }}
+                  style={{ width: expWidth }}
                   value={b.exponent}
                   placeholder=""
                   onChange={(e) => updateBlock(b.id, { exponent: e.target.value })}

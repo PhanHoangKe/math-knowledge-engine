@@ -88,15 +88,15 @@
 }
 
 .powerBase {
+  font-family: inherit;
   font-size: 1.15rem;
   font-weight: 400;
   color: inherit;
-  font-family: inherit;
   border: none;
   background: transparent;
   outline: none;
-  min-width: 6px;
-  text-align: right;
+  padding: 0;
+  margin: 0;
   line-height: 26px;
   vertical-align: baseline;
 }
@@ -123,6 +123,7 @@
 .emptySlot {
   background-color: #fefce8 !important; /* Soft pale yellow only when empty */
   border: 1px dashed #ca8a04 !important;
+  min-width: 14px;
 }
 
 .filledSlot {
@@ -142,19 +143,18 @@
 .slotExponent {
   display: inline-block;
   vertical-align: super;
-  font-size: 0.78rem;
+  font-family: inherit;
+  font-size: 0.75rem;
   font-weight: 400;
   color: #111827;
   border-radius: 2px;
-  padding: 0 2px;
-  min-width: 14px;
-  height: 16px;
+  padding: 0 1px;
+  margin: 0 0 6px 0;
+  height: 14px;
   line-height: 14px;
-  text-align: center;
+  text-align: left;
   outline: none;
   box-shadow: none;
-  margin-left: 1px;
-  margin-bottom: 6px;
 }
 
 .slotExponent:focus {
