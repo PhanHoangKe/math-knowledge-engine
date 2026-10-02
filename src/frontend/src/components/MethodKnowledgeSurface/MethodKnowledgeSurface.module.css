@@ -135,6 +135,28 @@
   font-size: 0.875rem;
 }
 
+.errorText {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.retryBtn {
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--error-border, #fecaca);
+  color: var(--error-text, #b91c1c);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retryBtn:hover {
+  background: var(--error-bg, #fef2f2);
+}
+
 [data-theme='dark'] .errorContainer,
 [data-theme='dark'] .conceptCardError,
 [data-theme='dark'] .formulaCardError,
@@ -142,6 +164,17 @@
   background: #450a0a;
   border-color: #7f1d1d;
   color: #fca5a5;
+}
+
+[data-theme='dark'] .retryBtn {
+  background: #450a0a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .retryBtn:hover {
+  background: #7f1d1d;
+  color: #fef2f2;
 }
 
 .surfaceBody {

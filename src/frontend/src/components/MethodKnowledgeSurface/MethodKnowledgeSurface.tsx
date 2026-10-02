@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { MethodKnowledge } from '../../api/contract';
-import { getMethodKnowledge } from '../../api/client';
+import {
+  getMethodKnowledge,
+  KnowledgeApiError,
+  NetworkError,
+  ProtocolError,
+} from '../../api/client';
 import { usePreferences } from '../../state/preferences';
 import { ConceptPrerequisiteList } from './ConceptPrerequisiteList';
 import { FormulaCard } from './FormulaCard';
@@ -14,6 +19,8 @@ export interface MethodKnowledgeSurfaceProps {
   initialData?: MethodKnowledge;
 }
 
+export type KnowledgeErrorKind = 'not_found' | 'network' | 'protocol' | 'generic';
+
 export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
   methodId,
   isOpen,
@@ -23,7 +30,39 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
   const { language, t } = usePreferences();
   const [data, setData] = useState<MethodKnowledge | undefined>(initialData);
   const [loading, setLoading] = useState<boolean>(!initialData);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<KnowledgeErrorKind | null>(null);
+  const activeRequestIdRef = useRef<number>(0);
+
+  const loadKnowledge = (id: string) => {
+    const requestId = ++activeRequestIdRef.current;
+    setLoading(true);
+    setErrorKind(null);
+
+    const abortController = new AbortController();
+
+    getMethodKnowledge(id, abortController.signal)
+      .then((knowledge) => {
+        if (activeRequestIdRef.current !== requestId) return;
+        setData(knowledge);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (activeRequestIdRef.current !== requestId) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (err instanceof KnowledgeApiError) {
+          setErrorKind('not_found');
+        } else if (err instanceof NetworkError) {
+          setErrorKind('network');
+        } else if (err instanceof ProtocolError) {
+          setErrorKind('protocol');
+        } else {
+          setErrorKind('generic');
+        }
+        setLoading(false);
+      });
+
+    return abortController;
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -31,32 +70,34 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
     if (initialData) {
       setData(initialData);
       setLoading(false);
+      setErrorKind(null);
       return;
     }
 
-    const abortController = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    getMethodKnowledge(methodId, abortController.signal)
-      .then((knowledge) => {
-        setData(knowledge);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError(err.message ?? 'Failed to load method knowledge');
-        setLoading(false);
-      });
+    const abortController = loadKnowledge(methodId);
 
     return () => {
-      abortController.abort();
+      abortController?.abort();
     };
   }, [methodId, isOpen, initialData]);
 
   if (!isOpen) {
     return null;
   }
+
+  const getErrorMessage = (): string => {
+    switch (errorKind) {
+      case 'not_found':
+        return t('err_knowledge_not_found');
+      case 'network':
+        return t('err_network_msg');
+      case 'protocol':
+        return t('err_protocol_msg');
+      case 'generic':
+      default:
+        return t('err_knowledge_generic');
+    }
+  };
 
   return (
     <div
@@ -84,21 +125,38 @@ export const MethodKnowledgeSurface: React.FC<MethodKnowledgeSurfaceProps> = ({
       </div>
 
       {loading && (
-        <div className={styles.loadingContainer} data-testid={`knowledge-loading-${methodId}`}>
+        <div
+          className={styles.loadingContainer}
+          role="status"
+          aria-live="polite"
+          data-testid={`knowledge-loading-${methodId}`}
+        >
           <span className={styles.loadingSpinner} />
           <span>{t('lbl_knowledge_loading')} ({methodId})</span>
         </div>
       )}
 
-      {error && !loading && (
-        <div className={styles.errorContainer} data-testid={`knowledge-error-${methodId}`}>
+      {errorKind && !loading && (
+        <div
+          className={styles.errorContainer}
+          role="alert"
+          data-testid={`knowledge-error-${methodId}`}
+        >
           <p className={styles.errorText}>
-            {t('lbl_knowledge_error')}: {error}
+            {getErrorMessage()}
           </p>
+          <button
+            type="button"
+            className={styles.retryBtn}
+            onClick={() => loadKnowledge(methodId)}
+            data-testid={`knowledge-retry-${methodId}`}
+          >
+            {t('btn_retry')}
+          </button>
         </div>
       )}
 
-      {!loading && !error && data && (
+      {!loading && !errorKind && data && (
         <div className={styles.surfaceBody}>
           {/* Method Title & Summary */}
           <div className={styles.summaryBlock}>

@@ -234,6 +234,8 @@ export const en: Translations = {
   lbl_curriculum_locator: 'Lesson Locator',
   lbl_knowledge_loading: 'Loading knowledge entity from server...',
   lbl_knowledge_error: 'Failed to load knowledge entity from server.',
+  err_knowledge_not_found: 'Knowledge entity not found on server.',
+  err_knowledge_generic: 'Failed to load knowledge entity from server.',
   lbl_knowledge_empty_prereqs: 'No prerequisite concepts.',
   lbl_knowledge_empty_formulas: 'No referenced formulas.',
   lbl_knowledge_empty_theorems: 'No referenced theorems.',

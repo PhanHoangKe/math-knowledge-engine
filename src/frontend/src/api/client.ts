@@ -10,6 +10,8 @@ import type {
   SolveResponse200,
   TransportErrorResponse,
   TransportErrorCode,
+  LocalizedText,
+  CurriculumRef,
   MethodKnowledge,
   ConceptKnowledge,
   FormulaKnowledge,
@@ -182,27 +184,197 @@ export async function solveEquation(
 }
 
 /**
- * Hardened structural runtime discriminator for KnowledgeApiErrorResponse.
+ * Reusable runtime structural validation primitives.
  */
-export function isKnowledgeApiErrorResponse(data: unknown): data is KnowledgeApiErrorResponse {
-  if (typeof data !== 'object' || data === null) {
-    return false;
-  }
-  const obj = data as Record<string, unknown>;
+export function isRecord(data: unknown): data is Record<string, unknown> {
+  return typeof data === 'object' && data !== null && !Array.isArray(data);
+}
+
+export function isStringArray(data: unknown): data is string[] {
+  return Array.isArray(data) && data.every((item) => typeof item === 'string');
+}
+
+export function isLocalizedText(data: unknown): data is LocalizedText {
   return (
-    obj.status === 'error' &&
-    obj.error_code === 'KNOWLEDGE_ENTITY_NOT_FOUND' &&
-    typeof obj.entity_type === 'string' &&
-    typeof obj.entity_id === 'string' &&
-    typeof obj.message_vi === 'string' &&
-    typeof obj.message_en === 'string'
+    isRecord(data) &&
+    typeof data.vi === 'string' &&
+    typeof data.en === 'string'
+  );
+}
+
+export function isLocalizedTextArray(data: unknown): data is LocalizedText[] {
+  return Array.isArray(data) && data.every(isLocalizedText);
+}
+
+export function isCurriculumRef(data: unknown): data is CurriculumRef {
+  if (!isRecord(data)) return false;
+  return (
+    typeof data.framework === 'string' &&
+    typeof data.grade_band === 'string' &&
+    typeof data.subject === 'string' &&
+    typeof data.topic === 'string' &&
+    typeof data.source_document === 'string' &&
+    typeof data.source_locator === 'string' &&
+    (data.status === 'VERIFIED_MAPPING' || data.status === 'PROVISIONAL_MAPPING') &&
+    (data.competency_ref === undefined || data.competency_ref === null || typeof data.competency_ref === 'string')
+  );
+}
+
+export function isCurriculumRefArray(data: unknown): data is CurriculumRef[] {
+  return Array.isArray(data) && data.every(isCurriculumRef);
+}
+
+/**
+ * Structural runtime validator for MethodKnowledge.
+ */
+export function isMethodKnowledge(data: unknown): data is MethodKnowledge {
+  if (!isRecord(data)) return false;
+  return (
+    typeof data.method_id === 'string' &&
+    typeof data.version === 'string' &&
+    isLocalizedText(data.title) &&
+    isLocalizedText(data.summary) &&
+    isLocalizedText(data.learning_objective) &&
+    isLocalizedText(data.formal_description) &&
+    (data.prerequisite_concept_ids === undefined || isStringArray(data.prerequisite_concept_ids)) &&
+    (data.formula_refs === undefined || isStringArray(data.formula_refs)) &&
+    (data.theorem_refs === undefined || isStringArray(data.theorem_refs)) &&
+    (data.related_method_ids === undefined || isStringArray(data.related_method_ids)) &&
+    (data.provenance_refs === undefined || isStringArray(data.provenance_refs)) &&
+    (data.applicability_guidance === undefined || isLocalizedTextArray(data.applicability_guidance)) &&
+    (data.non_applicability_guidance === undefined || isLocalizedTextArray(data.non_applicability_guidance)) &&
+    (data.common_mistakes === undefined || isLocalizedTextArray(data.common_mistakes)) &&
+    (data.diagnostic_tips === undefined || isLocalizedTextArray(data.diagnostic_tips)) &&
+    (data.curriculum_refs === undefined || isCurriculumRefArray(data.curriculum_refs))
   );
 }
 
 /**
- * Generic internal fetch helper for immutable knowledge endpoints.
+ * Structural runtime validator for ConceptKnowledge.
  */
-async function fetchKnowledgeEntity<T>(url: string, signal?: AbortSignal): Promise<T> {
+export function isConceptKnowledge(data: unknown): data is ConceptKnowledge {
+  if (!isRecord(data)) return false;
+  return (
+    typeof data.concept_id === 'string' &&
+    typeof data.version === 'string' &&
+    isLocalizedText(data.title) &&
+    isLocalizedText(data.definition) &&
+    (data.prerequisite_concept_ids === undefined || isStringArray(data.prerequisite_concept_ids)) &&
+    (data.related_concept_ids === undefined || isStringArray(data.related_concept_ids)) &&
+    (data.formula_refs === undefined || isStringArray(data.formula_refs)) &&
+    (data.method_refs === undefined || isStringArray(data.method_refs)) &&
+    (data.provenance_refs === undefined || isStringArray(data.provenance_refs)) &&
+    (data.curriculum_refs === undefined || isCurriculumRefArray(data.curriculum_refs))
+  );
+}
+
+/**
+ * Structural runtime validator for FormulaKnowledge.
+ */
+export function isFormulaKnowledge(data: unknown): data is FormulaKnowledge {
+  if (!isRecord(data)) return false;
+  if (
+    typeof data.formula_id !== 'string' ||
+    typeof data.version !== 'string' ||
+    !isLocalizedText(data.title) ||
+    typeof data.latex_template !== 'string' ||
+    !isLocalizedText(data.domain_conditions)
+  ) {
+    return false;
+  }
+  if (data.related_concept_ids !== undefined && !isStringArray(data.related_concept_ids)) {
+    return false;
+  }
+  if (data.provenance_refs !== undefined && !isStringArray(data.provenance_refs)) {
+    return false;
+  }
+  if (data.variables_description !== undefined) {
+    if (!isRecord(data.variables_description)) return false;
+    for (const val of Object.values(data.variables_description)) {
+      if (!isLocalizedText(val)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Structural runtime validator for TheoremKnowledge.
+ */
+export function isTheoremKnowledge(data: unknown): data is TheoremKnowledge {
+  if (!isRecord(data)) return false;
+  return (
+    typeof data.theorem_id === 'string' &&
+    typeof data.version === 'string' &&
+    isLocalizedText(data.title) &&
+    isLocalizedText(data.statement) &&
+    typeof data.formal_statement_latex === 'string' &&
+    (data.hypotheses === undefined || isLocalizedTextArray(data.hypotheses)) &&
+    (data.conclusions === undefined || isLocalizedTextArray(data.conclusions)) &&
+    (data.related_concept_ids === undefined || isStringArray(data.related_concept_ids)) &&
+    (data.provenance_refs === undefined || isStringArray(data.provenance_refs))
+  );
+}
+
+/**
+ * Structural runtime validator for GraphModel.
+ */
+export function isGraphModel(data: unknown): data is GraphModel {
+  if (!isRecord(data)) return false;
+  if (
+    typeof data.graph_id !== 'string' ||
+    typeof data.graph_kind !== 'string' ||
+    !isLocalizedText(data.title) ||
+    typeof data.version !== 'string' ||
+    typeof data.is_acyclic !== 'boolean'
+  ) {
+    return false;
+  }
+  if (data.nodes !== undefined) {
+    if (!Array.isArray(data.nodes)) return false;
+    for (const node of data.nodes) {
+      if (!isRecord(node)) return false;
+      if (typeof node.node_id !== 'string' || typeof node.node_type !== 'string' || !isLocalizedText(node.label)) {
+        return false;
+      }
+    }
+  }
+  if (data.edges !== undefined) {
+    if (!Array.isArray(data.edges)) return false;
+    for (const edge of data.edges) {
+      if (!isRecord(edge)) return false;
+      if (typeof edge.source !== 'string' || typeof edge.target !== 'string' || typeof edge.relation_type !== 'string' || typeof edge.is_directed !== 'boolean') {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Hardened structural runtime discriminator for KnowledgeApiErrorResponse.
+ */
+export function isKnowledgeApiErrorResponse(data: unknown): data is KnowledgeApiErrorResponse {
+  if (!isRecord(data)) {
+    return false;
+  }
+  return (
+    data.status === 'error' &&
+    data.error_code === 'KNOWLEDGE_ENTITY_NOT_FOUND' &&
+    typeof data.entity_type === 'string' &&
+    typeof data.entity_id === 'string' &&
+    typeof data.message_vi === 'string' &&
+    typeof data.message_en === 'string'
+  );
+}
+
+/**
+ * Generic internal fetch helper for immutable knowledge endpoints with strict runtime validation.
+ */
+async function fetchKnowledgeEntity<T>(
+  url: string,
+  validator: (data: unknown) => data is T,
+  signal?: AbortSignal
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -226,8 +398,14 @@ async function fetchKnowledgeEntity<T>(url: string, signal?: AbortSignal): Promi
     throw new ProtocolError('Invalid JSON response received from server', response.status);
   }
 
-  if (response.ok && typeof data === 'object' && data !== null) {
-    return data as T;
+  if (response.ok) {
+    if (validator(data)) {
+      return data;
+    }
+    throw new ProtocolError(
+      `Invalid knowledge response schema from server for ${url}`,
+      response.status
+    );
   }
 
   if (response.status === 404 && isKnowledgeApiErrorResponse(data)) {
@@ -256,6 +434,7 @@ export async function getMethodKnowledge(
 ): Promise<MethodKnowledge> {
   return fetchKnowledgeEntity<MethodKnowledge>(
     `/api/v1/knowledge/methods/${encodeURIComponent(methodId)}`,
+    isMethodKnowledge,
     signal
   );
 }
@@ -269,6 +448,7 @@ export async function getConceptKnowledge(
 ): Promise<ConceptKnowledge> {
   return fetchKnowledgeEntity<ConceptKnowledge>(
     `/api/v1/knowledge/concepts/${encodeURIComponent(conceptId)}`,
+    isConceptKnowledge,
     signal
   );
 }
@@ -282,6 +462,7 @@ export async function getFormulaKnowledge(
 ): Promise<FormulaKnowledge> {
   return fetchKnowledgeEntity<FormulaKnowledge>(
     `/api/v1/knowledge/formulas/${encodeURIComponent(formulaId)}`,
+    isFormulaKnowledge,
     signal
   );
 }
@@ -295,6 +476,7 @@ export async function getTheoremKnowledge(
 ): Promise<TheoremKnowledge> {
   return fetchKnowledgeEntity<TheoremKnowledge>(
     `/api/v1/knowledge/theorems/${encodeURIComponent(theoremId)}`,
+    isTheoremKnowledge,
     signal
   );
 }
@@ -303,5 +485,9 @@ export async function getTheoremKnowledge(
  * Fetch full immutable mathematical GraphModel.
  */
 export async function getKnowledgeGraph(signal?: AbortSignal): Promise<GraphModel> {
-  return fetchKnowledgeEntity<GraphModel>('/api/v1/knowledge/graph', signal);
+  return fetchKnowledgeEntity<GraphModel>(
+    '/api/v1/knowledge/graph',
+    isGraphModel,
+    signal
+  );
 }

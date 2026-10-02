@@ -58,10 +58,10 @@ describe('ConceptPrerequisiteList Component', () => {
       </PreferencesProvider>
     );
 
-    expect(screen.getByTestId('concept-loading-concept_discriminant')).toBeInTheDocument();
-    expect(
-      screen.getByTestId('concept-loading-concept_quadratic_equation')
-    ).toBeInTheDocument();
+    const loadingDisc = screen.getByTestId('concept-loading-concept_discriminant');
+    expect(loadingDisc).toBeInTheDocument();
+    expect(loadingDisc).toHaveAttribute('role', 'status');
+    expect(loadingDisc).toHaveAttribute('aria-live', 'polite');
 
     await waitFor(() => {
       expect(screen.getByText('Biệt thức Delta')).toBeInTheDocument();
@@ -108,7 +108,9 @@ describe('ConceptPrerequisiteList Component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('concept-error-concept_discriminant')).toBeInTheDocument();
+      const errElem = screen.getByTestId('concept-error-concept_discriminant');
+      expect(errElem).toBeInTheDocument();
+      expect(errElem).toHaveAttribute('role', 'alert');
     });
   });
 });

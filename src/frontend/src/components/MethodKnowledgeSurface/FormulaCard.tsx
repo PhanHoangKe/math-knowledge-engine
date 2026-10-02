@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { FormulaKnowledge } from '../../api/contract';
-import { getFormulaKnowledge } from '../../api/client';
+import {
+  getFormulaKnowledge,
+  KnowledgeApiError,
+  NetworkError,
+  ProtocolError,
+} from '../../api/client';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { usePreferences } from '../../state/preferences';
 import styles from './MethodKnowledgeSurface.module.css';
@@ -14,27 +19,36 @@ export const FormulaCard: React.FC<FormulaCardProps> = ({ formulaId, initialData
   const { language, t } = usePreferences();
   const [data, setData] = useState<FormulaKnowledge | undefined>(initialData);
   const [loading, setLoading] = useState<boolean>(!initialData);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'not_found' | 'network' | 'protocol' | 'generic' | null>(null);
+  const activeRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (initialData) {
       setData(initialData);
       setLoading(false);
+      setErrorKind(null);
       return;
     }
 
+    const requestId = ++activeRequestIdRef.current;
     const abortController = new AbortController();
     setLoading(true);
-    setError(null);
+    setErrorKind(null);
 
     getFormulaKnowledge(formulaId, abortController.signal)
       .then((formula) => {
+        if (activeRequestIdRef.current !== requestId) return;
         setData(formula);
         setLoading(false);
       })
       .catch((err) => {
+        if (activeRequestIdRef.current !== requestId) return;
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError(err.message ?? 'Failed to load formula');
+        let kind: 'not_found' | 'network' | 'protocol' | 'generic' = 'generic';
+        if (err instanceof KnowledgeApiError) kind = 'not_found';
+        else if (err instanceof NetworkError) kind = 'network';
+        else if (err instanceof ProtocolError) kind = 'protocol';
+        setErrorKind(kind);
         setLoading(false);
       });
 
@@ -45,16 +59,25 @@ export const FormulaCard: React.FC<FormulaCardProps> = ({ formulaId, initialData
 
   if (loading) {
     return (
-      <div className={styles.formulaCardLoading} data-testid={`formula-loading-${formulaId}`}>
+      <div
+        className={styles.formulaCardLoading}
+        role="status"
+        aria-live="polite"
+        data-testid={`formula-loading-${formulaId}`}
+      >
         <span className={styles.loadingSpinner} />
         <span>{t('lbl_knowledge_loading')} ({formulaId})</span>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (errorKind || !data) {
     return (
-      <div className={styles.formulaCardError} data-testid={`formula-error-${formulaId}`}>
+      <div
+        className={styles.formulaCardError}
+        role="alert"
+        data-testid={`formula-error-${formulaId}`}
+      >
         <code className={styles.entityId}>{formulaId}</code>
         <span className={styles.errorText}>{t('lbl_knowledge_error')}</span>
       </div>

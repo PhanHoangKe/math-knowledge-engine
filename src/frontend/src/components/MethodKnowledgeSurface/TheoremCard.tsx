@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { TheoremKnowledge } from '../../api/contract';
-import { getTheoremKnowledge } from '../../api/client';
+import {
+  getTheoremKnowledge,
+  KnowledgeApiError,
+  NetworkError,
+  ProtocolError,
+} from '../../api/client';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { usePreferences } from '../../state/preferences';
 import styles from './MethodKnowledgeSurface.module.css';
@@ -14,27 +19,36 @@ export const TheoremCard: React.FC<TheoremCardProps> = ({ theoremId, initialData
   const { language, t } = usePreferences();
   const [data, setData] = useState<TheoremKnowledge | undefined>(initialData);
   const [loading, setLoading] = useState<boolean>(!initialData);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'not_found' | 'network' | 'protocol' | 'generic' | null>(null);
+  const activeRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (initialData) {
       setData(initialData);
       setLoading(false);
+      setErrorKind(null);
       return;
     }
 
+    const requestId = ++activeRequestIdRef.current;
     const abortController = new AbortController();
     setLoading(true);
-    setError(null);
+    setErrorKind(null);
 
     getTheoremKnowledge(theoremId, abortController.signal)
       .then((theorem) => {
+        if (activeRequestIdRef.current !== requestId) return;
         setData(theorem);
         setLoading(false);
       })
       .catch((err) => {
+        if (activeRequestIdRef.current !== requestId) return;
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError(err.message ?? 'Failed to load theorem');
+        let kind: 'not_found' | 'network' | 'protocol' | 'generic' = 'generic';
+        if (err instanceof KnowledgeApiError) kind = 'not_found';
+        else if (err instanceof NetworkError) kind = 'network';
+        else if (err instanceof ProtocolError) kind = 'protocol';
+        setErrorKind(kind);
         setLoading(false);
       });
 
@@ -45,16 +59,25 @@ export const TheoremCard: React.FC<TheoremCardProps> = ({ theoremId, initialData
 
   if (loading) {
     return (
-      <div className={styles.theoremCardLoading} data-testid={`theorem-loading-${theoremId}`}>
+      <div
+        className={styles.theoremCardLoading}
+        role="status"
+        aria-live="polite"
+        data-testid={`theorem-loading-${theoremId}`}
+      >
         <span className={styles.loadingSpinner} />
         <span>{t('lbl_knowledge_loading')} ({theoremId})</span>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (errorKind || !data) {
     return (
-      <div className={styles.theoremCardError} data-testid={`theorem-error-${theoremId}`}>
+      <div
+        className={styles.theoremCardError}
+        role="alert"
+        data-testid={`theorem-error-${theoremId}`}
+      >
         <code className={styles.entityId}>{theoremId}</code>
         <span className={styles.errorText}>{t('lbl_knowledge_error')}</span>
       </div>

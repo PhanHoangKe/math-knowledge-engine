@@ -28,12 +28,14 @@ describe('MKE Knowledge API Client Functions', () => {
     global.fetch = originalFetch;
   });
 
-  it('fetches method knowledge successfully from /api/v1/knowledge/methods/{id}', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockMethodKnowledgeStandard), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+  it('1. fetches method knowledge successfully from /api/v1/knowledge/methods/{id}', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockMethodKnowledgeStandard), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
     global.fetch = fetchMock;
 
@@ -51,12 +53,14 @@ describe('MKE Knowledge API Client Functions', () => {
     expect(result.title.vi).toContain('Công thức nghiệm chuẩn tắc');
   });
 
-  it('fetches concept knowledge successfully from /api/v1/knowledge/concepts/{id}', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockConceptDiscriminant), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+  it('2. fetches concept knowledge successfully from /api/v1/knowledge/concepts/{id}', async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockConceptDiscriminant), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
 
     const result = await getConceptKnowledge('concept_discriminant');
@@ -64,12 +68,14 @@ describe('MKE Knowledge API Client Functions', () => {
     expect(result.title.vi).toBe('Biệt thức Delta');
   });
 
-  it('fetches formula knowledge successfully from /api/v1/knowledge/formulas/{id}', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockFormulaStandard), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+  it('3. fetches formula knowledge successfully from /api/v1/knowledge/formulas/{id}', async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockFormulaStandard), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
 
     const result = await getFormulaKnowledge('FORMULA_QUADRATIC_STANDARD');
@@ -77,12 +83,14 @@ describe('MKE Knowledge API Client Functions', () => {
     expect(result.latex_template).toContain('\\frac{-b');
   });
 
-  it('fetches theorem knowledge successfully from /api/v1/knowledge/theorems/{id}', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockTheoremQuadraticRoots), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+  it('4. fetches theorem knowledge successfully from /api/v1/knowledge/theorems/{id}', async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockTheoremQuadraticRoots), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
 
     const result = await getTheoremKnowledge('THEOREM_QUADRATIC_ROOTS');
@@ -90,7 +98,7 @@ describe('MKE Knowledge API Client Functions', () => {
     expect(result.formal_statement_latex).toContain('\\Delta > 0');
   });
 
-  it('fetches knowledge graph successfully from /api/v1/knowledge/graph', async () => {
+  it('5. fetches knowledge graph successfully from /api/v1/knowledge/graph', async () => {
     const mockGraph: GraphModel = {
       graph_id: 'mke_knowledge_graph_v1',
       graph_kind: 'KNOWLEDGE_GRAPH',
@@ -100,11 +108,13 @@ describe('MKE Knowledge API Client Functions', () => {
       nodes: [],
       edges: [],
     };
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockGraph), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockGraph), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
 
     const result = await getKnowledgeGraph();
@@ -112,7 +122,7 @@ describe('MKE Knowledge API Client Functions', () => {
     expect(result.graph_kind).toBe('KNOWLEDGE_GRAPH');
   });
 
-  it('throws KnowledgeApiError on HTTP 404 with structured error envelope', async () => {
+  it('6. throws KnowledgeApiError on HTTP 404 with structured error envelope', async () => {
     const notFoundError = {
       status: 'error' as const,
       error_code: 'KNOWLEDGE_ENTITY_NOT_FOUND' as const,
@@ -143,22 +153,136 @@ describe('MKE Knowledge API Client Functions', () => {
     }
   });
 
-  it('throws NetworkError when fetch fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
-    await expect(getConceptKnowledge('concept_discriminant')).rejects.toThrow(NetworkError);
+  it('7. throws ProtocolError on HTTP 500 with TransportErrorResponse structure', async () => {
+    const transportError = {
+      transport_status: 'ERROR',
+      transport_error_code: 'INTERNAL_TRANSPORT_ERROR',
+      message_vi: 'Lỗi máy chủ nội bộ',
+      message_en: 'Internal server error occurred',
+    };
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(transportError), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+
+    await expect(getMethodKnowledge('QUAD_FORMULA_STANDARD')).rejects.toThrow(ProtocolError);
+    try {
+      await getMethodKnowledge('QUAD_FORMULA_STANDARD');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ProtocolError);
+      expect((err as ProtocolError).status).toBe(500);
+      expect((err as ProtocolError).message).toContain('INTERNAL_TRANSPORT_ERROR');
+    }
   });
 
-  it('throws ProtocolError on non-JSON response', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response('<html>Error</html>', {
-        status: 500,
-        headers: { 'Content-Type': 'text/html' },
-      })
+  it('8. throws ProtocolError on non-JSON response (HTML or plain text)', async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response('<html><body>502 Bad Gateway</body></html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        })
+      )
     );
     await expect(getFormulaKnowledge('FORMULA_QUADRATIC_STANDARD')).rejects.toThrow(ProtocolError);
   });
 
-  it('properly aborts fetch when signal is cancelled', async () => {
+  it('9. throws ProtocolError on HTTP 200 with malformed/missing required fields', async () => {
+    const malformedPayload = {
+      foo: 'bar',
+      baz: 123,
+    };
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(malformedPayload), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+
+    await expect(getMethodKnowledge('QUAD_FORMULA_STANDARD')).rejects.toThrow(ProtocolError);
+  });
+
+  it('10. throws ProtocolError on HTTP 200 when nested LocalizedText or array is malformed', async () => {
+    // Missing 'en' in title LocalizedText
+    const brokenLocalizedText = {
+      ...mockMethodKnowledgeStandard,
+      title: { vi: 'Chỉ có tiếng Việt' },
+    };
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(brokenLocalizedText), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+
+    await expect(getMethodKnowledge('QUAD_FORMULA_STANDARD')).rejects.toThrow(ProtocolError);
+
+    // Invalid prerequisite_concept_ids (numbers instead of strings)
+    const brokenArray = {
+      ...mockMethodKnowledgeStandard,
+      prerequisite_concept_ids: [1, 2, 3],
+    };
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(brokenArray), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+
+    await expect(getMethodKnowledge('QUAD_FORMULA_STANDARD')).rejects.toThrow(ProtocolError);
+  });
+
+  it('11. properly encodes URL parameters with reserved characters using encodeURIComponent', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockConceptDiscriminant), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+    global.fetch = fetchMock;
+
+    await getConceptKnowledge('concept/special?query=1&test=true');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/knowledge/concepts/concept%2Fspecial%3Fquery%3D1%26test%3Dtrue',
+      expect.any(Object)
+    );
+  });
+
+  it('12. ensures knowledge GET requests do not include a request body', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockFormulaStandard), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+    global.fetch = fetchMock;
+
+    await getFormulaKnowledge('FORMULA_QUADRATIC_STANDARD');
+    const callArgs = fetchMock.mock.calls[0] as [string, RequestInit | undefined] | undefined;
+    expect(callArgs?.[1]?.body).toBeUndefined();
+    expect(callArgs?.[1]?.method).toBe('GET');
+  });
+
+  it('13. throws NetworkError when network fetch rejects', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(getConceptKnowledge('concept_discriminant')).rejects.toThrow(NetworkError);
+  });
+
+  it('14. properly aborts fetch when signal is cancelled', async () => {
     const controller = new AbortController();
     global.fetch = vi.fn().mockImplementation((_url, opts) => {
       return new Promise((_, reject) => {

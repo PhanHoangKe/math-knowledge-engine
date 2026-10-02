@@ -232,6 +232,8 @@ export const vi = {
   lbl_curriculum_locator: 'Vị trí bài học',
   lbl_knowledge_loading: 'Đang tải thông tin tri thức từ máy chủ...',
   lbl_knowledge_error: 'Không thể tải thông tin tri thức từ máy chủ.',
+  err_knowledge_not_found: 'Không tìm thấy thông tin tri thức trên máy chủ.',
+  err_knowledge_generic: 'Không thể tải thông tin tri thức từ máy chủ.',
   lbl_knowledge_empty_prereqs: 'Không có khái niệm tiên quyết nào.',
   lbl_knowledge_empty_formulas: 'Không có công thức liên quan nào.',
   lbl_knowledge_empty_theorems: 'Không có định lý liên quan nào.',

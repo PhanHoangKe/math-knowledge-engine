@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { ConceptKnowledge } from '../../api/contract';
-import { getConceptKnowledge } from '../../api/client';
+import {
+  getConceptKnowledge,
+  KnowledgeApiError,
+  NetworkError,
+  ProtocolError,
+} from '../../api/client';
 import { usePreferences } from '../../state/preferences';
 import styles from './MethodKnowledgeSurface.module.css';
 
@@ -11,12 +16,13 @@ export interface ConceptPrerequisiteListProps {
 interface ConceptState {
   loading: boolean;
   data?: ConceptKnowledge;
-  error?: string;
+  errorKind?: 'not_found' | 'network' | 'protocol' | 'generic';
 }
 
 export const ConceptPrerequisiteList: React.FC<ConceptPrerequisiteListProps> = ({ conceptIds }) => {
   const { language, t } = usePreferences();
   const [concepts, setConcepts] = useState<Record<string, ConceptState>>({});
+  const activeRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (!conceptIds || conceptIds.length === 0) {
@@ -24,6 +30,7 @@ export const ConceptPrerequisiteList: React.FC<ConceptPrerequisiteListProps> = (
       return;
     }
 
+    const requestId = ++activeRequestIdRef.current;
     const abortController = new AbortController();
 
     // Initialize loading states
@@ -36,16 +43,23 @@ export const ConceptPrerequisiteList: React.FC<ConceptPrerequisiteListProps> = (
     conceptIds.forEach((id) => {
       getConceptKnowledge(id, abortController.signal)
         .then((data) => {
+          if (activeRequestIdRef.current !== requestId) return;
           setConcepts((prev) => ({
             ...prev,
             [id]: { loading: false, data },
           }));
         })
         .catch((err) => {
+          if (activeRequestIdRef.current !== requestId) return;
           if (err instanceof DOMException && err.name === 'AbortError') return;
+          let kind: 'not_found' | 'network' | 'protocol' | 'generic' = 'generic';
+          if (err instanceof KnowledgeApiError) kind = 'not_found';
+          else if (err instanceof NetworkError) kind = 'network';
+          else if (err instanceof ProtocolError) kind = 'protocol';
+
           setConcepts((prev) => ({
             ...prev,
-            [id]: { loading: false, error: err.message ?? 'Error' },
+            [id]: { loading: false, errorKind: kind },
           }));
         });
     });
@@ -69,16 +83,27 @@ export const ConceptPrerequisiteList: React.FC<ConceptPrerequisiteListProps> = (
         const state = concepts[id];
         if (!state || state.loading) {
           return (
-            <div key={id} className={styles.conceptCardLoading} data-testid={`concept-loading-${id}`}>
+            <div
+              key={id}
+              className={styles.conceptCardLoading}
+              role="status"
+              aria-live="polite"
+              data-testid={`concept-loading-${id}`}
+            >
               <span className={styles.loadingSpinner} />
               <span>{t('lbl_knowledge_loading')} ({id})</span>
             </div>
           );
         }
 
-        if (state.error || !state.data) {
+        if (state.errorKind || !state.data) {
           return (
-            <div key={id} className={styles.conceptCardError} data-testid={`concept-error-${id}`}>
+            <div
+              key={id}
+              className={styles.conceptCardError}
+              role="alert"
+              data-testid={`concept-error-${id}`}
+            >
               <code className={styles.entityId}>{id}</code>
               <span className={styles.errorText}>{t('lbl_knowledge_error')}</span>
             </div>
