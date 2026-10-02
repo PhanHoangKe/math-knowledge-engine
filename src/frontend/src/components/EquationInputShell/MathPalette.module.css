@@ -328,3 +328,21 @@
   gap: 1.5px;
 }
 
+.btnPiecewise {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5px;
+}
+
+.btnBrace {
+  font-size: 17px;
+  line-height: 1;
+  font-family: 'Cambria Math', 'STIX Two Math', 'KaTeX_Math', serif;
+}
+
+.btnScriptFont {
+  font-family: 'Cambria Math', 'STIX Two Math', 'KaTeX_Math', 'Lucida Calligraphy', cursive, serif;
+  font-size: 14px;
+  line-height: 1;
+}
+

@@ -177,17 +177,35 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         case 'SECOND_DERIVATIVE':
           templateToInsert = createDefaultDerivative(2);
           break;
+        case 'PARTIAL':
+        case 'SECOND_PARTIAL':
+        case 'MIXED_PARTIAL':
+          templateToInsert = createDefaultDerivative(1);
+          break;
         case 'INTEGRAL':
+        case 'DOUBLE_INT':
+        case 'TRIPLE_INT':
           templateToInsert = createDefaultIntegral(false);
           break;
         case 'DEF_INTEGRAL':
+        case 'DEF_DOUBLE_INT':
+        case 'DEF_TRIPLE_INT':
           templateToInsert = createDefaultIntegral(true);
           break;
         case 'SUM':
+        case 'PRODUCT':
           templateToInsert = createDefaultSum();
           break;
         case 'LIMIT':
+        case 'LIMIT_LEFT':
+        case 'LIMIT_RIGHT':
+        case 'LIMIT_2D':
           templateToInsert = createDefaultLimit();
+          break;
+        case 'PIECEWISE_2':
+        case 'PIECEWISE_3':
+        case 'MAT_2X2':
+          templateToInsert = createDefaultMatrix(2, 2);
           break;
         case 'VEC_3':
         case 'VECTOR':
@@ -214,6 +232,12 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         case 'EXP_E': snippet = 'e'; break;
         case 'INFINITY': snippet = '∞'; break;
         case 'NEG_INFINITY': snippet = '-∞'; break;
+        case 'STEP_FUNC': snippet = 'UnitStep('; break;
+        case 'DELTA_FUNC': snippet = 'DiracDelta('; break;
+        case 'LAPLACE': snippet = 'LaplaceTransform('; break;
+        case 'INV_LAPLACE': snippet = 'InverseLaplaceTransform('; break;
+        case 'FOURIER': snippet = 'FourierTransform('; break;
+        case 'INV_FOURIER': snippet = 'InverseFourierTransform('; break;
         case 'PLUS': snippet = ' + '; break;
         case 'MINUS': snippet = ' − '; break;
         case 'MULTIPLY': snippet = '*'; break;
