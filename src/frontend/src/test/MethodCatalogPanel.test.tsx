@@ -382,4 +382,48 @@ describe('MethodCatalogPanel Component with Knowledge Surfaces', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('correctly handles UNKNOWN mathematical applicability without collapsing into NOT_APPLICABLE', async () => {
+    setupMockFetch();
+    const onSelectMethodMock = vi.fn();
+
+    const methodsWithUnknown: MethodOptionView[] = [
+      ...mockMethods,
+      {
+        method_id: 'QUAD_UNKNOWN_METHOD',
+        title_vi: 'Phương pháp thử nghiệm chưa xác định',
+        pedagogical_priority: 5,
+        mathematical_applicability: 'UNKNOWN',
+        execution_availability: 'AVAILABLE',
+        pedagogical_recommendation: 'NEUTRAL',
+        support_status: 'SUPPORTED',
+        verification_capability: 'NOT_APPLICABLE',
+        has_trace_available: false,
+      },
+    ];
+
+    render(
+      <PreferencesProvider initialLanguage="vi">
+        <MethodCatalogPanel
+          methods={methodsWithUnknown}
+          selectedMethodId="QUAD_FORMULA_STANDARD"
+          onSelectMethod={onSelectMethodMock}
+        />
+      </PreferencesProvider>
+    );
+
+    const cardUnknown = screen.getByTestId('method-card-QUAD_UNKNOWN_METHOD');
+    expect(within(cardUnknown).getByTitle('Áp dụng cho bài này')).toHaveTextContent('Áp dụng: Chưa xác định');
+
+    const unknownBtn = screen.getByTestId('select-method-btn-QUAD_UNKNOWN_METHOD');
+    expect(unknownBtn).toBeDisabled();
+    expect(unknownBtn).toHaveTextContent('Chưa xác định khả năng áp dụng');
+    expect(unknownBtn).not.toHaveTextContent('Không áp dụng cho bài này');
+
+    fireEvent.click(unknownBtn);
+    expect(onSelectMethodMock).not.toHaveBeenCalled();
+
+    const whyUnknownBtn = screen.getByTestId('why-method-btn-QUAD_UNKNOWN_METHOD');
+    expect(whyUnknownBtn).toBeEnabled();
+  });
 });

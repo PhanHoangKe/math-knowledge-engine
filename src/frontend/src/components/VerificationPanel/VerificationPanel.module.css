@@ -176,6 +176,12 @@
   border-color: rgba(16, 185, 129, 0.2);
 }
 
+.checkFail {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
 .checkNeutral {
   background: var(--color-bg-base);
   color: var(--color-text-muted);

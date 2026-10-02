@@ -38,7 +38,7 @@ const StepItem: React.FC<{ step: SolutionStep; depth?: number }> = ({ step, dept
 
         {step.why_this_step_vi && (
           <div className={styles.whyBox}>
-            <span className={styles.whyLabel}>{t('lbl_trace_why')}:</span>
+            <span className={styles.whyLabel}>{t('lbl_trace_why')}</span>
             <span className={styles.whyText}>{step.why_this_step_vi}</span>
           </div>
         )}

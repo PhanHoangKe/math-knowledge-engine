@@ -69,6 +69,7 @@ export const en: Translations = {
   btn_selected_method: 'Selected',
   btn_method_unavailable: 'Execution not yet supported',
   btn_method_not_applicable: 'Not applicable to this problem',
+  btn_method_unknown_applicability: 'Applicability not yet determined',
 
   panel_canonical_problem: 'Canonical Form & Coefficients',
   panel_method_catalog: 'Method Catalog',

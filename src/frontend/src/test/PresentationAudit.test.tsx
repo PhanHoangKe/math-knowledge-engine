@@ -42,10 +42,10 @@ describe('Presentation & UX Audit Tests (S3-04-R3)', () => {
     verifier_name: 'MKE_DETERMINISTIC_VERIFIER',
     verifier_version: '1.0.0',
     verified_at_utc: '2026-10-02T12:00:00Z',
-    multiplicity_verified: true,
+    multiplicity_verified: false,
     vieta_relations_checked: true,
     no_real_roots_verified: false,
-    residual_checks: ['1^2 - 5(1) + 6 = 2 \\neq 0'],
+    residual_checks: ['(2)^2 - 5(2) + 6 = 0', '(3)^2 - 5(3) + 6 = 0'],
     algebraic_identities_passed: ['(x-2)(x-3) \\equiv x^2 - 5x + 6'],
   };
 
@@ -137,14 +137,18 @@ describe('Presentation & UX Audit Tests (S3-04-R3)', () => {
   it('VerificationPanel renders explicit verification status text and collapsible metadata', () => {
     const { unmount } = render(
       <PreferencesProvider initialLanguage="vi">
-        <VerificationPanel certificate={mockCertificate} />
+        <VerificationPanel
+          certificate={mockCertificate}
+          solutionOutcome="TWO_DISTINCT_REAL_ROOTS"
+        />
       </PreferencesProvider>
     );
 
     // Check explicit check status text (no ambiguous dashes)
     expect(screen.queryByText('—')).not.toBeInTheDocument();
-    const verifiedBadges = screen.getAllByText('✓ Đã kiểm tra');
-    expect(verifiedBadges.length).toBe(2);
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✓ Đã kiểm tra');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Không áp dụng');
 
     // Collapsible metadata
     const details = screen.getByTestId('verification-technical-details');
@@ -158,44 +162,131 @@ describe('Presentation & UX Audit Tests (S3-04-R3)', () => {
     // English rendering
     render(
       <PreferencesProvider initialLanguage="en">
-        <VerificationPanel certificate={mockCertificate} />
+        <VerificationPanel
+          certificate={mockCertificate}
+          solutionOutcome="TWO_DISTINCT_REAL_ROOTS"
+        />
       </PreferencesProvider>
     );
 
-    const verifiedBadgesEn = screen.getAllByText('✓ Verified');
-    expect(verifiedBadgesEn.length).toBe(2);
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✓ Verified');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('Not applicable');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Not applicable');
     expect(screen.getByText('Technical Details')).toBeInTheDocument();
   });
 
-  it('VerificationPanel shows "Không áp dụng" / "Not applicable" when checks are unverified or false', () => {
-    const partialCertificate: VerificationCertificate = {
+  it('VerificationPanel enforces exact verification criterion applicability matrix for all solution outcomes', () => {
+    // 1. TWO_DISTINCT_REAL_ROOTS with vieta=true, mult=false, no_real=false
+    const twoRootsCert: VerificationCertificate = {
       ...mockCertificate,
+      vieta_relations_checked: true,
       multiplicity_verified: false,
-      vieta_relations_checked: false,
+      no_real_roots_verified: false,
     };
 
-    const { unmount } = render(
+    const { rerender } = render(
       <PreferencesProvider initialLanguage="vi">
-        <VerificationPanel certificate={partialCertificate} />
+        <VerificationPanel
+          certificate={twoRootsCert}
+          solutionOutcome="TWO_DISTINCT_REAL_ROOTS"
+        />
       </PreferencesProvider>
     );
 
-    const notAppBadges = screen.getAllByText('Không áp dụng');
-    expect(notAppBadges.length).toBe(2);
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✓ Đã kiểm tra');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Không áp dụng');
 
-    unmount();
+    // 2. ONE_REPEATED_REAL_ROOT with vieta=true, mult=true, no_real=false
+    const repeatedRootCert: VerificationCertificate = {
+      ...mockCertificate,
+      vieta_relations_checked: true,
+      multiplicity_verified: true,
+      no_real_roots_verified: false,
+    };
 
-    render(
-      <PreferencesProvider initialLanguage="en">
-        <VerificationPanel certificate={partialCertificate} />
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <VerificationPanel
+          certificate={repeatedRootCert}
+          solutionOutcome="ONE_REPEATED_REAL_ROOT"
+        />
       </PreferencesProvider>
     );
 
-    const notAppBadgesEn = screen.getAllByText('Not applicable');
-    expect(notAppBadgesEn.length).toBe(2);
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✓ Đã kiểm tra');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('✓ Đã kiểm tra');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Không áp dụng');
+
+    // 3. NO_REAL_ROOTS with vieta=false, mult=false, no_real=true
+    const noRootsCert: VerificationCertificate = {
+      ...mockCertificate,
+      vieta_relations_checked: false,
+      multiplicity_verified: false,
+      no_real_roots_verified: true,
+    };
+
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <VerificationPanel
+          certificate={noRootsCert}
+          solutionOutcome="NO_REAL_ROOTS"
+        />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('✓ Đã kiểm tra');
+
+    // 4. Applicable FAILED criterion in ONE_REPEATED_REAL_ROOT (multiplicity=false, outcome=VERIFICATION_FAILED)
+    const failedMultCert: VerificationCertificate = {
+      ...mockCertificate,
+      outcome: 'VERIFICATION_FAILED',
+      vieta_relations_checked: true,
+      multiplicity_verified: false,
+      no_real_roots_verified: false,
+    };
+
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <VerificationPanel
+          certificate={failedMultCert}
+          solutionOutcome="ONE_REPEATED_REAL_ROOT"
+        />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('✗ Không đạt');
+    expect(screen.getByTestId('check-multiplicity')).not.toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✓ Đã kiểm tra');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Không áp dụng');
+
+    // 5. Applicable FAILED criterion in TWO_DISTINCT_REAL_ROOTS (vieta=false, outcome=VERIFICATION_FAILED)
+    const failedVietaCert: VerificationCertificate = {
+      ...mockCertificate,
+      outcome: 'VERIFICATION_FAILED',
+      vieta_relations_checked: false,
+      multiplicity_verified: false,
+      no_real_roots_verified: false,
+    };
+
+    rerender(
+      <PreferencesProvider initialLanguage="vi">
+        <VerificationPanel
+          certificate={failedVietaCert}
+          solutionOutcome="TWO_DISTINCT_REAL_ROOTS"
+        />
+      </PreferencesProvider>
+    );
+
+    expect(screen.getByTestId('check-vieta')).toHaveTextContent('✗ Không đạt');
+    expect(screen.getByTestId('check-vieta')).not.toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-multiplicity')).toHaveTextContent('Không áp dụng');
+    expect(screen.getByTestId('check-no-real-roots')).toHaveTextContent('Không áp dụng');
   });
 
-  it('TracePanel renders cleaned "Vì sao làm bước này?" / "Why this step?" label', () => {
+  it('TracePanel renders exact "Vì sao làm bước này?" / "Why this step?" label without trailing colon', () => {
     const { unmount } = render(
       <PreferencesProvider initialLanguage="vi">
         <TracePanel trace={mockTrace} />
@@ -203,7 +294,8 @@ describe('Presentation & UX Audit Tests (S3-04-R3)', () => {
     );
 
     expect(screen.getByText('Lời giải từng bước')).toBeInTheDocument();
-    expect(screen.getByText('Vì sao làm bước này?:')).toBeInTheDocument();
+    expect(screen.getByText('Vì sao làm bước này?')).toBeInTheDocument();
+    expect(screen.queryByText('Vì sao làm bước này?:')).not.toBeInTheDocument();
     expect(screen.getByText('Chuẩn bị dữ liệu để tính biệt thức Delta')).toBeInTheDocument();
 
     unmount();
@@ -215,7 +307,8 @@ describe('Presentation & UX Audit Tests (S3-04-R3)', () => {
     );
 
     expect(screen.getByText('Step-by-Step Solution')).toBeInTheDocument();
-    expect(screen.getByText('Why this step?:')).toBeInTheDocument();
+    expect(screen.getByText('Why this step?')).toBeInTheDocument();
+    expect(screen.queryByText('Why this step?:')).not.toBeInTheDocument();
   });
 
   it('SolutionSummaryPanel and RevisionHistoryPanel render cleaned copy without raw LaTeX leaks', () => {

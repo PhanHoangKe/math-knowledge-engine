@@ -1,5 +1,5 @@
 import React from 'react';
-import type { VerificationCertificate } from '../../api/contract';
+import type { VerificationCertificate, SolutionOutcome } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { VERIFICATION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { MathLatex } from '../MathLatex/MathLatex';
@@ -8,14 +8,65 @@ import styles from './VerificationPanel.module.css';
 export interface VerificationPanelProps {
   certificate: VerificationCertificate;
   verificationScope?: 'FINAL_SOLUTION' | string;
+  solutionOutcome?: SolutionOutcome;
+}
+
+type CriterionState = 'VERIFIED' | 'FAILED' | 'NOT_APPLICABLE';
+
+function getCriterionState(applicable: boolean, passed: boolean): CriterionState {
+  if (!applicable) return 'NOT_APPLICABLE';
+  return passed ? 'VERIFIED' : 'FAILED';
 }
 
 export const VerificationPanel: React.FC<VerificationPanelProps> = ({
   certificate,
   verificationScope = 'FINAL_SOLUTION',
+  solutionOutcome,
 }) => {
   const { t } = usePreferences();
   const isComplete = certificate.outcome === 'VERIFIED_COMPLETE';
+
+  const isVietaApplicable =
+    solutionOutcome === 'TWO_DISTINCT_REAL_ROOTS' || solutionOutcome === 'ONE_REPEATED_REAL_ROOT';
+  const isMultiplicityApplicable = solutionOutcome === 'ONE_REPEATED_REAL_ROOT';
+  const isNoRealRootsApplicable = solutionOutcome === 'NO_REAL_ROOTS';
+
+  const multiplicityState = getCriterionState(
+    isMultiplicityApplicable,
+    certificate.multiplicity_verified
+  );
+  const vietaState = getCriterionState(
+    isVietaApplicable,
+    certificate.vieta_relations_checked
+  );
+  const noRealRootsState = getCriterionState(
+    isNoRealRootsApplicable,
+    certificate.no_real_roots_verified
+  );
+
+  const getStatusLabel = (state: CriterionState): string => {
+    switch (state) {
+      case 'VERIFIED':
+        return t('lbl_status_verified');
+      case 'FAILED':
+        return t('lbl_status_failed');
+      case 'NOT_APPLICABLE':
+      default:
+        return t('lbl_status_not_applicable');
+    }
+  };
+
+  const getStatusClass = (state: CriterionState): string => {
+    switch (state) {
+      case 'VERIFIED':
+        return styles.checkPass ?? '';
+      case 'FAILED':
+        return styles.checkFail ?? '';
+      case 'NOT_APPLICABLE':
+      default:
+        return styles.checkNeutral ?? '';
+    }
+  };
 
   return (
     <div className={styles.card} data-testid="verification-panel">
@@ -56,34 +107,34 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
           <h3 className={styles.checksTitle}>{t('lbl_verification_criteria')}</h3>
           <div className={styles.checksGrid}>
             <div
-              className={`${styles.checkItem} ${certificate.multiplicity_verified ? styles.checkPass : styles.checkNeutral}`}
+              className={`${styles.checkItem} ${getStatusClass(multiplicityState)}`}
               data-testid="check-multiplicity"
             >
               <span className={styles.checkIcon}>
-                {certificate.multiplicity_verified ? t('lbl_status_verified') : t('lbl_status_not_applicable')}
+                {getStatusLabel(multiplicityState)}
               </span>
               <span>{t('lbl_cert_multiplicity')}</span>
             </div>
 
             <div
-              className={`${styles.checkItem} ${certificate.vieta_relations_checked ? styles.checkPass : styles.checkNeutral}`}
+              className={`${styles.checkItem} ${getStatusClass(vietaState)}`}
               data-testid="check-vieta"
             >
               <span className={styles.checkIcon}>
-                {certificate.vieta_relations_checked ? t('lbl_status_verified') : t('lbl_status_not_applicable')}
+                {getStatusLabel(vietaState)}
               </span>
               <span>{t('lbl_cert_vieta')}</span>
             </div>
 
-            {certificate.no_real_roots_verified && (
-              <div
-                className={`${styles.checkItem} ${styles.checkPass}`}
-                data-testid="check-no-real-roots"
-              >
-                <span className={styles.checkIcon}>{t('lbl_status_verified')}</span>
-                <span>{t('lbl_cert_no_real_roots')}</span>
-              </div>
-            )}
+            <div
+              className={`${styles.checkItem} ${getStatusClass(noRealRootsState)}`}
+              data-testid="check-no-real-roots"
+            >
+              <span className={styles.checkIcon}>
+                {getStatusLabel(noRealRootsState)}
+              </span>
+              <span>{t('lbl_cert_no_real_roots')}</span>
+            </div>
           </div>
 
           {/* Residual Checks */}

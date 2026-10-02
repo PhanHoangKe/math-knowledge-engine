@@ -50,6 +50,7 @@ export const DegenerateSolutionPanel: React.FC<DegenerateSolutionPanelProps> = (
         <VerificationPanel
           certificate={solution.certificate}
           verificationScope={solution.verification_scope}
+          solutionOutcome={solution.outcome}
         />
       )}
     </div>

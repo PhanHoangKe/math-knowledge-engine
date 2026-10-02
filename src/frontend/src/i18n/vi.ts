@@ -67,6 +67,7 @@ export const vi = {
   btn_selected_method: 'Đang chọn',
   btn_method_unavailable: 'Chưa hỗ trợ giải',
   btn_method_not_applicable: 'Không áp dụng cho bài này',
+  btn_method_unknown_applicability: 'Chưa xác định khả năng áp dụng',
 
   panel_canonical_problem: 'Biểu thức Chuẩn tắc & Hệ số',
   panel_method_catalog: 'Danh mục Phương pháp Giải',

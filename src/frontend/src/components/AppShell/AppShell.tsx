@@ -165,6 +165,7 @@ export const AppShell: React.FC = () => {
                     <VerificationPanel
                       certificate={resp.solution.certificate}
                       verificationScope={resp.solution.verification_scope}
+                      solutionOutcome={resp.solution.outcome}
                     />
                   </div>
                 );
@@ -252,6 +253,7 @@ export const AppShell: React.FC = () => {
                         <VerificationPanel
                           certificate={resp.solution.certificate}
                           verificationScope={resp.solution.verification_scope}
+                          solutionOutcome={resp.solution.outcome}
                         />
                       </div>
                     );

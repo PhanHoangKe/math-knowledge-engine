@@ -61,10 +61,13 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
           let solveBtnLabel = t('btn_switch_method');
           let isSolveDisabled = isLoading;
 
-          if (!isApplicable) {
+          if (method.mathematical_applicability === 'NOT_APPLICABLE') {
             isSolveDisabled = true;
             solveBtnLabel = t('btn_method_not_applicable');
-          } else if (!isAvailable) {
+          } else if (method.mathematical_applicability === 'UNKNOWN') {
+            isSolveDisabled = true;
+            solveBtnLabel = t('btn_method_unknown_applicability');
+          } else if (method.mathematical_applicability === 'APPLICABLE' && !isAvailable) {
             isSolveDisabled = true;
             solveBtnLabel = t('btn_method_unavailable');
           } else if (isSelected) {
@@ -78,7 +81,7 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
           return (
             <div
               key={method.method_id}
-              className={`${styles.methodCard} ${isSelected ? styles.cardSelected : ''} ${!isApplicable ? styles.cardInapplicable : ''}`}
+              className={`${styles.methodCard} ${isSelected ? styles.cardSelected : ''} ${method.mathematical_applicability === 'NOT_APPLICABLE' ? styles.cardInapplicable : ''}`}
               data-testid={`method-card-${method.method_id}`}
             >
               <div className={styles.methodCardHeader}>
