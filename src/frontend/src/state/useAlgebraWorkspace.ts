@@ -201,10 +201,10 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
 
       if (solveResult.kind === 'application') {
         setStatus('application-response');
-        setLastFailedRequest(null);
 
         const resp = solveResult.response;
         if (resp.response_status === 'SOLVED' || resp.response_status === 'ANALYZED_NO_EXECUTION') {
+          setLastFailedRequest(null);
           const prob = resp.problem;
           setLastAcceptedResponse(resp);
 
@@ -256,6 +256,12 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
             }
             return [newEntry, ...prevHistory.slice(0, 14)];
           });
+        } else {
+          // resp.response_status === 'ERROR'
+          setLastFailedRequest({ origin, solveRequest: request });
+          if (origin === 'COEFFICIENT_EDIT') {
+            setReactiveStatus('error');
+          }
         }
       } else {
         setStatus('transport-error');

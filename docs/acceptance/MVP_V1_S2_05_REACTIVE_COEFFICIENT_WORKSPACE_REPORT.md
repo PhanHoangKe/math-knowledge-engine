@@ -1,14 +1,14 @@
-# MKE MVP V1 — S2-05-R2 STRICTMODE SAFETY, ACCEPTED-REVISION UX & FINAL TEST CLOSEOUT REPORT
+# MKE MVP V1 — S2-05-R3 APPLICATION-ERROR FAILURE SEMANTICS & FINAL EVIDENCE CLOSEOUT REPORT
 
 **Role:** Antigravity (“Anty”) — Implementation Engineer  
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
 **Date:** 2026-10-02  
-**Target Milestone:** S2-05-R2 StrictMode Safety, Accepted-Revision UX & Final Test Closeout  
+**Target Milestone:** S2-05-R3 Application-Error Failure Semantics & Final Evidence Closeout  
 **Branch:** `product/mvp-v1-s2-05-reactive-coefficients`  
 **Authoritative S2-05 Lineage:**
-- Current Audited S2-05-R1 Head (Parent for R2): `54e16945ea7e011957c4b0a8e5fe11c4a0124659`
+- Current Audited S2-05-R2 Head (Parent for R3): `ea18b2d1281b494e54d41e22b4316b504e991ad6`
 - Authoritative S2-05 Baseline HEAD: `aba7d60f3946ae5571cd9cc4d7ccee6411b1fc75`
 - Accepted S2-04 Baseline: `10b9317126f8d02ebd24a0681fe42b5205f4a594`
 - Accepted S2-03 Baseline: `fecb6c23d01e90e010f76aed0446e0ed96cf35d9`
@@ -18,21 +18,23 @@
 
 ---
 
-## 1. Executive Summary & R2 Closeout Actions
+## 1. Executive Summary & R3 Closeout Actions
 
-Stage **S2-05-R2** delivers final architectural purity, StrictMode safety, dual-rendering failure UX, and comprehensive regression closure for the reactive coefficient workspace:
+Stage **S2-05-R3** delivers final application-error request semantics, retry provenance, and component failure dual-rendering verification:
 
-1. **Pure StrictMode-Safe Updater Architecture:** Refactored `updateCoefficientField` in `useAlgebraWorkspace.ts` so that state updaters are 100% pure without side effects. Keystroke changes mutate and synchronize `coeffDraftRef.current` synchronously, while the 350ms debounce timer is scheduled exactly once outside any React state updater function. Tested and verified under `React.StrictMode`.
-2. **Synchronized Draft Ref on All Hydration Paths:** Guaranteed that `coeffDraftRef.current` is kept strictly in sync across all hydration paths (initial raw query, successful solve, degenerate/quadratic switch, `resetCoefficientsToBackend`, and `clearWorkspace`).
-3. **Draft Reset Invalidation:** Added `cancelDebounce()`, `sequenceRef.current += 1`, and active request abortion to `resetCoefficientsToBackend()`, ensuring in-flight requests cannot overwrite reset state.
-4. **Preserved Last Accepted Revision Dual-Rendering UX:** Exposed `lastAcceptedResponse` and `lastFailedRequestOrigin` from `useAlgebraWorkspace`. When a coefficient edit fails (`network-error`, `transport-error`, `protocol-error`, or application `ERROR`):
-   - The corresponding failure panel (`NetworkErrorPanel`, `TransportErrorPanel`, or `ApplicationErrorPanel`) is rendered.
-   - The user's unaccepted draft is retained in `CoefficientEditorPanel` with `reactiveStatus: 'error'`.
-   - An informational banner `lbl_last_accepted_revision` ("Phiên bản backend được chấp nhận gần nhất" / "Last accepted backend revision") is displayed.
-   - The previously accepted mathematical workspace (`CanonicalProblemPanel`, `SolutionSummaryPanel`, `TracePanel`, `VerificationPanel`) remains displayed.
-   - When an initial raw solve fails with no prior accepted response, only the error panel is rendered (no fake accepted workspace).
-5. **Strict Transport Error Whitelist:** Updated `TransportErrorPanel.tsx` to restrict structured validation array extraction solely to `details.validation_errors`. Removed `details.errors` and `details.detail` fallbacks to prevent accidental leakage of unparsed exception strings.
-6. **Live Proxy Evidence Correction:** Formally documented that `METHOD_SWITCH` on quadratic equation with `selected_method_id: 'QUAD_COMPLETE_SQUARE'` returns `response_status: ANALYZED_NO_EXECUTION` with `reason_code: METHOD_NOT_EXECUTABLE`.
+1. **Application ERROR Request Failure Semantics:** In `useAlgebraWorkspace.ts`, `executeSolve()` inspects `resp.response_status`. When `response_status === 'ERROR'`, it preserves the failed request context (`setLastFailedRequest({ origin, solveRequest: request })`) and sets `reactiveStatus: 'error'` on `origin === 'COEFFICIENT_EDIT'`. An `ApplicationErrorResponse` is **NOT** treated as an accepted mathematical revision:
+   - Does not mutate `lastAcceptedResponse`.
+   - Does not rehydrate coefficient draft from the error response.
+   - Does not append an entry to `revisionHistory`.
+   - Retains the user's unaccepted draft in `coeffDraft` with `reactiveStatus: 'error'`.
+2. **Accurate Coefficient Retry Provenance:** `retryLastRequest()` for failed coefficient requests (whether failing via network error, transport 422, protocol error, or Application ERROR) resends the exact failed `COEFFICIENTS` payload (`a`, `b`, `c`, `target_variable: 'x'`, `selected_method_id: null`) with `AbortSignal`.
+3. **Comprehensive Component Dual-Render Verification:** Verified through `<App />` that for failed coefficient edits across all failure modes (Application ERROR, TransportError, NetworkError, ProtocolError):
+   - The corresponding failure panel is rendered.
+   - The user's unaccepted draft is preserved in `CoefficientEditorPanel`.
+   - The `last-accepted-revision-banner` ("Phiên bản backend được chấp nhận gần nhất" / "Last accepted backend revision") is displayed.
+   - The previously accepted mathematical solution (`CanonicalProblemPanel`, `SolutionSummaryPanel`, `TracePanel`, `VerificationPanel`) remains displayed.
+   - No fake mathematical solution is rendered for unaccepted draft values.
+4. **Exact Test Count Accounting:** Verified all 14 Vitest suites, with `reactiveCoefficients.test.tsx` containing exactly 16 tests and `LiveWorkspace.test.tsx` containing exactly 20 tests, totaling 100/100 passing frontend tests.
 
 ---
 
@@ -50,6 +52,7 @@ Stage **S2-05-R2** delivers final architectural purity, StrictMode safety, dual-
 │ - Source Mode: RAW_TEXT | COEFFICIENTS (preserved during METHOD_SWITCH)                 │
 │ - Sequence Counter: Monotonic uint & AbortController (immediate race guard)             │
 │ - Pure StrictMode Refs: coeffDraftRef + single debounceTimerRef outside setState        │
+│ - Application ERROR Semantics: setLastFailedRequest, retain draft, reactiveStatus: error│
 │ - Preserved Last Accepted Revision: lastAcceptedResponse + dual failure rendering       │
 │ - Bounded Session History: max 15 entries, deduplicated across entire history by hash   │
 │ - Reactive Status: idle | debouncing | recomputing | invalid | updated | error          │
@@ -77,8 +80,8 @@ Stage **S2-05-R2** delivers final architectural purity, StrictMode safety, dual-
 
 | Test Suite | Tests | Result | Coverage Description |
 |:---|:---:|:---:|:---|
-| `reactiveCoefficients.test.tsx` | 14 | **PASS** | Valid edit stale rejection, invalid edit stale rejection, $c=6 \to 7$ exact request, debounce restart ($6 \to 7 \to 8 \to 9$), fractional unreduced payload, Degenerate $\leftrightarrow$ Quadratic transitions, method switch provenance, debounce cancellations (`clearWorkspace`, `setQuery`, `resetCoefficientsToBackend`), retry provenance (RAW_TEXT, METHOD_SWITCH, COEFFICIENTS), `React.StrictMode` pure timer immunity, and `lastAcceptedResponse` preservation on transport/network failure. |
-| `LiveWorkspace.test.tsx` | 17 | **PASS** | Component workspace integration, method switching, loading states, error panels, failed coefficient edit dual-rendering (error panel + draft + last accepted banner + old math), and initial raw solve failure sanity. |
+| `reactiveCoefficients.test.tsx` | 16 | **PASS** | Valid edit stale rejection, invalid edit stale rejection, $c=6 \to 7$ exact request, debounce restart ($6 \to 7 \to 8 \to 9$), fractional unreduced payload, Degenerate $\leftrightarrow$ Quadratic transitions, method switch provenance, debounce cancellations (`clearWorkspace`, `setQuery`, `resetCoefficientsToBackend`), retry provenance (RAW_TEXT, METHOD_SWITCH, COEFFICIENTS with exact payload assertions), `React.StrictMode` pure timer immunity, `lastAcceptedResponse` preservation on transport/network failure, Application ERROR state preservation, and Application ERROR retry payload verification. |
+| `LiveWorkspace.test.tsx` | 20 | **PASS** | Component workspace integration, method switching, loading states, error panels, failed coefficient edit dual-rendering across all failure modes (NetworkError, TransportError, ProtocolError, Application ERROR), and initial raw solve failure sanity. |
 | `revisionHistory.test.ts` | 2 | **PASS** | Monotonic recording, entire-history hash deduplication ($A \to B \to A$), method switch deduplication, and 15-entry FIFO bounding directly through `useAlgebraWorkspace`. |
 | `revisionHistoryPanel.test.tsx` | 2 | **PASS** | Observational rendering, empty state, provenance badges, and assertion that zero rollback/restore buttons exist. |
 | `TransportErrorPanel.test.tsx` | 4 | **PASS** | Structured 422 `validation_errors`, safe scalar fields (`limit_bytes`, `declared_bytes`, `streamed_bytes_exceeded`, `header`, `reason`, `path`, `status_code`), exclusion of injected secrets, and strict exclusion of `details.detail` and `details.errors` arrays. |
@@ -91,23 +94,23 @@ Stage **S2-05-R2** delivers final architectural purity, StrictMode safety, dual-
 | `apiContract.test.ts` | 3 | **PASS** | OpenAPI DTO type validation. |
 | `MathLatex.test.tsx` | 3 | **PASS** | Offline KaTeX rendering and security flags. |
 | `App.test.tsx` | 7 | **PASS** | App shell rendering and default Vietnamese atmospheric branding. |
-| **Total Frontend Tests** | **95** | **PASS** | **14/14 test files passed (100%)** |
+| **Total Frontend Tests** | **100** | **PASS** | **14/14 test files passed (100%) in 6.17s** |
 
 ### B. Type & Schema Verification
 - `npm run check:api`: **PASSED** (OpenAPI schema and generated TypeScript types in 100% sync).
 - `npm run typecheck`: **PASSED** (0 errors across app and node configurations).
-- `npm run build`: **PASSED** (Production bundle built in 1.29s).
+- `npm run build`: **PASSED** (Production bundle built in 988ms).
 
 ### C. Backend Full S1/S0 & Transport Regressions
 - **Full S1/S0 Mathematical Service Gate:**
   `pytest -q tests/test_application_s1_acceptance.py tests/test_application_orchestrator_s1.py tests/test_application_traces_s1.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_domain_core_s0.py`
-  **Result:** `278 passed in 1.10s` (100% pass).
+  **Result:** `278 passed in 0.95s` (100% pass).
 - **Transport Smoke & Acceptance Gate:**
   `pytest -q tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py`
-  **Result:** `149 passed in 5.62s` (100% pass).
+  **Result:** `149 passed in 4.72s` (100% pass).
 - **Legacy Browser UI Acceptance Gate:**
   `pytest -q tests/test_browser_canonical_ui.py`
-  **Result:** `21 passed in 48.95s` (21/21 passed).
+  **Result:** `21 passed in 47.35s` (21/21 passed).
 - **Total Backend & Legacy Acceptance Tests:** **448/448 PASSED (100%)**.
 
 ### D. Live Proxy Observed Evidence (127.0.0.1:5173 ➔ 127.0.0.1:8000)

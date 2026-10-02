@@ -504,4 +504,150 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     expect(screen.queryByTestId('solved-workspace')).not.toBeInTheDocument();
     expect(screen.queryByTestId('coefficient-editor-panel')).not.toBeInTheDocument();
   });
+
+  it('W: coefficient edit resulting in Application ERROR renders ApplicationErrorPanel, draft, banner, and old math', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(clientModule, 'solveEquation')
+        .mockResolvedValueOnce({
+          kind: 'application',
+          status: 200,
+          response: mockSolvedTwoRoots,
+        })
+        .mockResolvedValueOnce({
+          kind: 'application',
+          status: 200,
+          response: mockApplicationErrorSyntax,
+        });
+
+      render(<App />);
+
+      const input = screen.getByTestId('equation-input');
+      fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
+      fireEvent.click(screen.getByTestId('compute-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
+      });
+
+      const cNumeratorInput = screen.getByDisplayValue('6');
+      fireEvent.change(cNumeratorInput, { target: { value: '7' } });
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Application error panel is rendered
+      expect(screen.getByTestId('application-error-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('application-error-code')).toHaveTextContent('SYNTAX_ERROR');
+
+      // User draft c=7 is preserved in editor
+      expect(screen.getByDisplayValue('7')).toBeInTheDocument();
+
+      // Last accepted revision banner is rendered
+      expect(screen.getByTestId('last-accepted-revision-banner')).toBeInTheDocument();
+
+      // Previous accepted math remains visible
+      expect(screen.getByTestId('solution-outcome-badge')).toHaveTextContent('2 nghiệm thực phân biệt');
+      expect(screen.getByTestId('root-latex-0')).toHaveTextContent('x_1 = 2');
+      expect(screen.getByTestId('root-latex-1')).toHaveTextContent('x_2 = 3');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('X: coefficient edit resulting in TransportError renders TransportErrorPanel, draft, banner, and old math', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(clientModule, 'solveEquation')
+        .mockResolvedValueOnce({
+          kind: 'application',
+          status: 200,
+          response: mockSolvedTwoRoots,
+        })
+        .mockResolvedValueOnce({
+          kind: 'transport-error',
+          status: 422,
+          response: mockTransportError422,
+        });
+
+      render(<App />);
+
+      const input = screen.getByTestId('equation-input');
+      fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
+      fireEvent.click(screen.getByTestId('compute-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
+      });
+
+      const cNumeratorInput = screen.getByDisplayValue('6');
+      fireEvent.change(cNumeratorInput, { target: { value: '7' } });
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Transport error panel is rendered
+      expect(screen.getByTestId('transport-error-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('transport-error-code')).toHaveTextContent('REQUEST_VALIDATION_FAILED');
+
+      // Draft c=7 is preserved
+      expect(screen.getByDisplayValue('7')).toBeInTheDocument();
+
+      // Last accepted revision banner is rendered
+      expect(screen.getByTestId('last-accepted-revision-banner')).toBeInTheDocument();
+
+      // Previous accepted math remains visible
+      expect(screen.getByTestId('solution-outcome-badge')).toHaveTextContent('2 nghiệm thực phân biệt');
+      expect(screen.getByTestId('root-latex-0')).toHaveTextContent('x_1 = 2');
+      expect(screen.getByTestId('root-latex-1')).toHaveTextContent('x_2 = 3');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Y: coefficient edit resulting in ProtocolError renders safe protocol error panel, draft, banner, and old math', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(clientModule, 'solveEquation')
+        .mockResolvedValueOnce({
+          kind: 'application',
+          status: 200,
+          response: mockSolvedTwoRoots,
+        })
+        .mockRejectedValueOnce(new ProtocolError('Unrecognized response schema', 500));
+
+      render(<App />);
+
+      const input = screen.getByTestId('equation-input');
+      fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
+      fireEvent.click(screen.getByTestId('compute-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
+      });
+
+      const cNumeratorInput = screen.getByDisplayValue('6');
+      fireEvent.change(cNumeratorInput, { target: { value: '7' } });
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Safe protocol error panel is rendered
+      expect(screen.getByTestId('network-error-panel')).toBeInTheDocument();
+      expect(screen.getByText('Phản hồi không hợp lệ')).toBeInTheDocument();
+
+      // Raw ProtocolError message is NOT leaked
+      expect(screen.queryByText(/Unrecognized response schema/i)).toBeNull();
+
+      // Draft c=7 is preserved
+      expect(screen.getByDisplayValue('7')).toBeInTheDocument();
+
+      // Last accepted revision banner is rendered
+      expect(screen.getByTestId('last-accepted-revision-banner')).toBeInTheDocument();
+
+      // Previous accepted math remains visible
+      expect(screen.getByTestId('solution-outcome-badge')).toHaveTextContent('2 nghiệm thực phân biệt');
+      expect(screen.getByTestId('root-latex-0')).toHaveTextContent('x_1 = 2');
+      expect(screen.getByTestId('root-latex-1')).toHaveTextContent('x_2 = 3');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

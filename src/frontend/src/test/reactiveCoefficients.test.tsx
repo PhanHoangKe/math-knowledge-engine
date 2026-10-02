@@ -6,6 +6,7 @@ import * as apiClient from '../api/client';
 import {
   mockSolvedTwoRoots,
   mockAnalyzedDegenerateLinear,
+  mockApplicationErrorSyntax,
 } from './fixtures/responses';
 import type { SolvedResponse, TransportErrorResponse } from '../api/contract';
 
@@ -511,7 +512,7 @@ describe('Reactive Coefficients & Revision Flow (Sections 2-17, 20)', () => {
   });
 
   it('retries failed requests with exact original provenance', async () => {
-    vi.spyOn(apiClient, 'solveEquation')
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation')
       // First solve succeeds
       .mockResolvedValueOnce({
         kind: 'application',
@@ -553,6 +554,127 @@ describe('Reactive Coefficients & Revision Flow (Sections 2-17, 20)', () => {
     expect(result.current.status).toBe('application-response');
     expect(result.current.sourceMode).toBe('COEFFICIENTS');
     expect(result.current.reactiveStatus).toBe('updated');
+
+    expect(solveSpy).toHaveBeenLastCalledWith(
+      {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'COEFFICIENTS',
+          a: { numerator: 1, denominator: 1 },
+          b: { numerator: -5, denominator: 1 },
+          c: { numerator: 7, denominator: 1 },
+          target_variable: 'x',
+        },
+        selected_method_id: null,
+      },
+      expect.any(AbortSignal)
+    );
+  });
+
+  it('preserves state and draft and marks reactiveStatus error when coefficient edit receives Application ERROR response', async () => {
+    vi.spyOn(apiClient, 'solveEquation')
+      // Initial solve succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      // Coefficient edit returns Application ERROR
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockApplicationErrorSyntax,
+      });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    expect(result.current.lastAcceptedResponse?.problem.problem_id).toBe('prob_quad_x2_minus_5x_plus_6');
+    expect(result.current.revisionHistory).toHaveLength(1);
+
+    // Edit c: 6 -> 7
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(result.current.status).toBe('application-response');
+    expect(result.current.result?.kind).toBe('application');
+    expect((result.current.result as { kind: 'application'; response: { response_status: string } })?.response.response_status).toBe('ERROR');
+    expect(result.current.lastFailedRequestOrigin).toBe('COEFFICIENT_EDIT');
+    expect(result.current.reactiveStatus).toBe('error');
+    expect(result.current.coeffDraft.c.numeratorStr).toBe('7');
+    // lastAcceptedResponse remains previous accepted quadratic
+    expect(result.current.lastAcceptedResponse?.problem.problem_id).toBe('prob_quad_x2_minus_5x_plus_6');
+    // revisionHistory does NOT append ErrorResponse
+    expect(result.current.revisionHistory).toHaveLength(1);
+  });
+
+  it('retries Application ERROR coefficient request with exact COEFFICIENTS payload', async () => {
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation')
+      // Initial solve succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      // Coefficient edit returns Application ERROR
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockApplicationErrorSyntax,
+      })
+      // Retry succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedQuadratic7Response,
+      });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    // Edit c: 6 -> 7
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(result.current.status).toBe('application-response');
+    expect(result.current.lastFailedRequestOrigin).toBe('COEFFICIENT_EDIT');
+
+    // Retry
+    await act(async () => {
+      await result.current.retryLastRequest();
+    });
+
+    expect(result.current.status).toBe('application-response');
+    expect(result.current.sourceMode).toBe('COEFFICIENTS');
+    expect(result.current.reactiveStatus).toBe('updated');
+    expect(solveSpy).toHaveBeenLastCalledWith(
+      {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'COEFFICIENTS',
+          a: { numerator: 1, denominator: 1 },
+          b: { numerator: -5, denominator: 1 },
+          c: { numerator: 7, denominator: 1 },
+          target_variable: 'x',
+        },
+        selected_method_id: null,
+      },
+      expect.any(AbortSignal)
+    );
   });
 
   it('StrictMode: pure state updater schedules exactly one timer without duplicate execution under React.StrictMode', async () => {
