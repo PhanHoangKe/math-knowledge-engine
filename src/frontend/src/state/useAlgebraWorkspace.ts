@@ -66,6 +66,7 @@ export interface UseAlgebraWorkspaceReturn {
   revisionHistory: RevisionHistoryEntry[];
   currentProblem: CanonicalQuadraticProblemView | CanonicalDegenerateProblemView | null;
   currentQuadraticProblem: CanonicalQuadraticProblemView | null;
+  lastAcceptedResponse: SolvedResponse | AnalyzedNoExecutionResponse | null;
   lastFailedRequestOrigin: RequestOrigin | null;
   updateCoefficientField: (coeff: 'a' | 'b' | 'c', part: 'numerator' | 'denominator', value: string) => void;
   resetCoefficientsToBackend: () => void;
@@ -96,11 +97,13 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
   const [coeffValidationErrors, setCoeffValidationErrors] = useState<CoefficientsValidationErrors>({});
   const [reactiveStatus, setReactiveStatus] = useState<ReactiveCoeffStatus>('idle');
   const [revisionHistory, setRevisionHistory] = useState<RevisionHistoryEntry[]>([]);
+  const [lastAcceptedResponse, setLastAcceptedResponse] = useState<SolvedResponse | AnalyzedNoExecutionResponse | null>(null);
   const [lastFailedRequest, setLastFailedRequest] = useState<{ origin: RequestOrigin; solveRequest: SolveRequest } | null>(null);
 
   const sequenceRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const coeffDraftRef = useRef<CoefficientsDraft>(INITIAL_COEFF_DRAFT);
 
   // Clear debounce timer helper
   const cancelDebounce = useCallback(() => {
@@ -139,6 +142,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     setResult(null);
     setHttpStatus(null);
     setLastFailedRequest(null);
+    setLastAcceptedResponse(null);
     setReactiveStatus('idle');
   }, [cancelDebounce]);
 
@@ -157,8 +161,10 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     setResult(null);
     setHttpStatus(null);
     setLastFailedRequest(null);
+    setLastAcceptedResponse(null);
     setReactiveStatus('idle');
     setSourceMode('RAW_TEXT');
+    coeffDraftRef.current = INITIAL_COEFF_DRAFT;
     setCoeffDraft(INITIAL_COEFF_DRAFT);
     setCoeffValidationErrors({});
   }, [cancelDebounce]);
@@ -200,6 +206,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
         const resp = solveResult.response;
         if (resp.response_status === 'SOLVED' || resp.response_status === 'ANALYZED_NO_EXECUTION') {
           const prob = resp.problem;
+          setLastAcceptedResponse(resp);
 
           // Freeze provenance semantics:
           // RAW_TEXT -> RAW_TEXT
@@ -211,15 +218,19 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
             setSourceMode('COEFFICIENTS');
           }
 
-          // Rehydrate draft from authoritative backend values
+          // Rehydrate draft from authoritative backend values and keep ref synchronized
           if (prob.problem_type === 'QUADRATIC') {
-            setCoeffDraft(hydrateDraftFromBackend(prob.a, prob.b, prob.c));
+            const freshDraft = hydrateDraftFromBackend(prob.a, prob.b, prob.c);
+            coeffDraftRef.current = freshDraft;
+            setCoeffDraft(freshDraft);
           } else {
-            setCoeffDraft((prev) => ({
-              a: prev.a.numeratorStr === '0' ? prev.a : { numeratorStr: '0', denominatorStr: '1' },
+            const freshDraft: CoefficientsDraft = {
+              a: coeffDraftRef.current.a.numeratorStr === '0' ? coeffDraftRef.current.a : { numeratorStr: '0', denominatorStr: '1' },
               b: { numeratorStr: String(prob.b.numerator), denominatorStr: String(prob.b.denominator) },
               c: { numeratorStr: String(prob.c.numerator), denominatorStr: String(prob.c.denominator) },
-            }));
+            };
+            coeffDraftRef.current = freshDraft;
+            setCoeffDraft(freshDraft);
           }
           setCoeffValidationErrors({});
           setReactiveStatus('updated');
@@ -329,11 +340,8 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
   }
 
   /**
-   * Update an individual coefficient input field with validation and debounced recomputation.
-   * On EVERY edit:
-   * - cancel pending debounce
-   * - immediately increment sequenceRef.current
-   * - abort in-flight request if present
+   * StrictMode-Safe Pure updateCoefficientField.
+   * Maintains coeffDraftRef and schedules debounce timer directly outside state updaters.
    */
   const updateCoefficientField = useCallback((
     coeff: 'a' | 'b' | 'c',
@@ -352,92 +360,106 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
       abortControllerRef.current = null;
     }
 
-    setCoeffDraft((prev) => {
-      const fieldKey = `${part}Str` as const;
-      const nextCoeff = { ...prev[coeff], [fieldKey]: value };
-      const nextDraft: CoefficientsDraft = { ...prev, [coeff]: nextCoeff };
+    // 4. Compute nextDraft purely from ref
+    const fieldKey = `${part}Str` as const;
+    const nextCoeff = { ...coeffDraftRef.current[coeff], [fieldKey]: value };
+    const nextDraft: CoefficientsDraft = { ...coeffDraftRef.current, [coeff]: nextCoeff };
 
-      const { isValid, errors } = validateCoefficientsDraft(nextDraft);
-      setCoeffValidationErrors(errors);
+    // 5. Update ref and state
+    coeffDraftRef.current = nextDraft;
+    setCoeffDraft(nextDraft);
 
-      if (!isValid) {
+    // 6. Validate nextDraft
+    const { isValid, errors } = validateCoefficientsDraft(nextDraft);
+    setCoeffValidationErrors(errors);
+
+    if (!isValid) {
+      setReactiveStatus('invalid');
+      return;
+    }
+
+    setReactiveStatus('debouncing');
+
+    // 7. Schedule exactly ONE debounce timer outside any React state updater
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      setReactiveStatus('recomputing');
+      const payload = draftToRationalPayload(nextDraft);
+      if (!payload) {
         setReactiveStatus('invalid');
-        return nextDraft;
+        return;
       }
 
-      setReactiveStatus('debouncing');
-
-      debounceTimerRef.current = setTimeout(() => {
-        debounceTimerRef.current = null;
-        setReactiveStatus('recomputing');
-        const payload = draftToRationalPayload(nextDraft);
-        if (!payload) {
-          setReactiveStatus('invalid');
-          return;
-        }
-
-        const solveRequest: SolveRequest = {
-          schema_version: '1.0.0',
-          input_payload: {
-            input_mode: 'COEFFICIENTS',
-            a: payload.a,
-            b: payload.b,
-            c: payload.c,
-            target_variable: 'x',
-          },
-          selected_method_id: null, // Reset selected_method_id for fresh revision
-        };
-        executeSolve(solveRequest, 'COEFFICIENT_EDIT');
-      }, COEFFICIENT_EDIT_DEBOUNCE_MS);
-
-      return nextDraft;
-    });
+      const solveRequest: SolveRequest = {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'COEFFICIENTS',
+          a: payload.a,
+          b: payload.b,
+          c: payload.c,
+          target_variable: 'x',
+        },
+        selected_method_id: null, // Reset selected_method_id for fresh revision
+      };
+      executeSolve(solveRequest, 'COEFFICIENT_EDIT');
+    }, COEFFICIENT_EDIT_DEBOUNCE_MS);
   }, [executeSolve, cancelDebounce]);
 
   /**
    * Reset coefficient drafts to current accepted backend canonical values.
+   * Invalidates active in-flight requests and restores draft.
    */
   const resetCoefficientsToBackend = useCallback(() => {
     cancelDebounce();
-    if (!currentProblem) return;
+    sequenceRef.current += 1;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
 
-    if (currentProblem.problem_type === 'QUADRATIC') {
-      const freshDraft = hydrateDraftFromBackend(currentProblem.a, currentProblem.b, currentProblem.c);
+    const targetProblem = currentProblem || lastAcceptedResponse?.problem;
+    if (!targetProblem) return;
+
+    if (targetProblem.problem_type === 'QUADRATIC') {
+      const freshDraft = hydrateDraftFromBackend(targetProblem.a, targetProblem.b, targetProblem.c);
+      coeffDraftRef.current = freshDraft;
       setCoeffDraft(freshDraft);
       setCoeffValidationErrors({});
       setReactiveStatus('idle');
     } else {
       const freshDraft: CoefficientsDraft = {
         a: { numeratorStr: '0', denominatorStr: '1' },
-        b: { numeratorStr: String(currentProblem.b.numerator), denominatorStr: String(currentProblem.b.denominator) },
-        c: { numeratorStr: String(currentProblem.c.numerator), denominatorStr: String(currentProblem.c.denominator) },
+        b: { numeratorStr: String(targetProblem.b.numerator), denominatorStr: String(targetProblem.b.denominator) },
+        c: { numeratorStr: String(targetProblem.c.numerator), denominatorStr: String(targetProblem.c.denominator) },
       };
+      coeffDraftRef.current = freshDraft;
       setCoeffDraft(freshDraft);
       setCoeffValidationErrors({});
       setReactiveStatus('idle');
     }
-  }, [currentProblem, cancelDebounce]);
+  }, [currentProblem, lastAcceptedResponse, cancelDebounce]);
 
   /**
    * Switch method using newest backend canonical coefficients.
    */
   const switchMethod = useCallback(async (methodId: string) => {
-    if (!currentQuadraticProblem) return;
+    const targetProblem = currentQuadraticProblem || (lastAcceptedResponse?.problem?.problem_type === 'QUADRATIC' ? lastAcceptedResponse.problem : null);
+    if (!targetProblem) return;
 
     const request: SolveRequest = {
       schema_version: '1.0.0',
       input_payload: {
         input_mode: 'COEFFICIENTS',
-        a: currentQuadraticProblem.a,
-        b: currentQuadraticProblem.b,
-        c: currentQuadraticProblem.c,
+        a: targetProblem.a,
+        b: targetProblem.b,
+        c: targetProblem.c,
         target_variable: 'x',
       },
       selected_method_id: methodId,
     };
 
     await executeSolve(request, 'METHOD_SWITCH');
-  }, [currentQuadraticProblem, executeSolve]);
+  }, [currentQuadraticProblem, lastAcceptedResponse, executeSolve]);
 
   /**
    * Retry the exact failed request according to its original provenance.
@@ -460,6 +482,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     revisionHistory,
     currentProblem,
     currentQuadraticProblem,
+    lastAcceptedResponse,
     lastFailedRequestOrigin: lastFailedRequest?.origin ?? null,
     updateCoefficientField,
     resetCoefficientsToBackend,

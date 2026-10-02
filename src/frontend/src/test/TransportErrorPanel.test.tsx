@@ -96,4 +96,40 @@ describe('TransportErrorPanel Detail Whitelist & Sanitization (Sections 18 & 19)
     expect(screen.queryByText(/RAW_UNPARSED_EXCEPTION_SENTINEL/i)).toBeNull();
     expect(screen.queryByText(/INTERNAL_EXCEPTION_OBJECT/i)).toBeNull();
   });
+
+  it('strictly ignores details.detail and details.errors arrays (only details.validation_errors allowed)', () => {
+    const errorWithDetailArray: TransportErrorResponse = {
+      transport_status: 'ERROR',
+      transport_error_code: 'REQUEST_VALIDATION_FAILED',
+      message_vi: 'Lỗi truyền tải.',
+      message_en: 'Transport error.',
+      details: {
+        detail: [
+          {
+            loc: ['SECRET_LOC'],
+            msg: 'SECRET_DETAIL_SENTINEL',
+            type: 'secret_error_type',
+          },
+        ],
+        errors: [
+          {
+            loc: ['SECRET_ERRORS_LOC'],
+            msg: 'SECRET_ERRORS_SENTINEL',
+            type: 'secret_errors_type',
+          },
+        ],
+      },
+    };
+
+    render(
+      <PreferencesProvider>
+        <TransportErrorPanel error={errorWithDetailArray} httpStatus={422} />
+      </PreferencesProvider>
+    );
+
+    expect(screen.queryByText(/SECRET_LOC/i)).toBeNull();
+    expect(screen.queryByText(/SECRET_DETAIL_SENTINEL/i)).toBeNull();
+    expect(screen.queryByText(/SECRET_ERRORS_LOC/i)).toBeNull();
+    expect(screen.queryByText(/SECRET_ERRORS_SENTINEL/i)).toBeNull();
+  });
 });

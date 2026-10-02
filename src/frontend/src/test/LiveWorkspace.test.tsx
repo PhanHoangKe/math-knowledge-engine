@@ -434,4 +434,74 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     expect(disclaimer.textContent).toContain('diễn giải sư phạm tất định');
     expect(disclaimer.textContent).toContain('Phạm vi xác thực toán học độc lập là kết quả nghiệm cuối cùng');
   });
+
+  it('U: failed coefficient edit renders error panel, user draft, last accepted revision banner, and old math', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(clientModule, 'solveEquation')
+        .mockResolvedValueOnce({
+          kind: 'application',
+          status: 200,
+          response: mockSolvedTwoRoots,
+        })
+        .mockRejectedValueOnce(new NetworkError('Failed to fetch'));
+
+      render(<App />);
+
+      const input = screen.getByTestId('equation-input');
+      fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
+      fireEvent.click(screen.getByTestId('compute-btn'));
+
+      // Wait for initial solve
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('solved-workspace')).toBeInTheDocument();
+      });
+
+      // Find coefficient c numerator input and change 6 -> 7
+      const cNumeratorInput = screen.getByDisplayValue('6');
+      fireEvent.change(cNumeratorInput, { target: { value: '7' } });
+
+      // Fast-forward debounce timer 350ms
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Verify error panel is rendered
+      expect(screen.getByTestId('network-error-panel')).toBeInTheDocument();
+
+      // Verify user draft c=7 is preserved in coefficient editor
+      expect(screen.getByDisplayValue('7')).toBeInTheDocument();
+
+      // Verify last accepted revision banner is rendered
+      expect(screen.getByTestId('last-accepted-revision-banner')).toBeInTheDocument();
+      expect(screen.getByTestId('last-accepted-revision-banner')).toHaveTextContent(
+        'Phiên bản backend được chấp nhận gần nhất'
+      );
+
+      // Verify old accepted mathematical workspace is still visible
+      expect(screen.getByTestId('solution-outcome-badge')).toHaveTextContent('2 nghiệm thực phân biệt');
+      expect(screen.getByTestId('root-latex-0')).toHaveTextContent('x_1 = 2');
+      expect(screen.getByTestId('root-latex-1')).toHaveTextContent('x_2 = 3');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('V: initial raw solve failure does NOT render a fake accepted workspace or revision banner', async () => {
+    vi.spyOn(clientModule, 'solveEquation').mockRejectedValueOnce(
+      new NetworkError('Failed to fetch')
+    );
+
+    render(<App />);
+
+    const input = screen.getByTestId('equation-input');
+    fireEvent.change(input, { target: { value: 'x^2 - 5*x + 6 = 0' } });
+    fireEvent.click(screen.getByTestId('compute-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('network-error-panel')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('last-accepted-revision-banner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('solved-workspace')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('coefficient-editor-panel')).not.toBeInTheDocument();
+  });
 });

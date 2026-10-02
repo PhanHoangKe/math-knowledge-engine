@@ -1,3 +1,4 @@
+import React, { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAlgebraWorkspace } from '../state/useAlgebraWorkspace';
@@ -6,7 +7,7 @@ import {
   mockSolvedTwoRoots,
   mockAnalyzedDegenerateLinear,
 } from './fixtures/responses';
-import type { SolvedResponse } from '../api/contract';
+import type { SolvedResponse, TransportErrorResponse } from '../api/contract';
 
 describe('Reactive Coefficients & Revision Flow (Sections 2-17, 20)', () => {
   beforeEach(() => {
@@ -552,5 +553,319 @@ describe('Reactive Coefficients & Revision Flow (Sections 2-17, 20)', () => {
     expect(result.current.status).toBe('application-response');
     expect(result.current.sourceMode).toBe('COEFFICIENTS');
     expect(result.current.reactiveStatus).toBe('updated');
+  });
+
+  it('StrictMode: pure state updater schedules exactly one timer without duplicate execution under React.StrictMode', async () => {
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation').mockResolvedValue({
+      kind: 'application',
+      status: 200,
+      response: mockSolvedTwoRoots,
+    });
+
+    // Render hook inside React.StrictMode wrapper
+    const { result } = renderHook(() => useAlgebraWorkspace(), {
+      wrapper: ({ children }: { children: React.ReactNode }) => <StrictMode>{children}</StrictMode>,
+    });
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+    expect(solveSpy).toHaveBeenCalledTimes(1);
+
+    // Rapid edits inside StrictMode
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '8');
+    });
+
+    // Before debounce expiration
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(solveSpy).toHaveBeenCalledTimes(1);
+
+    // Advance remaining debounce time
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // Exactly one new solve request must have been dispatched
+    expect(solveSpy).toHaveBeenCalledTimes(2);
+    expect(solveSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        input_payload: expect.objectContaining({
+          c: { numerator: 8, denominator: 1 },
+        }),
+      }),
+      expect.any(AbortSignal)
+    );
+  });
+
+  it('preserves lastAcceptedResponse when coefficient edit results in network-error, transport-error, or protocol-error', async () => {
+    vi.spyOn(apiClient, 'solveEquation')
+      // Initial solve succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      // Coefficient edit fails with transport error
+      .mockResolvedValueOnce({
+        kind: 'transport-error',
+        status: 422,
+        response: {
+          transport_status: 'ERROR',
+          transport_error_code: 'REQUEST_VALIDATION_FAILED',
+          message_vi: 'Dữ liệu không hợp lệ',
+          message_en: 'Invalid request data',
+        } as TransportErrorResponse,
+      });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    expect(result.current.lastAcceptedResponse?.problem.problem_id).toBe('prob_quad_x2_minus_5x_plus_6');
+
+    // Edit c: 6 -> 7
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    // Workspace status is transport-error, reactiveStatus is error
+    expect(result.current.status).toBe('transport-error');
+    expect(result.current.reactiveStatus).toBe('error');
+    // Draft retains unaccepted value c=7
+    expect(result.current.coeffDraft.c.numeratorStr).toBe('7');
+    // lastAcceptedResponse is preserved intact
+    expect(result.current.lastAcceptedResponse?.problem.problem_id).toBe('prob_quad_x2_minus_5x_plus_6');
+    expect(result.current.lastFailedRequestOrigin).toBe('COEFFICIENT_EDIT');
+  });
+
+  it('cancels coefficient debounce when setQuery is called', async () => {
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation').mockResolvedValue({
+      kind: 'application',
+      status: 200,
+      response: mockSolvedTwoRoots,
+    });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+    expect(solveSpy).toHaveBeenCalledTimes(1);
+
+    // Edit coefficient
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    expect(result.current.reactiveStatus).toBe('debouncing');
+
+    // User types into search query box
+    act(() => {
+      result.current.setQuery('x^2 - 9 = 0');
+    });
+
+    // Advance timer
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    // No coefficient request should have been fired
+    expect(solveSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels in-flight requests and resets draft when resetCoefficientsToBackend is called', async () => {
+    let resolveA!: (value: any) => void;
+    const promiseA = new Promise((resolve) => {
+      resolveA = resolve;
+    });
+
+    vi.spyOn(apiClient, 'solveEquation')
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      .mockReturnValueOnce(promiseA as any);
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    // Edit c: 6 -> 7 (in flight)
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
+    expect(result.current.reactiveStatus).toBe('recomputing');
+
+    // User resets coefficients
+    act(() => {
+      result.current.resetCoefficientsToBackend();
+    });
+
+    expect(result.current.coeffDraft.c.numeratorStr).toBe('6');
+    expect(result.current.reactiveStatus).toBe('idle');
+
+    // In-flight request resolves late
+    await act(async () => {
+      resolveA({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedQuadratic7Response,
+      });
+    });
+
+    // Must still be 6
+    expect(result.current.coeffDraft.c.numeratorStr).toBe('6');
+    expect(result.current.reactiveStatus).toBe('idle');
+  });
+
+  it('discards late METHOD_SWITCH response when a subsequent COEFFICIENT_EDIT occurs', async () => {
+    let resolveMethod!: (value: any) => void;
+    const methodPromise = new Promise((resolve) => {
+      resolveMethod = resolve;
+    });
+
+    vi.spyOn(apiClient, 'solveEquation')
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      .mockReturnValueOnce(methodPromise as any)
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedQuadratic7Response,
+      });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    // Trigger method switch (hangs)
+    act(() => {
+      void result.current.switchMethod('QUAD_FORMULA_REDUCED');
+    });
+
+    // User edits coefficient c: 6 -> 7
+    act(() => {
+      result.current.updateCoefficientField('c', 'numerator', '7');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    // Method switch resolves late
+    await act(async () => {
+      resolveMethod({
+        kind: 'application',
+        status: 200,
+        response: {
+          ...mockSolvedTwoRoots,
+          selected_method_id: 'QUAD_FORMULA_REDUCED',
+        },
+      });
+    });
+
+    // Revision hash must be quad_7, not the stale method response
+    expect(result.current.revisionHistory[0]?.semantic_revision_hash).toBe('rev_hash_quad_7');
+    expect(result.current.coeffDraft.c.numeratorStr).toBe('7');
+  });
+
+  it('retries RAW_QUERY and METHOD_SWITCH requests with exact respective payloads', async () => {
+    const solveSpy = vi.spyOn(apiClient, 'solveEquation')
+      // 1. Raw solve fails
+      .mockRejectedValueOnce(new apiClient.NetworkError('Network failure'))
+      // 2. Retry succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      })
+      // 3. Method switch fails
+      .mockRejectedValueOnce(new apiClient.NetworkError('Network failure on method switch'))
+      // 4. Retry succeeds
+      .mockResolvedValueOnce({
+        kind: 'application',
+        status: 200,
+        response: {
+          ...mockSolvedTwoRoots,
+          selected_method_id: 'QUAD_FORMULA_REDUCED',
+        },
+      });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    // Raw solve fails
+    await act(async () => {
+      await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+    expect(result.current.status).toBe('network-error');
+    expect(result.current.lastFailedRequestOrigin).toBe('RAW_TEXT');
+
+    // Retry raw solve
+    await act(async () => {
+      await result.current.retryLastRequest();
+    });
+    expect(result.current.status).toBe('application-response');
+    expect(solveSpy).toHaveBeenLastCalledWith(
+      {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'RAW_TEXT',
+          raw_query: 'x^2 - 5*x + 6 = 0',
+          target_variable: 'x',
+        },
+        selected_method_id: null,
+      },
+      expect.any(AbortSignal)
+    );
+
+    // Method switch fails
+    await act(async () => {
+      await result.current.switchMethod('QUAD_FORMULA_REDUCED');
+    });
+    expect(result.current.status).toBe('network-error');
+    expect(result.current.lastFailedRequestOrigin).toBe('METHOD_SWITCH');
+
+    // Retry method switch
+    await act(async () => {
+      await result.current.retryLastRequest();
+    });
+    expect(result.current.status).toBe('application-response');
+    expect(solveSpy).toHaveBeenLastCalledWith(
+      {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'COEFFICIENTS',
+          a: { numerator: 1, denominator: 1 },
+          b: { numerator: -5, denominator: 1 },
+          c: { numerator: 6, denominator: 1 },
+          target_variable: 'x',
+        },
+        selected_method_id: 'QUAD_FORMULA_REDUCED',
+      },
+      expect.any(AbortSignal)
+    );
   });
 });

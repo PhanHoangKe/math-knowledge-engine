@@ -37,6 +37,8 @@ export const AppShell: React.FC = () => {
     coeffValidationErrors,
     reactiveStatus,
     revisionHistory,
+    lastAcceptedResponse,
+    lastFailedRequestOrigin,
     updateCoefficientField,
     resetCoefficientsToBackend,
     submitRawSolve,
@@ -44,6 +46,15 @@ export const AppShell: React.FC = () => {
     retryLastRequest,
     clearWorkspace,
   } = useAlgebraWorkspace();
+
+  const isFailedCoeffEdit = Boolean(
+    lastAcceptedResponse &&
+    lastFailedRequestOrigin === 'COEFFICIENT_EDIT' &&
+    (status === 'network-error' ||
+      status === 'protocol-error' ||
+      status === 'transport-error' ||
+      (status === 'application-response' && result && result.kind === 'application' && result.response.response_status === 'ERROR'))
+  );
 
   const getStatusText = (): string => {
     switch (status) {
@@ -102,39 +113,48 @@ export const AppShell: React.FC = () => {
             </div>
           )}
 
-          {status === 'network-error' && (
-            <NetworkErrorPanel onRetry={() => retryLastRequest()} />
-          )}
-
-          {status === 'protocol-error' && (
-            <NetworkErrorPanel isProtocolError onRetry={() => retryLastRequest()} />
-          )}
-
-          {status === 'transport-error' && result && result.kind === 'transport-error' && (
-            <TransportErrorPanel
-              error={result.response as TransportErrorResponse}
-              httpStatus={httpStatus}
-            />
-          )}
-
-          {status === 'application-response' && result && result.kind === 'application' && (
+          {/* Failed Coefficient Edit: Render Failure Panel + Coefficient Draft + Last Accepted Revision */}
+          {isFailedCoeffEdit && (
             <>
-              {/* SOLVED Response */}
-              {result.response.response_status === 'SOLVED' && (() => {
-                const resp = result.response as SolvedResponse;
+              {status === 'network-error' && (
+                <NetworkErrorPanel onRetry={() => retryLastRequest()} />
+              )}
+              {status === 'protocol-error' && (
+                <NetworkErrorPanel isProtocolError onRetry={() => retryLastRequest()} />
+              )}
+              {status === 'transport-error' && result && result.kind === 'transport-error' && (
+                <TransportErrorPanel
+                  error={result.response as TransportErrorResponse}
+                  httpStatus={httpStatus}
+                />
+              )}
+              {status === 'application-response' && result && result.kind === 'application' && result.response.response_status === 'ERROR' && (
+                <ApplicationErrorPanel
+                  error={result.response as ApplicationErrorResponse}
+                />
+              )}
+
+              <CoefficientEditorPanel
+                draft={coeffDraft}
+                errors={coeffValidationErrors}
+                reactiveStatus={reactiveStatus}
+                sourceMode={sourceMode}
+                isLoading={reactiveStatus === 'recomputing'}
+                isDegenerate={lastAcceptedResponse?.problem?.problem_type === 'DEGENERATE'}
+                onUpdateField={updateCoefficientField}
+                onReset={resetCoefficientsToBackend}
+              />
+
+              <div className={styles.lastAcceptedBanner} data-testid="last-accepted-revision-banner">
+                <span className={styles.lastAcceptedIcon} aria-hidden="true">ℹ️</span>
+                <span>{t('lbl_last_accepted_revision')}</span>
+              </div>
+
+              {lastAcceptedResponse?.response_status === 'SOLVED' && (() => {
+                const resp = lastAcceptedResponse as SolvedResponse;
                 return (
                   <div className={styles.solvedLayout} data-testid="solved-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
-                    <CoefficientEditorPanel
-                      draft={coeffDraft}
-                      errors={coeffValidationErrors}
-                      reactiveStatus={reactiveStatus}
-                      sourceMode={sourceMode}
-                      isLoading={reactiveStatus === 'recomputing'}
-                      isDegenerate={false}
-                      onUpdateField={updateCoefficientField}
-                      onReset={resetCoefficientsToBackend}
-                    />
                     <SolutionSummaryPanel solution={resp.solution} />
                     <MethodCatalogPanel
                       methods={resp.available_methods}
@@ -150,9 +170,8 @@ export const AppShell: React.FC = () => {
                 );
               })()}
 
-              {/* ANALYZED_NO_EXECUTION Response */}
-              {result.response.response_status === 'ANALYZED_NO_EXECUTION' && (() => {
-                const resp = result.response as AnalyzedNoExecutionResponse;
+              {lastAcceptedResponse?.response_status === 'ANALYZED_NO_EXECUTION' && (() => {
+                const resp = lastAcceptedResponse as AnalyzedNoExecutionResponse;
                 const isDegenerate =
                   resp.reason_code === 'DEGENERATE_EXACT_SOLUTION' &&
                   resp.degenerate_solution;
@@ -161,16 +180,6 @@ export const AppShell: React.FC = () => {
                   return (
                     <div className={styles.degenerateLayout} data-testid="degenerate-workspace">
                       <CanonicalProblemPanel problem={resp.problem} />
-                      <CoefficientEditorPanel
-                        draft={coeffDraft}
-                        errors={coeffValidationErrors}
-                        reactiveStatus={reactiveStatus}
-                        sourceMode={sourceMode}
-                        isLoading={reactiveStatus === 'recomputing'}
-                        isDegenerate={true}
-                        onUpdateField={updateCoefficientField}
-                        onReset={resetCoefficientsToBackend}
-                      />
                       <DegenerateSolutionPanel solution={resp.degenerate_solution} />
                     </div>
                   );
@@ -179,16 +188,6 @@ export const AppShell: React.FC = () => {
                 return (
                   <div className={styles.analyzedLayout} data-testid="analyzed-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
-                    <CoefficientEditorPanel
-                      draft={coeffDraft}
-                      errors={coeffValidationErrors}
-                      reactiveStatus={reactiveStatus}
-                      sourceMode={sourceMode}
-                      isLoading={reactiveStatus === 'recomputing'}
-                      isDegenerate={resp.problem.problem_type === 'DEGENERATE'}
-                      onUpdateField={updateCoefficientField}
-                      onReset={resetCoefficientsToBackend}
-                    />
                     <MethodNotExecutablePanel
                       reasonCode={resp.reason_code}
                       analysisMessageVi={resp.analysis_message_vi}
@@ -204,12 +203,122 @@ export const AppShell: React.FC = () => {
                   </div>
                 );
               })()}
+            </>
+          )}
 
-              {/* Application ERROR Response */}
-              {result.response.response_status === 'ERROR' && (
-                <ApplicationErrorPanel
-                  error={result.response as ApplicationErrorResponse}
+          {/* Standard (Non-Coefficient-Failure) Failure & Response Panels */}
+          {!isFailedCoeffEdit && (
+            <>
+              {status === 'network-error' && (
+                <NetworkErrorPanel onRetry={() => retryLastRequest()} />
+              )}
+
+              {status === 'protocol-error' && (
+                <NetworkErrorPanel isProtocolError onRetry={() => retryLastRequest()} />
+              )}
+
+              {status === 'transport-error' && result && result.kind === 'transport-error' && (
+                <TransportErrorPanel
+                  error={result.response as TransportErrorResponse}
+                  httpStatus={httpStatus}
                 />
+              )}
+
+              {status === 'application-response' && result && result.kind === 'application' && (
+                <>
+                  {/* SOLVED Response */}
+                  {result.response.response_status === 'SOLVED' && (() => {
+                    const resp = result.response as SolvedResponse;
+                    return (
+                      <div className={styles.solvedLayout} data-testid="solved-workspace">
+                        <CanonicalProblemPanel problem={resp.problem} />
+                        <CoefficientEditorPanel
+                          draft={coeffDraft}
+                          errors={coeffValidationErrors}
+                          reactiveStatus={reactiveStatus}
+                          sourceMode={sourceMode}
+                          isLoading={reactiveStatus === 'recomputing'}
+                          isDegenerate={false}
+                          onUpdateField={updateCoefficientField}
+                          onReset={resetCoefficientsToBackend}
+                        />
+                        <SolutionSummaryPanel solution={resp.solution} />
+                        <MethodCatalogPanel
+                          methods={resp.available_methods}
+                          selectedMethodId={resp.selected_method_id}
+                          onSelectMethod={switchMethod}
+                        />
+                        <TracePanel trace={resp.solution.trace} />
+                        <VerificationPanel
+                          certificate={resp.solution.certificate}
+                          verificationScope={resp.solution.verification_scope}
+                        />
+                      </div>
+                    );
+                  })()}
+
+                  {/* ANALYZED_NO_EXECUTION Response */}
+                  {result.response.response_status === 'ANALYZED_NO_EXECUTION' && (() => {
+                    const resp = result.response as AnalyzedNoExecutionResponse;
+                    const isDegenerate =
+                      resp.reason_code === 'DEGENERATE_EXACT_SOLUTION' &&
+                      resp.degenerate_solution;
+
+                    if (isDegenerate && resp.degenerate_solution) {
+                      return (
+                        <div className={styles.degenerateLayout} data-testid="degenerate-workspace">
+                          <CanonicalProblemPanel problem={resp.problem} />
+                          <CoefficientEditorPanel
+                            draft={coeffDraft}
+                            errors={coeffValidationErrors}
+                            reactiveStatus={reactiveStatus}
+                            sourceMode={sourceMode}
+                            isLoading={reactiveStatus === 'recomputing'}
+                            isDegenerate={true}
+                            onUpdateField={updateCoefficientField}
+                            onReset={resetCoefficientsToBackend}
+                          />
+                          <DegenerateSolutionPanel solution={resp.degenerate_solution} />
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className={styles.analyzedLayout} data-testid="analyzed-workspace">
+                        <CanonicalProblemPanel problem={resp.problem} />
+                        <CoefficientEditorPanel
+                          draft={coeffDraft}
+                          errors={coeffValidationErrors}
+                          reactiveStatus={reactiveStatus}
+                          sourceMode={sourceMode}
+                          isLoading={reactiveStatus === 'recomputing'}
+                          isDegenerate={resp.problem.problem_type === 'DEGENERATE'}
+                          onUpdateField={updateCoefficientField}
+                          onReset={resetCoefficientsToBackend}
+                        />
+                        <MethodNotExecutablePanel
+                          reasonCode={resp.reason_code}
+                          analysisMessageVi={resp.analysis_message_vi}
+                          selectedMethodId={resp.selected_method_id}
+                        />
+                        {resp.available_methods && resp.available_methods.length > 0 && (
+                          <MethodCatalogPanel
+                            methods={resp.available_methods}
+                            selectedMethodId={resp.selected_method_id}
+                            onSelectMethod={switchMethod}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Application ERROR Response */}
+                  {result.response.response_status === 'ERROR' && (
+                    <ApplicationErrorPanel
+                      error={result.response as ApplicationErrorResponse}
+                    />
+                  )}
+                </>
               )}
             </>
           )}

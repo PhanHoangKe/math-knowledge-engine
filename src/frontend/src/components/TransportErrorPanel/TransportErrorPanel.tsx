@@ -37,19 +37,13 @@ function extractSafeDetails(details: Record<string, unknown> | undefined): {
   const validationErrors: SafeValidationError[] = [];
   const scalarDetails: SafeDetailItem[] = [];
 
-  if (!details || typeof details !== 'object') {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
     return { validationErrors, scalarDetails };
   }
 
-  // If details has a validation_errors array, errors array, or detail array (e.g., FastAPI 422 validation items)
-  const candidateArray = Array.isArray(details)
-    ? details
-    : Array.isArray(details.validation_errors)
+  // If details has a validation_errors array (e.g., FastAPI 422 validation items)
+  const candidateArray = Array.isArray(details.validation_errors)
     ? details.validation_errors
-    : Array.isArray(details.errors)
-    ? details.errors
-    : Array.isArray(details.detail)
-    ? details.detail
     : null;
 
   if (candidateArray) {
@@ -76,18 +70,6 @@ function extractSafeDetails(details: Record<string, unknown> | undefined): {
       if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
         scalarDetails.push({ key, value: String(val) });
       }
-    }
-  }
-
-  // If top-level loc exists without candidateArray (e.g., 400 malformed JSON), format loc safely
-  if (!candidateArray && details.loc) {
-    const locStr = Array.isArray(details.loc)
-      ? details.loc.map(String).join(' → ')
-      : typeof details.loc === 'string'
-      ? details.loc
-      : undefined;
-    if (locStr) {
-      scalarDetails.push({ key: 'loc', value: locStr });
     }
   }
 
