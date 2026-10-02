@@ -274,9 +274,10 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       let updated = [...blocks];
       let insertIdx = updated.length;
 
-      // If the composer only contains 1 empty text block, replace it entirely with the new template block
+      // If the composer only contains 1 empty text block, replace it with new template block + trailing text
       if (updated.length === 1 && updated[0]?.type === 'text' && !updated[0].value) {
-        updated = [newBlock, { type: 'text', id: genId(), value: '' }];
+        const trailingText: MathBlock = { type: 'text', id: genId(), value: '' };
+        updated = [newBlock, trailingText];
       } else {
         if (focusedTarget) {
           const found = updated.findIndex((b) => b.id === focusedTarget.blockId);
@@ -284,11 +285,8 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
             insertIdx = found + 1;
           }
         }
-        updated.splice(insertIdx, 0, newBlock);
-        // Append a trailing text block if not present
-        if (updated[updated.length - 1]?.type !== 'text') {
-          updated.push({ type: 'text', id: genId(), value: '' });
-        }
+        const trailingText: MathBlock = { type: 'text', id: genId(), value: '' };
+        updated.splice(insertIdx, 0, newBlock, trailingText);
       }
 
       notifyChange(updated);
@@ -327,6 +325,14 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       } else if (targetBlock.type === 'sqrt' || targetBlock.type === 'nth_root') {
         if (focusedTarget?.slot === 'radicand') targetBlock.radicand += text;
         else if (targetBlock.type === 'nth_root') targetBlock.index += text;
+      } else if (targetBlock.type === 'derivative') {
+        if (focusedTarget?.slot === 'wrt') targetBlock.wrt += text;
+        else targetBlock.expr += text;
+      } else if (targetBlock.type === 'integral') {
+        if (focusedTarget?.slot === 'wrt') targetBlock.wrt += text;
+        else if (focusedTarget?.slot === 'upper') targetBlock.upper = (targetBlock.upper || '') + text;
+        else if (focusedTarget?.slot === 'lower') targetBlock.lower = (targetBlock.lower || '') + text;
+        else targetBlock.expr += text;
       }
 
       notifyChange(updated);
@@ -345,27 +351,21 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         if (targetBlock.value.length > 0) {
           targetBlock.value = targetBlock.value.slice(0, -1);
           notifyChange(updated);
-        } else if (updated.length > 1) {
-          // Remove empty text block and focus previous
-          updated.splice(idx, 1);
-          notifyChange(updated);
-        }
-      } else {
-        // For non-text blocks, if current slot is empty, remove the block
-        let isSlotEmpty = false;
-        if (targetBlock.type === 'power' && focusedTarget.slot === 'exponent') isSlotEmpty = !targetBlock.exponent;
-        if (targetBlock.type === 'fraction') isSlotEmpty = !targetBlock.num && !targetBlock.den;
-        if (targetBlock.type === 'sqrt') isSlotEmpty = !targetBlock.radicand;
-
-        if (isSlotEmpty || targetBlock.type === 'power') {
-          // If power exponent is empty, convert back to text
-          if (targetBlock.type === 'power' && !targetBlock.exponent) {
-            updated[idx] = { type: 'text', id: genId(), value: targetBlock.base };
-          } else {
-            updated.splice(idx, 1);
+        } else if (idx > 0) {
+          // Remove empty text block and previous block
+          updated.splice(idx - 1, 2);
+          if (updated.length === 0) {
+            updated.push({ type: 'text', id: genId(), value: '' });
           }
           notifyChange(updated);
         }
+      } else {
+        // Delete block directly
+        updated.splice(idx, 1);
+        if (updated.length === 0) {
+          updated.push({ type: 'text', id: genId(), value: '' });
+        }
+        notifyChange(updated);
       }
     };
 
@@ -379,6 +379,51 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         e.preventDefault();
         onSubmit();
         return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        const inputEl = e.currentTarget;
+        if (inputEl.selectionStart === inputEl.value.length) {
+          const nextIdx = index + 1;
+          if (nextIdx < blocks.length) {
+            e.preventDefault();
+            const nextBlock = blocks[nextIdx]!;
+            const nextSlot = nextBlock.type === 'text' ? 'value' : 'exponent';
+            setFocusedTarget({ blockId: nextBlock.id, slot: nextSlot });
+            requestAnimationFrame(() => {
+              const el = inputRefs.current.get(`${nextBlock.id}_${nextSlot}`);
+              el?.focus();
+              el?.setSelectionRange(0, 0);
+            });
+          }
+          return;
+        }
+      }
+
+      if (e.key === 'ArrowLeft') {
+        const inputEl = e.currentTarget;
+        if (inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) {
+          const prevIdx = index - 1;
+          if (prevIdx >= 0) {
+            e.preventDefault();
+            const prevBlock = blocks[prevIdx]!;
+            const prevSlot = prevBlock.type === 'text' ? 'value' : 'expr';
+            setFocusedTarget({ blockId: prevBlock.id, slot: prevSlot });
+            requestAnimationFrame(() => {
+              const el =
+                inputRefs.current.get(`${prevBlock.id}_${prevSlot}`) ??
+                inputRefs.current.get(`${prevBlock.id}_expr`) ??
+                inputRefs.current.get(`${prevBlock.id}_den`) ??
+                inputRefs.current.get(`${prevBlock.id}_radicand`) ??
+                inputRefs.current.get(`${prevBlock.id}_value`);
+              el?.focus();
+              if (el) {
+                el.setSelectionRange(el.value.length, el.value.length);
+              }
+            });
+          }
+          return;
+        }
       }
 
       if (e.key === 'ArrowDown' || e.key === 'Tab') {
@@ -405,40 +450,61 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
 
       if (e.key === 'Backspace') {
         const inputEl = e.currentTarget;
-        // If cursor at position 0 or input is empty, handle backspace deletion
         if (inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) {
-          if (block.type === 'power' && slot === 'exponent' && !block.exponent) {
+          // If in text block and empty, delete previous block!
+          if (block.type === 'text' && !block.value && index > 0) {
             e.preventDefault();
             const updated = [...blocks];
-            // Convert power to plain text base
-            updated[index] = { type: 'text', id: genId(), value: block.base };
+            // Remove previous block and current empty text block if needed
+            updated.splice(index - 1, 1);
             notifyChange(updated);
+            const focusIdx = Math.max(0, index - 2);
+            const focusBlock = updated[focusIdx] ?? updated[0];
+            if (focusBlock) {
+              const slotToFocus = focusBlock.type === 'text' ? 'value' : 'value';
+              setFocusedTarget({ blockId: focusBlock.id, slot: slotToFocus });
+              requestAnimationFrame(() => {
+                const el =
+                  inputRefs.current.get(`${focusBlock.id}_${slotToFocus}`) ??
+                  inputRefs.current.get(`${focusBlock.id}_value`);
+                el?.focus();
+              });
+            }
             return;
           }
 
-          if (block.type === 'fraction' && slot === 'den' && !block.den) {
+          // If in a template block and slot is empty, delete or collapse the block!
+          if (block.type !== 'text') {
             e.preventDefault();
-            // Move focus to numerator
-            setFocusedTarget({ blockId: block.id, slot: 'num' });
+            const updated = [...blocks];
+            if (block.type === 'power' && block.base) {
+              const collapsedBlock: MathBlock = { type: 'text', id: genId(), value: block.base };
+              updated.splice(index, 1, collapsedBlock);
+              notifyChange(updated);
+              setFocusedTarget({ blockId: collapsedBlock.id, slot: 'value' });
+              requestAnimationFrame(() => {
+                const el = inputRefs.current.get(`${collapsedBlock.id}_value`);
+                el?.focus();
+                if (el) {
+                  el.setSelectionRange(el.value.length, el.value.length);
+                }
+              });
+              return;
+            }
+
+            updated.splice(index, 1);
+            if (updated.length === 0) {
+              updated.push({ type: 'text', id: genId(), value: '' });
+            }
+            notifyChange(updated);
+            const focusIdx = Math.max(0, index - 1);
+            const focusBlock = updated[focusIdx] ?? updated[0]!;
+            const slotToFocus = focusBlock.type === 'text' ? 'value' : 'value';
+            setFocusedTarget({ blockId: focusBlock.id, slot: slotToFocus });
             requestAnimationFrame(() => {
-              inputRefs.current.get(`${block.id}_num`)?.focus();
+              const el = inputRefs.current.get(`${focusBlock.id}_${slotToFocus}`);
+              el?.focus();
             });
-            return;
-          }
-
-          if (block.type === 'fraction' && slot === 'num' && !block.num && !block.den) {
-            e.preventDefault();
-            const updated = [...blocks];
-            updated.splice(index, 1);
-            notifyChange(updated);
-            return;
-          }
-
-          if (block.type === 'sqrt' && !block.radicand) {
-            e.preventDefault();
-            const updated = [...blocks];
-            updated.splice(index, 1);
-            notifyChange(updated);
             return;
           }
         }
@@ -460,12 +526,27 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         ref={containerRef}
         className={styles.composerContainer}
         data-testid={testId}
-        onClick={() => {
-          if (!focusedTarget && blocks.length > 0) {
-            const last = blocks[blocks.length - 1];
-            if (last) {
-              const el = inputRefs.current.get(`${last.id}_${last.type === 'text' ? 'value' : 'exponent'}`);
-              el?.focus();
+        onClick={(e) => {
+          if (e.target === containerRef.current || (styles.composerContainer && (e.target as HTMLElement).classList.contains(styles.composerContainer))) {
+            const updated = [...blocks];
+            const last = updated[updated.length - 1];
+            if (!last || last.type !== 'text') {
+              const newTrailing: MathBlock = { type: 'text', id: genId(), value: '' };
+              updated.push(newTrailing);
+              notifyChange(updated);
+              setFocusedTarget({ blockId: newTrailing.id, slot: 'value' });
+              requestAnimationFrame(() => {
+                inputRefs.current.get(`${newTrailing.id}_value`)?.focus();
+              });
+            } else {
+              setFocusedTarget({ blockId: last.id, slot: 'value' });
+              requestAnimationFrame(() => {
+                const el = inputRefs.current.get(`${last.id}_value`);
+                el?.focus();
+                if (el) {
+                  el.setSelectionRange(el.value.length, el.value.length);
+                }
+              });
             }
           }
         }}
@@ -473,19 +554,22 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         {blocks.map((b, idx) => {
           if (b.type === 'text') {
             const isSingleEmpty = blocks.length === 1 && !b.value;
+            const isTrailing = idx === blocks.length - 1;
             const inputWidth = isSingleEmpty
               ? `${placeholder.length * 0.85}ch`
               : b.value
               ? `${Math.max(1, b.value.length) * 0.85 + 0.2}ch`
-              : '4px';
+              : isTrailing
+              ? 'auto'
+              : '8px';
 
             return (
               <input
                 key={b.id}
                 ref={(el) => setInputRef(`${b.id}_value`, el)}
                 type="text"
-                className={styles.textInput}
-                style={{ width: inputWidth }}
+                className={isTrailing && !b.value ? styles.trailingTextInput : styles.textInput}
+                style={{ width: isTrailing && !b.value ? undefined : inputWidth }}
                 value={b.value}
                 placeholder={isSingleEmpty ? placeholder : ''}
                 onChange={(e) => updateBlock(b.id, { value: e.target.value })}
