@@ -62,8 +62,6 @@ export const PALETTE_CATEGORIES: PaletteCategoryDef[] = [
     isEnabled: true,
     buttons: [
       { id: 'btn_a_frac', displayLabel: '□/□', actionId: 'FRACTION', ariaKey: 'aria_insert_fraction', capability: 'FRACTION', isEnabled: true },
-      { id: 'btn_a_x', displayLabel: 'x', actionId: 'VAR_X', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
-      { id: 'btn_a_y', displayLabel: 'y', actionId: 'VAR_Y', ariaKey: 'aria_insert_var_x', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_sq', displayLabel: '□²', actionId: 'SQUARE', ariaKey: 'aria_insert_square', capability: 'QUADRATIC', isEnabled: true },
       { id: 'btn_a_pow', displayLabel: '□^□', actionId: 'POWER', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
       { id: 'btn_a_sqrt', displayLabel: '√□', actionId: 'SQRT', ariaKey: 'aria_insert_square', capability: 'QUADRATIC', isEnabled: true },
@@ -76,12 +74,11 @@ export const PALETTE_CATEGORIES: PaletteCategoryDef[] = [
       { id: 'btn_a_epow', displayLabel: 'e^□', actionId: 'EXP_POW', ariaKey: 'aria_insert_power', capability: 'POWER', isEnabled: true },
       { id: 'btn_a_ln', displayLabel: 'ln(□)', actionId: 'LN', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_logb', displayLabel: 'log_□(□)', actionId: 'LOG_BASE', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
-      { id: 'btn_a_log10', displayLabel: 'log₁₀(□)', actionId: 'LOG', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
+      { id: 'btn_a_log10', displayLabel: 'log₁₀(□)', actionId: 'LOG_10', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_abs', displayLabel: '|□|', actionId: 'ABS', ariaKey: 'aria_insert_power', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_le', displayLabel: '□ ≤ □', actionId: 'LE', ariaKey: 'aria_insert_equals', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_ge', displayLabel: '□ ≥ □', actionId: 'GE', ariaKey: 'aria_insert_equals', capability: 'ALGEBRA_BASIC', isEnabled: true },
       { id: 'btn_a_ne', displayLabel: '□ ≠ □', actionId: 'NE', ariaKey: 'aria_insert_equals', capability: 'ALGEBRA_BASIC', isEnabled: true },
-      { id: 'btn_a_clear', displayLabel: 'C', actionId: 'CLEAR', ariaKey: 'aria_clear_all', capability: 'EDITING', isEnabled: true },
     ],
   },
   {

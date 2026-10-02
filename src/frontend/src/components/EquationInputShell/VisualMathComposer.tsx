@@ -121,7 +121,27 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       }
 
       if (actionId === 'POWER') {
-        insertTextAtFocus('^');
+        const updated = [...blocks];
+        let targetBlock = focusedTarget ? updated.find((b) => b.id === focusedTarget.blockId) : null;
+        if (targetBlock && targetBlock.type === 'text' && targetBlock.value) {
+          const val = targetBlock.value;
+          const match = val.match(/([a-zA-Z0-9_]+)$/);
+          if (match) {
+            const baseToken = match[1]!;
+            targetBlock.value = val.slice(0, val.length - baseToken.length);
+            const newPower: MathBlock = { type: 'power', id: genId(), base: baseToken, exponent: '' };
+            insertBlockAtFocus(newPower, 'exponent');
+            return;
+          }
+        }
+        const newPower: MathBlock = { type: 'power', id: genId(), base: '', exponent: '' };
+        insertBlockAtFocus(newPower, 'base');
+        return;
+      }
+
+      if (actionId === 'EXP_POW') {
+        const newPower: MathBlock = { type: 'power', id: genId(), base: 'e', exponent: '' };
+        insertBlockAtFocus(newPower, 'exponent');
         return;
       }
 
@@ -206,11 +226,18 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       switch (actionId) {
         case 'VAR_X': snippet = 'x'; break;
         case 'VAR_Y': snippet = 'y'; break;
+        case 'EXP_E': snippet = 'e'; break;
+        case 'INFINITY': snippet = '∞'; break;
+        case 'NEG_INFINITY': snippet = '-∞'; break;
         case 'PLUS': snippet = ' + '; break;
         case 'MINUS': snippet = ' − '; break;
         case 'MULTIPLY': snippet = '*'; break;
         case 'DIVIDE': snippet = '/'; break;
         case 'EQUALS': snippet = ' = '; break;
+        case 'LE': snippet = ' <= '; break;
+        case 'GE': snippet = ' >= '; break;
+        case 'NE': snippet = ' != '; break;
+        case 'ABS': snippet = '|'; break;
         case 'LPAREN': snippet = '('; break;
         case 'RPAREN': snippet = ')'; break;
         case 'PLUS_MINUS': snippet = '±'; break;
@@ -228,6 +255,8 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         case 'COS': snippet = 'cos('; break;
         case 'TAN': snippet = 'tan('; break;
         case 'LOG': snippet = 'log('; break;
+        case 'LOG_10': snippet = 'log10('; break;
+        case 'LOG_BASE': snippet = 'log_'; break;
         case 'LN': snippet = 'ln('; break;
         case 'EXP': snippet = 'exp('; break;
         case 'DIGIT_0': snippet = '0'; break;
@@ -250,6 +279,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
 
       insertTextAtFocus(snippet);
     };
+
 
     const insertBlockAtFocus = (newBlock: MathBlock, focusSlot: string) => {
       let updated = [...blocks];
@@ -362,17 +392,35 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         return;
       }
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === '^' && block.type === 'power' && slot === 'base') {
+        e.preventDefault();
+        setFocusedTarget({ blockId: block.id, slot: 'exponent' });
+        requestAnimationFrame(() => {
+          inputRefs.current.get(`${block.id}_exponent`)?.focus();
+        });
+        return;
+      }
+
+      if (e.key === 'ArrowRight' || e.key === 'Tab') {
         const inputEl = e.currentTarget;
+        if (block.type === 'power' && slot === 'base' && inputEl.selectionStart === inputEl.value.length) {
+          e.preventDefault();
+          setFocusedTarget({ blockId: block.id, slot: 'exponent' });
+          requestAnimationFrame(() => {
+            inputRefs.current.get(`${block.id}_exponent`)?.focus();
+          });
+          return;
+        }
+
         if (inputEl.selectionStart === inputEl.value.length) {
           const nextIdx = index + 1;
           if (nextIdx < blocks.length) {
             e.preventDefault();
             const nextBlock = blocks[nextIdx]!;
-            const nextSlot = nextBlock.type === 'text' ? 'value' : 'exponent';
+            const nextSlot = nextBlock.type === 'text' ? 'value' : (nextBlock.type === 'power' ? 'base' : 'expr');
             setFocusedTarget({ blockId: nextBlock.id, slot: nextSlot });
             requestAnimationFrame(() => {
-              const el = inputRefs.current.get(`${nextBlock.id}_${nextSlot}`);
+              const el = inputRefs.current.get(`${nextBlock.id}_${nextSlot}`) ?? inputRefs.current.get(`${nextBlock.id}_value`);
               el?.focus();
               el?.setSelectionRange(0, 0);
             });
@@ -383,16 +431,28 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
 
       if (e.key === 'ArrowLeft') {
         const inputEl = e.currentTarget;
+        if (block.type === 'power' && slot === 'exponent' && inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) {
+          e.preventDefault();
+          setFocusedTarget({ blockId: block.id, slot: 'base' });
+          requestAnimationFrame(() => {
+            const el = inputRefs.current.get(`${block.id}_base`);
+            el?.focus();
+            if (el) el.setSelectionRange(el.value.length, el.value.length);
+          });
+          return;
+        }
+
         if (inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) {
           const prevIdx = index - 1;
           if (prevIdx >= 0) {
             e.preventDefault();
             const prevBlock = blocks[prevIdx]!;
-            const prevSlot = prevBlock.type === 'text' ? 'value' : 'expr';
+            const prevSlot = prevBlock.type === 'text' ? 'value' : (prevBlock.type === 'power' ? 'exponent' : 'expr');
             setFocusedTarget({ blockId: prevBlock.id, slot: prevSlot });
             requestAnimationFrame(() => {
               const el =
                 inputRefs.current.get(`${prevBlock.id}_${prevSlot}`) ??
+                inputRefs.current.get(`${prevBlock.id}_exponent`) ??
                 inputRefs.current.get(`${prevBlock.id}_expr`) ??
                 inputRefs.current.get(`${prevBlock.id}_den`) ??
                 inputRefs.current.get(`${prevBlock.id}_radicand`) ??
@@ -428,6 +488,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           return;
         }
       }
+
 
       if (e.key === 'Backspace') {
         const inputEl = e.currentTarget;
@@ -588,10 +649,24 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           }
 
           if (b.type === 'power') {
+            const baseWidth = b.base ? `${Math.max(1, b.base.length) * 0.9}ch` : '16px';
             const expWidth = b.exponent ? `${Math.max(1, b.exponent.length) * 0.75}ch` : '16px';
             return (
               <span key={b.id} className={styles.powerBlock}>
-                <span className={styles.powerBase}>{b.base}</span>
+                <input
+                  ref={(el) => setInputRef(`${b.id}_base`, el)}
+                  type="text"
+                  className={`${styles.slotPowerBase} ${!b.base ? styles.emptySlot : styles.filledSlot}`}
+                  style={{ width: baseWidth }}
+                  value={b.base}
+                  placeholder=""
+                  onChange={(e) => updateBlock(b.id, { base: e.target.value })}
+                  onFocus={() => setFocusedTarget({ blockId: b.id, slot: 'base' })}
+                  onKeyDown={(e) => handleSlotKeyDown(e, b, 'base', idx)}
+                  disabled={disabled}
+                  aria-label="Cơ số"
+                  data-testid={`base-slot-${b.id}`}
+                />
                 <input
                   ref={(el) => setInputRef(`${b.id}_exponent`, el)}
                   type="text"

@@ -37,6 +37,13 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             <span className={styles.btnBox} />
           </span>
         );
+      case 'SQUARE':
+        return (
+          <span className={styles.btnPower}>
+            <span className={styles.btnBox} />
+            <span className={styles.btnSuperText}>2</span>
+          </span>
+        );
       case 'POWER':
         return (
           <span className={styles.btnPower}>
@@ -44,7 +51,62 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             <span className={styles.btnSuperBox} />
           </span>
         );
+      case 'EXP_POW':
+        return (
+          <span className={styles.btnPower}>
+            <span className={styles.btnText}>e</span>
+            <span className={styles.btnSuperBox} />
+          </span>
+        );
+      case 'LN':
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>ln</span>(
+            <span className={styles.btnBox} />)
+          </span>
+        );
+      case 'LOG_BASE':
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>log</span>
+            <span className={styles.btnSubBox} />(
+            <span className={styles.btnBox} />)
+          </span>
+        );
+      case 'LOG_10':
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>log</span>
+            <span className={styles.btnSubText}>10</span>(
+            <span className={styles.btnBox} />)
+          </span>
+        );
+      case 'ABS':
+        return (
+          <span className={styles.btnInlineFunc}>
+            |<span className={styles.btnBox} />|
+          </span>
+        );
+      case 'LE':
+        return (
+          <span className={styles.btnRel}>
+            <span className={styles.btnBox} /> ≤ <span className={styles.btnBox} />
+          </span>
+        );
+      case 'GE':
+        return (
+          <span className={styles.btnRel}>
+            <span className={styles.btnBox} /> ≥ <span className={styles.btnBox} />
+          </span>
+        );
+      case 'NE':
+        return (
+          <span className={styles.btnRel}>
+            <span className={styles.btnBox} /> ≠ <span className={styles.btnBox} />
+          </span>
+        );
       case 'SQRT':
+
         return (
           <span className={styles.btnSqrt}>
             <span className={styles.btnSqrtSym}>√</span>

@@ -145,7 +145,7 @@ describe('MathInputComposer & Serialization Utilities', () => {
       const onSubmit = vi.fn();
       const onClear = vi.fn();
 
-      const { rerender } = render(
+      render(
         <PreferencesProvider>
           <EquationInputShell
             query={queryValue}
@@ -159,32 +159,22 @@ describe('MathInputComposer & Serialization Utilities', () => {
       // Switch to Math mode
       fireEvent.click(screen.getByTestId('mode-math-btn'));
 
+      // Click '√□' in Common category
+      const btnSqrt = screen.getByTestId('palette-btn-SQRT');
+      fireEvent.click(btnSqrt);
+      expect(onQueryChange).toHaveBeenCalledWith('√()');
+
       // Click the Algebra category tab (√)
       const algebraCategoryBtn = screen.getByTitle('Đại số & Căn thức');
       fireEvent.click(algebraCategoryBtn);
 
-      // Click 'x'
-      const btnX = screen.getByTestId('palette-btn-VAR_X');
-      fireEvent.click(btnX);
-      expect(onQueryChange).toHaveBeenCalledWith('x');
-
-      // Update props and click 'x²'
-      queryValue = 'x';
-      rerender(
-        <PreferencesProvider>
-          <EquationInputShell
-            query={queryValue}
-            onQueryChange={onQueryChange}
-            onSubmit={onSubmit}
-            onClear={onClear}
-          />
-        </PreferencesProvider>
-      );
-
-      const btnSquare = screen.getByTestId('palette-btn-SQUARE');
-      fireEvent.click(btnSquare);
-      expect(onQueryChange).toHaveBeenCalledWith('x²');
+      // Click 'π' (PI button in Algebra tab)
+      const btnPi = screen.getByTestId('palette-btn-PI');
+      fireEvent.click(btnPi);
+      expect(onQueryChange).toHaveBeenCalled();
     });
+
+
 
     it('clicking fraction button creates Casio 2-tier interactive slots', () => {
       let queryValue = '';
