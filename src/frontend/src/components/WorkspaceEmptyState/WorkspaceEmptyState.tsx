@@ -33,7 +33,11 @@ export const WorkspaceEmptyState: React.FC = () => {
   ];
 
   return (
-    <section className={styles.container} aria-label={t('empty_workspace_title')}>
+    <section
+      className={styles.container}
+      aria-label={t('empty_workspace_title')}
+      data-testid="workspace-empty-state"
+    >
       {/* Central Truthful Empty State Banner */}
       <div className={styles.emptyCard}>
         <div className={styles.iconCircle} aria-hidden="true">
