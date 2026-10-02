@@ -186,8 +186,8 @@
       "concept_real_root"
     ],
     "provenance_refs": [
-      "SRC_MKE_S1_ORCHESTRATOR",
-      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+      "SRC_GELFAND_ALGEBRA",
+      "SRC_MKE_S1_ORCHESTRATOR"
     ],
     "related_method_ids": [
       "QUAD_FACTORIZATION_Q",

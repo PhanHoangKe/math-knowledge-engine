@@ -22,6 +22,7 @@ class LocalizedText(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -53,6 +54,7 @@ class CurriculumRef(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -78,6 +80,7 @@ class SourceProvenance(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -99,6 +102,7 @@ class FormulaKnowledge(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -117,6 +121,7 @@ class TheoremKnowledge(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -136,6 +141,7 @@ class ConceptKnowledge(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 
@@ -159,6 +165,7 @@ class MethodKnowledge(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         frozen=True,
     )
 

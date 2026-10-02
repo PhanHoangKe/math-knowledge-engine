@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
+from pydantic import TypeAdapter
+
 from mke_product.domain.registry import MethodRegistry
 from mke_product.knowledge.schemas import (
     ConceptKnowledge,
@@ -22,6 +24,19 @@ from mke_product.knowledge.schemas import (
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
+_PROVENANCE_LIST_ADAPTER = TypeAdapter(List[SourceProvenance])
+_FORMULA_LIST_ADAPTER = TypeAdapter(List[FormulaKnowledge])
+_THEOREM_LIST_ADAPTER = TypeAdapter(List[TheoremKnowledge])
+_CONCEPT_LIST_ADAPTER = TypeAdapter(List[ConceptKnowledge])
+_METHOD_LIST_ADAPTER = TypeAdapter(List[MethodKnowledge])
+
+
+def _read_json_bytes(path: Path) -> bytes:
+    """Reads raw bytes of a UTF-8 JSON file."""
+    if not path.is_file():
+        raise FileNotFoundError(f"Knowledge dataset file not found: {path}")
+    return path.read_bytes()
+
 
 def _read_json_file(path: Path) -> Any:
     """Reads and decodes a UTF-8 JSON file."""
@@ -32,48 +47,38 @@ def _read_json_file(path: Path) -> Any:
 
 
 def load_provenances(data_dir: Optional[Path] = None) -> List[SourceProvenance]:
-    """Loads and validates all source provenance definitions."""
+    """Loads and strictly validates all source provenance definitions."""
     directory = data_dir or DEFAULT_DATA_DIR
-    raw_data = _read_json_file(directory / "provenance.json")
-    if not isinstance(raw_data, list):
-        raise ValueError("provenance.json must contain a JSON array of objects.")
-    return [SourceProvenance.model_validate(item) for item in raw_data]
+    raw_bytes = _read_json_bytes(directory / "provenance.json")
+    return _PROVENANCE_LIST_ADAPTER.validate_json(raw_bytes)
 
 
 def load_formulas(data_dir: Optional[Path] = None) -> List[FormulaKnowledge]:
-    """Loads and validates all formula knowledge definitions."""
+    """Loads and strictly validates all formula knowledge definitions."""
     directory = data_dir or DEFAULT_DATA_DIR
-    raw_data = _read_json_file(directory / "formulas.json")
-    if not isinstance(raw_data, list):
-        raise ValueError("formulas.json must contain a JSON array of objects.")
-    return [FormulaKnowledge.model_validate(item) for item in raw_data]
+    raw_bytes = _read_json_bytes(directory / "formulas.json")
+    return _FORMULA_LIST_ADAPTER.validate_json(raw_bytes)
 
 
 def load_theorems(data_dir: Optional[Path] = None) -> List[TheoremKnowledge]:
-    """Loads and validates all theorem knowledge definitions."""
+    """Loads and strictly validates all theorem knowledge definitions."""
     directory = data_dir or DEFAULT_DATA_DIR
-    raw_data = _read_json_file(directory / "theorems.json")
-    if not isinstance(raw_data, list):
-        raise ValueError("theorems.json must contain a JSON array of objects.")
-    return [TheoremKnowledge.model_validate(item) for item in raw_data]
+    raw_bytes = _read_json_bytes(directory / "theorems.json")
+    return _THEOREM_LIST_ADAPTER.validate_json(raw_bytes)
 
 
 def load_concepts(data_dir: Optional[Path] = None) -> List[ConceptKnowledge]:
-    """Loads and validates all concept knowledge definitions."""
+    """Loads and strictly validates all concept knowledge definitions."""
     directory = data_dir or DEFAULT_DATA_DIR
-    raw_data = _read_json_file(directory / "concepts.json")
-    if not isinstance(raw_data, list):
-        raise ValueError("concepts.json must contain a JSON array of objects.")
-    return [ConceptKnowledge.model_validate(item) for item in raw_data]
+    raw_bytes = _read_json_bytes(directory / "concepts.json")
+    return _CONCEPT_LIST_ADAPTER.validate_json(raw_bytes)
 
 
 def load_methods(data_dir: Optional[Path] = None) -> List[MethodKnowledge]:
-    """Loads and validates all method knowledge definitions."""
+    """Loads and strictly validates all method knowledge definitions."""
     directory = data_dir or DEFAULT_DATA_DIR
-    raw_data = _read_json_file(directory / "methods.json")
-    if not isinstance(raw_data, list):
-        raise ValueError("methods.json must contain a JSON array of objects.")
-    return [MethodKnowledge.model_validate(item) for item in raw_data]
+    raw_bytes = _read_json_bytes(directory / "methods.json")
+    return _METHOD_LIST_ADAPTER.validate_json(raw_bytes)
 
 
 def load_knowledge_dataset(data_dir: Optional[Path] = None) -> Dict[str, Any]:

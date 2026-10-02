@@ -1,6 +1,15 @@
 [
   {
-    "author_or_institution": "MKE Core Team",
+    "author_or_institution": "I.M. Gelfand, A. Shen (Birkh\u00e4user Boston)",
+    "locator": "Sections 30-36: Quadratic Equations and Vieta's Theorem (pp. 53-67)",
+    "publication_year": 1993,
+    "source_id": "SRC_GELFAND_ALGEBRA",
+    "source_type": "ACADEMIC_TEXT",
+    "title": "Algebra",
+    "verification_status": "VERIFIED"
+  },
+  {
+    "author_or_institution": "Math Knowledge Engine Core Team",
     "locator": "src/mke_product/domain/registry.py",
     "publication_year": 2026,
     "source_id": "SRC_MKE_S1_ORCHESTRATOR",
@@ -9,21 +18,12 @@
     "verification_status": "VERIFIED"
   },
   {
-    "author_or_institution": "Standard Mathematical Literature",
-    "locator": "Polynomial Algebra Chapter: Quadratic Equations",
-    "publication_year": 2000,
-    "source_id": "SRC_STANDARD_ALGEBRA_QUADRATIC",
-    "source_type": "ACADEMIC_REFERENCE",
-    "title": "Classical Elementary Algebra and Analytic Geometry",
-    "verification_status": "VERIFIED"
-  },
-  {
-    "author_or_institution": "Bộ Giáo dục và Đào tạo Việt Nam",
-    "locator": "Chương IV: Hàm số y = ax^2. Phương trình bậc hai một ẩn",
-    "publication_year": 2018,
+    "author_or_institution": "Phan \u0110\u1ee9c Ch\u00ednh (T\u1ed5ng Ch\u1ee7 bi\u00ean), T\u00f4n Th\u00e2n (Ch\u1ee7 bi\u00ean), Nh\u00e0 xu\u1ea5t b\u1ea3n Gi\u00e1o d\u1ee5c Vi\u1ec7t Nam",
+    "locator": "Ch\u01b0\u01a1ng IV: H\u00e0m s\u1ed1 y = ax^2 (a != 0) - Ph\u01b0\u01a1ng tr\u00ecnh b\u1eadc hai m\u1ed9t \u1ea9n, B\u00e0i 4-7 (Trang 40-54)",
+    "publication_year": 2005,
     "source_id": "SRC_TEXTBOOK_VIETNAM_MATH9",
-    "source_type": "TEXTBOOK",
-    "title": "Sách giáo khoa Toán 9",
+    "source_type": "OFFICIAL_TEXTBOOK",
+    "title": "S\u00e1ch gi\u00e1o khoa To\u00e1n 9, T\u1eadp 2 (Ch\u01b0\u01a1ng tr\u00ecnh Chu\u1ea9n GDPT)",
     "verification_status": "VERIFIED"
   }
 ]

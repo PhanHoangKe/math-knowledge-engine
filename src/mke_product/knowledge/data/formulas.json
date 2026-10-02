@@ -46,7 +46,7 @@
     "formula_id": "FORMULA_PERFECT_SQUARE",
     "latex_template": "(x + k)^2 = x^2 + 2kx + k^2",
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_GELFAND_ALGEBRA",
       "SRC_TEXTBOOK_VIETNAM_MATH9"
     ],
     "related_concept_ids": [

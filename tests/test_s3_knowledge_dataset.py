@@ -201,17 +201,20 @@ def test_content_hash_determinism() -> None:
     hash2 = compute_dataset_content_hash()
     assert hash1 == hash2
     assert len(hash1) == 64  # SHA-256 hex string
+    assert hash1 == "88c0e80629e4dcd88a518321c26ecd2fdb0272c03faed095115cb84467c8e8dd"
 
 
 def test_s1_four_equation_mathematical_regression_guard() -> None:
-    """Verifies that S1 mathematical engine produces exact expected assessments."""
+    """Verifies that S1 mathematical engine produces exact expected assessments for the 4 canonical S3-P0 equations."""
     registry = MethodRegistry()
 
-    # Eq 1: x^2 - 5*x + 6 = 0
+    # ------------------------------------------------------------------------
+    # Canonical Equation 1: x^2 - 5*x + 6 = 0
+    # ------------------------------------------------------------------------
     assess1 = registry.assess_quadratic(Rational(1, 1), Rational(-5, 1), Rational(6, 1))
-    fact_q = next(m for m in assess1 if m.method_id == "QUAD_FACTORIZATION_Q")
-    assert fact_q.mathematical_applicability == MathematicalApplicability.APPLICABLE
-    assert fact_q.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
+    fact_q1 = next(m for m in assess1 if m.method_id == "QUAD_FACTORIZATION_Q")
+    assert fact_q1.mathematical_applicability == MathematicalApplicability.APPLICABLE
+    assert fact_q1.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
 
     req1 = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 - 5*x + 6 = 0"))
     res1 = solve_request(req1)
@@ -219,23 +222,47 @@ def test_s1_four_equation_mathematical_regression_guard() -> None:
     assert res1.solution.outcome == SolutionOutcome.TWO_DISTINCT_REAL_ROOTS
     assert len(res1.solution.roots) == 2
 
-    # Eq 2: x^2 - 4*x + 4 = 0
-    req2 = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 - 4*x + 4 = 0"))
+    # ------------------------------------------------------------------------
+    # Canonical Equation 2: x^2 + 2*x + 1 = 0
+    # ------------------------------------------------------------------------
+    assess2 = registry.assess_quadratic(Rational(1, 1), Rational(2, 1), Rational(1, 1))
+    red2 = next(m for m in assess2 if m.method_id == "QUAD_FORMULA_REDUCED")
+    assert red2.mathematical_applicability == MathematicalApplicability.APPLICABLE
+    assert red2.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
+
+    viete_dif2 = next(m for m in assess2 if m.method_id == "QUAD_VIETE_SPECIAL_DIF")
+    assert viete_dif2.mathematical_applicability == MathematicalApplicability.APPLICABLE
+    assert viete_dif2.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
+
+    req2 = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 + 2*x + 1 = 0"))
     res2 = solve_request(req2)
     assert isinstance(res2, SolvedResponse)
     assert res2.solution.outcome == SolutionOutcome.ONE_REPEATED_REAL_ROOT
     assert len(res2.solution.roots) == 1
 
-    # Eq 3: x^2 + x + 1 = 0
-    req3 = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 + x + 1 = 0"))
+    # ------------------------------------------------------------------------
+    # Canonical Equation 3: x^2 + 1 = 0
+    # ------------------------------------------------------------------------
+    assess3 = registry.assess_quadratic(Rational(1, 1), Rational(0, 1), Rational(1, 1))
+    fact_q3 = next(m for m in assess3 if m.method_id == "QUAD_FACTORIZATION_Q")
+    assert fact_q3.mathematical_applicability == MathematicalApplicability.NOT_APPLICABLE
+
+    fact_r3 = next(m for m in assess3 if m.method_id == "QUAD_FACTORIZATION_R")
+    assert fact_r3.mathematical_applicability == MathematicalApplicability.NOT_APPLICABLE
+
+    graph3 = next(m for m in assess3 if m.method_id == "QUAD_GRAPHICAL_ANALYSIS")
+    assert graph3.mathematical_applicability == MathematicalApplicability.APPLICABLE
+    assert graph3.pedagogical_recommendation == PedagogicalRecommendation.RECOMMENDED
+
+    req3 = SolveRequest(input_payload=RawEquationInput(raw_query="x^2 + 1 = 0"))
     res3 = solve_request(req3)
     assert isinstance(res3, SolvedResponse)
     assert res3.solution.outcome == SolutionOutcome.NO_REAL_ROOTS
     assert len(res3.solution.roots) == 0
 
-    # Eq 4: 2x^2 + 3x + 7 = 0
-    # Invariant: QUAD_FORMULA_REDUCED is APPLICABLE with NEUTRAL recommendation (odd b)
-    # Invariant: QUAD_GRAPHICAL_ANALYSIS priority is 6
+    # ------------------------------------------------------------------------
+    # Canonical Equation 4: 2*x^2 + 3*x + 7 = 0
+    # ------------------------------------------------------------------------
     assess4 = registry.assess_quadratic(Rational(2, 1), Rational(3, 1), Rational(7, 1))
     red4 = next(m for m in assess4 if m.method_id == "QUAD_FORMULA_REDUCED")
     assert red4.mathematical_applicability == MathematicalApplicability.APPLICABLE
@@ -243,4 +270,16 @@ def test_s1_four_equation_mathematical_regression_guard() -> None:
 
     graph4 = next(m for m in assess4 if m.method_id == "QUAD_GRAPHICAL_ANALYSIS")
     assert graph4.pedagogical_priority == 6
+
+    # ------------------------------------------------------------------------
+    # Supplementary Regression Invariants (x^2 - 4x + 4 = 0, x^2 + x + 1 = 0)
+    # ------------------------------------------------------------------------
+    res_sup1 = solve_request(SolveRequest(input_payload=RawEquationInput(raw_query="x^2 - 4*x + 4 = 0")))
+    assert isinstance(res_sup1, SolvedResponse)
+    assert res_sup1.solution.outcome == SolutionOutcome.ONE_REPEATED_REAL_ROOT
+
+    res_sup2 = solve_request(SolveRequest(input_payload=RawEquationInput(raw_query="x^2 + x + 1 = 0")))
+    assert isinstance(res_sup2, SolvedResponse)
+    assert res_sup2.solution.outcome == SolutionOutcome.NO_REAL_ROOTS
+
 

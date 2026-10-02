@@ -181,3 +181,80 @@ def test_method_knowledge_schema_negative_runtime_leak_guard() -> None:
         kwargs_with_forbidden = {**valid_kwargs, **forbidden_field}
         with pytest.raises(ValidationError):
             MethodKnowledge(**kwargs_with_forbidden)  # type: ignore[arg-type]
+
+
+def test_strict_type_coercion_rejection() -> None:
+    """Verifies that strict=True rejects implicit type coercion in Python data structures."""
+    # 1. String year must NOT coerce to integer
+    with pytest.raises(ValidationError):
+        SourceProvenance(
+            source_id="SRC_TEST",
+            source_type="ENGINE_SPEC",
+            title="Test",
+            author_or_institution="Team",
+            publication_year="2026",  # type: ignore[arg-type]
+            locator="test.py",
+            verification_status=ProvenanceStatus.VERIFIED,
+        )
+
+    # 2. Float year must NOT coerce to integer
+    with pytest.raises(ValidationError):
+        SourceProvenance(
+            source_id="SRC_TEST",
+            source_type="ENGINE_SPEC",
+            title="Test",
+            author_or_institution="Team",
+            publication_year=2026.0,  # type: ignore[arg-type]
+            locator="test.py",
+            verification_status=ProvenanceStatus.VERIFIED,
+        )
+
+    # 3. Tuple must NOT coerce to List
+    with pytest.raises(ValidationError):
+        FormulaKnowledge(
+            formula_id="FORMULA_DISCRIMINANT",
+            title=LocalizedText(vi="Biệt thức", en="Discriminant"),
+            latex_template=r"\Delta = b^2 - 4ac",
+            variables_description={"Delta": LocalizedText(vi="Biệt thức", en="Discriminant")},
+            domain_conditions=LocalizedText(vi="a != 0", en="a != 0"),
+            related_concept_ids=("concept_discriminant",),  # type: ignore[arg-type]
+            provenance_refs=["SRC_MKE_S1_ORCHESTRATOR"],
+        )
+
+
+def test_strict_type_adapter_json_validation() -> None:
+    """Verifies that TypeAdapter validate_json enforces strict types from raw JSON."""
+    from mke_product.knowledge.loader import _PROVENANCE_LIST_ADAPTER
+
+    # String integer in JSON must be rejected in strict mode
+    invalid_json = b"""[
+      {
+        "author_or_institution": "Team",
+        "locator": "test.py",
+        "publication_year": "2026",
+        "source_id": "SRC_TEST",
+        "source_type": "ENGINE_SPEC",
+        "title": "Title",
+        "verification_status": "VERIFIED"
+      }
+    ]"""
+    with pytest.raises(ValidationError):
+        _PROVENANCE_LIST_ADAPTER.validate_json(invalid_json)
+
+    # Valid JSON with integer year and string enum must pass
+    valid_json = b"""[
+      {
+        "author_or_institution": "Team",
+        "locator": "test.py",
+        "publication_year": 2026,
+        "source_id": "SRC_TEST",
+        "source_type": "ENGINE_SPEC",
+        "title": "Title",
+        "verification_status": "VERIFIED"
+      }
+    ]"""
+    result = _PROVENANCE_LIST_ADAPTER.validate_json(valid_json)
+    assert len(result) == 1
+    assert result[0].publication_year == 2026
+    assert result[0].verification_status == ProvenanceStatus.VERIFIED
+

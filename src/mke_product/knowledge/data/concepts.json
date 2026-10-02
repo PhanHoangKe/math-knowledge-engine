@@ -74,7 +74,7 @@
       "concept_quadratic_equation"
     ],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_GELFAND_ALGEBRA",
       "SRC_TEXTBOOK_VIETNAM_MATH9"
     ],
     "related_concept_ids": [
@@ -104,7 +104,7 @@
       "concept_parabola"
     ],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_GELFAND_ALGEBRA",
       "SRC_TEXTBOOK_VIETNAM_MATH9"
     ],
     "related_concept_ids": [
@@ -134,7 +134,7 @@
       "concept_real_number"
     ],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_GELFAND_ALGEBRA",
       "SRC_TEXTBOOK_VIETNAM_MATH9"
     ],
     "related_concept_ids": [
@@ -193,7 +193,7 @@
       "concept_polynomial_coefficient"
     ],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_GELFAND_ALGEBRA",
       "SRC_TEXTBOOK_VIETNAM_MATH9"
     ],
     "related_concept_ids": [
@@ -261,7 +261,7 @@
       "concept_real_number"
     ],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+      "SRC_GELFAND_ALGEBRA"
     ],
     "related_concept_ids": [
       "concept_real_number"
@@ -285,7 +285,7 @@
     ],
     "prerequisite_concept_ids": [],
     "provenance_refs": [
-      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+      "SRC_GELFAND_ALGEBRA"
     ],
     "related_concept_ids": [
       "concept_rational_number",
