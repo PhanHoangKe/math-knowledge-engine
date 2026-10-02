@@ -566,6 +566,57 @@ export const MathPalette: React.FC<MathPaletteProps> = ({
             </span>)
           </span>
         );
+      case 'SIN':
+      case 'COS':
+      case 'TAN':
+      case 'SEC':
+      case 'CSC':
+      case 'COT':
+      case 'SINH':
+      case 'COSH':
+      case 'TANH':
+      case 'SECH':
+      case 'CSCH':
+      case 'COTH': {
+        const funcName = btn.actionId.toLowerCase();
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnText}>{funcName}</span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      }
+      case 'ARCSIN':
+      case 'ARCCOS':
+      case 'ARCTAN': {
+        const baseFunc = btn.actionId === 'ARCSIN' ? 'sin' : btn.actionId === 'ARCCOS' ? 'cos' : 'tan';
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnPower}>
+              <span className={styles.btnText}>{baseFunc}</span>
+              <span className={styles.btnSuperText}>-1</span>
+            </span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      }
+      case 'ARSINH':
+      case 'ARCOSH':
+      case 'ARTANH':
+      case 'ARSECH':
+      case 'ARCSCH':
+      case 'ARCOTH': {
+        const baseFunc = btn.actionId.replace('AR', '').toLowerCase();
+        return (
+          <span className={styles.btnInlineFunc}>
+            <span className={styles.btnPower}>
+              <span className={styles.btnText}>{baseFunc}</span>
+              <span className={styles.btnSuperText}>-1</span>
+            </span>
+            <span className={styles.btnBox} />
+          </span>
+        );
+      }
       default:
         return btn.displayLabel;
     }
