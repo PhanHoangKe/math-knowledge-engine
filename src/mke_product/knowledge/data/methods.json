@@ -1,0 +1,604 @@
+[
+  {
+    "applicability_guidance": [
+      {
+        "en": "Effective for understanding algebraic geometry, completing binomial expansions, and deriving the general quadratic formula.",
+        "vi": "Hiệu quả để hiểu bản chất hình học đại số, khai triển nhị thức và chứng minh công thức nghiệm tổng quát."
+      },
+      {
+        "en": "Especially convenient when the leading coefficient a = 1 and the linear coefficient b is an even integer.",
+        "vi": "Đặc biệt thuận tiện khi hệ số bậc hai a = 1 và hệ số bậc một b là số nguyên chẵn."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Forgetting to balance the constant term on both sides when adding (b / 2a)^2.",
+        "vi": "Quên cộng lượng cân bằng (b / 2a)^2 vào cả hai vế hoặc quên chia hệ số a trước khi biến đổi."
+      },
+      {
+        "en": "Sign errors when taking the square root of the completed square term.",
+        "vi": "Sai dấu khi khai căn bậc hai của biểu thức bình phương hoàn chỉnh."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Divide the entire equation by the leading coefficient a first if a != 1.",
+        "vi": "Chia toàn bộ phương trình cho hệ số bậc hai a trước nếu a != 1."
+      }
+    ],
+    "formal_description": {
+      "en": "Transforms the quadratic equation ax^2 + bx + c = 0 into the canonical form a(x + b/(2a))^2 = (b^2 - 4ac)/(4a) by completing the square.",
+      "vi": "Biến đổi phương trình bậc hai ax^2 + bx + c = 0 về dạng chính tắc a(x + b/(2a))^2 = (b^2 - 4ac)/(4a) bằng phương pháp tách và hoàn chỉnh bình phương."
+    },
+    "formula_refs": [
+      "FORMULA_PERFECT_SQUARE"
+    ],
+    "learning_objective": {
+      "en": "Master the structural technique of forming perfect squares to solve quadratics and establish vertex coordinates.",
+      "vi": "Nắm vững kỹ thuật biến đổi hằng đẳng thức bình phương hoàn chỉnh để giải phương trình và xác định toạ độ đỉnh."
+    },
+    "method_id": "QUAD_COMPLETE_SQUARE",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the leading coefficient a = 0 (linear or degenerate equation).",
+        "vi": "Không áp dụng khi hệ số bậc hai a = 0 (phương trình bậc nhất hoặc suy biến)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_perfect_square_identity",
+      "concept_quadratic_equation",
+      "concept_square_root"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_FACTORIZATION_R",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "summary": {
+      "en": "Solves a quadratic equation by transforming the trinomial into a completed perfect square.",
+      "vi": "Giải phương trình bậc hai bằng cách biến đổi tam thức về dạng bình phương hoàn chỉnh."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Completing the Square Method",
+      "vi": "Phương pháp biến đổi bình phương hoàn chỉnh"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Highly recommended and fastest when the quadratic trinomial has integer or rational roots.",
+        "vi": "Khuyến khích sử dụng và nhanh nhất khi tam thức bậc hai có các nghiệm nguyên hoặc hữu tỉ."
+      },
+      {
+        "en": "Requires the discriminant Delta to be a perfect square of a rational number.",
+        "vi": "Yêu cầu biệt thức Delta phải là bình phương hoàn chỉnh của một số hữu tỉ."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Incorrect grouping or sign errors when splitting the middle linear term bx.",
+        "vi": "Nhóm hạng tử sai hoặc nhầm dấu khi tách hạng tử bậc một bx."
+      },
+      {
+        "en": "Attempting rational factorization when Delta is not a rational square.",
+        "vi": "Cố gắng phân tích trên trường số hữu tỉ khi Delta không phải là bình phương hữu tỉ."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Look for integer factor pairs of a*c whose sum equals b.",
+        "vi": "Tìm các cặp thừa số nguyên của a*c có tổng bằng b."
+      }
+    ],
+    "formal_description": {
+      "en": "Factors the quadratic polynomial ax^2 + bx + c into a product of linear binomials (p1*x + q1)(p2*x + q2) = 0 over the rational field Q.",
+      "vi": "Phân tích đa thức bậc hai ax^2 + bx + c thành tích các nhị thức bậc nhất (p1*x + q1)(p2*x + q2) = 0 trên trường số hữu tỉ Q."
+    },
+    "formula_refs": [],
+    "learning_objective": {
+      "en": "Develop polynomial factorization skills over the rational numbers by splitting terms and grouping.",
+      "vi": "Phát triển kỹ năng phân tích đa thức thành nhân tử trên tập số hữu tỉ thông qua tách hạng tử và nhóm."
+    },
+    "method_id": "QUAD_FACTORIZATION_Q",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the discriminant Delta is negative or not a perfect rational square.",
+        "vi": "Không áp dụng khi biệt thức Delta âm hoặc không phải là bình phương của một số hữu tỉ."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_factorization",
+      "concept_quadratic_equation",
+      "concept_rational_number"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_FACTORIZATION_R",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "summary": {
+      "en": "Decomposes the quadratic polynomial into rational linear factors to find roots.",
+      "vi": "Phân tích đa thức bậc hai thành các nhân tử hữu tỉ bậc nhất để tìm nghiệm."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Factorization over Rational Field (Q)",
+      "vi": "Phương pháp phân tích nhân tử trên tập hữu tỉ (Q)"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Applicable whenever the quadratic equation has real roots (Delta >= 0), factoring as a*(x - x1)*(x - x2) = 0.",
+        "vi": "Áp dụng bất cứ khi nào phương trình bậc hai có nghiệm thực (Delta >= 0), phân tích thành dạng a*(x - x1)*(x - x2) = 0."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Forgetting the leading coefficient multiplier a in the factored expression a(x - x1)(x - x2).",
+        "vi": "Quên hệ số bậc hai a phía trước biểu thức phân tích a(x - x1)(x - x2)."
+      },
+      {
+        "en": "Sign confusion when subtracting negative roots: (x - (-r)) = (x + r).",
+        "vi": "Nhầm lẫn dấu khi trừ đi nghiệm âm: (x - (-r)) = (x + r)."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Check that the discriminant Delta is non-negative before writing real factors.",
+        "vi": "Kiểm tra biệt thức Delta không âm trước khi viết dạng nhân tử trên trường số thực."
+      }
+    ],
+    "formal_description": {
+      "en": "Decomposes the quadratic polynomial ax^2 + bx + c into linear factors over R using the real roots x1 and x2.",
+      "vi": "Phân tích đa thức bậc hai ax^2 + bx + c thành các nhân tử bậc nhất trên trường số thực R sử dụng các nghiệm thực x1 và x2."
+    },
+    "formula_refs": [
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "learning_objective": {
+      "en": "Understand the fundamental theorem of algebra for real quadratic polynomials.",
+      "vi": "Hiểu định lý cơ bản của đại số áp dụng cho đa thức bậc hai trên trường số thực."
+    },
+    "method_id": "QUAD_FACTORIZATION_R",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable over R when the discriminant Delta is strictly negative (no real roots).",
+        "vi": "Không áp dụng trên tập số thực R khi biệt thức Delta âm (phương trình vô nghiệm thực)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_factorization",
+      "concept_quadratic_equation",
+      "concept_real_number",
+      "concept_real_root"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+    ],
+    "related_method_ids": [
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "summary": {
+      "en": "Factors the quadratic polynomial over the real numbers using its real roots.",
+      "vi": "Phân tích đa thức bậc hai thành nhân tử trên tập số thực sử dụng các nghiệm thực."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Factorization over Real Field (R)",
+      "vi": "Phương pháp phân tích nhân tử trên tập thực (R)"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Mathematically applicable to any quadratic equation with real coefficients (a != 0).",
+        "vi": "Về mặt toán học có thể áp dụng cho mọi phương trình bậc hai với hệ số thực (a != 0)."
+      },
+      {
+        "en": "Pedagogically and computationally recommended when the linear coefficient b is an even integer (b = 2*b').",
+        "vi": "Được khuyến khích về mặt sư phạm và tính toán khi hệ số bậc một b là số chẵn (b = 2*b')."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Dividing the denominator by 2a instead of a in the reduced formula x = (-b' +- sqrt(Delta')) / a.",
+        "vi": "Nhầm lẫn chia mẫu số cho 2a thay vì a trong công thức thu gọn x = (-b' +- sqrt(Delta')) / a."
+      },
+      {
+        "en": "Using 4ac instead of ac when computing the reduced discriminant Delta' = (b')^2 - ac.",
+        "vi": "Dùng 4ac thay vì ac khi tính biệt thức thu gọn Delta' = (b')^2 - ac."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Compute b' = b / 2 first and verify whether b is an even integer for maximum calculation efficiency.",
+        "vi": "Tính b' = b / 2 trước và kiểm tra xem b có phải là số nguyên chẵn hay không để tối ưu tính toán."
+      }
+    ],
+    "formal_description": {
+      "en": "Computes the reduced discriminant Delta' = (b')^2 - ac where b = 2*b', and evaluates roots x = (-b' +- sqrt(Delta')) / a.",
+      "vi": "Tính biệt thức thu gọn Delta' = (b')^2 - ac với b = 2*b', và tính nghiệm x = (-b' +- sqrt(Delta')) / a."
+    },
+    "formula_refs": [
+      "FORMULA_QUADRATIC_REDUCED",
+      "FORMULA_REDUCED_DISCRIMINANT"
+    ],
+    "learning_objective": {
+      "en": "Master the simplified discriminant formula to streamline quadratic root computation when b is even.",
+      "vi": "Nắm vững công thức nghiệm thu gọn để tính toán nhanh hơn khi hệ số b chẵn."
+    },
+    "method_id": "QUAD_FORMULA_REDUCED",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the leading coefficient a = 0 (not a quadratic equation).",
+        "vi": "Không áp dụng khi hệ số bậc hai a = 0 (không phải phương trình bậc hai)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_reduced_discriminant"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "summary": {
+      "en": "Solves quadratic equations using the reduced discriminant Delta' when b is even.",
+      "vi": "Giải phương trình bậc hai bằng biệt thức thu gọn Delta' khi hệ số b chẵn."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Reduced Quadratic Formula",
+      "vi": "Công thức nghiệm thu gọn"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Universally applicable to any standard quadratic equation ax^2 + bx + c = 0 with a != 0.",
+        "vi": "Áp dụng phổ quát cho mọi phương trình bậc hai chuẩn ax^2 + bx + c = 0 với a != 0."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Sign inversion error when evaluating -b, especially when b is already negative.",
+        "vi": "Sai dấu khi tính -b, đặc biệt khi hệ số b là số âm."
+      },
+      {
+        "en": "Arithmetic error when calculating -4*a*c when c or a is negative.",
+        "vi": "Sai số học khi tính -4*a*c trong trường hợp c hoặc a mang dấu âm."
+      },
+      {
+        "en": "Forgetting the factor of 2 in the denominator 2a.",
+        "vi": "Quên nhân 2 ở mẫu số 2a."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Calculate and inspect the sign of Delta = b^2 - 4ac before computing the square root.",
+        "vi": "Tính và kiểm tra dấu của biệt thức Delta = b^2 - 4ac trước khi khai căn."
+      }
+    ],
+    "formal_description": {
+      "en": "Evaluates the discriminant Delta = b^2 - 4ac and applies the universal quadratic root formula x = (-b +- sqrt(Delta)) / (2a).",
+      "vi": "Tính biệt thức Delta = b^2 - 4ac và áp dụng công thức nghiệm tổng quát x = (-b +- sqrt(Delta)) / (2a)."
+    },
+    "formula_refs": [
+      "FORMULA_DISCRIMINANT",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "learning_objective": {
+      "en": "Master the universal algebraic method for determining the solvability and roots of any quadratic equation.",
+      "vi": "Nắm vững phương pháp đại số tổng quát để xác định số nghiệm và tính nghiệm của mọi phương trình bậc hai."
+    },
+    "method_id": "QUAD_FORMULA_STANDARD",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the leading coefficient a = 0 (linear or degenerate equation).",
+        "vi": "Không áp dụng khi hệ số bậc hai a = 0 (phương trình bậc nhất hoặc suy biến)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_discriminant",
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_real_root",
+      "concept_square_root"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FORMULA_REDUCED"
+    ],
+    "summary": {
+      "en": "The general algebraic method for solving quadratic equations via the standard discriminant Delta.",
+      "vi": "Phương pháp đại số tổng quát để giải phương trình bậc hai thông qua biệt thức Delta chuẩn."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Standard Quadratic Formula",
+      "vi": "Công thức nghiệm tổng quát (Chuẩn)"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Provides visual and geometric insight into the real roots as x-intercepts of the parabola y = ax^2 + bx + c.",
+        "vi": "Cung cấp cái nhìn trực quan và hình học về các nghiệm thực dưới dạng hoành độ giao điểm của parabol y = ax^2 + bx + c với trục Ox."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Confusing the sign of the vertex coordinates (-b/(2a), -Delta/(4a)).",
+        "vi": "Nhầm dấu của toạ độ đỉnh (-b/(2a), -Delta/(4a))."
+      },
+      {
+        "en": "Assuming graphical inspection gives exact roots when roots are irrational.",
+        "vi": "Xem nghiệm đọc từ đồ thị là nghiệm chính xác khi nghiệm là số vô tỉ."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Plot the vertex and axis of symmetry first, then find intersection points with coordinate axes.",
+        "vi": "Vẽ toạ độ đỉnh và trục đối xứng trước, sau đó xác định các giao điểm với các trục toạ độ."
+      }
+    ],
+    "formal_description": {
+      "en": "Analyzes the geometry of the parabola y = ax^2 + bx + c, determining vertex coordinates, concavity, axis of symmetry, and x-intercepts.",
+      "vi": "Phân tích hình học của parabol y = ax^2 + bx + c, xác định toạ độ đỉnh, hướng bề lõm, trục đối xứng và giao điểm với trục hoành."
+    },
+    "formula_refs": [],
+    "learning_objective": {
+      "en": "Connect algebraic quadratic solutions to geometric parabola properties and graphical intersection points.",
+      "vi": "Liên hệ lời giải đại số của phương trình bậc hai với tính chất hình học của parabol và giao điểm đồ thị."
+    },
+    "method_id": "QUAD_GRAPHICAL_ANALYSIS",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the leading coefficient a = 0 (straight line rather than a parabola).",
+        "vi": "Không áp dụng khi hệ số bậc hai a = 0 (đồ thị là đường thẳng chứ không phải parabol)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_axis_symmetry",
+      "concept_parabola",
+      "concept_parabola_vertex",
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "summary": {
+      "en": "Analyzes roots and behavior through the geometric properties of the quadratic function's parabola graph.",
+      "vi": "Phân tích nghiệm và tính chất phương trình thông qua đặc trưng hình học của đồ thị hàm số bậc hai (parabol)."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Graphical Analysis Method",
+      "vi": "Phương pháp khảo sát đồ thị hàm số bậc hai"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Highly recommended shortcut when the sum of coefficients with alternating sign is zero: a - b + c = 0.",
+        "vi": "Phương pháp nhẩm nghiệm nhanh khi tổng các hệ số đan dấu bằng 0: a - b + c = 0."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Confusing the special difference case (a - b + c = 0, roots -1, -c/a) with the sum case (a + b + c = 0, roots 1, c/a).",
+        "vi": "Nhầm lẫn trường hợp a - b + c = 0 (nghiệm là -1 và -c/a) với trường hợp a + b + c = 0 (nghiệm là 1 và c/a)."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Quickly compute a - b + c before calculating the full discriminant Delta.",
+        "vi": "Tính nhanh giá trị a - b + c trước khi tính toàn bộ biệt thức Delta."
+      }
+    ],
+    "formal_description": {
+      "en": "If the coefficients satisfy a - b + c = 0, the equation ax^2 + bx + c = 0 immediately possesses roots x1 = -1 and x2 = -c/a.",
+      "vi": "Nếu các hệ số thoả mãn a - b + c = 0, phương trình ax^2 + bx + c = 0 ngay lập tức có hai nghiệm x1 = -1 và x2 = -c/a."
+    },
+    "formula_refs": [],
+    "learning_objective": {
+      "en": "Recognize and exploit the special alternating-coefficient relation a - b + c = 0 for instantaneous root finding.",
+      "vi": "Nhận diện và áp dụng trường hợp đặc biệt a - b + c = 0 để nhẩm nghiệm nhanh chóng."
+    },
+    "method_id": "QUAD_VIETE_SPECIAL_DIF",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the condition a - b + c = 0 is not satisfied.",
+        "vi": "Không áp dụng khi điều kiện a - b + c = 0 không thỏa mãn."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "summary": {
+      "en": "Instant root finding when the coefficient condition a - b + c = 0 holds (roots: -1, -c/a).",
+      "vi": "Nhẩm nghiệm tức thì khi các hệ số thoả mãn a - b + c = 0 (nghiệm: -1, -c/a)."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "title": {
+      "en": "Viète Special Case: a - b + c = 0",
+      "vi": "Nhẩm nghiệm Vi-ét trường hợp đặc biệt: a - b + c = 0"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Highly recommended shortcut when the sum of all coefficients is zero: a + b + c = 0.",
+        "vi": "Phương pháp nhẩm nghiệm nhanh nhất khi tổng tất cả các hệ số bằng 0: a + b + c = 0."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Forgetting that the second root is c/a (not c or -c/a).",
+        "vi": "Quên rằng nghiệm thứ hai là c/a (không phải c hay -c/a)."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Always test if a + b + c == 0 first before applying lengthy algebraic algorithms.",
+        "vi": "Luôn kiểm tra xem a + b + c == 0 đầu tiên trước khi áp dụng các công thức tính toán phức tạp."
+      }
+    ],
+    "formal_description": {
+      "en": "If the coefficients satisfy a + b + c = 0, the equation ax^2 + bx + c = 0 immediately possesses roots x1 = 1 and x2 = c/a.",
+      "vi": "Nếu các hệ số thoả mãn a + b + c = 0, phương trình ax^2 + bx + c = 0 ngay lập tức có hai nghiệm x1 = 1 và x2 = c/a."
+    },
+    "formula_refs": [],
+    "learning_objective": {
+      "en": "Instantly identify when x = 1 is a root due to zero coefficient sum a + b + c = 0.",
+      "vi": "Nhận biết ngay lập tức khi nào x = 1 là nghiệm do tổng hệ số a + b + c = 0."
+    },
+    "method_id": "QUAD_VIETE_SPECIAL_SUM",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when the sum of coefficients a + b + c != 0.",
+        "vi": "Không áp dụng khi tổng các hệ số a + b + c != 0."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "summary": {
+      "en": "Instant root finding when the coefficient sum a + b + c = 0 holds (roots: 1, c/a).",
+      "vi": "Nhẩm nghiệm tức thì khi tổng các hệ số a + b + c = 0 (nghiệm: 1, c/a)."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "title": {
+      "en": "Viète Special Case: a + b + c = 0",
+      "vi": "Nhẩm nghiệm Vi-ét trường hợp đặc biệt: a + b + c = 0"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_guidance": [
+      {
+        "en": "Effective when the sum S = -b/a and product P = c/a of roots can be mentally guessed as integer or simple rational pairs.",
+        "vi": "Hiệu quả khi tổng S = -b/a và tích P = c/a của hai nghiệm có thể nhẩm ra nhanh dưới dạng cặp số nguyên hoặc hữu tỉ đơn giản."
+      }
+    ],
+    "common_mistakes": [
+      {
+        "en": "Guessing numbers u, v such that u + v = b/a instead of -b/a (sign inversion on sum).",
+        "vi": "Nhẩm nhầm u + v = b/a thay vì -b/a (sai dấu của tổng nghiệm)."
+      },
+      {
+        "en": "Applying mental guessing when roots are complex or irrational.",
+        "vi": "Áp dụng nhẩm nghiệm khi phương trình có nghiệm vô tỉ hoặc vô nghiệm thực."
+      }
+    ],
+    "curriculum_refs": [],
+    "diagnostic_tips": [
+      {
+        "en": "Form the system u + v = -b/a and u * v = c/a, and test factor pairs of P.",
+        "vi": "Lập hệ u + v = -b/a và u * v = c/a, rồi thử các cặp ước số của P."
+      }
+    ],
+    "formal_description": {
+      "en": "Uses Viète's relations to find two numbers u and v whose sum is S = -b/a and product is P = c/a, satisfying u^2 - S*u + P = 0.",
+      "vi": "Sử dụng định lý Vi-ét để tìm hai số u và v có tổng S = -b/a và tích P = c/a, thoả mãn u^2 - S*u + P = 0."
+    },
+    "formula_refs": [],
+    "learning_objective": {
+      "en": "Apply the sum-product Viète relations to mentally calculate quadratic roots.",
+      "vi": "Ứng dụng hệ thức tổng và tích Vi-ét để nhẩm nhanh nghiệm của phương trình."
+    },
+    "method_id": "QUAD_VIETE_SUM_PRODUCT",
+    "non_applicability_guidance": [
+      {
+        "en": "Not applicable when S^2 - 4P < 0 (no two real numbers exist with sum S and product P).",
+        "vi": "Không áp dụng khi S^2 - 4P < 0 (không tồn tại hai số thực có tổng S và tích P)."
+      }
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root",
+      "concept_vieta_relations"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_method_ids": [
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM"
+    ],
+    "summary": {
+      "en": "Finds roots by guessing numbers that satisfy sum S = -b/a and product P = c/a.",
+      "vi": "Tìm nghiệm bằng cách nhẩm hai số có tổng S = -b/a và tích P = c/a."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "title": {
+      "en": "Viète Sum & Product Root Guessing",
+      "vi": "Nhẩm nghiệm qua hệ thức Tổng và Tích Vi-ét"
+    },
+    "version": "1.0.0"
+  }
+]

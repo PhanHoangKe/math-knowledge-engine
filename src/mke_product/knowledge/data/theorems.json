@@ -1,0 +1,44 @@
+[
+  {
+    "conclusions": [
+      {
+        "en": "The sum of the roots is S = x_1 + x_2 = -b/a",
+        "vi": "Tổng hai nghiệm là S = x_1 + x_2 = -b/a"
+      },
+      {
+        "en": "The product of the roots is P = x_1 * x_2 = c/a",
+        "vi": "Tích hai nghiệm là P = x_1 * x_2 = c/a"
+      }
+    ],
+    "formal_statement_latex": "ax^2 + bx + c = 0 \\implies x_1 + x_2 = -\\frac{b}{a} \\land x_1 x_2 = \\frac{c}{a}",
+    "hypotheses": [
+      {
+        "en": "Quadratic equation ax^2 + bx + c = 0 with a != 0",
+        "vi": "Phương trình bậc hai ax^2 + bx + c = 0 với a != 0"
+      },
+      {
+        "en": "The equation has real roots x_1, x_2 (discriminant Delta >= 0)",
+        "vi": "Phương trình có các nghiệm thực x_1, x_2 (biệt thức Delta >= 0)"
+      }
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root",
+      "concept_vieta_relations"
+    ],
+    "statement": {
+      "en": "If a quadratic equation ax^2 + bx + c = 0 (a != 0) has two roots x_1 and x_2, then their sum is -b/a and their product is c/a.",
+      "vi": "Nếu phương trình bậc hai ax^2 + bx + c = 0 (a != 0) có hai nghiệm x_1 và x_2, thì tổng hai nghiệm bằng -b/a và tích hai nghiệm bằng c/a."
+    },
+    "theorem_id": "THEOREM_VIETA_RELATIONS",
+    "title": {
+      "en": "Viète's Theorem for Quadratic Equations",
+      "vi": "Định lý Vi-ét cho phương trình bậc hai"
+    },
+    "version": "1.0.0"
+  }
+]

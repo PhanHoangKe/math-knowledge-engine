@@ -1,0 +1,29 @@
+[
+  {
+    "author_or_institution": "MKE Core Team",
+    "locator": "src/mke_product/domain/registry.py",
+    "publication_year": 2026,
+    "source_id": "SRC_MKE_S1_ORCHESTRATOR",
+    "source_type": "ENGINE_SPEC",
+    "title": "MKE S1 Algebra Execution Engine Specification",
+    "verification_status": "VERIFIED"
+  },
+  {
+    "author_or_institution": "Standard Mathematical Literature",
+    "locator": "Polynomial Algebra Chapter: Quadratic Equations",
+    "publication_year": 2000,
+    "source_id": "SRC_STANDARD_ALGEBRA_QUADRATIC",
+    "source_type": "ACADEMIC_REFERENCE",
+    "title": "Classical Elementary Algebra and Analytic Geometry",
+    "verification_status": "VERIFIED"
+  },
+  {
+    "author_or_institution": "Bộ Giáo dục và Đào tạo Việt Nam",
+    "locator": "Chương IV: Hàm số y = ax^2. Phương trình bậc hai một ẩn",
+    "publication_year": 2018,
+    "source_id": "SRC_TEXTBOOK_VIETNAM_MATH9",
+    "source_type": "TEXTBOOK",
+    "title": "Sách giáo khoa Toán 9",
+    "verification_status": "VERIFIED"
+  }
+]

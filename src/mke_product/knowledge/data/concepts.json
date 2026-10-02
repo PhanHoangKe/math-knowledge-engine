@@ -1,0 +1,422 @@
+[
+  {
+    "concept_id": "concept_axis_symmetry",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The vertical line x = -b/(2a) passing through the vertex of a parabola, dividing it into two symmetric halves.",
+      "vi": "Đường thẳng thẳng đứng x = -b/(2a) đi qua đỉnh của parabol, chia parabol thành hai phần đối xứng."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_GRAPHICAL_ANALYSIS"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_parabola"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_parabola",
+      "concept_parabola_vertex"
+    ],
+    "title": {
+      "en": "Axis of Symmetry",
+      "vi": "Trục đối xứng của parabol"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_discriminant",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The algebraic quantity Delta = b^2 - 4ac that determines the number and nature of the real roots of a quadratic equation.",
+      "vi": "Đại lượng đại số Delta = b^2 - 4ac xác định số lượng và tính chất các nghiệm thực của phương trình bậc hai."
+    },
+    "formula_refs": [
+      "FORMULA_DISCRIMINANT",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "method_refs": [
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root",
+      "concept_reduced_discriminant"
+    ],
+    "title": {
+      "en": "Discriminant (Delta)",
+      "vi": "Biệt thức Delta"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_parabola",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The planar curve representing the graph of a quadratic function y = ax^2 + bx + c (a != 0).",
+      "vi": "Đường cong phẳng biểu diễn đồ thị của hàm số bậc hai y = ax^2 + bx + c (a != 0)."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_GRAPHICAL_ANALYSIS"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_axis_symmetry",
+      "concept_parabola_vertex",
+      "concept_quadratic_equation"
+    ],
+    "title": {
+      "en": "Parabola Graph",
+      "vi": "Đồ thị Parabol"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_parabola_vertex",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The extremum point (-b/(2a), -Delta/(4a)) of a parabolic curve, corresponding to its minimum or maximum.",
+      "vi": "Điểm cực trị (-b/(2a), -Delta/(4a)) của parabol, tương ứng với điểm thấp nhất hoặc cao nhất của đồ thị."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_GRAPHICAL_ANALYSIS"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_axis_symmetry",
+      "concept_parabola"
+    ],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_axis_symmetry",
+      "concept_parabola"
+    ],
+    "title": {
+      "en": "Parabola Vertex",
+      "vi": "Đỉnh của parabol"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_perfect_square_identity",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The algebraic identity expanding or factoring trinomials of the form (u + v)^2 = u^2 + 2uv + v^2.",
+      "vi": "Hằng đẳng thức đại số biểu diễn dạng (u + v)^2 = u^2 + 2uv + v^2."
+    },
+    "formula_refs": [
+      "FORMULA_PERFECT_SQUARE"
+    ],
+    "method_refs": [
+      "QUAD_COMPLETE_SQUARE"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_real_number"
+    ],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_polynomial_factorization"
+    ],
+    "title": {
+      "en": "Perfect Square Identity",
+      "vi": "Hằng đẳng thức bình phương hoàn chỉnh"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_polynomial_coefficient",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The numeric multipliers a, b, c attached to polynomial terms x^2, x^1, x^0.",
+      "vi": "Các hệ số số học a, b, c đi kèm với các số hạng x^2, x^1, x^0 của đa thức."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_real_number"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_rational_number"
+    ],
+    "title": {
+      "en": "Polynomial Coefficient",
+      "vi": "Hệ số của đa thức"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_polynomial_factorization",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The decomposition of a polynomial expression into a product of simpler linear or irreducible factors.",
+      "vi": "Sự phân tích một biểu thức đa thức thành tích của các nhân tử bậc nhất hoặc nhân tử bất khả quy."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FACTORIZATION_R"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_perfect_square_identity",
+      "concept_polynomial_coefficient"
+    ],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root"
+    ],
+    "title": {
+      "en": "Polynomial Factorization",
+      "vi": "Phân tích đa thức thành nhân tử"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_quadratic_equation",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "A second-degree polynomial equation in one variable of canonical form ax^2 + bx + c = 0 where a != 0.",
+      "vi": "Phương trình đa thức bậc hai một ẩn có dạng chính tắc ax^2 + bx + c = 0 với a != 0."
+    },
+    "formula_refs": [
+      "FORMULA_DISCRIMINANT",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "method_refs": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FACTORIZATION_R",
+      "QUAD_FORMULA_REDUCED",
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_GRAPHICAL_ANALYSIS",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_parabola",
+      "concept_real_root"
+    ],
+    "title": {
+      "en": "Quadratic Equation in One Variable",
+      "vi": "Phương trình bậc hai một ẩn"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_rational_number",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "A real number expressible as the ratio of two integers p/q where q != 0.",
+      "vi": "Số thực có thể biểu diễn dưới dạng tỉ số của hai số nguyên p/q với q != 0."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_FACTORIZATION_Q"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_real_number"
+    ],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+    ],
+    "related_concept_ids": [
+      "concept_real_number"
+    ],
+    "title": {
+      "en": "Rational Number (Q)",
+      "vi": "Số hữu tỉ (Q)"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_real_number",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "A continuous one-dimensional mathematical quantity along the real number line R.",
+      "vi": "Tập hợp các đại lượng số liên tục trên trục số thực R."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_FACTORIZATION_R"
+    ],
+    "prerequisite_concept_ids": [],
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC"
+    ],
+    "related_concept_ids": [
+      "concept_rational_number",
+      "concept_square_root"
+    ],
+    "title": {
+      "en": "Real Number (R)",
+      "vi": "Số thực (R)"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_real_root",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "A real value x in R that satisfies the equation ax^2 + bx + c = 0, making the expression identically zero.",
+      "vi": "Giá trị thực x thuộc R thỏa mãn phương trình ax^2 + bx + c = 0, làm cho giá trị vế trái bằng 0."
+    },
+    "formula_refs": [
+      "FORMULA_QUADRATIC_REDUCED",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "method_refs": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_number"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_vieta_relations"
+    ],
+    "title": {
+      "en": "Real Root of an Equation",
+      "vi": "Nghiệm thực của phương trình"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_reduced_discriminant",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The scaled discriminant Delta' = (b')^2 - ac where b = 2*b', simplifying quadratic calculations when b is even.",
+      "vi": "Biệt thức thu gọn Delta' = (b')^2 - ac với b = 2*b', giúp đơn giản hóa việc tính toán khi hệ số b là số chẵn."
+    },
+    "formula_refs": [
+      "FORMULA_QUADRATIC_REDUCED",
+      "FORMULA_REDUCED_DISCRIMINANT"
+    ],
+    "method_refs": [
+      "QUAD_FORMULA_REDUCED"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_discriminant"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_real_root"
+    ],
+    "title": {
+      "en": "Reduced Discriminant (Delta Prime)",
+      "vi": "Biệt thức thu gọn Delta phẩy"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_square_root",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The non-negative real number y such that y^2 = x for any non-negative real number x >= 0.",
+      "vi": "Số thực không âm y sao cho y^2 = x đối với mọi số thực không âm x >= 0."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_real_number"
+    ],
+    "provenance_refs": [
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_real_number"
+    ],
+    "title": {
+      "en": "Arithmetic Square Root",
+      "vi": "Căn bậc hai số học"
+    },
+    "version": "1.0.0"
+  },
+  {
+    "concept_id": "concept_vieta_relations",
+    "curriculum_refs": [],
+    "definition": {
+      "en": "The algebraic relations linking the roots of a polynomial to ratios of its coefficients.",
+      "vi": "Các hệ thức đại số liên hệ giữa các nghiệm của đa thức với tỉ số giữa các hệ số của nó."
+    },
+    "formula_refs": [],
+    "method_refs": [
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_real_root"
+    ],
+    "title": {
+      "en": "Viète Relations",
+      "vi": "Hệ thức Vi-ét"
+    },
+    "version": "1.0.0"
+  }
+]

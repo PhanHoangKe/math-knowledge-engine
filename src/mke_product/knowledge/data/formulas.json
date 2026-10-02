@@ -1,0 +1,182 @@
+[
+  {
+    "domain_conditions": {
+      "en": "Coefficients a, b, c in R with a != 0",
+      "vi": "Các hệ số a, b, c thuộc R với a != 0"
+    },
+    "formula_id": "FORMULA_DISCRIMINANT",
+    "latex_template": "\\Delta = b^2 - 4ac",
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_quadratic_equation"
+    ],
+    "title": {
+      "en": "Standard Quadratic Discriminant Formula",
+      "vi": "Công thức biệt thức Delta"
+    },
+    "variables_description": {
+      "Delta": {
+        "en": "Standard quadratic discriminant value",
+        "vi": "Biệt thức bậc hai chuẩn"
+      },
+      "a": {
+        "en": "Leading quadratic coefficient (non-zero)",
+        "vi": "Hệ số bậc hai (khác 0)"
+      },
+      "b": {
+        "en": "Linear coefficient",
+        "vi": "Hệ số bậc một"
+      },
+      "c": {
+        "en": "Constant coefficient",
+        "vi": "Hệ số tự do"
+      }
+    },
+    "version": "1.0.0"
+  },
+  {
+    "domain_conditions": {
+      "en": "Expressions x and constant k in R",
+      "vi": "Biểu thức x và hằng số k thuộc R"
+    },
+    "formula_id": "FORMULA_PERFECT_SQUARE",
+    "latex_template": "(x + k)^2 = x^2 + 2kx + k^2",
+    "provenance_refs": [
+      "SRC_STANDARD_ALGEBRA_QUADRATIC",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_perfect_square_identity",
+      "concept_polynomial_factorization"
+    ],
+    "title": {
+      "en": "Perfect Square Identity",
+      "vi": "Hằng đẳng thức bình phương của một tổng"
+    },
+    "variables_description": {
+      "k": {
+        "en": "Half-linear shift parameter",
+        "vi": "Tham số tịnh tiến nửa tuyến tính"
+      },
+      "x": {
+        "en": "Variable term",
+        "vi": "Số hạng biến"
+      }
+    },
+    "version": "1.0.0"
+  },
+  {
+    "domain_conditions": {
+      "en": "a, b, c in R with a != 0, b = 2*b', Delta' = (b')^2 - ac >= 0",
+      "vi": "a, b, c thuộc R với a != 0, b = 2*b', Delta' = (b')^2 - ac >= 0"
+    },
+    "formula_id": "FORMULA_QUADRATIC_REDUCED",
+    "latex_template": "x = \\frac{-b' \\pm \\sqrt{\\Delta'}}{a}",
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_real_root",
+      "concept_reduced_discriminant"
+    ],
+    "title": {
+      "en": "Reduced Quadratic Root Formula",
+      "vi": "Công thức nghiệm thu gọn của phương trình bậc hai"
+    },
+    "variables_description": {
+      "Delta_prime": {
+        "en": "Reduced discriminant (b')^2 - ac",
+        "vi": "Biệt thức thu gọn Delta' = (b')^2 - ac"
+      },
+      "a": {
+        "en": "Leading coefficient (non-zero)",
+        "vi": "Hệ số bậc hai (khác 0)"
+      },
+      "b_prime": {
+        "en": "Half-linear coefficient b/2",
+        "vi": "Hệ số nửa bậc một b' = b/2"
+      }
+    },
+    "version": "1.0.0"
+  },
+  {
+    "domain_conditions": {
+      "en": "a, b, c in R with a != 0, Delta = b^2 - 4ac >= 0",
+      "vi": "a, b, c thuộc R với a != 0, Delta = b^2 - 4ac >= 0"
+    },
+    "formula_id": "FORMULA_QUADRATIC_STANDARD",
+    "latex_template": "x = \\frac{-b \\pm \\sqrt{\\Delta}}{2a}",
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_discriminant",
+      "concept_quadratic_equation",
+      "concept_real_root"
+    ],
+    "title": {
+      "en": "Standard Quadratic Root Formula",
+      "vi": "Công thức nghiệm chuẩn của phương trình bậc hai"
+    },
+    "variables_description": {
+      "Delta": {
+        "en": "Standard discriminant b^2 - 4ac",
+        "vi": "Biệt thức chuẩn Delta = b^2 - 4ac"
+      },
+      "a": {
+        "en": "Leading coefficient (non-zero)",
+        "vi": "Hệ số bậc hai (khác 0)"
+      },
+      "b": {
+        "en": "Linear coefficient",
+        "vi": "Hệ số bậc một"
+      }
+    },
+    "version": "1.0.0"
+  },
+  {
+    "domain_conditions": {
+      "en": "Coefficients a, b, c in R with a != 0 and b = 2*b'",
+      "vi": "Các hệ số a, b, c thuộc R với a != 0 và b = 2*b'"
+    },
+    "formula_id": "FORMULA_REDUCED_DISCRIMINANT",
+    "latex_template": "\\Delta' = (b')^2 - ac",
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "related_concept_ids": [
+      "concept_reduced_discriminant"
+    ],
+    "title": {
+      "en": "Reduced Quadratic Discriminant Formula",
+      "vi": "Công thức biệt thức thu gọn Delta phẩy"
+    },
+    "variables_description": {
+      "Delta_prime": {
+        "en": "Reduced discriminant value",
+        "vi": "Biệt thức thu gọn"
+      },
+      "a": {
+        "en": "Leading quadratic coefficient (non-zero)",
+        "vi": "Hệ số bậc hai (khác 0)"
+      },
+      "b_prime": {
+        "en": "Half-linear coefficient b/2",
+        "vi": "Hệ số nửa bậc một b' = b/2"
+      },
+      "c": {
+        "en": "Constant coefficient",
+        "vi": "Hệ số tự do"
+      }
+    },
+    "version": "1.0.0"
+  }
+]
