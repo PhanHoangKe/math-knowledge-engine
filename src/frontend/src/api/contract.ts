@@ -30,9 +30,37 @@ export type ApplicationErrorResponse = components['schemas']['ErrorResponse'];
 export type TransportErrorResponse = components['schemas']['TransportErrorResponse'];
 export type TransportErrorCode = components['schemas']['TransportErrorCode'];
 
-// --- Domain Models & Views ---
-export type MethodOptionView = components['schemas']['MethodOptionView'];
+// --- Problem Views & Classification ---
+export type CanonicalQuadraticProblemView = components['schemas']['CanonicalQuadraticProblemView'];
+export type CanonicalDegenerateProblemView = components['schemas']['CanonicalDegenerateProblemView'];
+export type CanonicalProblemViewUnion = SolvedResponse['problem'] | AnalyzedNoExecutionResponse['problem'];
+export type QuadraticDiscriminant = components['schemas']['QuadraticDiscriminant'];
+
+// --- Solution, Trace & Certificate Types ---
 export type VerifiedSolutionView = components['schemas']['VerifiedSolutionView'];
 export type DegenerateSolutionView = components['schemas']['DegenerateSolutionView'];
+export type RealRootValue = components['schemas']['RealRootValue'];
+export type SolutionOutcome = components['schemas']['SolutionOutcome'];
+export type SolutionRootType = components['schemas']['SolutionRootType'];
+export type SolutionTrace = components['schemas']['SolutionTrace'];
+export type SolutionStep = components['schemas']['SolutionStep'];
+export type VerificationCertificate = components['schemas']['VerificationCertificate'];
+export type VerificationOutcome = components['schemas']['VerificationOutcome'];
+
+// --- Method Assessment Profile ---
+export type MethodOptionView = components['schemas']['MethodOptionView'];
+export type PrerequisiteStatus = components['schemas']['PrerequisiteStatus'];
+export type MathematicalApplicability = components['schemas']['MathematicalApplicability'];
+export type ExecutionAvailability = components['schemas']['ExecutionAvailability'];
+export type PedagogicalRecommendation = components['schemas']['PedagogicalRecommendation'];
+export type SupportStatus = components['schemas']['SupportStatus'];
+export type VerificationCapability = components['schemas']['VerificationCapability'];
+
+// --- Reason & Error Codes ---
+export type NoExecutionReasonCode = components['schemas']['NoExecutionReasonCode'];
+export type ApplicationErrorCode = components['schemas']['ApplicationErrorCode'];
+export type Span = components['schemas']['Span'];
+
+// --- Rational Numbers & Health ---
 export type RationalFraction = components['schemas']['RationalFraction'];
 export type HealthResponse = components['schemas']['HealthResponse'];

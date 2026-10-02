@@ -54,8 +54,9 @@ function getInitialTheme(): Theme {
 }
 
 function getSystemTheme(): 'light' | 'dark' {
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    const res = window.matchMedia('(prefers-color-scheme: dark)');
+    return res && res.matches ? 'dark' : 'light';
   }
   return 'light';
 }
@@ -79,11 +80,13 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({
 
   // Listen to system prefers-color-scheme changes when theme is auto
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    if (!mediaQuery) return;
+
     const handler = (e: MediaQueryListEvent) => {
-      setSystemTheme(e.matches ? 'dark' : 'light');
+      setSystemTheme(e && e.matches ? 'dark' : 'light');
     };
 
     if (mediaQuery.addEventListener) {

@@ -1,12 +1,65 @@
 import React from 'react';
 import { usePreferences } from '../../state/preferences';
+import { useAlgebraWorkspace } from '../../state/useAlgebraWorkspace';
 import { HeaderBar } from '../HeaderBar/HeaderBar';
 import { EquationInputShell } from '../EquationInputShell/EquationInputShell';
 import { WorkspaceEmptyState } from '../WorkspaceEmptyState/WorkspaceEmptyState';
+import { CanonicalProblemPanel } from '../CanonicalProblemPanel/CanonicalProblemPanel';
+import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
+import { SolutionSummaryPanel } from '../SolutionSummaryPanel/SolutionSummaryPanel';
+import { TracePanel } from '../TracePanel/TracePanel';
+import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
+import { DegenerateSolutionPanel } from '../DegenerateSolutionPanel/DegenerateSolutionPanel';
+import { MethodNotExecutablePanel } from '../MethodNotExecutablePanel/MethodNotExecutablePanel';
+import { ApplicationErrorPanel } from '../ApplicationErrorPanel/ApplicationErrorPanel';
+import { TransportErrorPanel } from '../TransportErrorPanel/TransportErrorPanel';
+import { NetworkErrorPanel } from '../NetworkErrorPanel/NetworkErrorPanel';
+import type {
+  SolvedResponse,
+  AnalyzedNoExecutionResponse,
+  ApplicationErrorResponse,
+  TransportErrorResponse,
+} from '../../api/contract';
 import styles from './AppShell.module.css';
 
 export const AppShell: React.FC = () => {
   const { t } = usePreferences();
+  const {
+    query,
+    setQuery,
+    status,
+    result,
+    httpStatus,
+    submitRawSolve,
+    switchMethod,
+    clearWorkspace,
+  } = useAlgebraWorkspace();
+
+  const getStatusText = (): string => {
+    switch (status) {
+      case 'loading':
+        return t('shell_status_loading');
+      case 'application-response':
+        if (result && result.kind === 'application') {
+          if (result.response.response_status === 'SOLVED') {
+            return t('shell_status_solved');
+          }
+          if (result.response.response_status === 'ANALYZED_NO_EXECUTION') {
+            return t('shell_status_analyzed');
+          }
+          if (result.response.response_status === 'ERROR') {
+            return t('shell_status_error');
+          }
+        }
+        return t('shell_status_idle');
+      case 'transport-error':
+      case 'network-error':
+      case 'protocol-error':
+        return t('shell_status_error');
+      default:
+        return t('shell_status_idle');
+    }
+  };
 
   return (
     <div className={styles.appRoot}>
@@ -15,8 +68,112 @@ export const AppShell: React.FC = () => {
 
       {/* Main Workspace Surface */}
       <main className={styles.mainContent}>
-        <EquationInputShell />
-        <WorkspaceEmptyState />
+        <EquationInputShell
+          query={query}
+          onQueryChange={setQuery}
+          onSubmit={() => submitRawSolve()}
+          onClear={clearWorkspace}
+          isLoading={status === 'loading'}
+          statusText={getStatusText()}
+        />
+
+        {/* Live Workspace Container */}
+        <section
+          className={styles.workspaceSection}
+          aria-live="polite"
+          aria-busy={status === 'loading'}
+        >
+          {status === 'idle' && <WorkspaceEmptyState />}
+
+          {status === 'loading' && (
+            <div className={styles.loadingContainer} data-testid="workspace-loading">
+              <div className={styles.loadingSpinner} />
+              <p className={styles.loadingText}>{t('state_loading')}</p>
+            </div>
+          )}
+
+          {status === 'network-error' && (
+            <NetworkErrorPanel onRetry={() => submitRawSolve()} />
+          )}
+
+          {status === 'protocol-error' && (
+            <NetworkErrorPanel isProtocolError onRetry={() => submitRawSolve()} />
+          )}
+
+          {status === 'transport-error' && result && result.kind === 'transport-error' && (
+            <TransportErrorPanel
+              error={result.response as TransportErrorResponse}
+              httpStatus={httpStatus}
+            />
+          )}
+
+          {status === 'application-response' && result && result.kind === 'application' && (
+            <>
+              {/* SOLVED Response */}
+              {result.response.response_status === 'SOLVED' && (() => {
+                const resp = result.response as SolvedResponse;
+                return (
+                  <div className={styles.solvedLayout} data-testid="solved-workspace">
+                    <CanonicalProblemPanel problem={resp.problem} />
+                    <SolutionSummaryPanel solution={resp.solution} />
+                    <MethodCatalogPanel
+                      methods={resp.available_methods}
+                      selectedMethodId={resp.selected_method_id}
+                      onSelectMethod={switchMethod}
+                    />
+                    <TracePanel trace={resp.solution.trace} />
+                    <VerificationPanel
+                      certificate={resp.solution.certificate}
+                      verificationScope={resp.solution.verification_scope}
+                    />
+                  </div>
+                );
+              })()}
+
+              {/* ANALYZED_NO_EXECUTION Response */}
+              {result.response.response_status === 'ANALYZED_NO_EXECUTION' && (() => {
+                const resp = result.response as AnalyzedNoExecutionResponse;
+                const isDegenerate =
+                  resp.reason_code === 'DEGENERATE_EXACT_SOLUTION' &&
+                  resp.degenerate_solution;
+
+                if (isDegenerate && resp.degenerate_solution) {
+                  return (
+                    <div className={styles.degenerateLayout} data-testid="degenerate-workspace">
+                      <CanonicalProblemPanel problem={resp.problem} />
+                      <DegenerateSolutionPanel solution={resp.degenerate_solution} />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className={styles.analyzedLayout} data-testid="analyzed-workspace">
+                    <CanonicalProblemPanel problem={resp.problem} />
+                    <MethodNotExecutablePanel
+                      reasonCode={resp.reason_code}
+                      analysisMessageVi={resp.analysis_message_vi}
+                      selectedMethodId={resp.selected_method_id}
+                    />
+                    {resp.available_methods && resp.available_methods.length > 0 && (
+                      <MethodCatalogPanel
+                        methods={resp.available_methods}
+                        selectedMethodId={resp.selected_method_id}
+                        onSelectMethod={switchMethod}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Application ERROR Response */}
+              {result.response.response_status === 'ERROR' && (
+                <ApplicationErrorPanel
+                  error={result.response as ApplicationErrorResponse}
+                />
+              )}
+            </>
+          )}
+        </section>
 
         {/* MKE Architecture Flow Banner */}
         <section className={styles.flowBanner} aria-label={t('flow_tagline')}>

@@ -108,10 +108,49 @@
   font-size: 1.5rem;
   font-weight: 700;
   border: none;
-  opacity: 0.7;
-  cursor: not-allowed;
+  cursor: pointer;
   user-select: none;
-  transition: background-color var(--transition-speed) ease;
+  transition: all var(--transition-speed) ease;
+}
+
+.computeBtn:hover:not(:disabled) {
+  background-color: var(--compute-btn-hover);
+  transform: scale(1.02);
+}
+
+.computeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.statusDotActive {
+  background-color: #f59e0b;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .subToolbar {

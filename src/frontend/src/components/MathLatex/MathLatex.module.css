@@ -1,0 +1,17 @@
+.mathContainer {
+  font-family: var(--font-mono);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.inlineMath {
+  padding: 0 0.15rem;
+}
+
+.displayMath {
+  display: block;
+  text-align: center;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

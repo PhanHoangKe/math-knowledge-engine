@@ -1,40 +1,47 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { usePreferences } from '../../state/preferences';
 import styles from './EquationInputShell.module.css';
 
 export interface EquationInputShellProps {
-  initialQuery?: string;
-  onQueryChange?: (query: string) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  onSubmit: () => void;
+  onClear: () => void;
+  isLoading?: boolean;
+  statusText?: string;
 }
 
 export const EquationInputShell: React.FC<EquationInputShellProps> = ({
-  initialQuery = '',
+  query,
   onQueryChange,
+  onSubmit,
+  onClear,
+  isLoading = false,
+  statusText,
 }) => {
   const { t } = usePreferences();
-  const [query, setQuery] = useState(initialQuery);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
-    onQueryChange?.(val);
+    onQueryChange(e.target.value);
   };
 
-  const handleClear = useCallback(() => {
-    setQuery('');
-    onQueryChange?.('');
-  }, [onQueryChange]);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (query.trim() && !isLoading) {
+        onSubmit();
+      }
+    }
+  };
 
   const insertQuickKey = useCallback(
     (snippet: string) => {
-      setQuery((prev) => {
-        const next = prev + snippet;
-        onQueryChange?.(next);
-        return next;
-      });
+      onQueryChange(query + snippet);
     },
-    [onQueryChange]
+    [query, onQueryChange]
   );
+
+  const isSubmitDisabled = !query.trim() || isLoading;
 
   return (
     <section className={styles.wrapper} aria-label={t('input_aria')}>
@@ -46,7 +53,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
       </div>
 
       {/* Capsule Equation Input Container */}
-      <div className={styles.capsuleBox}>
+      <div className={`${styles.capsuleBox} ${isLoading ? styles.capsuleLoading : ''}`}>
         <label htmlFor="equation-input" className="sr-only">
           {t('input_label')}
         </label>
@@ -56,33 +63,43 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
           className={styles.inputField}
           value={query}
           onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           placeholder={t('input_placeholder')}
           autoComplete="off"
           spellCheck="false"
+          disabled={isLoading}
+          data-testid="equation-input"
         />
 
-        {query.length > 0 && (
+        {query.length > 0 && !isLoading && (
           <button
             type="button"
             className={styles.clearBtn}
-            onClick={handleClear}
+            onClick={onClear}
             aria-label={t('clear_btn_aria')}
             title={t('clear_btn_aria')}
+            data-testid="clear-btn"
           >
             ×
           </button>
         )}
 
-        {/* Compute Button — Intentionally non-functional in S2-03 shell */}
+        {/* Compute Button */}
         <button
           type="button"
           className={styles.computeBtn}
           aria-label={t('compute_btn_aria')}
           title={t('compute_btn_aria')}
-          disabled
-          aria-disabled="true"
+          onClick={onSubmit}
+          disabled={isSubmitDisabled}
+          aria-disabled={isSubmitDisabled}
+          data-testid="compute-btn"
         >
-          {t('compute_btn_text')}
+          {isLoading ? (
+            <span className={styles.spinner} aria-hidden="true" />
+          ) : (
+            t('compute_btn_text')
+          )}
         </button>
       </div>
 
@@ -96,6 +113,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
               type="button"
               className={styles.quickKeyBtn}
               onClick={() => insertQuickKey(keySymbol)}
+              disabled={isLoading}
             >
               {keySymbol}
             </button>
@@ -103,8 +121,13 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         </div>
 
         <div className={styles.statusNote}>
-          <span className={styles.statusDot} aria-hidden="true" />
-          <span>{t('shell_status_idle')}</span>
+          <span
+            className={`${styles.statusDot} ${isLoading ? styles.statusDotActive : ''}`}
+            aria-hidden="true"
+          />
+          <span data-testid="shell-status-text">
+            {statusText || (isLoading ? t('shell_status_loading') : t('shell_status_idle'))}
+          </span>
         </div>
       </div>
     </section>
