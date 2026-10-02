@@ -1,6 +1,7 @@
 import React from 'react';
 import type { NoExecutionReasonCode } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
+import { NO_EXECUTION_REASON_I18N } from '../../i18n/enumMappings';
 import styles from './MethodNotExecutablePanel.module.css';
 
 export interface MethodNotExecutablePanelProps {
@@ -36,11 +37,11 @@ export const MethodNotExecutablePanel: React.FC<MethodNotExecutablePanelProps> =
         </div>
         <div className={styles.headerText}>
           <h2 className={styles.bannerTitle}>
-            {t(`lbl_reason_${reasonCode}` as any) || t('lbl_reason_code')}
+            {t(NO_EXECUTION_REASON_I18N[reasonCode]) || t('lbl_reason_code')}
           </h2>
           {selectedMethodId && (
             <span className={styles.methodBadge}>
-              Phương pháp yêu cầu: <code>{selectedMethodId}</code>
+              {t('lbl_requested_method')} <code>{selectedMethodId}</code>
             </span>
           )}
         </div>

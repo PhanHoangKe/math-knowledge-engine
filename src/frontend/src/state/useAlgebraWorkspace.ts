@@ -46,36 +46,39 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
   const sequenceRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Abort pending request on unmount
+  // Abort pending request and invalidate sequence on unmount
   useEffect(() => {
     return () => {
+      sequenceRef.current += 1;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, []);
 
   /**
    * Update query text.
-   * Section 9 & 31.R: Immediately reset/clear prior results when query changes
-   * to prevent stale results from being presented as the outcome of the new query.
+   * Section 1 & 9: Invalidate sequence counter, abort in-flight request,
+   * and reset workspace state on query modification.
    */
   const setQuery = useCallback((newQuery: string) => {
-    setQueryState(newQuery);
-    if (result !== null || status !== 'idle') {
-      // Abort any ongoing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      setStatus('idle');
-      setResult(null);
-      setHttpStatus(null);
-    }
-  }, [result, status]);
-
-  const clearWorkspace = useCallback(() => {
+    sequenceRef.current += 1;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setQueryState(newQuery);
+    setStatus('idle');
+    setResult(null);
+    setHttpStatus(null);
+  }, []);
+
+  const clearWorkspace = useCallback(() => {
+    sequenceRef.current += 1;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
     setQueryState('');
     setStatus('idle');
@@ -90,6 +93,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
     // Cancel previous in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
 
     const controller = new AbortController();
@@ -139,10 +143,11 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
 
   /**
    * Submit raw mathematical query equation.
+   * Section 12: Preserves verbatim user text (including spaces) without trimming raw_query.
    */
   const submitRawSolve = useCallback(async (overrideQuery?: string) => {
-    const raw = (overrideQuery !== undefined ? overrideQuery : query).trim();
-    if (!raw) return;
+    const candidate = overrideQuery !== undefined ? overrideQuery : query;
+    if (!candidate.trim()) return;
 
     if (overrideQuery !== undefined) {
       setQueryState(overrideQuery);
@@ -152,7 +157,7 @@ export function useAlgebraWorkspace(): UseAlgebraWorkspaceReturn {
       schema_version: '1.0.0',
       input_payload: {
         input_mode: 'RAW_TEXT',
-        raw_query: raw,
+        raw_query: candidate,
         target_variable: 'x',
       },
       selected_method_id: null,

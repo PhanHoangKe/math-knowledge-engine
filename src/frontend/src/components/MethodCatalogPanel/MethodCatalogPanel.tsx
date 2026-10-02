@@ -1,6 +1,12 @@
 import React from 'react';
 import type { MethodOptionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
+import {
+  MATHEMATICAL_APPLICABILITY_I18N,
+  EXECUTION_AVAILABILITY_I18N,
+  PEDAGOGICAL_RECOMMENDATION_I18N,
+  VERIFICATION_CAPABILITY_I18N,
+} from '../../i18n/enumMappings';
 import styles from './MethodCatalogPanel.module.css';
 
 export interface MethodCatalogPanelProps {
@@ -27,7 +33,7 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
       <div className={styles.cardHeader}>
         <h2 className={styles.cardTitle}>{t('panel_method_catalog')}</h2>
         <span className={styles.methodCountBadge}>
-          {methods.length} phương thức
+          {methods.length} {t('lbl_methods_unit')}
         </span>
       </div>
 
@@ -54,28 +60,28 @@ export const MethodCatalogPanel: React.FC<MethodCatalogPanelProps> = ({
                     className={`${styles.badge} ${isApplicable ? styles.badgeSuccess : styles.badgeMuted}`}
                     title={t('lbl_method_applicability')}
                   >
-                    {t(`enum_app_${method.mathematical_applicability}` as any)}
+                    {t(MATHEMATICAL_APPLICABILITY_I18N[method.mathematical_applicability])}
                   </span>
                   {/* Execution Availability Badge */}
                   <span
                     className={`${styles.badge} ${isAvailable ? styles.badgeSuccess : styles.badgeMuted}`}
                     title={t('enum_exec_AVAILABLE')}
                   >
-                    {t(`enum_exec_${method.execution_availability}` as any)}
+                    {t(EXECUTION_AVAILABILITY_I18N[method.execution_availability])}
                   </span>
                   {/* Recommendation Badge */}
                   <span
                     className={`${styles.badge} ${method.pedagogical_recommendation === 'RECOMMENDED' ? styles.badgePrimary : styles.badgeNeutral}`}
                     title={t('lbl_method_recommendation')}
                   >
-                    {t(`enum_rec_${method.pedagogical_recommendation}` as any)}
+                    {t(PEDAGOGICAL_RECOMMENDATION_I18N[method.pedagogical_recommendation])}
                   </span>
                   {/* Verification Capability */}
                   <span
                     className={`${styles.badge} ${method.verification_capability === 'HOST_VERIFIABLE' ? styles.badgeVerifiable : styles.badgeNeutral}`}
                     title={t('lbl_method_verification')}
                   >
-                    {t(`enum_ver_${method.verification_capability}` as any)}
+                    {t(VERIFICATION_CAPABILITY_I18N[method.verification_capability])}
                   </span>
                 </div>
               </div>

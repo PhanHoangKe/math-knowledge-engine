@@ -159,4 +159,14 @@ export const en: Translations = {
   err_code_lbl: 'Error Code',
   err_span_lbl: 'Error Position in Input',
   err_details_lbl: 'Technical Details',
+
+  lbl_methods_unit: 'methods',
+  lbl_verification_criteria: 'Mathematical Verification Criteria:',
+  lbl_cert_no_real_roots: 'No real roots verified',
+  lbl_trace_empty: 'No step-by-step trace available.',
+  lbl_linear_single_root: 'Unique linear root:',
+  lbl_requested_method: 'Requested method:',
+  lbl_validation_error_loc: 'Location',
+  lbl_validation_error_msg: 'Message',
+  lbl_validation_error_type: 'Rule',
 };

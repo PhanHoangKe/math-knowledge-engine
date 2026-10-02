@@ -157,6 +157,16 @@ export const vi = {
   err_code_lbl: 'Mã lỗi',
   err_span_lbl: 'Vị trí lỗi trên chuỗi nhập',
   err_details_lbl: 'Chi tiết kỹ thuật',
+
+  lbl_methods_unit: 'phương thức',
+  lbl_verification_criteria: 'Các tiêu chí kiểm chứng toán học:',
+  lbl_cert_no_real_roots: 'Xác thực không có nghiệm thực',
+  lbl_trace_empty: 'Không có bước giải chi tiết nào.',
+  lbl_linear_single_root: 'Nghiệm bậc nhất duy nhất:',
+  lbl_requested_method: 'Phương pháp yêu cầu:',
+  lbl_validation_error_loc: 'Vị trí',
+  lbl_validation_error_msg: 'Nội dung',
+  lbl_validation_error_type: 'Quy tắc',
 } as const;
 
 export type TranslationKey = keyof typeof vi;

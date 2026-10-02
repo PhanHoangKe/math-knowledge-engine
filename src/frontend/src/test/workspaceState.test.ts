@@ -106,9 +106,9 @@ describe('useAlgebraWorkspace State Management Hook', () => {
       await result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
     });
 
-    // 2. Switch Method
+    // 2. Switch Method using real method ID QUAD_COMPLETE_SQUARE
     await act(async () => {
-      await result.current.switchMethod('QUAD_VIETA_FACTORING_TRIAL');
+      await result.current.switchMethod('QUAD_COMPLETE_SQUARE');
     });
 
     expect(solveSpy).toHaveBeenLastCalledWith(
@@ -121,7 +121,7 @@ describe('useAlgebraWorkspace State Management Hook', () => {
           c: { numerator: 6, denominator: 1 },
           target_variable: 'x',
         },
-        selected_method_id: 'QUAD_VIETA_FACTORING_TRIAL',
+        selected_method_id: 'QUAD_COMPLETE_SQUARE',
       },
       expect.any(AbortSignal)
     );
@@ -132,7 +132,123 @@ describe('useAlgebraWorkspace State Management Hook', () => {
     }
   });
 
-  it('guarantees newer request B supersedes delayed older request A (Section 33 / 31.Q)', async () => {
+  it('preserves exact raw query text including leading and trailing whitespace', async () => {
+    const solveSpy = vi.spyOn(clientModule, 'solveEquation').mockResolvedValue({
+      kind: 'application',
+      status: 200,
+      response: mockSolvedTwoRoots,
+    });
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    const untrimmedQuery = '   x^2 - 5*x + 6 = 0   ';
+    await act(async () => {
+      await result.current.submitRawSolve(untrimmedQuery);
+    });
+
+    expect(solveSpy).toHaveBeenCalledWith(
+      {
+        schema_version: '1.0.0',
+        input_payload: {
+          input_mode: 'RAW_TEXT',
+          raw_query: untrimmedQuery, // Sent verbatim without trim
+          target_variable: 'x',
+        },
+        selected_method_id: null,
+      },
+      expect.any(AbortSignal)
+    );
+  });
+
+  it('invalidates sequence on query edit so in-flight request that ignores AbortSignal cannot overwrite cleared state (Section 4)', async () => {
+    let resolveA!: (value: ApiSolveResult) => void;
+    const promiseA = new Promise<ApiSolveResult>((res) => {
+      resolveA = res;
+    });
+
+    vi.spyOn(clientModule, 'solveEquation').mockImplementationOnce(() => promiseA);
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    // 1. Request A starts
+    let solvePromiseA: Promise<void>;
+    act(() => {
+      solvePromiseA = result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    expect(result.current.status).toBe('loading');
+
+    // 2. User edits query while A is still in-flight
+    act(() => {
+      result.current.setQuery('x^2 + 2*x + 1 = 0');
+    });
+
+    expect(result.current.query).toBe('x^2 + 2*x + 1 = 0');
+    expect(result.current.status).toBe('idle');
+    expect(result.current.result).toBeNull();
+    expect(result.current.httpStatus).toBeNull();
+
+    // 3. Request A resolves (simulating fetch ignoring abort)
+    await act(async () => {
+      resolveA({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      });
+      await solvePromiseA;
+    });
+
+    // 4. Stale response A MUST NOT overwrite cleared workspace state
+    expect(result.current.query).toBe('x^2 + 2*x + 1 = 0');
+    expect(result.current.status).toBe('idle');
+    expect(result.current.result).toBeNull();
+    expect(result.current.httpStatus).toBeNull();
+  });
+
+  it('invalidates sequence on clearWorkspace so in-flight request cannot restore old result (Section 5)', async () => {
+    let resolveA!: (value: ApiSolveResult) => void;
+    const promiseA = new Promise<ApiSolveResult>((res) => {
+      resolveA = res;
+    });
+
+    vi.spyOn(clientModule, 'solveEquation').mockImplementationOnce(() => promiseA);
+
+    const { result } = renderHook(() => useAlgebraWorkspace());
+
+    // 1. Request A starts
+    let solvePromiseA: Promise<void>;
+    act(() => {
+      solvePromiseA = result.current.submitRawSolve('x^2 - 5*x + 6 = 0');
+    });
+
+    expect(result.current.status).toBe('loading');
+
+    // 2. User clears workspace
+    act(() => {
+      result.current.clearWorkspace();
+    });
+
+    expect(result.current.query).toBe('');
+    expect(result.current.status).toBe('idle');
+    expect(result.current.result).toBeNull();
+
+    // 3. Request A resolves later while ignoring abort
+    await act(async () => {
+      resolveA({
+        kind: 'application',
+        status: 200,
+        response: mockSolvedTwoRoots,
+      });
+      await solvePromiseA;
+    });
+
+    // 4. Workspace remains cleared
+    expect(result.current.query).toBe('');
+    expect(result.current.status).toBe('idle');
+    expect(result.current.result).toBeNull();
+  });
+
+  it('guarantees newer request B supersedes delayed older request A (Section 6 / Section 33)', async () => {
     let resolveA!: (value: ApiSolveResult) => void;
     let resolveB!: (value: ApiSolveResult) => void;
 

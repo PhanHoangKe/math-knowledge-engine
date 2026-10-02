@@ -1,6 +1,7 @@
 import React from 'react';
 import type { VerifiedSolutionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
+import { SOLUTION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { MathLatex } from '../MathLatex/MathLatex';
 import styles from './SolutionSummaryPanel.module.css';
 
@@ -18,7 +19,7 @@ export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({ solu
           <h2 className={styles.cardTitle}>{t('panel_solution_summary')}</h2>
         </div>
         <span className={styles.outcomeBadge} data-testid="solution-outcome-badge">
-          {t(`enum_out_${solution.outcome}` as any)}
+          {t(SOLUTION_OUTCOME_I18N[solution.outcome])}
         </span>
       </div>
 

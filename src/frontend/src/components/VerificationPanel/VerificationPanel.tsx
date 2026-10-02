@@ -1,6 +1,8 @@
 import React from 'react';
 import type { VerificationCertificate } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
+import { VERIFICATION_OUTCOME_I18N } from '../../i18n/enumMappings';
+import { MathLatex } from '../MathLatex/MathLatex';
 import styles from './VerificationPanel.module.css';
 
 export interface VerificationPanelProps {
@@ -39,7 +41,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
           className={`${styles.outcomeBadge} ${isComplete ? styles.badgeSuccess : styles.badgeFailed}`}
           data-testid="verification-outcome-badge"
         >
-          {t(`enum_ver_out_${certificate.outcome}` as any)}
+          {t(VERIFICATION_OUTCOME_I18N[certificate.outcome])}
         </span>
       </div>
 
@@ -87,7 +89,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
         {/* Verification Check Badges */}
         <div className={styles.checksSection}>
-          <h3 className={styles.checksTitle}>Các tiêu chí kiểm chứng toán học:</h3>
+          <h3 className={styles.checksTitle}>{t('lbl_verification_criteria')}</h3>
           <div className={styles.checksGrid}>
             <div
               className={`${styles.checkItem} ${certificate.multiplicity_verified ? styles.checkPass : styles.checkNeutral}`}
@@ -115,11 +117,26 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 data-testid="check-no-real-roots"
               >
                 <span className={styles.checkIcon}>✓</span>
-                <span>Xác thực không có nghiệm thực</span>
+                <span>{t('lbl_cert_no_real_roots')}</span>
               </div>
             )}
           </div>
 
+          {/* Residual Checks */}
+          {certificate.residual_checks && certificate.residual_checks.length > 0 && (
+            <div className={styles.identitiesBox} data-testid="residual-checks">
+              <span className={styles.identitiesLabel}>{t('lbl_cert_residuals')}:</span>
+              <ul className={styles.identitiesList}>
+                {certificate.residual_checks.map((check, i) => (
+                  <li key={i}>
+                    <MathLatex latex={check} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Algebraic Identities Passed */}
           {certificate.algebraic_identities_passed &&
             certificate.algebraic_identities_passed.length > 0 && (
               <div className={styles.identitiesBox}>

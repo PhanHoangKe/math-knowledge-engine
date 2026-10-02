@@ -9,6 +9,7 @@ import type {
   SolveRequest,
   SolveResponse200,
   TransportErrorResponse,
+  TransportErrorCode,
 } from './contract';
 
 export type ApiSolveResult =
@@ -31,8 +32,17 @@ export class NetworkError extends Error {
   }
 }
 
+const FROZEN_TRANSPORT_ERROR_CODES: ReadonlySet<TransportErrorCode> = new Set<TransportErrorCode>([
+  'MALFORMED_JSON',
+  'REQUEST_VALIDATION_FAILED',
+  'PAYLOAD_TOO_LARGE',
+  'UNSUPPORTED_MEDIA_TYPE',
+  'API_NOT_FOUND',
+  'INTERNAL_TRANSPORT_ERROR',
+]);
+
 /**
- * Minimal safe runtime discriminator for Application SolveResponse200.
+ * Hardened structural runtime discriminator for Application SolveResponse200.
  */
 export function isApplicationResponse(data: unknown): data is SolveResponse200 {
   if (typeof data !== 'object' || data === null) {
@@ -40,18 +50,53 @@ export function isApplicationResponse(data: unknown): data is SolveResponse200 {
   }
   const obj = data as Record<string, unknown>;
   const status = obj.response_status;
-  return status === 'SOLVED' || status === 'ANALYZED_NO_EXECUTION' || status === 'ERROR';
+
+  if (status === 'SOLVED') {
+    return (
+      typeof obj.problem === 'object' &&
+      obj.problem !== null &&
+      typeof obj.solution === 'object' &&
+      obj.solution !== null &&
+      Array.isArray(obj.available_methods) &&
+      typeof obj.selected_method_id === 'string'
+    );
+  }
+
+  if (status === 'ANALYZED_NO_EXECUTION') {
+    return (
+      typeof obj.problem === 'object' &&
+      obj.problem !== null &&
+      typeof obj.reason_code === 'string' &&
+      (obj.available_methods === undefined || Array.isArray(obj.available_methods))
+    );
+  }
+
+  if (status === 'ERROR') {
+    return (
+      typeof obj.error_code === 'string' &&
+      typeof obj.message_vi === 'string' &&
+      typeof obj.message_en === 'string'
+    );
+  }
+
+  return false;
 }
 
 /**
- * Minimal safe runtime discriminator for TransportErrorResponse.
+ * Hardened structural runtime discriminator for TransportErrorResponse.
  */
 export function isTransportErrorResponse(data: unknown): data is TransportErrorResponse {
   if (typeof data !== 'object' || data === null) {
     return false;
   }
   const obj = data as Record<string, unknown>;
-  return obj.transport_status === 'ERROR' && typeof obj.transport_error_code === 'string';
+  return (
+    obj.transport_status === 'ERROR' &&
+    typeof obj.transport_error_code === 'string' &&
+    FROZEN_TRANSPORT_ERROR_CODES.has(obj.transport_error_code as TransportErrorCode) &&
+    typeof obj.message_vi === 'string' &&
+    typeof obj.message_en === 'string'
+  );
 }
 
 /**

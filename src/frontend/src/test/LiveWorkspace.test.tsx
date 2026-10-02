@@ -9,6 +9,7 @@ import {
   mockAnalyzedMethodNotApplicable,
   mockApplicationErrorSyntax,
   mockTransportError422,
+  mockTransportErrorWithSecretDetail,
 } from './fixtures/responses';
 import { NetworkError, ProtocolError } from '../api/client';
 
@@ -140,7 +141,7 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     // Must render all 3 cards from fixture
     expect(screen.getByTestId('method-card-QUAD_FORMULA_STANDARD')).toBeInTheDocument();
     expect(screen.getByTestId('method-card-QUAD_FORMULA_REDUCED')).toBeInTheDocument();
-    expect(screen.getByTestId('method-card-QUAD_VIETA_FACTORING_TRIAL')).toBeInTheDocument();
+    expect(screen.getByTestId('method-card-QUAD_COMPLETE_SQUARE')).toBeInTheDocument();
 
     // Verify count badge
     expect(screen.getByText('3 phương thức')).toBeInTheDocument();
@@ -166,11 +167,11 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     fireEvent.click(screen.getByTestId('compute-btn'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('method-card-QUAD_VIETA_FACTORING_TRIAL')).toBeInTheDocument();
+      expect(screen.getByTestId('method-card-QUAD_COMPLETE_SQUARE')).toBeInTheDocument();
     });
 
-    // Click switch method button on QUAD_VIETA_FACTORING_TRIAL card
-    const methodCard = screen.getByTestId('method-card-QUAD_VIETA_FACTORING_TRIAL');
+    // Click switch method button on QUAD_COMPLETE_SQUARE card
+    const methodCard = screen.getByTestId('method-card-QUAD_COMPLETE_SQUARE');
     const selectBtn = methodCard.querySelector('button')!;
     fireEvent.click(selectBtn);
 
@@ -188,7 +189,7 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
           c: { numerator: 6, denominator: 1 },
           target_variable: 'x',
         },
-        selected_method_id: 'QUAD_VIETA_FACTORING_TRIAL',
+        selected_method_id: 'QUAD_COMPLETE_SQUARE',
       },
       expect.any(AbortSignal)
     );
@@ -315,6 +316,31 @@ describe('MKE Live Algebra Workspace UI Component (<App />)', () => {
     });
 
     expect(screen.getByTestId('transport-error-code')).toHaveTextContent('REQUEST_VALIDATION_FAILED');
+  });
+
+  it('N2: Transport detail whitelist prevents unknown secret sentinel leakage (Section 8)', async () => {
+    vi.spyOn(clientModule, 'solveEquation').mockResolvedValue({
+      kind: 'transport-error',
+      status: 400,
+      response: mockTransportErrorWithSecretDetail,
+    });
+
+    render(<App />);
+
+    const input = screen.getByTestId('equation-input');
+    fireEvent.change(input, { target: { value: 'x^2 = 0' } });
+    fireEvent.click(screen.getByTestId('compute-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('transport-error-panel')).toBeInTheDocument();
+    });
+
+    // Safe field must be rendered
+    expect(screen.getByText('Safe validation summary')).toBeInTheDocument();
+
+    // Secret sentinel MUST NOT be present anywhere in the DOM
+    expect(screen.queryByText(/MUST_NOT_RENDER/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/SECRET_UNKNOWN_DETAIL_SENTINEL/i)).not.toBeInTheDocument();
   });
 
   it('O: Network exceptions render generic message without raw exception string leakage', async () => {

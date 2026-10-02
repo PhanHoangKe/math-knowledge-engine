@@ -89,7 +89,7 @@ export const TracePanel: React.FC<TracePanelProps> = ({ trace }) => {
         {trace.steps && trace.steps.length > 0 ? (
           trace.steps.map((step) => <StepItem key={step.step_number} step={step} />)
         ) : (
-          <div className={styles.emptySteps}>Không có bước giải chi tiết nào.</div>
+          <div className={styles.emptySteps}>{t('lbl_trace_empty')}</div>
         )}
       </div>
     </div>

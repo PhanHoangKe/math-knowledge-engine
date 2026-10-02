@@ -69,8 +69,8 @@ export const mockSolvedTwoRoots: SolvedResponse = {
       reasons: ['Hệ số b = -5 là số lẻ, không áp dụng được b = 2b\'.'],
     },
     {
-      method_id: 'QUAD_VIETA_FACTORING_TRIAL',
-      title_vi: 'Nhẩm nghiệm theo định lý Viète & Phân tích nhân tử',
+      method_id: 'QUAD_COMPLETE_SQUARE',
+      title_vi: 'Phương pháp biến đổi thêm bớt tạo bình phương hoàn thức',
       mathematical_applicability: 'APPLICABLE',
       execution_availability: 'UNAVAILABLE',
       pedagogical_recommendation: 'RECOMMENDED',
@@ -255,7 +255,7 @@ export const mockAnalyzedMethodNotExecutable: AnalyzedNoExecutionResponse = {
   response_status: 'ANALYZED_NO_EXECUTION',
   reason_code: 'METHOD_NOT_EXECUTABLE',
   analysis_message_vi: 'Phương pháp được chọn chưa hỗ trợ động cơ giải chi tiết.',
-  selected_method_id: 'QUAD_VIETA_FACTORING_TRIAL',
+  selected_method_id: 'QUAD_COMPLETE_SQUARE',
   problem: mockSolvedTwoRoots.problem,
   available_methods: mockSolvedTwoRoots.available_methods,
 };
@@ -278,6 +278,13 @@ export const mockApplicationErrorSyntax: ApplicationErrorResponse = {
     start: 3,
     end: 7,
   },
+};
+
+export const mockTransportError400: TransportErrorResponse = {
+  transport_status: 'ERROR',
+  transport_error_code: 'MALFORMED_JSON',
+  message_vi: 'Dữ liệu JSON trong yêu cầu không hợp lệ.',
+  message_en: 'Malformed JSON payload in request.',
 };
 
 export const mockTransportError422: TransportErrorResponse = {
@@ -303,4 +310,15 @@ export const mockTransportError415: TransportErrorResponse = {
   transport_error_code: 'UNSUPPORTED_MEDIA_TYPE',
   message_vi: 'Loại nội dung không được hỗ trợ. Vui lòng gửi application/json.',
   message_en: 'Unsupported Media Type. Expected application/json.',
+};
+
+export const mockTransportErrorWithSecretDetail: TransportErrorResponse = {
+  transport_status: 'ERROR',
+  transport_error_code: 'REQUEST_VALIDATION_FAILED',
+  message_vi: 'Lỗi xác thực dữ liệu kiểm tra rò rỉ chi tiết.',
+  message_en: 'Validation error for testing detail leakage.',
+  details: {
+    safe_expected_field: 'Safe validation summary',
+    SECRET_UNKNOWN_DETAIL_SENTINEL: 'MUST_NOT_RENDER',
+  },
 };

@@ -115,6 +115,30 @@ describe('MKE Typed API Client (POST /api/v1/algebra/solve)', () => {
     }
   });
 
+  it('classifies HTTP 400 MALFORMED_JSON as TransportErrorResponse', async () => {
+    const malformedJsonError = {
+      transport_status: 'ERROR' as const,
+      transport_error_code: 'MALFORMED_JSON' as const,
+      message_vi: 'Dữ liệu JSON trong yêu cầu không hợp lệ.',
+      message_en: 'Malformed JSON payload in request.',
+    };
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(malformedJsonError), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await solveEquation(dummyRawRequest);
+
+    expect(result.kind).toBe('transport-error');
+    expect(result.status).toBe(400);
+    if (result.kind === 'transport-error') {
+      expect(result.response.transport_status).toBe('ERROR');
+      expect(result.response.transport_error_code).toBe('MALFORMED_JSON');
+    }
+  });
+
   it('classifies HTTP 413 Payload Too Large as TransportErrorResponse', async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(mockTransportError413), {
@@ -218,6 +242,47 @@ describe('MKE Typed API Client (POST /api/v1/algebra/solve)', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
+    );
+
+    await expect(solveEquation(dummyRawRequest)).rejects.toThrow(ProtocolError);
+  });
+
+  it('throws ProtocolError when response_status is SOLVED but missing required structural fields', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ response_status: 'SOLVED' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(solveEquation(dummyRawRequest)).rejects.toThrow(ProtocolError);
+  });
+
+  it('throws ProtocolError when response_status is ERROR but missing localized messages', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ response_status: 'ERROR', error_code: 'SYNTAX_ERROR' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(solveEquation(dummyRawRequest)).rejects.toThrow(ProtocolError);
+  });
+
+  it('throws ProtocolError when transport_error_code is not in frozen enum set', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          transport_status: 'ERROR',
+          transport_error_code: 'UNKNOWN_CUSTOM_CODE',
+          message_vi: 'Lỗi không xác định',
+          message_en: 'Unknown error',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
     );
 
     await expect(solveEquation(dummyRawRequest)).rejects.toThrow(ProtocolError);

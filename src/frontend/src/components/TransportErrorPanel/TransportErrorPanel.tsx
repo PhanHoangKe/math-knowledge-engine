@@ -8,9 +8,89 @@ export interface TransportErrorPanelProps {
   httpStatus?: number | null;
 }
 
+const SAFE_WHITELIST_KEYS = new Set([
+  'detail',
+  'message',
+  'msg',
+  'type',
+  'error',
+  'code',
+  'field',
+  'expected_content_type',
+  'max_bytes',
+  'actual_bytes',
+  'safe_expected_field',
+]);
+
+interface SafeValidationError {
+  loc?: string;
+  msg?: string;
+  type?: string;
+}
+
+interface SafeDetailItem {
+  key: string;
+  value: string;
+}
+
+function extractSafeDetails(details: Record<string, unknown> | undefined): {
+  validationErrors: SafeValidationError[];
+  scalarDetails: SafeDetailItem[];
+} {
+  const validationErrors: SafeValidationError[] = [];
+  const scalarDetails: SafeDetailItem[] = [];
+
+  if (!details || typeof details !== 'object') {
+    return { validationErrors, scalarDetails };
+  }
+
+  // If details has an errors array or detail array (e.g., Pydantic validation items)
+  const candidateArray = Array.isArray(details)
+    ? details
+    : Array.isArray(details.errors)
+    ? details.errors
+    : Array.isArray(details.detail)
+    ? details.detail
+    : null;
+
+  if (candidateArray) {
+    for (const item of candidateArray) {
+      if (item && typeof item === 'object') {
+        const errObj = item as Record<string, unknown>;
+        const loc = Array.isArray(errObj.loc)
+          ? errObj.loc.map(String).join(' → ')
+          : typeof errObj.loc === 'string'
+          ? errObj.loc
+          : undefined;
+        const msg = typeof errObj.msg === 'string' ? errObj.msg : undefined;
+        const type = typeof errObj.type === 'string' ? errObj.type : undefined;
+        if (loc || msg || type) {
+          validationErrors.push({ loc, msg, type });
+        }
+      }
+    }
+  }
+
+  // Process scalar keys against strict whitelist
+  for (const [key, val] of Object.entries(details)) {
+    if (SAFE_WHITELIST_KEYS.has(key)) {
+      if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+        scalarDetails.push({ key, value: String(val) });
+      }
+    }
+  }
+
+  return { validationErrors, scalarDetails };
+}
+
 export const TransportErrorPanel: React.FC<TransportErrorPanelProps> = ({ error, httpStatus }) => {
   const { language, t } = usePreferences();
   const localizedMsg = language === 'en' ? error.message_en : error.message_vi;
+
+  const { validationErrors, scalarDetails } = extractSafeDetails(
+    error.details as Record<string, unknown> | undefined
+  );
+  const hasDetails = validationErrors.length > 0 || scalarDetails.length > 0;
 
   return (
     <div className={styles.card} data-testid="transport-error-panel">
@@ -45,12 +125,34 @@ export const TransportErrorPanel: React.FC<TransportErrorPanelProps> = ({ error,
           {localizedMsg}
         </p>
 
-        {error.details && Object.keys(error.details).length > 0 && (
-          <div className={styles.detailsBox}>
+        {hasDetails && (
+          <div className={styles.detailsBox} data-testid="transport-error-details">
             <span className={styles.detailsLabel}>{t('err_details_lbl')}:</span>
-            <pre className={styles.detailsCode}>
-              {JSON.stringify(error.details, null, 2)}
-            </pre>
+            {scalarDetails.map((item) => (
+              <div key={item.key} className={styles.detailRow}>
+                <span className={styles.detailKey}>{item.key}:</span>
+                <span className={styles.detailValue}>{item.value}</span>
+              </div>
+            ))}
+            {validationErrors.map((err, idx) => (
+              <div key={idx} className={styles.validationItem} data-testid={`validation-error-${idx}`}>
+                {err.loc && (
+                  <div>
+                    <strong>{t('lbl_validation_error_loc')}:</strong> <code>{err.loc}</code>
+                  </div>
+                )}
+                {err.msg && (
+                  <div>
+                    <strong>{t('lbl_validation_error_msg')}:</strong> {err.msg}
+                  </div>
+                )}
+                {err.type && (
+                  <div>
+                    <strong>{t('lbl_validation_error_type')}:</strong> <code>{err.type}</code>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

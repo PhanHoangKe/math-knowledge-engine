@@ -1,6 +1,7 @@
 import React from 'react';
 import type { DegenerateSolutionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
+import { SOLUTION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
 import { formatRational } from '../../utils/formatters';
@@ -21,7 +22,7 @@ export const DegenerateSolutionPanel: React.FC<DegenerateSolutionPanelProps> = (
             <h2 className={styles.cardTitle}>{t('panel_degenerate_solution')}</h2>
           </div>
           <span className={styles.outcomeBadge} data-testid="degenerate-outcome-badge">
-            {t(`enum_out_${solution.outcome}` as any)}
+            {t(SOLUTION_OUTCOME_I18N[solution.outcome])}
           </span>
         </div>
 
@@ -35,7 +36,7 @@ export const DegenerateSolutionPanel: React.FC<DegenerateSolutionPanelProps> = (
 
           {solution.linear_root && (
             <div className={styles.rootSection} data-testid="degenerate-linear-root">
-              <span className={styles.sectionLabel}>Nghiệm bậc nhất duy nhất:</span>
+              <span className={styles.sectionLabel}>{t('lbl_linear_single_root')}</span>
               <div className={styles.rootDisplay}>
                 <MathLatex latex={`x = ${formatRational(solution.linear_root)}`} />
               </div>
@@ -44,9 +45,12 @@ export const DegenerateSolutionPanel: React.FC<DegenerateSolutionPanelProps> = (
         </div>
       </div>
 
-      {/* Verification Certificate for Degenerate Equation */}
+      {/* Verification Certificate for Degenerate Equation with explicit verification scope */}
       {solution.certificate && (
-        <VerificationPanel certificate={solution.certificate} />
+        <VerificationPanel
+          certificate={solution.certificate}
+          verificationScope={solution.verification_scope}
+        />
       )}
     </div>
   );

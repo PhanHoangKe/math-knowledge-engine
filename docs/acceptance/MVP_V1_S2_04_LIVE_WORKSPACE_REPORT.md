@@ -5,7 +5,7 @@
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
 **Date:** 2026-10-02  
-**Target Milestone:** S2-04 Live React Algebra Workspace Integration  
+**Target Milestone:** S2-04-R1 Live React Algebra Workspace Integration & Safety Closeout  
 **Branch:** `product/mvp-v1-s2-04-live-workspace`  
 **Baseline Lineage:**
 - Accepted S2-03 Baseline: `fecb6c23d01e90e010f76aed0446e0ed96cf35d9`
@@ -21,11 +21,12 @@ Stage S2-04 transforms the static S2-03 frontend shell into a fully connected, l
 
 The frontend architecture strictly enforces that the **backend remains the sole mathematical authority**:
 1. **Zero Client Mathematical Solving:** The browser derives no discriminants, computes no roots, evaluates no method applicabilities, and fabricates no certificates.
-2. **Deterministic Response Discrimination:** Direct typed runtime discrimination of backend response states (`SOLVED`, `ANALYZED_NO_EXECUTION`, `ERROR`, `TransportErrorResponse`, `NetworkError`, `ProtocolError`).
-3. **Stateless Live Method Switching:** Switching methods reuses the exact canonical rational coefficients (`a`, `b`, `c`) returned by the backend without client recalculation or AST re-parsing.
+2. **Deterministic Response Discrimination:** Direct typed structural runtime discrimination of backend response states (`SOLVED`, `ANALYZED_NO_EXECUTION`, `ERROR`, `TransportErrorResponse`, `NetworkError`, `ProtocolError`).
+3. **Stateless Live Method Switching:** Switching methods reuses the exact canonical rational coefficients (`a`, `b`, `c`) returned by the backend with parameter `selected_method_id` without client recalculation or AST re-parsing.
 4. **Pedagogical and Cryptographic Honesty:** Clear visual disclaimers clarify that the step-by-step trace is a pedagogical explanation (verification scope is `FINAL_SOLUTION`) and that the `integrity_fingerprint` is an unkeyed SHA-256 digest identifying verified certificate content (not a digital signature).
 5. **Offline KaTeX Rendering:** Mathematical typesetting is handled by the locally vendored KaTeX engine with strict security settings (`throwOnError: false`, `trust: false`, zero `dangerouslySetInnerHTML`).
-6. **Concurrency & Stale-Result Guards:** Sequence counters and `AbortController` ensure newer requests supersede older in-flight requests and editing query text immediately invalidates previous results.
+6. **Concurrency & Stale-Result Guards:** Sequence counters and `AbortController` ensure newer requests supersede older in-flight requests, and editing or clearing query text immediately increments the sequence counter and invalidates pending in-flight responses.
+7. **Transport Detail Whitelisting:** Transport error details are projected through a strict whitelist to prevent leaking internal debug/trace keys, raw inputs, or sentinel tokens.
 
 ---
 
@@ -66,18 +67,18 @@ The frontend architecture strictly enforces that the **backend remains the sole 
 | Component / Module | Path | Description |
 | :--- | :--- | :--- |
 | **API Contract** | `src/frontend/src/api/contract.ts` | Complete set of DTO aliases derived strictly from `api.generated.ts`. |
-| **API Client** | `src/frontend/src/api/client.ts` | Native `fetch` client with runtime response discrimination and sanitized error classes (`NetworkError`, `ProtocolError`). |
-| **Workspace State Hook** | `src/frontend/src/state/useAlgebraWorkspace.ts` | State machine with sequence guards, cancellation, query-edit cache invalidation, and coefficient-based method switching. |
+| **API Client** | `src/frontend/src/api/client.ts` | Native `fetch` client with structural response discrimination and sanitized error classes (`NetworkError`, `ProtocolError`). |
+| **Workspace State Hook** | `src/frontend/src/state/useAlgebraWorkspace.ts` | State machine with sequence guards, cancellation, query-edit cache invalidation, verbatim raw query preservation, and coefficient-based method switching. |
 | **KaTeX Renderer** | `src/frontend/src/components/MathLatex/MathLatex.tsx` | Offline KaTeX renderer with `trust: false`, `throwOnError: false`, and safe text fallback. |
 | **Canonical Problem Panel** | `src/frontend/src/components/CanonicalProblemPanel/` | Displays canonical LaTeX equation, problem ID, revision hash, classification, rational coefficients, and quadratic discriminant analysis. |
 | **Method Catalog Panel** | `src/frontend/src/components/MethodCatalogPanel/` | Dynamically renders all methods in `available_methods` with applicability, recommendation, and execution badges. |
-| **Solution Summary Panel** | `src/frontend/src/components/SolutionSummaryPanel/` | Displays solution set LaTeX, real roots from `latex_str`, and approximate floats. |
+| **Solution Summary Panel** | `src/frontend/src/components/SolutionSummaryPanel/` | Displays solution set LaTeX, real roots from `latex_str`, and numeric approximations from `approximate_float`. |
 | **Trace Panel** | `src/frontend/src/components/TracePanel/` | Recursively renders pedagogical solution steps with rules, explanations, and verification scope disclaimers. |
-| **Verification Panel** | `src/frontend/src/components/VerificationPanel/` | Renders certificate metadata, integrity fingerprint (unkeyed SHA-256 disclaimer), and verification checks. |
-| **Degenerate Solution Panel** | `src/frontend/src/components/DegenerateSolutionPanel/` | Renders linear, identity, or contradiction solutions with dedicated certificates and zero fake quadratic methods. |
-| **Method Not Executable Panel** | `src/frontend/src/components/MethodNotExecutablePanel/` | Honestly displays `METHOD_NOT_EXECUTABLE` or `METHOD_NOT_APPLICABLE` without synthetic fallback. |
-| **Application Error Panel** | `src/frontend/src/components/ApplicationErrorPanel/` | Renders application error codes (`SYNTAX_ERROR`, etc.), localized messages, and input spans. |
-| **Transport Error Panel** | `src/frontend/src/components/TransportErrorPanel/` | Renders transport error codes (400, 413, 415, 422, 500) and localized messages. |
+| **Verification Panel** | `src/frontend/src/components/VerificationPanel/` | Renders certificate metadata, integrity fingerprint (unkeyed SHA-256 disclaimer), residual checks, and verification checks. |
+| **Degenerate Solution Panel** | `src/frontend/src/components/DegenerateSolutionPanel/` | Renders linear, identity, or contradiction solutions with dedicated certificates and explicit `verification_scope`. |
+| **Method Not Executable Panel** | `src/frontend/src/components/MethodNotExecutablePanel/` | Honestly displays `METHOD_NOT_EXECUTABLE` or `METHOD_NOT_APPLICABLE` with `selected_method_id` without synthetic fallback. |
+| **Application Error Panel** | `src/frontend/src/components/ApplicationErrorPanel/` | Renders application error codes (`SYNTAX_ERROR`, `EQUATION_STRUCTURE_ERROR`, etc.), localized messages, and input spans. |
+| **Transport Error Panel** | `src/frontend/src/components/TransportErrorPanel/` | Renders transport error codes (400, 413, 415, 422, 500) and safe whitelisted details without arbitrary JSON dump. |
 | **Network Error Panel** | `src/frontend/src/components/NetworkErrorPanel/` | Renders generic localized network/protocol errors with retry capability and zero raw exception leakage. |
 | **Controlled Equation Input** | `src/frontend/src/components/EquationInputShell/` | Controlled input with quick math keys, Enter key submit, loading spinner, and compute button state management. |
 
@@ -119,20 +120,20 @@ npm test
 
  RUN  v3.0.7 D:/Math Knowledge Engine/src/frontend
 
- ✓ src/test/apiContract.test.ts (3 tests) 13ms
- ✓ src/test/frontendPurity.test.ts (1 test) 19ms
- ✓ src/test/apiClient.test.ts (11 tests) 45ms
- ✓ src/test/i18n.test.ts (4 tests) 34ms
- ✓ src/test/workspaceState.test.ts (5 tests) 74ms
- ✓ src/test/preferences.test.tsx (8 tests) 89ms
- ✓ src/test/MathLatex.test.tsx (3 tests) 48ms
- ✓ src/test/App.test.tsx (7 tests) 462ms
- ✓ src/test/LiveWorkspace.test.tsx (14 tests) 747ms
+ ✓ src/test/apiContract.test.ts (3 tests)
+ ✓ src/test/frontendPurity.test.ts (1 test)
+ ✓ src/test/apiClient.test.ts (15 tests)
+ ✓ src/test/i18n.test.ts (4 tests)
+ ✓ src/test/workspaceState.test.ts (8 tests)
+ ✓ src/test/preferences.test.tsx (8 tests)
+ ✓ src/test/MathLatex.test.tsx (3 tests)
+ ✓ src/test/App.test.tsx (7 tests)
+ ✓ src/test/LiveWorkspace.test.tsx (15 tests)
 
  Test Files  9 passed (9)
-      Tests  56 passed (56)
-   Start at  08:04:56
-   Duration  3.40s
+      Tests  64 passed (64)
+   Start at  08:18:20
+   Duration  3.16s
 ```
 
 ### 4. Production Bundle Build (`build`)
@@ -143,13 +144,13 @@ npm run build
 
 vite v6.2.0 building for production...
 transforming...
-✓ 66 modules transformed.
+✓ 67 modules transformed.
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.73 kB │ gzip:  0.43 kB
 dist/assets/index-Bo47x40a.css   35.65 kB │ gzip:  6.82 kB
-dist/assets/index-CmnMzEkc.js   204.52 kB │ gzip: 64.01 kB
-✓ built in 1.27s
+dist/assets/index-BfJ7p7qy.js   208.83 kB │ gzip: 65.05 kB
+✓ built in 936ms
 ```
 
 ---
@@ -186,20 +187,20 @@ Local integration test executed through Vite dev server reverse proxy (`http://1
 ```text
 pytest -q tests/test_browser_canonical_ui.py
 .....................                                                    [100%]
-21 passed in 45.26s
+21 passed in 44.18s
 ```
 - **Passed:** 21 / 21 tests (100% pass rate). Legacy `ui/ui00/` source code is completely unmodified.
 
 ### 2. Transport Acceptance & Smoke Suites
 ```text
 pytest -q tests/test_transport_fastapi_s2_smoke.py tests/test_transport_fastapi_s2_acceptance.py
-149 passed, 5 warnings in 3.27s
+149 passed, 5 warnings in 3.16s
 ```
 
 ### 3. S1 / S0 Application & Domain Acceptance Suites
 ```text
 pytest -q tests/test_application_s1_acceptance.py tests/test_application_orchestrator_s1.py tests/test_application_traces_s1.py tests/test_application_degenerate_s1.py tests/test_application_normalizer_s1.py tests/test_domain_core_s0.py
-278 passed in 0.93s
+278 passed in 0.86s
 ```
 
 ---
@@ -230,5 +231,5 @@ Static code analysis in `src/test/frontendPurity.test.ts` scanned all production
 
 ## 9. Audit Status
 
-**STATUS:** PENDING INDEPENDENT S2-04 AUDIT  
+**STATUS:** PENDING INDEPENDENT S2-04-R1 FINAL AUDIT  
 *(Implementation engineer will await authorization before proceeding to Stage S2-05).*
