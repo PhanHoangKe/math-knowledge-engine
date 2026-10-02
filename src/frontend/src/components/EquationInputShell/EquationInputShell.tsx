@@ -54,6 +54,14 @@ const SAMPLE_EQUATIONS = [
   'x^2 - 2 = 0',
 ];
 
+export const NATURAL_MATH_KEYS: string[][] = [
+  ['π', '°', '∞', '√', '∫', 'Σ', '∂', 'Π', '∀', '∃', '∪', '∩', '∇', 'Δ', 'α', 'β'],
+  ['γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ρ', 'σ', 'τ', 'φ', 'χ'],
+  ['ψ', 'ω', 'Γ', 'Θ', 'Λ', 'Ξ', 'Υ', 'Φ', 'Ψ', 'Ω', '℧', 'Å', 'ħ', 'ℵ', '⇄', '→'],
+  ['⊕', '⊙', '♂', '♀', '†', '≠', '≥', '≤'],
+];
+
+
 export const EquationInputShell: React.FC<EquationInputShellProps> = ({
   query,
   onQueryChange,
@@ -498,16 +506,17 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
             <div className={styles.naturalActionsBar}>
               <button
                 type="button"
-                className={`${styles.iconActionBtn} ${showQuickKeys ? styles.iconActionActive : ''}`}
+                className={`${styles.naturalTabBtn} ${showQuickKeys ? styles.naturalTabActive : ''}`}
                 onClick={() => setShowQuickKeys((prev) => !prev)}
                 title={t('tooltip_keyboard')}
                 aria-label={t('tooltip_keyboard')}
+                aria-expanded={showQuickKeys}
               >
                 <KeyboardIcon size={15} />
               </button>
               <button
                 type="button"
-                className={styles.iconActionBtn}
+                className={styles.naturalActionIconBtn}
                 onClick={handleRandomSample}
                 title={t('tooltip_samples')}
                 aria-label={t('tooltip_samples')}
@@ -516,7 +525,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
               </button>
               <button
                 type="button"
-                className={styles.iconActionBtn}
+                className={styles.naturalActionIconBtn}
                 onClick={handleCameraClick}
                 title={t('tooltip_upload')}
                 aria-label={t('tooltip_upload')}
@@ -525,7 +534,7 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
               </button>
               <button
                 type="button"
-                className={styles.iconActionBtn}
+                className={styles.naturalActionIconBtn}
                 onClick={handleRandomSample}
                 title={t('tooltip_random')}
                 aria-label={t('tooltip_random')}
@@ -548,23 +557,30 @@ export const EquationInputShell: React.FC<EquationInputShellProps> = ({
         </div>
       )}
 
-      {/* Expanded Quick Keys in Natural Mode if toggled */}
+      {/* Expanded Natural Math Drawer in Natural Mode if toggled */}
       {mode === 'natural' && showQuickKeys && (
-        <div className={styles.quickKeysDrawer}>
-          <span className={styles.quickKeysLabel}>{t('quick_keys_label')}</span>
-          {['*', 'x', '^2', '^0', '/', '=', '(', ')'].map((keySymbol) => (
-            <button
-              key={keySymbol}
-              type="button"
-              className={styles.quickKeyBtn}
-              onClick={() => handlePaletteAction(keySymbol)}
-              disabled={isLoading}
-            >
-              {keySymbol}
-            </button>
-          ))}
+        <div className={styles.naturalMathDrawer} data-testid="natural-math-drawer">
+          <div className={styles.naturalMathGrid}>
+            {NATURAL_MATH_KEYS.map((row, rowIdx) => (
+              <div key={rowIdx} className={styles.naturalMathRow}>
+                {row.map((symbol) => (
+                  <button
+                    key={symbol}
+                    type="button"
+                    className={styles.naturalMathKeyBtn}
+                    onClick={() => handlePaletteAction(symbol)}
+                    disabled={isLoading}
+                    title={`Chèn ${symbol}`}
+                  >
+                    {symbol}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
 
       {/* Status Note Indicator */}
       <div className={styles.statusNote}>

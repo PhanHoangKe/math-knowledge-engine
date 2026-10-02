@@ -300,25 +300,55 @@
 .naturalActionsBar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.naturalIconBtn {
+.naturalTabBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+  color: #ea580c;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.naturalTabBtn:hover {
+  background: #fdf2e9;
+  color: #c2410c;
+}
+
+.naturalTabActive {
+  background: #f5f5f5 !important;
+  border: 1px solid #dfdfdf !important;
+  border-bottom: 1px solid #f5f5f5 !important;
+  color: #ea580c !important;
+  position: relative;
+  z-index: 10;
+  margin-bottom: -1px;
+}
+
+.naturalActionIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: none;
   border-radius: 4px;
   color: #ea580c;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.naturalIconBtn:hover {
-  background: #ffedd5;
+.naturalActionIconBtn:hover {
+  background: #fdf2e9;
+  color: #c2410c;
 }
 
 /* Drawer & Quick Keys */
@@ -328,45 +358,72 @@
   margin-top: 4px;
 }
 
-.quickKeysDrawer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* Natural Math Drawer */
+.naturalMathDrawer {
   width: 100%;
-  max-width: 840px;
-  margin-top: 6px;
-  padding: 5px 10px;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  border-radius: 7px;
+  max-width: 100%;
+  background: #f5f5f5;
+  border-top: 1px solid #dfdfdf;
+  border-bottom: 1px solid #dfdfdf;
+  padding: 16px 12px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  animation: fadeIn 0.15s ease-out;
   overflow-x: auto;
 }
 
-.quickKeysLabel {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #92400e;
-  white-space: nowrap;
+.naturalMathGrid {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
-.quickKeyBtn {
-  min-width: 28px;
-  height: 28px;
-  padding: 2px 6px;
+.naturalMathRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.naturalMathKeyBtn {
+  width: 36px;
+  height: 34px;
   background: #ffffff;
-  border: 1px solid #fcd34d;
+  border: 1px solid #dfdfdf;
   border-radius: 4px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #78350f;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-family: 'Cambria Math', 'STIX Two Math', 'Source Sans 3', -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #222222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
+  user-select: none;
+  padding: 0;
 }
 
-.quickKeyBtn:hover:not(:disabled) {
-  background: #fef9c3;
-  border-color: #f59e0b;
+.naturalMathKeyBtn:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.18);
+  transform: translateY(-1px);
 }
+
+.naturalMathKeyBtn:active:not(:disabled) {
+  background: #f0f0f0;
+  transform: translateY(0);
+}
+
+.naturalMathKeyBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 /* Status Note */
 .statusNote {
