@@ -124,13 +124,19 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           const targetId = focusedNodeId || findFirstTextNodeId(cloned) || '';
           const res = findNodeAndParent(cloned, targetId);
           if (res && res.node.type === 'text') {
-            if (res.node.value && !res.node.value.endsWith(' ') && !res.node.value.endsWith('+') && !res.node.value.endsWith('-') && !res.node.value.endsWith('−') && !res.node.value.endsWith('=')) {
+            if (
+              res.node.value &&
+              !res.node.value.endsWith(' ') &&
+              !res.node.value.endsWith('+') &&
+              !res.node.value.endsWith('-') &&
+              !res.node.value.endsWith('−') &&
+              !res.node.value.endsWith('=')
+            ) {
               res.node.value += '²';
               notifyChange(cloned);
               return;
             }
           }
-          // Empty base with exponent 2
           templateToInsert = createDefaultPower('', '2');
           preferBaseFocus = true;
           break;
@@ -145,7 +151,7 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
               const baseStr = match[1]!;
               res.node.value = res.node.value.slice(0, res.node.value.length - baseStr.length);
               templateToInsert = createDefaultPower(baseStr, '');
-              insertBlockAtFocus(templateToInsert);
+              insertBlockAtFocus(templateToInsert, false);
               return;
             }
           }
@@ -267,7 +273,6 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
       const trailingText = createEmptyTextNode('');
       if (res && res.node.type === 'text') {
         if (!res.node.value) {
-          // Replace empty text slot with template + trailing text
           res.parent.splice(res.index, 1, newBlock, trailingText);
         } else {
           res.parent.splice(res.index + 1, 0, newBlock, trailingText);
@@ -323,7 +328,6 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
           }
           notifyChange(cloned);
         } else {
-          // res.index === 0: delete enclosing template block!
           const enclosing = findEnclosingBlockAndParent(cloned, focusedNodeId);
           if (enclosing) {
             enclosing.parent.splice(enclosing.index, 1);
@@ -368,7 +372,6 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 }
                 notifyChange(cloned);
               } else {
-                // Delete enclosing template block
                 const enclosing = findEnclosingBlockAndParent(cloned, nodeId);
                 if (enclosing) {
                   e.preventDefault();
@@ -500,7 +503,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
             if (b.type === 'sqrt') {
               return (
                 <span key={b.id} className={styles.sqrtBlock}>
-                  <span className={styles.sqrtSymbol}>√</span>
+                  <svg className={styles.sqrtRadicalSvg} viewBox="0 0 12 36" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M 1 20 L 3.5 20 L 6.5 33 L 11 2 L 12 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <div className={styles.slotRadicandWrap}>
                     {renderSlotList(b.radicand, false, depth + 1, 'Biểu thức dưới căn')}
                   </div>
@@ -514,7 +519,9 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                   <div className={styles.slotNthIndexWrap}>
                     {renderSlotList(b.index, false, depth + 1, 'Bậc căn')}
                   </div>
-                  <span className={styles.sqrtSymbol}>√</span>
+                  <svg className={styles.sqrtRadicalSvg} viewBox="0 0 12 36" fill="none" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M 1 20 L 3.5 20 L 6.5 33 L 11 2 L 12 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <div className={styles.slotRadicandWrap}>
                     {renderSlotList(b.radicand, false, depth + 1, 'Biểu thức dưới căn')}
                   </div>
@@ -544,12 +551,14 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
                 <span key={b.id} className={styles.integralBlock}>
                   {b.isDefinite ? (
                     <span className={styles.defIntegralSymbolWrap}>
-                      <div className={styles.slotSuper}>
-                        {renderSlotList(b.upper || [], false, depth + 1, 'Cận trên')}
-                      </div>
                       <span className={styles.integralSymbol}>∫</span>
-                      <div className={styles.slotSub}>
-                        {renderSlotList(b.lower || [], false, depth + 1, 'Cận dưới')}
+                      <div className={styles.integralLimitsCol}>
+                        <div className={styles.slotSuper}>
+                          {renderSlotList(b.upper || [], false, depth + 1, 'Cận trên')}
+                        </div>
+                        <div className={styles.slotSub}>
+                          {renderSlotList(b.lower || [], false, depth + 1, 'Cận dưới')}
+                        </div>
                       </div>
                     </span>
                   ) : (
