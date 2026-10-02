@@ -234,8 +234,8 @@ describe('MathInputComposer & Serialization Utilities', () => {
       // Switch to math mode
       fireEvent.click(screen.getByTestId('mode-math-btn'));
 
-      // Click CLEAR palette button
-      const clearBtn = screen.getByTestId('palette-btn-CLEAR');
+      // Click clear circle button in capsule box
+      const clearBtn = screen.getByTestId('clear-btn');
       fireEvent.click(clearBtn);
 
       expect(onClear).toHaveBeenCalled();

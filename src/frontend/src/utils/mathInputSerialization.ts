@@ -171,9 +171,11 @@ export function serializePaletteAction(
     case 'LIMIT':
       return insertSnippet(query, 'lim ', selection);
     case 'VECTOR':
-      return insertSnippet(query, '[x, y]', selection);
+    case 'VEC_3':
+      return insertSnippet(query, '[x, y, z]', selection);
     case 'MATRIX':
-      return insertSnippet(query, '[[a, b], [c, d]]', selection);
+    case 'MAT_3X3':
+      return insertSnippet(query, '[[a, b, c], [d, e, f], [g, h, i]]', selection);
     case 'MULTIPLY':
       return insertSnippet(query, '*', selection);
     case 'DIVIDE':

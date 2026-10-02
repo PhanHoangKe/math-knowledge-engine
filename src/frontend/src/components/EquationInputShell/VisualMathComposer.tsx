@@ -168,9 +168,45 @@ export const VisualMathComposer = forwardRef<VisualMathComposerHandle, VisualMat
         return;
       }
 
+      if (actionId === 'SECOND_DERIVATIVE') {
+        const newDeriv: MathBlock = { type: 'derivative', id: genId(), order: 2, wrt: 'x', expr: '' };
+        insertBlockAtFocus(newDeriv, 'expr');
+        return;
+      }
+
       if (actionId === 'INTEGRAL') {
         const newInt: MathBlock = { type: 'integral', id: genId(), isDefinite: false, expr: '', wrt: 'x' };
         insertBlockAtFocus(newInt, 'expr');
+        return;
+      }
+
+      if (actionId === 'DEF_INTEGRAL') {
+        const newInt: MathBlock = { type: 'integral', id: genId(), isDefinite: true, lower: 'a', upper: 'b', expr: '', wrt: 'x' };
+        insertBlockAtFocus(newInt, 'expr');
+        return;
+      }
+
+      if (actionId === 'SUM') {
+        const newSum: MathBlock = { type: 'text', id: genId(), value: '∑(n, 1, k)' };
+        insertBlockAtFocus(newSum, 'value');
+        return;
+      }
+
+      if (actionId === 'LIMIT') {
+        const newLim: MathBlock = { type: 'text', id: genId(), value: 'lim(x->0)' };
+        insertBlockAtFocus(newLim, 'value');
+        return;
+      }
+
+      if (actionId === 'VEC_3' || actionId === 'VECTOR') {
+        const newVec: MathBlock = { type: 'text', id: genId(), value: '[x, y, z]' };
+        insertBlockAtFocus(newVec, 'value');
+        return;
+      }
+
+      if (actionId === 'MAT_3X3' || actionId === 'MATRIX') {
+        const newMat: MathBlock = { type: 'text', id: genId(), value: '[[a, b, c], [d, e, f], [g, h, i]]' };
+        insertBlockAtFocus(newMat, 'value');
         return;
       }
 
