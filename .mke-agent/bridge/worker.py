@@ -200,7 +200,7 @@ class TaskWorker:
             )
             full_prompt = wrapper + record.prompt
             agent_res = run_cmd(
-                [agy_bin, "-p", full_prompt, "--output-format", "json"],
+                [agy_bin, "-p", full_prompt, "--output-format", "json", "--dangerously-skip-permissions"],
                 cwd=worktree_path,
                 timeout=record.timeout_seconds,
                 check=True,
