@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MKE ChatGPT Auto-Wake
 // @namespace    mke-datn
-// @version      1.0.0
+// @version      1.1.0
 // @description  Wake the current ChatGPT conversation when a new MKE Bridge task reaches a terminal state.
 // @match        https://chatgpt.com/*
 // @grant        GM_xmlhttpRequest
@@ -75,18 +75,103 @@
     return true;
   }
 
+  function getEditor() {
+    return document.querySelector(
+      '#prompt-textarea, textarea, div.ProseMirror[contenteditable="true"], div[contenteditable="true"]'
+    );
+  }
+
+  function editorText(el) {
+    if (!el) return '';
+    return el.tagName === 'TEXTAREA' ? (el.value || '') : (el.innerText || el.textContent || '');
+  }
+
+  async function waitComposerCleared(originalText, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const el = getEditor();
+      const current = editorText(el).trim();
+      if (!current || current !== originalText.trim()) return true;
+      await new Promise(r => setTimeout(r, 150));
+    }
+    return false;
+  }
+
+  function findSendButton(editor) {
+    const selectors = [
+      'button[data-testid="send-button"]',
+      'button[data-testid="composer-submit-button"]',
+      'button[aria-label="Send message"]',
+      'button[aria-label="Send prompt"]',
+      'button[aria-label="Send"]',
+      'button[aria-label="Gửi tin nhắn"]',
+      'button[aria-label="Gửi lời nhắc"]',
+      'button[type="submit"]'
+    ];
+    for (const selector of selectors) {
+      const local = editor?.closest('form')?.querySelector(selector);
+      if (local && !local.disabled) return local;
+      const global = document.querySelector(selector);
+      if (global && !global.disabled) return global;
+    }
+    return null;
+  }
+
+  async function trySubmit(text) {
+    const editor = getEditor();
+    if (!editor) return false;
+
+    const button = findSendButton(editor);
+    if (button) {
+      button.click();
+      if (await waitComposerCleared(text)) return true;
+    }
+
+    const form = editor.closest('form');
+    if (form && typeof form.requestSubmit === 'function') {
+      try {
+        form.requestSubmit();
+        if (await waitComposerCleared(text)) return true;
+      } catch (_) {}
+    }
+
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      editor.dispatchEvent(new KeyboardEvent(type, {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+    }
+    return await waitComposerCleared(text);
+  }
+
   async function sendMessage(text) {
     for (let i = 0; i < 60; i++) {
-      if (setEditorText(text)) {
-        await new Promise(r => setTimeout(r, 400));
-        const btn = document.querySelector(
-          'button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="Gửi lời nhắc"]'
-        );
-        if (btn && !btn.disabled) {
-          btn.click();
-          return true;
-        }
+      const editor = getEditor();
+      if (!editor) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
       }
+
+      const current = editorText(editor).trim();
+      if (current && current !== text.trim()) {
+        // Never overwrite a message the user is currently composing.
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+
+      if (!current && !setEditorText(text)) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+
+      await new Promise(r => setTimeout(r, 500));
+      if (await trySubmit(text)) return true;
+
+      console.debug('[MKE AUTO-WAKE] submit attempt failed; retrying');
       await new Promise(r => setTimeout(r, 1000));
     }
     return false;
