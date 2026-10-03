@@ -86,6 +86,53 @@ def find_agy() -> str:
     raise RunnerError("Antigravity CLI 'agy' not found. Run the one-time installer.")
 
 
+def process_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        cp = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return re.search(rf"\\b{pid}\\b", cp.stdout or "") is not None
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def acquire_instance_lock(lock_path: Path) -> int:
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(2):
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("ascii"))
+            return fd
+        except FileExistsError:
+            try:
+                existing_pid = int(lock_path.read_text(encoding="ascii").strip())
+            except Exception:
+                existing_pid = -1
+            if process_exists(existing_pid):
+                raise RunnerError(f"Another MKE runner is active with PID {existing_pid}")
+            lock_path.unlink(missing_ok=True)
+    raise RunnerError("Could not acquire runner instance lock")
+
+
+def release_instance_lock(lock_path: Path, fd: int) -> None:
+    try:
+        os.close(fd)
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def sync_control(control: Path) -> None:
     git(control, "fetch", "origin", CONTROL_BRANCH, timeout=180)
     git(control, "reset", "--hard", f"origin/{CONTROL_BRANCH}", timeout=180)
@@ -138,6 +185,25 @@ def update_control_state(control: Path, task_id: str, status: str, result: dict)
     git(control, "config", "user.email", "mke-agent-runner@local.invalid")
     git(control, "commit", "-m", f"chore(agent): {status.lower()} {task_id}", timeout=180)
     git(control, "push", "origin", f"HEAD:refs/heads/{CONTROL_BRANCH}", timeout=300)
+
+
+def recover_interrupted_task(control: Path) -> None:
+    task = read_json(control / TASK_REL)
+    if task.get("status") != "RUNNING":
+        return
+    task_id = str(task.get("task_id", "UNKNOWN"))
+    result = task.get("result") if isinstance(task.get("result"), dict) else {}
+    result = dict(result)
+    result.update({
+        "task_id": task_id,
+        "attempt": task.get("attempt", 1),
+        "status": "BLOCKED",
+        "finished_at": utc_now(),
+        "stage": "runner-recovery",
+        "error": "Previous runner exited while the remote task was RUNNING. Marked BLOCKED fail-closed for ChatGPT audit/remediation.",
+    })
+    log(f"Recovering interrupted task {task_id} as BLOCKED")
+    update_control_state(control, task_id, "BLOCKED", result)
 
 
 def mark_running(control: Path, task: dict) -> None:
@@ -305,21 +371,28 @@ def process_task(repo: Path, control: Path, worktree_root: Path) -> None:
 def daemon(repo: Path, control: Path, once: bool) -> int:
     global LOG_PATH
     LOG_PATH = control / ".mke-agent" / "logs" / "runner.log"
-    policy = read_json(control / POLICY_REL)
-    poll = int(policy.get("poll_seconds", 60))
-    worktree_root = repo.parent / "mke_agent_worktrees"
-    log(f"MKE runner started. repo={repo} control={control}")
-    while True:
-        try:
-            sync_control(control)
-            task = read_json(control / TASK_REL)
-            if task.get("status") == "READY":
-                process_task(repo, control, worktree_root)
-        except Exception as exc:
-            log(f"Runner loop error: {exc}")
-        if once:
-            return 0
-        time.sleep(max(15, poll))
+    lock_path = control / ".mke-agent" / "runtime" / "runner.lock"
+    lock_fd = acquire_instance_lock(lock_path)
+    try:
+        policy = read_json(control / POLICY_REL)
+        poll = int(policy.get("poll_seconds", 60))
+        worktree_root = repo.parent / "mke_agent_worktrees"
+        log(f"MKE runner started. repo={repo} control={control}")
+        sync_control(control)
+        recover_interrupted_task(control)
+        while True:
+            try:
+                sync_control(control)
+                task = read_json(control / TASK_REL)
+                if task.get("status") == "READY":
+                    process_task(repo, control, worktree_root)
+            except Exception as exc:
+                log(f"Runner loop error: {exc}")
+            if once:
+                return 0
+            time.sleep(max(15, poll))
+    finally:
+        release_instance_lock(lock_path, lock_fd)
 
 
 def main() -> int:
