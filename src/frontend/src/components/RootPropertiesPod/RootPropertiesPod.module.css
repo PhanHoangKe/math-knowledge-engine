@@ -13,15 +13,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 6px 14px;
-  background: var(--bg-subtle, #f4f6f9);
-  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--col-pod-header-bg, #f4f6f9);
+  border-bottom: 1px solid var(--col-pod-border, #e2e8f0);
 }
 
 .podTitle {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text-muted, #555555);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--col-pod-header-title, #4a709c);
   letter-spacing: 0.01em;
 }
 

@@ -16,9 +16,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.875rem 1.25rem;
-  background: var(--color-surface-hover);
-  border-bottom: 1px solid var(--color-border);
+  padding: 6px 14px;
+  background: var(--col-pod-header-bg, #f4f6f9);
+  border-bottom: 1px solid var(--col-pod-border, #e2e8f0);
 }
 
 .headerLeft {
@@ -27,10 +27,12 @@
 }
 
 .cardTitle {
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
   margin: 0;
-  color: var(--color-text-main);
+  color: var(--col-pod-header-title, #4a709c);
+  letter-spacing: 0.01em;
 }
 
 .outcomeBadge {

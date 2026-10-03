@@ -27,6 +27,12 @@
   --accent-hover: #6c5694;
   --accent-subtle: #f3f0fc;
 
+  /* Pod Headers & Cards (Wolfram|Alpha Style) */
+  --col-pod-header-bg: #f4f6f9;
+  --col-pod-header-title: #4a709c;
+  --col-pod-border: #e2e8f0;
+  --col-pod-border-hover: #ffc845;
+
   /* Typography Colors (Light Theme) */
   --text-primary: #333333;
   --text-secondary: #535353;
@@ -119,6 +125,11 @@
   --accent-primary: #9d7fe3;
   --accent-hover: #bca4f5;
   --accent-subtle: #3a2e54;
+
+  --col-pod-header-bg: #22252a;
+  --col-pod-header-title: #93c5fd;
+  --col-pod-border: #3d3d3d;
+  --col-pod-border-hover: #f59e0b;
 
   --text-primary: #f3f4f6;
   --text-secondary: #d1d5db;
