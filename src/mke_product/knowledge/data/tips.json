@@ -1,0 +1,233 @@
+[
+  {
+    "applicability_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "B_EVEN_INTEGER"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "category": "REDUCED_ARITHMETIC",
+    "curriculum_refs": [],
+    "explanation": {
+      "en": "When the linear coefficient b is an even integer (b = 2b'), the standard discriminant factors as Delta = b^2 - 4ac = (2b')^2 - 4ac = 4((b')^2 - ac) = 4*Delta'. Taking the square root gives sqrt(Delta) = 2*sqrt(Delta'). Substituting into the root formula gives x = (-2b' +- 2*sqrt(Delta')) / (2a) = (-b' +- sqrt(Delta')) / a. This reduces arithmetic magnitude and avoids a factor of 4 in discriminant calculation.",
+      "vi": "Khi hệ số bậc một b là số nguyên chẵn (b = 2b'), biệt thức Delta phân tích thành Delta = b^2 - 4ac = (2b')^2 - 4ac = 4((b')^2 - ac) = 4*Delta'. Khi đó sqrt(Delta) = 2*sqrt(Delta'). Thay vào công thức nghiệm ta được x = (-2b' +- 2*sqrt(Delta')) / (2a) = (-b' +- sqrt(Delta')) / a. Biến đổi này giúp giảm độ lớn số học và tránh nhân hệ số 4 khi tính biệt thức."
+    },
+    "formula_refs": [
+      "FORMULA_QUADRATIC_REDUCED",
+      "FORMULA_REDUCED_DISCRIMINANT"
+    ],
+    "invalid_scope": {
+      "en": "Not recommended when b is an odd integer or non-integer, as evaluating b' = b/2 introduces fractional arithmetic which negates the simplification benefits. Strictly invalid if leading coefficient a = 0.",
+      "vi": "Không khuyến khích sử dụng khi b là số lẻ hoặc không phải số nguyên, vì khi đó b' = b/2 xuất hiện phân số làm phức tạp phép tính. Hoàn toàn không hợp lệ nếu hệ số bậc hai a = 0."
+    },
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "quick_steps": [
+      {
+        "en": "Compute half of the linear coefficient: b' = b / 2.",
+        "vi": "Tính nửa hệ số bậc một: b' = b / 2."
+      },
+      {
+        "en": "Evaluate the reduced discriminant: Delta' = (b')^2 - ac.",
+        "vi": "Tính biệt thức thu gọn: Delta' = (b')^2 - ac."
+      },
+      {
+        "en": "If Delta' > 0, compute two distinct real roots: x = (-b' +- sqrt(Delta')) / a.",
+        "vi": "Nếu Delta' > 0, phương trình có 2 nghiệm phân biệt: x = (-b' +- sqrt(Delta')) / a."
+      },
+      {
+        "en": "If Delta' = 0, compute the repeated real root: x = -b' / a.",
+        "vi": "Nếu Delta' = 0, phương trình có nghiệm kép: x = -b' / a."
+      },
+      {
+        "en": "If Delta' < 0, conclude that no real roots exist.",
+        "vi": "Nếu Delta' < 0, kết luận phương trình vô nghiệm thực."
+      }
+    ],
+    "recognition_guidance": {
+      "en": "Inspect the linear coefficient b. If b is clearly divisible by 2 (even integer), immediately use the reduced formula with b' = b/2 and Delta' = (b')^2 - ac for faster mental or written calculation.",
+      "vi": "Quan sát hệ số bậc một b. Nếu b chia hết cho 2 (số chẵn), ngay lập tức áp dụng công thức thu gọn với b' = b/2 và Delta' = (b')^2 - ac để tính toán nhanh hơn."
+    },
+    "related_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_reduced_discriminant"
+    ],
+    "related_method_ids": [
+      "QUAD_FORMULA_REDUCED"
+    ],
+    "related_problem_form_ids": [
+      "QUAD_FORM_COMPLETE_QUADRATIC",
+      "QUAD_FORM_GENERAL_QUADRATIC",
+      "QUAD_FORM_INCOMPLETE_B_ZERO",
+      "QUAD_FORM_INCOMPLETE_C_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Computes roots via reduced discriminant Delta' = (b')^2 - ac when the linear coefficient b is even.",
+      "vi": "Tính nghiệm thông qua biệt thức thu gọn Delta' = (b')^2 - ac khi hệ số bậc một b là số chẵn."
+    },
+    "theorem_refs": [],
+    "tip_id": "QUAD_TIP_REDUCED_FORMULA_EVEN_B",
+    "title": {
+      "en": "Reduced Formula Shortcut for Even Linear Coefficient",
+      "vi": "Mẹo giải nhanh bằng công thức nghiệm thu gọn khi b chẵn"
+    },
+    "valid_scope": {
+      "en": "All standard quadratic equations ax^2 + bx + c = 0 with a != 0 where b is an even integer.",
+      "vi": "Tất cả các phương trình bậc hai ax^2 + bx + c = 0 với a != 0 có hệ số b là số nguyên chẵn."
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "A_MINUS_B_PLUS_C_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "category": "COEFFICIENT_RELATION",
+    "curriculum_refs": [],
+    "explanation": {
+      "en": "Evaluating the quadratic polynomial f(x) = ax^2 + bx + c at x = -1 yields f(-1) = a(-1)^2 + b(-1) + c = a - b + c. If a - b + c = 0, then x_1 = -1 is an exact root. By Viète's product relation x_1 * x_2 = c/a, substituting x_1 = -1 yields (-1) * x_2 = c/a, hence x_2 = -c/a.",
+      "vi": "Tính giá trị đa thức bậc hai f(x) = ax^2 + bx + c tại x = -1 ta có f(-1) = a(-1)^2 + b(-1) + c = a - b + c. Khi a - b + c = 0, giá trị f(-1) = 0 nên x_1 = -1 là nghiệm của phương trình. Theo định lý Vi-ét về tích hai nghiệm x_1 * x_2 = c/a, thay x_1 = -1 suy ra (-1) * x_2 = c/a, do đó x_2 = -c/a."
+    },
+    "formula_refs": [],
+    "invalid_scope": {
+      "en": "Invalid if a - b + c != 0 or if leading coefficient a = 0. Do not confuse with the sum relation a + b + c = 0.",
+      "vi": "Không áp dụng được nếu a - b + c != 0 hoặc hệ số bậc hai a = 0. Tránh nhầm lẫn với điều kiện tổng hệ số a + b + c = 0."
+    },
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "quick_steps": [
+      {
+        "en": "Verify that the alternating coefficient sum equals zero: a - b + c = 0.",
+        "vi": "Kiểm tra tổng đan dấu các hệ số bằng 0: a - b + c = 0."
+      },
+      {
+        "en": "State the first root immediately: x_1 = -1.",
+        "vi": "Xác định ngay nghiệm thứ nhất: x_1 = -1."
+      },
+      {
+        "en": "Compute the second root directly: x_2 = -c / a.",
+        "vi": "Tính nghiệm thứ hai: x_2 = -c / a."
+      }
+    ],
+    "recognition_guidance": {
+      "en": "Check whether the sum of the leading and constant coefficients equals the linear coefficient (a + c = b), which is equivalent to a - b + c = 0.",
+      "vi": "Kiểm tra xem tổng hệ số bậc hai và hệ số tự do có bằng hệ số bậc một không (a + c = b), tương đương với a - b + c = 0."
+    },
+    "related_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "related_method_ids": [
+      "QUAD_VIETE_SPECIAL_DIF"
+    ],
+    "related_problem_form_ids": [
+      "QUAD_FORM_COMPLETE_QUADRATIC",
+      "QUAD_FORM_GENERAL_QUADRATIC",
+      "QUAD_FORM_SPECIAL_DIF_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Instant mental root determination (x_1 = -1, x_2 = -c/a) when alternating coefficient sum a - b + c = 0.",
+      "vi": "Nhẩm nghiệm tức thì (x_1 = -1, x_2 = -c/a) khi tổng các hệ số đan dấu a - b + c = 0."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "tip_id": "QUAD_TIP_SPECIAL_A_MINUS_B_PLUS_C_ZERO",
+    "title": {
+      "en": "Instant Viète Roots for Alternating Sum a - b + c = 0",
+      "vi": "Mẹo nhẩm nghiệm nhanh trường hợp đặc biệt a - b + c = 0"
+    },
+    "valid_scope": {
+      "en": "Quadratic equations ax^2 + bx + c = 0 (a != 0) where the condition a - b + c = 0 holds strictly.",
+      "vi": "Phương trình bậc hai ax^2 + bx + c = 0 (a != 0) thoả mãn điều kiện a - b + c = 0."
+    },
+    "version": "1.0.0"
+  },
+  {
+    "applicability_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "A_PLUS_B_PLUS_C_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "category": "COEFFICIENT_RELATION",
+    "curriculum_refs": [],
+    "explanation": {
+      "en": "Evaluating the quadratic polynomial f(x) = ax^2 + bx + c at x = 1 yields f(1) = a(1)^2 + b(1) + c = a + b + c. If a + b + c = 0, then x_1 = 1 is an exact root. By Viète's product relation x_1 * x_2 = c/a, substituting x_1 = 1 yields 1 * x_2 = c/a, hence x_2 = c/a.",
+      "vi": "Tính giá trị đa thức bậc hai f(x) = ax^2 + bx + c tại x = 1 ta có f(1) = a(1)^2 + b(1) + c = a + b + c. Khi a + b + c = 0, giá trị f(1) = 0 nên x_1 = 1 là một nghiệm của phương trình. Theo định lý Vi-ét về tích hai nghiệm x_1 * x_2 = c/a, thay x_1 = 1 suy ra 1 * x_2 = c/a, do đó x_2 = c/a."
+    },
+    "formula_refs": [],
+    "invalid_scope": {
+      "en": "Invalid if a + b + c != 0 or if leading coefficient a = 0. Do not apply when total coefficient sum is non-zero.",
+      "vi": "Không áp dụng được nếu tổng các hệ số a + b + c != 0 hoặc hệ số bậc hai a = 0."
+    },
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "quick_steps": [
+      {
+        "en": "Verify that the sum of all coefficients equals zero: a + b + c = 0.",
+        "vi": "Kiểm tra tổng tất cả các hệ số bằng 0: a + b + c = 0."
+      },
+      {
+        "en": "State the first root immediately: x_1 = 1.",
+        "vi": "Xác định ngay nghiệm thứ nhất: x_1 = 1."
+      },
+      {
+        "en": "Compute the second root directly: x_2 = c / a.",
+        "vi": "Tính nghiệm thứ hai: x_2 = c / a."
+      }
+    ],
+    "recognition_guidance": {
+      "en": "Quickly add the coefficients a + b + c mentally. If their sum is 0, skip computing Delta and write roots x_1 = 1 and x_2 = c/a directly.",
+      "vi": "Cộng nhẩm nhanh các hệ số a + b + c. Nếu tổng bằng 0, bỏ qua bước tính Delta và ghi ngay hai nghiệm x_1 = 1 và x_2 = c/a."
+    },
+    "related_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "related_method_ids": [
+      "QUAD_VIETE_SPECIAL_SUM"
+    ],
+    "related_problem_form_ids": [
+      "QUAD_FORM_COMPLETE_QUADRATIC",
+      "QUAD_FORM_GENERAL_QUADRATIC",
+      "QUAD_FORM_SPECIAL_SUM_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Instant mental root determination (x_1 = 1, x_2 = c/a) when all coefficients sum to zero (a + b + c = 0).",
+      "vi": "Nhẩm nghiệm tức thì (x_1 = 1, x_2 = c/a) khi tổng tất cả các hệ số bằng 0 (a + b + c = 0)."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "tip_id": "QUAD_TIP_SPECIAL_A_PLUS_B_PLUS_C_ZERO",
+    "title": {
+      "en": "Instant Viète Roots for Zero Sum a + b + c = 0",
+      "vi": "Mẹo nhẩm nghiệm nhanh trường hợp đặc biệt a + b + c = 0"
+    },
+    "valid_scope": {
+      "en": "Quadratic equations ax^2 + bx + c = 0 (a != 0) where the condition a + b + c = 0 holds strictly.",
+      "vi": "Phương trình bậc hai ax^2 + bx + c = 0 (a != 0) thoả mãn điều kiện a + b + c = 0."
+    },
+    "version": "1.0.0"
+  }
+]

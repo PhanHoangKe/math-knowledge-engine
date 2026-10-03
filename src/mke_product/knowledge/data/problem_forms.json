@@ -1,0 +1,358 @@
+[
+  {
+    "canonical_structure_latex": "ax^2 + bx + c = 0 \\quad (a \\ne 0, b \\ne 0, c \\ne 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_COMPLETE_QUADRATIC",
+    "formula_refs": [
+      "FORMULA_DISCRIMINANT",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "guaranteed_tip_ids": [],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "B_NONZERO",
+        "C_NONZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Verify that all three coefficients a, b, and c are non-zero. This represents a full quadratic trinomial without vanishing terms.",
+      "vi": "Kiểm tra cả ba hệ số a, b và c đều khác 0. Đây là dạng tam thức bậc hai đầy đủ không bị khuyết hạng tử."
+    },
+    "related_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FACTORIZATION_R",
+      "QUAD_FORMULA_REDUCED",
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_GRAPHICAL_ANALYSIS",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_REDUCED_FORMULA_EVEN_B",
+      "QUAD_TIP_SPECIAL_A_MINUS_B_PLUS_C_ZERO",
+      "QUAD_TIP_SPECIAL_A_PLUS_B_PLUS_C_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Complete quadratic equation archetype with all three coefficients non-zero (a != 0, b != 0, c != 0).",
+      "vi": "Dạng bài phương trình bậc hai đầy đủ với cả ba hệ số đều khác 0 (a != 0, b != 0, c != 0)."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Complete Quadratic Equation Form",
+      "vi": "Dạng phương trình bậc hai đầy đủ"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  },
+  {
+    "canonical_structure_latex": "ax^2 + bx + c = 0 \\quad (a \\ne 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_GENERAL_QUADRATIC",
+    "formula_refs": [
+      "FORMULA_DISCRIMINANT",
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "guaranteed_tip_ids": [],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Any second-degree polynomial equation where the leading coefficient a is non-zero matches this universal archetype.",
+      "vi": "Mọi phương trình đa thức bậc hai có hệ số bậc hai a khác 0 đều thuộc dạng bài tổng quát này."
+    },
+    "related_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FACTORIZATION_R",
+      "QUAD_FORMULA_REDUCED",
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_GRAPHICAL_ANALYSIS",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_REDUCED_FORMULA_EVEN_B",
+      "QUAD_TIP_SPECIAL_A_MINUS_B_PLUS_C_ZERO",
+      "QUAD_TIP_SPECIAL_A_PLUS_B_PLUS_C_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "General quadratic equation archetype in canonical form ax^2 + bx + c = 0 with a != 0.",
+      "vi": "Dạng bài phương trình bậc hai tổng quát ở dạng chính tắc ax^2 + bx + c = 0 với a != 0."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "General Quadratic Equation Form",
+      "vi": "Dạng phương trình bậc hai tổng quát"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  },
+  {
+    "canonical_structure_latex": "ax^2 + c = 0 \\quad (a \\ne 0, b = 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_INCOMPLETE_B_ZERO",
+    "formula_refs": [
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "guaranteed_tip_ids": [
+      "QUAD_TIP_REDUCED_FORMULA_EVEN_B"
+    ],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_quadratic_equation",
+      "concept_square_root"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "B_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Observe that the linear coefficient b is zero (the equation contains no first-degree x term, only ax^2 + c = 0).",
+      "vi": "Nhận thấy hệ số bậc một b = 0 (phương trình khuyết số hạng chứa x bậc một, chỉ còn ax^2 + c = 0)."
+    },
+    "related_method_ids": [
+      "QUAD_COMPLETE_SQUARE",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_REDUCED_FORMULA_EVEN_B"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Incomplete quadratic equation archetype lacking the linear term (b = 0), solvable directly by taking square roots x = +-sqrt(-c/a).",
+      "vi": "Dạng bài phương trình bậc hai khuyết hệ số bậc một (b = 0), có thể giải trực tiếp bằng phép khai căn x = +-sqrt(-c/a)."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Incomplete Quadratic Form (b = 0)",
+      "vi": "Dạng phương trình bậc hai khuyết hệ số bậc một (b = 0)"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  },
+  {
+    "canonical_structure_latex": "ax^2 + bx = 0 \\quad (a \\ne 0, c = 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_INCOMPLETE_C_ZERO",
+    "formula_refs": [
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "guaranteed_tip_ids": [],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_factorization",
+      "concept_quadratic_equation"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "C_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Observe that the constant term c is zero (the equation is ax^2 + bx = 0), allowing immediate common factor extraction x(ax + b) = 0.",
+      "vi": "Nhận thấy hệ số tự do c = 0 (phương trình có dạng ax^2 + bx = 0), cho phép đặt ngay nhân tử chung x(ax + b) = 0."
+    },
+    "related_method_ids": [
+      "QUAD_FACTORIZATION_Q",
+      "QUAD_FORMULA_STANDARD"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_REDUCED_FORMULA_EVEN_B"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Incomplete quadratic equation archetype lacking the constant term (c = 0), yielding roots x = 0 and x = -b/a.",
+      "vi": "Dạng bài phương trình bậc hai khuyết hệ số tự do (c = 0), luôn có hai nghiệm x = 0 và x = -b/a."
+    },
+    "theorem_refs": [],
+    "title": {
+      "en": "Incomplete Quadratic Form (c = 0)",
+      "vi": "Dạng phương trình bậc hai khuyết hệ số tự do (c = 0)"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  },
+  {
+    "canonical_structure_latex": "ax^2 + bx + c = 0 \\quad (a \\ne 0, a - b + c = 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_SPECIAL_DIF_ZERO",
+    "formula_refs": [
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SPECIAL_DIF"
+    ],
+    "guaranteed_tip_ids": [
+      "QUAD_TIP_SPECIAL_A_MINUS_B_PLUS_C_ZERO"
+    ],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "A_MINUS_B_PLUS_C_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Check if the alternating coefficient sum equals zero: a - b + c = 0 (or a + c = b).",
+      "vi": "Kiểm tra tổng các hệ số đan dấu có bằng 0 hay không: a - b + c = 0 (hoặc a + c = b)."
+    },
+    "related_method_ids": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SPECIAL_DIF",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_SPECIAL_A_MINUS_B_PLUS_C_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Special coefficient relation archetype satisfying a - b + c = 0 with guaranteed roots x_1 = -1 and x_2 = -c/a.",
+      "vi": "Dạng bài có quan hệ hệ số đặc biệt a - b + c = 0, đảm bảo có nghiệm x_1 = -1 và x_2 = -c/a."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "title": {
+      "en": "Special Difference Form (a - b + c = 0)",
+      "vi": "Dạng đặc biệt có tổng đan dấu hệ số bằng 0 (a - b + c = 0)"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  },
+  {
+    "canonical_structure_latex": "ax^2 + bx + c = 0 \\quad (a \\ne 0, a + b + c = 0)",
+    "curriculum_refs": [],
+    "difficulty": "BASIC",
+    "form_id": "QUAD_FORM_SPECIAL_SUM_ZERO",
+    "formula_refs": [
+      "FORMULA_QUADRATIC_STANDARD"
+    ],
+    "guaranteed_method_ids": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SPECIAL_SUM"
+    ],
+    "guaranteed_tip_ids": [
+      "QUAD_TIP_SPECIAL_A_PLUS_B_PLUS_C_ZERO"
+    ],
+    "practice_example_ids": [],
+    "prerequisite_concept_ids": [
+      "concept_polynomial_coefficient",
+      "concept_quadratic_equation",
+      "concept_vieta_relations"
+    ],
+    "provenance_refs": [
+      "SRC_MKE_S1_ORCHESTRATOR",
+      "SRC_TEXTBOOK_VIETNAM_MATH9"
+    ],
+    "recognition_condition": {
+      "all_of": [
+        "A_NONZERO",
+        "A_PLUS_B_PLUS_C_ZERO"
+      ],
+      "any_of": [],
+      "none_of": []
+    },
+    "recognition_guidance": {
+      "en": "Check if the sum of all coefficients equals zero: a + b + c = 0.",
+      "vi": "Kiểm tra tổng tất cả các hệ số có bằng 0 hay không: a + b + c = 0."
+    },
+    "related_method_ids": [
+      "QUAD_FORMULA_STANDARD",
+      "QUAD_VIETE_SPECIAL_SUM",
+      "QUAD_VIETE_SUM_PRODUCT"
+    ],
+    "related_tip_ids": [
+      "QUAD_TIP_SPECIAL_A_PLUS_B_PLUS_C_ZERO"
+    ],
+    "status": "VERIFIED",
+    "summary": {
+      "en": "Special coefficient relation archetype satisfying a + b + c = 0 with guaranteed roots x_1 = 1 and x_2 = c/a.",
+      "vi": "Dạng bài có quan hệ hệ số đặc biệt a + b + c = 0, đảm bảo có nghiệm x_1 = 1 và x_2 = c/a."
+    },
+    "theorem_refs": [
+      "THEOREM_VIETA_RELATIONS"
+    ],
+    "title": {
+      "en": "Special Sum Form (a + b + c = 0)",
+      "vi": "Dạng đặc biệt có tổng hệ số bằng 0 (a + b + c = 0)"
+    },
+    "version": "1.0.0",
+    "worked_example_ids": []
+  }
+]
