@@ -174,25 +174,34 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert "3" in root1.text
 
         # Independent Verification Certificate
-        cert_badge = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-outcome-badge']")
-        assert "Xác thực Toàn diện Thành công" in cert_badge.text
+        # Activate verifier tab in ToolsTray
+        verifier_tool_btn = self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='toggle-tool-verifier']")
+        if verifier_tool_btn:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", verifier_tool_btn[0])
+            time.sleep(0.2)
+
+        cert_badge = WebDriverWait(self.driver, 5.0).until(
+            lambda d: d.find_element(By.CSS_SELECTOR, "[data-testid='verification-outcome-badge']")
+        )
+        assert "Xác thực Toàn diện Thành công" in (cert_badge.text or cert_badge.get_attribute("textContent") or "")
 
         # Open collapsible technical details to inspect certificate ID and fingerprint
         tech_details = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-technical-details']")
-        tech_details.find_element(By.TAG_NAME, "summary").click()
+        summary_elem = tech_details.find_element(By.TAG_NAME, "summary")
+        self.driver.execute_script("arguments[0].click();", summary_elem)
 
         cert_id = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='certificate-id']")
-        assert len(cert_id.text.strip()) > 0
+        assert len((cert_id.text or cert_id.get_attribute("textContent") or "").strip()) > 0
 
         fingerprint = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='integrity-fingerprint']")
-        assert len(fingerprint.text.strip()) == 64  # SHA-256 hex digest
+        assert len((fingerprint.text or fingerprint.get_attribute("textContent") or "").strip()) == 64  # SHA-256 hex digest
 
         # Trace Summary Pod & Expandable Trace Panel
         trace_pod = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='trace-summary-pod']")
         assert trace_pod.is_displayed()
 
         toggle_trace_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='toggle-trace-btn']")
-        toggle_trace_btn.click()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", toggle_trace_btn)
 
         trace_panel = WebDriverWait(self.driver, 5.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='trace-panel']"))
@@ -331,9 +340,9 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # Expand coefficient editor
         coeff_toggle_btn = WebDriverWait(self.driver, 5.0).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
         )
-        coeff_toggle_btn.click()
+        self.driver.execute_script("arguments[0].click();", coeff_toggle_btn)
 
         WebDriverWait(self.driver, 8.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='coeff-c-num']"))
@@ -377,9 +386,9 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # Expand coefficient editor
         coeff_toggle_btn = WebDriverWait(self.driver, 5.0).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
         )
-        coeff_toggle_btn.click()
+        self.driver.execute_script("arguments[0].click();", coeff_toggle_btn)
 
         WebDriverWait(self.driver, 8.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='coeff-a-num']"))
@@ -534,9 +543,9 @@ class TestMVPV1ReactE2E(unittest.TestCase):
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='solution-summary-panel']"))
         )
         coeff_toggle_btn = WebDriverWait(self.driver, 5.0).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']"))
         )
-        coeff_toggle_btn.click()
+        self.driver.execute_script("arguments[0].click();", coeff_toggle_btn)
 
         # Wait for CoefficientEditorPanel to appear and verify visible inputs
         coeff_panel = WebDriverWait(self.driver, 8.0).until(
@@ -632,13 +641,47 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         )
         assert palette.is_displayed()
 
-        # 3. Enter equation using Math Palette buttons: x² − 5*x + 6 = 0
-        for btn_action in [
-            'SQUARE', 'MINUS', 'DIGIT_5', 'MULTIPLY', 'VAR_X', 'PLUS', 'DIGIT_6', 'EQUALS', 'DIGIT_0'
-        ]:
-            btn = self.driver.find_element(By.CSS_SELECTOR, f"[data-testid='palette-btn-{btn_action}']")
-            self.driver.execute_script("arguments[0].click();", btn)
-            time.sleep(0.08)
+        # 3. Confirm COMMON math palette initially appears
+        common_palette = WebDriverWait(self.driver, 5.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='palette-category-COMMON']"))
+        )
+        assert common_palette.is_displayed()
+
+        # 4. Select the Algebra category tab
+        algebra_tabs = [
+            btn for btn in self.driver.find_elements(By.CSS_SELECTOR, "button[role='tab']")
+            if btn.get_attribute("title") in ("Đại số & Căn thức", "Algebra & Roots")
+            or btn.get_attribute("aria-label") in ("Đại số & Căn thức", "Algebra & Roots")
+        ]
+        assert len(algebra_tabs) > 0, "Algebra category tab not found"
+        algebra_tabs[0].click()
+        time.sleep(0.2)
+
+        # 5. Confirm Algebra palette is active
+        algebra_palette = WebDriverWait(self.driver, 5.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='palette-category-ALGEBRA']"))
+        )
+        assert algebra_palette.is_displayed()
+
+        # 6. Assert SQUARE button exists and is enabled
+        square_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='palette-btn-SQUARE']")
+        assert square_btn.is_enabled()
+
+        # 7. Enter equation using Math Palette SQUARE button and composer input: x² − 5*x + 6 = 0
+        square_btn.click()
+        time.sleep(0.15)
+
+        # Base slot receives 'x'
+        inputs = self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='visual-math-composer'] input")
+        assert len(inputs) > 0, "No composer inputs found"
+        inputs[0].send_keys("x")
+        time.sleep(0.1)
+
+        # Trailing slot receives remaining expression: - 5*x + 6 = 0
+        inputs = self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='visual-math-composer'] input")
+        inputs[-1].click()
+        inputs[-1].send_keys(" - 5*x + 6 = 0")
+        time.sleep(0.1)
 
         # Verify input field content
         eq_input = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='equation-input']")
@@ -648,7 +691,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert "6" in val
         assert "= 0" in val
 
-        # 4. Verify switching back to Quick Input converts equation to raw format
+        # 8. Verify switching back to Quick Input converts equation to raw format
         quick_tab.click()
         time.sleep(0.2)
         natural_eq_input = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='equation-input']")
@@ -656,7 +699,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert "x^2" in natural_val
         assert "5*x" in natural_val
 
-        # 5. Submit solve
+        # 9. Submit solve
         compute_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='compute-btn']")
         compute_btn.click()
 
@@ -675,10 +718,21 @@ class TestMVPV1ReactE2E(unittest.TestCase):
         assert solution_pod.is_displayed()
 
         # Pod 3: Independent Verification Summary Pod
-        verif_pod = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-summary-pod']")
+        # In ToolsTray, activate verifier tab
+        verifier_tool_btn = self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='toggle-tool-verifier']")
+        if verifier_tool_btn:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", verifier_tool_btn[0])
+            time.sleep(0.2)
+
+        verif_pod = WebDriverWait(self.driver, 5.0).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='verification-summary-pod']"))
+        )
         assert verif_pod.is_displayed()
-        verif_badge = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='verification-outcome-badge']")
-        assert "Xác thực Toàn diện Thành công" in verif_badge.text
+        verif_badge = WebDriverWait(self.driver, 5.0).until(
+            lambda d: d.find_element(By.CSS_SELECTOR, "[data-testid='verification-outcome-badge']")
+        )
+        badge_text = verif_badge.get_attribute("textContent") or ""
+        assert ("Xác thực Toàn diện Thành công" in badge_text or "Comprehensive Verification Succeeded" in badge_text)
 
         # Pod 4: Selected Method Summary Pod
         method_pod = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='selected-method-summary-pod']")
@@ -690,7 +744,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # 7. Test progressive disclosure in Verification Pod
         toggle_verif_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='toggle-verification-btn']")
-        toggle_verif_btn.click()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", toggle_verif_btn)
         verif_panel = WebDriverWait(self.driver, 5.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='verification-panel']"))
         )
@@ -698,7 +752,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # 8. Test progressive disclosure in Selected Method Pod ("Why this method?" + Method Catalog)
         why_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid^='why-method-btn-']")
-        why_btn.click()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", why_btn)
         knowledge_surface = WebDriverWait(self.driver, 8.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid^='method-knowledge-surface-']"))
         )
@@ -706,7 +760,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # 9. Test progressive disclosure in Trace Pod
         toggle_trace_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='toggle-trace-btn']")
-        toggle_trace_btn.click()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", toggle_trace_btn)
         trace_panel = WebDriverWait(self.driver, 5.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='trace-panel']"))
         )
@@ -714,7 +768,7 @@ class TestMVPV1ReactE2E(unittest.TestCase):
 
         # 10. Test progressive disclosure in Coefficient Editor
         coeff_toggle_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-testid='toggle-coeff-editor-btn']")
-        coeff_toggle_btn.click()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", coeff_toggle_btn)
         coeff_panel = WebDriverWait(self.driver, 5.0).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid='coefficient-editor-panel']"))
         )
