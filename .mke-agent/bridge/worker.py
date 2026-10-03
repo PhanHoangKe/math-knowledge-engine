@@ -109,6 +109,45 @@ def validate_scope(all_changed: List[str], allowed_prefixes: List[str]) -> None:
             raise WorkerError(f"Scope violation: {path} is not in allowed_prefixes.")
 
 
+def cleanup_test_side_effects(worktree_path: Path, base_sha: str, allowed_prefixes: List[str]) -> List[str]:
+    """Remove only out-of-scope filesystem changes introduced after pre-test scope validation.
+
+    Before regression tests run, validate_scope() has already established that all task-authored
+    changes are inside allowed_prefixes. Therefore any newly observed out-of-scope changes after
+    tests are test-harness side effects, not authorized task output. Revert tracked paths to the
+    baseline and delete untracked paths, then return the remaining changed-file set.
+    """
+    changed = collect_changed_files(worktree_path, base_sha)
+    for rel in changed:
+        norm = rel.replace("\\", "/")
+        if allowed_path(norm, allowed_prefixes):
+            continue
+
+        tracked = git(
+            worktree_path, "ls-files", "--error-unmatch", "--", norm,
+            check=False,
+        ).returncode == 0
+
+        if tracked:
+            git(worktree_path, "restore", "--source", base_sha, "--", norm, check=True)
+            continue
+
+        target = (worktree_path / Path(norm)).resolve()
+        try:
+            target.relative_to(worktree_path.resolve())
+        except ValueError as exc:
+            raise WorkerError(f"Unsafe test side-effect path outside worktree: {norm}") from exc
+
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
+        elif target.exists():
+            target.unlink()
+
+    remaining = collect_changed_files(worktree_path, base_sha)
+    validate_scope(remaining, allowed_prefixes)
+    return remaining
+
+
 class TaskWorker:
     """Manages background task queue and worker execution."""
 
@@ -229,6 +268,13 @@ class TaskWorker:
             test_res = run_cmd([py_bin, "-m", "pytest", "tests/", "-q"], cwd=worktree_path, timeout=600, check=True)
             prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
             record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
+
+            # Regression tests may create screenshots/evidence/cache files outside the task scope.
+            # Pre-test scope validation already proved task-authored changes were allowed, so
+            # clean only those post-test out-of-scope side effects before staging.
+            record.changed_files = cleanup_test_side_effects(
+                worktree_path, record.base_sha, record.allowed_prefixes
+            )
 
             # 6. Commit & Push
             record.stage = "commit-push"
