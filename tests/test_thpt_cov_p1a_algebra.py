@@ -23,10 +23,16 @@ Validates:
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from mke_product.core.rational import Rational
 from mke_product.coverage.adapters import ExecutionOptions
-from mke_product.coverage.algebra_rational import AlgebraRationalAdapter
+from mke_product.coverage.algebra_rational import (
+    AlgebraRationalAdapter,
+    NumberFieldElement,
+    are_roots_equal,
+    deduplicate_roots,
+)
 from mke_product.coverage.contracts import (
     AllRealSolutionEntity,
     AllRealsExceptFiniteEntity,
@@ -815,4 +821,175 @@ class TestAdversarialVerifierSoundnessR2:
         ver = adapter.verify(ir, multi_cand)
         assert ver.disposition == VerificationDisposition.REJECTED
         assert ver.verification_level == VerificationLevel.UNSUPPORTED
+
+
+# ===========================================================================
+# 19. Root Equivalence Soundness Remediation Tests
+# ===========================================================================
+
+class TestRootEquivalenceSoundnessRemediation:
+    @pytest.fixture
+    def adapter(self) -> AlgebraRationalAdapter:
+        return AlgebraRationalAdapter()
+
+    # 1. finite alias attack A,B => NOT EXACT_VERIFIED (PARTIAL acceptable)
+    def test_finite_alias_attack_ab_not_exact_verified(self, adapter: AlgebraRationalAdapter):
+        # Attack 1: (x^2 - 2)/(x - 3) = 0 with candidate roots:
+        # A = (p=0, q=1, d=2, r=1) = sqrt(2)
+        # B = (p=0, q=2, d=2, r=2) = 2*sqrt(2)/2 = sqrt(2)
+        # Missing root is -sqrt(2). The candidate duplicates sqrt(2) under two different encodings.
+        # MUST NOT be EXACT_VERIFIED / ACCEPTED! PARTIAL is acceptable.
+        ir = parse_equation_to_ir("(x^2 - 2) / (x - 3) = 0", "adv_finite_alias_ab")
+        A = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        B = RealQuadraticSurdEntity(p=0, q=2, d=2, r=2, latex="\\frac{2\\sqrt{2}}{2}")
+        cand = CandidateSolution(
+            candidate_id="cand_alias_ab",
+            generator_engine="adversarial_untrusted",
+            raw_symbolic_output="x = sqrt(2), x = 2*sqrt(2)/2",
+            parsed_entities=(FiniteRootCollectionEntity(roots=(A, B)),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level != VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition != VerificationDisposition.ACCEPTED
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+
+    # 2. exclusion alias attack A,B => REJECTED/not exact
+    def test_exclusion_alias_attack_ab_rejected(self, adapter: AlgebraRationalAdapter):
+        # Attack 2: 1/(x^2 - 2) = 1/(x^2 - 2) with candidate exclusions A, B
+        # True exclusions are -sqrt(2) and +sqrt(2). Candidate provides sqrt(2) twice.
+        # MUST NOT be EXACT_VERIFIED / ACCEPTED. MUST be REJECTED / not exact.
+        ir = parse_equation_to_ir("1 / (x^2 - 2) = 1 / (x^2 - 2)", "adv_excl_alias_ab")
+        A = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        B = RealQuadraticSurdEntity(p=0, q=2, d=2, r=2, latex="\\frac{2\\sqrt{2}}{2}")
+        cand = CandidateSolution(
+            candidate_id="cand_excl_alias_ab",
+            generator_engine="adversarial_untrusted",
+            raw_symbolic_output="x in R \\ {sqrt(2), 2*sqrt(2)/2}",
+            parsed_entities=(AllRealsExceptFiniteEntity(excluded_points=(A, B)),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level != VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+
+    # 3. cross-type Rational 1 + q=0 surd alias => NOT EXACT_VERIFIED
+    def test_cross_type_rational_surd_alias_not_exact_verified(self, adapter: AlgebraRationalAdapter):
+        # Attack 3: (x^2 - 3*x + 2)/(x - 4) = 0 with candidate roots:
+        # RationalScalarEntity(1/1) = 1
+        # RealQuadraticSurdEntity(p=1, q=0, d=2, r=1) = 1
+        # True roots are {1, 2}. Candidate duplicates root 1 across two different entity types, missing root 2.
+        # MUST NOT be EXACT_VERIFIED / ACCEPTED! PARTIAL is acceptable.
+        ir = parse_equation_to_ir("(x^2 - 3*x + 2) / (x - 4) = 0", "adv_cross_type_alias")
+        r_rat = RationalScalarEntity.from_rational(Rational(1, 1))
+        r_surd = RealQuadraticSurdEntity(p=1, q=0, d=2, r=1, latex="1")
+        cand = CandidateSolution(
+            candidate_id="cand_cross_type",
+            generator_engine="adversarial_untrusted",
+            raw_symbolic_output="x = 1, x = (1+0*sqrt(2))/1",
+            parsed_entities=(FiniteRootCollectionEntity(roots=(r_rat, r_surd)),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level != VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition != VerificationDisposition.ACCEPTED
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+
+    # 4. {-sqrt(2), +sqrt(2)} remains EXACT_VERIFIED
+    def test_genuine_distinct_surds_remain_exact_verified(self, adapter: AlgebraRationalAdapter):
+        # (x^2 - 2)/(x - 3) = 0 with legitimate roots {-sqrt(2), +sqrt(2)}
+        ir = parse_equation_to_ir("(x^2 - 2) / (x - 3) = 0", "legit_surds_test")
+        r_minus = RealQuadraticSurdEntity(p=0, q=-1, d=2, r=1, latex="-\\sqrt{2}")
+        r_plus = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        cand = CandidateSolution(
+            candidate_id="cand_legit_surds",
+            generator_engine="mke_solver",
+            raw_symbolic_output="x = -sqrt(2), x = sqrt(2)",
+            parsed_entities=(FiniteRootCollectionEntity(roots=(r_minus, r_plus)),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 5. sqrt(8)/2 == sqrt(2)
+    def test_exact_surd_equality_sqrt8_div_2_equals_sqrt2(self):
+        r1 = RealQuadraticSurdEntity(p=0, q=1, d=8, r=2, latex="\\frac{\\sqrt{8}}{2}")
+        r2 = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        assert are_roots_equal(r1, r2) is True
+        assert are_roots_equal(r2, r1) is True
+        assert len(deduplicate_roots((r1, r2))) == 1
+
+    # 6. 2*sqrt(2)/2 == sqrt(2)
+    def test_exact_surd_equality_2_sqrt2_div_2_equals_sqrt2(self):
+        r1 = RealQuadraticSurdEntity(p=0, q=2, d=2, r=2, latex="\\frac{2\\sqrt{2}}{2}")
+        r2 = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        assert are_roots_equal(r1, r2) is True
+        assert are_roots_equal(r2, r1) is True
+        assert len(deduplicate_roots((r1, r2))) == 1
+
+    # 7. perfect-square radicand collapses to rational: (2+3*sqrt(4))/4 == 2
+    def test_perfect_square_radicand_collapses_to_rational(self):
+        r1 = RealQuadraticSurdEntity(p=2, q=3, d=4, r=4, latex="\\frac{2+3\\sqrt{4}}{4}")
+        r2 = RationalScalarEntity.from_rational(Rational(2, 1))
+        assert are_roots_equal(r1, r2) is True
+        assert are_roots_equal(r2, r1) is True
+        assert len(deduplicate_roots((r1, r2))) == 1
+
+        # Check NumberFieldElement evaluation collapses to pure rational
+        nf = NumberFieldElement.from_surd_entity(r1)
+        assert nf.u == Rational(2, 1)
+        assert nf.v == Rational(0, 1)
+        assert nf.d == 1
+
+    # 8. q=0 collapses to rational
+    def test_q_zero_surd_collapses_to_rational(self):
+        r1 = RealQuadraticSurdEntity(p=3, q=0, d=5, r=2, latex="\\frac{3}{2}")
+        r2 = RationalScalarEntity.from_rational(Rational(3, 2))
+        assert are_roots_equal(r1, r2) is True
+        assert are_roots_equal(r2, r1) is True
+        assert len(deduplicate_roots((r1, r2))) == 1
+
+        # Check NumberFieldElement evaluation collapses to pure rational
+        nf = NumberFieldElement.from_surd_entity(r1)
+        assert nf.u == Rational(3, 2)
+        assert nf.v == Rational(0, 1)
+        assert nf.d == 1
+
+    # 9. latex differences irrelevant
+    def test_latex_differences_irrelevant(self):
+        r1 = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        r2 = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="DIFFERENT_LATEX_NOTATION")
+        assert are_roots_equal(r1, r2) is True
+        assert len(deduplicate_roots((r1, r2))) == 1
+
+        r3 = RationalScalarEntity(numerator=1, denominator=1, latex="1")
+        r4 = RationalScalarEntity(numerator=1, denominator=1, latex="\\frac{1}{1}")
+        assert are_roots_equal(r3, r4) is True
+        assert len(deduplicate_roots((r3, r4))) == 1
+
+    # 10. constructing d=0 raises Pydantic validation error
+    def test_constructing_d_zero_raises_validation_error(self):
+        with pytest.raises(ValidationError):
+            RealQuadraticSurdEntity(p=0, q=1, d=0, r=1)
+        with pytest.raises(ValidationError):
+            RealQuadraticSurdEntity(p=0, q=1, d=-2, r=1)
+
+    # 11. constructing r<=0 raises Pydantic validation error
+    def test_constructing_r_le_zero_raises_validation_error(self):
+        with pytest.raises(ValidationError):
+            RealQuadraticSurdEntity(p=0, q=1, d=2, r=0)
+        with pytest.raises(ValidationError):
+            RealQuadraticSurdEntity(p=0, q=1, d=2, r=-1)
+
+    # Additional: +sqrt(2) != -sqrt(2)
+    def test_opposite_sign_surds_not_equal(self):
+        r_plus = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        r_minus = RealQuadraticSurdEntity(p=0, q=-1, d=2, r=1, latex="-\\sqrt{2}")
+        assert are_roots_equal(r_plus, r_minus) is False
+        assert are_roots_equal(r_minus, r_plus) is False
+        assert len(deduplicate_roots((r_plus, r_minus))) == 2
 

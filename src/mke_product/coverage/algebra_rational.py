@@ -229,7 +229,19 @@ class NumberFieldElement:
 
     @classmethod
     def from_surd_entity(cls, ent: RealQuadraticSurdEntity) -> NumberFieldElement:
-        return cls(Rational(ent.p, ent.r), Rational(ent.q, ent.r), ent.d)
+        if ent.r <= 0 or ent.d <= 0:
+            raise ValueError(f"Invalid surd parameters: r={ent.r}, d={ent.d}")
+        u = Rational(ent.p, ent.r)
+        if ent.q == 0:
+            return cls.from_rational(u)
+        v = Rational(ent.q, ent.r)
+        if v.is_zero:
+            return cls.from_rational(u)
+        s = math.isqrt(ent.d)
+        if s * s == ent.d:
+            val = u + v * Rational(s, 1)
+            return cls.from_rational(val)
+        return cls(u, v, ent.d)
 
     @property
     def is_zero(self) -> bool:
@@ -502,21 +514,74 @@ def solve_poly_degree_le_2(
     raise DegreeOutOfScopeError(f"Polynomial degree {p.degree} exceeds quadratic bound <= 2")
 
 
+def _normalize_root_for_comparison(
+    r: Any,
+) -> Union[Rational, Tuple[Rational, Rational, int]]:
+    """Normalize a root entity to either exact Rational or (u, v, d) where d is non-square and v != 0."""
+    if isinstance(r, RationalScalarEntity):
+        return r.to_rational
+    if isinstance(r, RealQuadraticSurdEntity):
+        if r.r <= 0 or r.d <= 0:
+            raise ValueError(f"Invalid surd parameters: r={r.r}, d={r.d}")
+        u = Rational(r.p, r.r)
+        if r.q == 0:
+            return u
+        v = Rational(r.q, r.r)
+        if v.is_zero:
+            return u
+        s = math.isqrt(r.d)
+        if s * s == r.d:
+            return u + v * Rational(s, 1)
+        return (u, v, r.d)
+    raise TypeError(f"Unsupported root entity type: {type(r).__name__}")
+
+
 def are_roots_equal(
-    r1: Union[RationalScalarEntity, RealQuadraticSurdEntity],
-    r2: Union[RationalScalarEntity, RealQuadraticSurdEntity],
+    r1: Any,
+    r2: Any,
 ) -> bool:
-    """Exact equality check between two algebraic roots."""
-    if isinstance(r1, RationalScalarEntity) and isinstance(r2, RationalScalarEntity):
-        return r1.to_rational == r2.to_rational
-    if isinstance(r1, RealQuadraticSurdEntity) and isinstance(r2, RealQuadraticSurdEntity):
-        return (r1.p == r2.p and r1.q == r2.q and r1.d == r2.d and r1.r == r2.r)
-    return False
+    """Exact mathematical equality check between two algebraic root entities."""
+    try:
+        norm1 = _normalize_root_for_comparison(r1)
+        norm2 = _normalize_root_for_comparison(r2)
+    except Exception:
+        return False
+
+    # Rational vs Rational compares exact rational values
+    if isinstance(norm1, Rational) and isinstance(norm2, Rational):
+        return norm1 == norm2
+
+    # Rational vs non-rational surd is unequal
+    if isinstance(norm1, Rational) or isinstance(norm2, Rational):
+        return False
+
+    # Two non-rational surds: (u, v, d)
+    u1, v1, d1 = norm1
+    u2, v2, d2 = norm2
+
+    # Require u1 == u2
+    if u1 != u2:
+        return False
+
+    # g = gcd(d1, d2), a = d1/g, b = d2/g
+    g = math.gcd(d1, d2)
+    a = d1 // g
+    b = d2 // g
+
+    sa = math.isqrt(a)
+    sb = math.isqrt(b)
+
+    # d1/d2 is a rational square iff a and b are both perfect squares (use isqrt only)
+    if sa * sa != a or sb * sb != b:
+        return False
+
+    # Compare v1*sqrt(a) == v2*sqrt(b) exactly as Rational coefficients
+    return v1 * Rational(sa, 1) == v2 * Rational(sb, 1)
 
 
 def is_root_in_collection(
-    r: Union[RationalScalarEntity, RealQuadraticSurdEntity],
-    collection: Sequence[Union[RationalScalarEntity, RealQuadraticSurdEntity]],
+    r: Any,
+    collection: Sequence[Any],
 ) -> bool:
     return any(are_roots_equal(r, item) for item in collection)
 
@@ -960,7 +1025,18 @@ class AlgebraRationalAdapter(DomainAdapter):
                 if isinstance(r, RationalScalarEntity):
                     pt = NumberFieldElement.from_rational(r.to_rational)
                 elif isinstance(r, RealQuadraticSurdEntity):
-                    pt = NumberFieldElement.from_surd_entity(r)
+                    try:
+                        pt = NumberFieldElement.from_surd_entity(r)
+                    except Exception:
+                        all_in_domain = False
+                        all_satisfied = False
+                        domain_checks.append(
+                            DomainCheck(
+                                condition_desc=f"Root {idx} malformed surd entity",
+                                satisfied=False,
+                            )
+                        )
+                        continue
                 else:
                     all_in_domain = False
                     all_satisfied = False
@@ -1244,7 +1320,11 @@ class AlgebraRationalAdapter(DomainAdapter):
                 if isinstance(e, RationalScalarEntity):
                     pt = NumberFieldElement.from_rational(e.to_rational)
                 elif isinstance(e, RealQuadraticSurdEntity):
-                    pt = NumberFieldElement.from_surd_entity(e)
+                    try:
+                        pt = NumberFieldElement.from_surd_entity(e)
+                    except Exception:
+                        all_exclusions_valid = False
+                        break
                 else:
                     all_exclusions_valid = False
                     break
