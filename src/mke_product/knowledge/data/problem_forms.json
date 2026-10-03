@@ -158,8 +158,8 @@
       "none_of": []
     },
     "recognition_guidance": {
-      "en": "Observe that the linear coefficient b is zero (the equation contains no first-degree x term, only ax^2 + c = 0).",
-      "vi": "Nhận thấy hệ số bậc một b = 0 (phương trình khuyết số hạng chứa x bậc một, chỉ còn ax^2 + c = 0)."
+      "en": "Observe that the linear coefficient b is zero (ax^2 + c = 0). Rewrite as x^2 = -c/a and evaluate the sign of -c/a to determine real roots.",
+      "vi": "Nhận thấy hệ số bậc một b = 0 (ax² + c = 0). Chuyển vế thành x² = -c/a và xét dấu của -c/a để kết luận nghiệm trên tập số thực."
     },
     "related_method_ids": [
       "QUAD_COMPLETE_SQUARE",
@@ -170,8 +170,8 @@
     ],
     "status": "VERIFIED",
     "summary": {
-      "en": "Incomplete quadratic equation archetype lacking the linear term (b = 0), solvable directly by taking square roots x = +-sqrt(-c/a).",
-      "vi": "Dạng bài phương trình bậc hai khuyết hệ số bậc một (b = 0), có thể giải trực tiếp bằng phép khai căn x = +-sqrt(-c/a)."
+      "en": "Incomplete quadratic equation archetype lacking the linear term (b = 0), ax^2 + c = 0 (x^2 = -c/a). Over the real domain: if -c/a > 0, two distinct real roots x = +-sqrt(-c/a); if -c/a = 0, one repeated root x = 0; if -c/a < 0, no real roots.",
+      "vi": "Dạng bài phương trình bậc hai khuyết hệ số bậc một (b = 0), ax² + c = 0 (x² = -c/a). Trong miền thực: nếu -c/a > 0 có 2 nghiệm phân biệt x = ±√(-c/a); nếu -c/a = 0 có 1 nghiệm kép x = 0; nếu -c/a < 0 phương trình vô nghiệm thực."
     },
     "theorem_refs": [],
     "title": {
@@ -212,8 +212,8 @@
       "none_of": []
     },
     "recognition_guidance": {
-      "en": "Observe that the constant term c is zero (the equation is ax^2 + bx = 0), allowing immediate common factor extraction x(ax + b) = 0.",
-      "vi": "Nhận thấy hệ số tự do c = 0 (phương trình có dạng ax^2 + bx = 0), cho phép đặt ngay nhân tử chung x(ax + b) = 0."
+      "en": "Observe that the constant term c is zero (the equation is ax^2 + bx = 0), allowing immediate common factor extraction x(ax + b) = 0 to determine candidate roots x = 0 and x = -b/a.",
+      "vi": "Nhận thấy hệ số tự do c = 0 (phương trình có dạng ax² + bx = 0), cho phép đặt ngay nhân tử chung x(ax + b) = 0 để tìm các nghiệm x = 0 và x = -b/a."
     },
     "related_method_ids": [
       "QUAD_FACTORIZATION_Q",
@@ -224,8 +224,8 @@
     ],
     "status": "VERIFIED",
     "summary": {
-      "en": "Incomplete quadratic equation archetype lacking the constant term (c = 0), yielding roots x = 0 and x = -b/a.",
-      "vi": "Dạng bài phương trình bậc hai khuyết hệ số tự do (c = 0), luôn có hai nghiệm x = 0 và x = -b/a."
+      "en": "Incomplete quadratic equation archetype lacking the constant term (c = 0), with roots determined by factoring x(ax + b) = 0: x = 0 or x = -b/a. When b = 0 the two values coincide, yielding one repeated root x = 0.",
+      "vi": "Dạng phương trình ax² + bx = 0 có nghiệm được xác định từ x(ax+b)=0: x=0 hoặc x=-b/a. Khi b=0 hai giá trị trùng nhau, tạo nghiệm kép x=0."
     },
     "theorem_refs": [],
     "title": {

@@ -1,16 +1,17 @@
-"""MKE MVP V1 — Milestone K1-02 Curated Knowledge Dataset Test Suite.
+"""MKE MVP V1 — Milestone K1-02-R1 Curated Knowledge Dataset Test Suite.
 
 Verifies:
 1. Exact cardinalities (3 tips, 6 problem forms) and exact canonical IDs.
-2. Canonical lexicographic ordering in raw JSON dataset files.
+2. Canonical lexicographic ordering in raw JSON dataset files and loader enforcement.
 3. Bilingual completeness and non-empty pedagogical text across all fields.
 4. Exact mathematical conditions using the closed PredicateId language.
 5. Referential integrity to existing S3 entities (provenances, methods, concepts, formulas, theorems).
 6. Relation subset invariants (guaranteed_method_ids ⊆ related_method_ids, guaranteed_tip_ids ⊆ related_tip_ids).
 7. Empty example reference policy (worked_example_ids and practice_example_ids must be empty).
-8. Provenance verification gate (VERIFIED entities only reference VERIFIED sources).
-9. Fail-closed rejection of malformed, duplicate, or dangling references.
+8. Provenance verification gate (VERIFIED entities only reference VERIFIED sources, rejects UNVERIFIED).
+9. Fail-closed rejection of malformed, duplicate, dangling, or unverified references.
 10. Content hashing invariance (S3 hash byte-frozen, K1 combined hash deterministic).
+11. Repeated load determinism (load_quick_tips() and load_problem_forms() are idempotent and deterministic).
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from mke_product.knowledge.loader import (
     compute_dataset_content_hash,
     load_knowledge_dataset,
 )
+from mke_product.knowledge.schemas import ProvenanceStatus, SourceProvenance
 
 EXPECTED_S3_HASH = "e689055c355bf91b748e1bb0909359ffa13177a8f334bc25df9caf8c2cf8ca66"
 
@@ -87,6 +89,20 @@ class TestK102DatasetCardinalitiesAndOrdering:
             raw_data = json.load(f)
         raw_ids = [item["form_id"] for item in raw_data]
         assert raw_ids == sorted(raw_ids), f"problem_forms.json is not sorted lexicographically: {raw_ids}"
+
+    def test_loader_rejects_non_canonical_tip_ordering(self):
+        dataset = load_k1_knowledge_dataset()
+        # Reverse tips order
+        dataset["tips"] = list(reversed(dataset["tips"]))
+        with pytest.raises(ValueError, match="tips dataset must be in canonical lexicographic tip_id order"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_loader_rejects_non_canonical_problem_form_ordering(self):
+        dataset = load_k1_knowledge_dataset()
+        # Reverse problem_forms order
+        dataset["problem_forms"] = list(reversed(dataset["problem_forms"]))
+        with pytest.raises(ValueError, match="problem_forms dataset must be in canonical lexicographic form_id order"):
+            validate_k1_knowledge_dataset(dataset)
 
 
 class TestK102DatasetMathematicalConditions:
@@ -189,6 +205,37 @@ class TestK102BilingualAndPedagogicalCompleteness:
             assert form.canonical_structure_latex.strip()
             assert form.recognition_guidance.en.strip() and form.recognition_guidance.vi.strip()
 
+    def test_incomplete_forms_sound_wording(self):
+        forms = {f.form_id: f for f in load_problem_forms()}
+
+        # Incomplete C=0 must note b=0 repeated root distinction
+        form_c = forms["QUAD_FORM_INCOMPLETE_C_ZERO"]
+        assert "Khi b=0" in form_c.summary.vi or "b=0" in form_c.summary.vi
+        assert "When b = 0" in form_c.summary.en or "b = 0" in form_c.summary.en
+
+        # Incomplete B=0 must specify real domain sign cases for -c/a
+        form_b = forms["QUAD_FORM_INCOMPLETE_B_ZERO"]
+        assert "-c/a > 0" in form_b.summary.vi and "-c/a < 0" in form_b.summary.vi
+        assert "-c/a > 0" in form_b.summary.en and "-c/a < 0" in form_b.summary.en
+
+
+class TestK102StatusAndGovernanceMatrix:
+    """Verifies explicit status attributes of all tips and forms."""
+
+    def test_all_quick_tips_status_verified(self):
+        tips = load_quick_tips()
+        for tip in tips:
+            assert tip.status == KnowledgeEntityStatus.VERIFIED, (
+                f"QuickTip '{tip.tip_id}' status is not VERIFIED: {tip.status}"
+            )
+
+    def test_all_problem_forms_status_verified(self):
+        forms = load_problem_forms()
+        for form in forms:
+            assert form.status == KnowledgeEntityStatus.VERIFIED, (
+                f"ProblemForm '{form.form_id}' status is not VERIFIED: {form.status}"
+            )
+
 
 class TestK102ReferentialIntegrityAndRelationInvariants:
     """Verifies relational invariants, foreign keys, and empty example lists."""
@@ -255,12 +302,12 @@ class TestK102ReferentialIntegrityAndRelationInvariants:
         for tip in dataset["tips"]:
             if tip.status == KnowledgeEntityStatus.VERIFIED:
                 for ref in tip.provenance_refs:
-                    assert prov_map[ref].verification_status == "VERIFIED"
+                    assert prov_map[ref].verification_status == ProvenanceStatus.VERIFIED
 
         for form in dataset["problem_forms"]:
             if form.status == KnowledgeEntityStatus.VERIFIED:
                 for ref in form.provenance_refs:
-                    assert prov_map[ref].verification_status == "VERIFIED"
+                    assert prov_map[ref].verification_status == ProvenanceStatus.VERIFIED
 
 
 class TestK102FailClosedValidation:
@@ -275,6 +322,24 @@ class TestK102FailClosedValidation:
         with pytest.raises(ValueError, match="references unknown provenance"):
             validate_k1_knowledge_dataset(dataset)
 
+    def test_rejects_unknown_provenance_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["provenance_refs"] = ("UNKNOWN_SOURCE_ID",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown provenance"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_method_in_tip(self):
+        dataset = load_k1_knowledge_dataset()
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["related_method_ids"] = ("NON_EXISTENT_METHOD",)
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references unknown method"):
+            validate_k1_knowledge_dataset(dataset)
+
     def test_rejects_unknown_method_in_problem_form(self):
         dataset = load_k1_knowledge_dataset()
         form_dict = dataset["problem_forms"][0].model_dump()
@@ -284,10 +349,99 @@ class TestK102FailClosedValidation:
         with pytest.raises(ValueError, match="references unknown related method"):
             validate_k1_knowledge_dataset(dataset)
 
+    def test_rejects_unknown_guaranteed_method_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["guaranteed_method_ids"] = ("NON_EXISTENT_METHOD",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown guaranteed method"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_concept_in_tip(self):
+        dataset = load_k1_knowledge_dataset()
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["related_concept_ids"] = ("NON_EXISTENT_CONCEPT",)
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references unknown concept"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_concept_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["prerequisite_concept_ids"] = ("NON_EXISTENT_CONCEPT",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown prerequisite concept"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_formula_in_tip(self):
+        dataset = load_k1_knowledge_dataset()
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["formula_refs"] = ("NON_EXISTENT_FORMULA",)
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references unknown formula"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_formula_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["formula_refs"] = ("NON_EXISTENT_FORMULA",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown formula"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_theorem_in_tip(self):
+        dataset = load_k1_knowledge_dataset()
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["theorem_refs"] = ("NON_EXISTENT_THEOREM",)
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references unknown theorem"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_unknown_theorem_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["theorem_refs"] = ("NON_EXISTENT_THEOREM",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown theorem"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_dangling_related_problem_form_in_tip(self):
+        dataset = load_k1_knowledge_dataset()
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["related_problem_form_ids"] = ("DANGLING_FORM_ID",)
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references unknown problem form"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_dangling_related_tip_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["related_tip_ids"] = ("DANGLING_TIP_ID",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown related tip"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_dangling_guaranteed_tip_in_problem_form(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["guaranteed_tip_ids"] = ("DANGLING_TIP_ID",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references unknown guaranteed tip"):
+            validate_k1_knowledge_dataset(dataset)
+
     def test_rejects_guaranteed_method_not_in_related_methods(self):
         dataset = load_k1_knowledge_dataset()
         form_dict = dataset["problem_forms"][0].model_dump()
-        # Set guaranteed to standard formula but omit standard formula from related
         form_dict["guaranteed_method_ids"] = ("QUAD_FORMULA_STANDARD",)
         form_dict["related_method_ids"] = ("QUAD_COMPLETE_SQUARE",)
         dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
@@ -314,6 +468,58 @@ class TestK102FailClosedValidation:
         with pytest.raises(ValueError, match="Worked examples must be empty in K1-02 dataset"):
             validate_k1_knowledge_dataset(dataset)
 
+    def test_rejects_non_empty_practice_example_references(self):
+        dataset = load_k1_knowledge_dataset()
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["practice_example_ids"] = ("PRACTICE_001",)
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="Practice examples must be empty in K1-02 dataset"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_verified_tip_referencing_unverified_provenance(self):
+        dataset = load_k1_knowledge_dataset()
+        # Inject an unverified provenance source into dataset
+        unverified_prov = SourceProvenance(
+            source_id="SRC_UNVERIFIED_SOURCE",
+            title="Unverified Source",
+            author_or_institution="Unknown",
+            publication_year=2026,
+            source_type="ENGINE_SPEC",
+            locator="test",
+            verification_status=ProvenanceStatus.UNVERIFIED,
+        )
+        dataset["provenances"] = dataset["provenances"] + [unverified_prov]
+
+        tip_dict = dataset["tips"][0].model_dump()
+        tip_dict["provenance_refs"] = ("SRC_UNVERIFIED_SOURCE",)
+        tip_dict["status"] = KnowledgeEntityStatus.VERIFIED
+        dataset["tips"] = [QuickTipKnowledge.model_validate(tip_dict)] + dataset["tips"][1:]
+
+        with pytest.raises(ValueError, match="references non-VERIFIED provenance"):
+            validate_k1_knowledge_dataset(dataset)
+
+    def test_rejects_verified_problem_form_referencing_unverified_provenance(self):
+        dataset = load_k1_knowledge_dataset()
+        unverified_prov = SourceProvenance(
+            source_id="SRC_UNVERIFIED_SOURCE",
+            title="Unverified Source",
+            author_or_institution="Unknown",
+            publication_year=2026,
+            source_type="ENGINE_SPEC",
+            locator="test",
+            verification_status=ProvenanceStatus.UNVERIFIED,
+        )
+        dataset["provenances"] = dataset["provenances"] + [unverified_prov]
+
+        form_dict = dataset["problem_forms"][0].model_dump()
+        form_dict["provenance_refs"] = ("SRC_UNVERIFIED_SOURCE",)
+        form_dict["status"] = KnowledgeEntityStatus.VERIFIED
+        dataset["problem_forms"] = [RelatedProblemFormKnowledge.model_validate(form_dict)] + dataset["problem_forms"][1:]
+
+        with pytest.raises(ValueError, match="references non-VERIFIED provenance"):
+            validate_k1_knowledge_dataset(dataset)
+
     def test_rejects_duplicate_tip_ids(self):
         dataset = load_k1_knowledge_dataset()
         dataset["tips"] = dataset["tips"] + [dataset["tips"][0]]
@@ -327,6 +533,50 @@ class TestK102FailClosedValidation:
 
         with pytest.raises(ValueError, match="Duplicate form_id found"):
             validate_k1_knowledge_dataset(dataset)
+
+
+class TestK102MalformedDataAndLoaderDeterminism:
+    """Verifies loader error handling on malformed files and repeated load determinism."""
+
+    def test_load_quick_tips_rejects_malformed_json(self, tmp_path: Path):
+        bad_json = tmp_path / "tips.json"
+        bad_json.write_text("{ this is not valid json }", encoding="utf-8")
+
+        with pytest.raises(Exception):
+            load_quick_tips(data_dir=tmp_path)
+
+    def test_load_quick_tips_rejects_invalid_schema(self, tmp_path: Path):
+        bad_schema = tmp_path / "tips.json"
+        bad_schema.write_text(json.dumps([{"invalid_field": "test"}]), encoding="utf-8")
+
+        with pytest.raises(Exception):
+            load_quick_tips(data_dir=tmp_path)
+
+    def test_load_problem_forms_rejects_malformed_json(self, tmp_path: Path):
+        bad_json = tmp_path / "problem_forms.json"
+        bad_json.write_text("{ this is not valid json }", encoding="utf-8")
+
+        with pytest.raises(Exception):
+            load_problem_forms(data_dir=tmp_path)
+
+    def test_load_problem_forms_rejects_invalid_schema(self, tmp_path: Path):
+        bad_schema = tmp_path / "problem_forms.json"
+        bad_schema.write_text(json.dumps([{"invalid_field": "test"}]), encoding="utf-8")
+
+        with pytest.raises(Exception):
+            load_problem_forms(data_dir=tmp_path)
+
+    def test_repeated_load_quick_tips_is_deterministic(self):
+        t1 = load_quick_tips()
+        t2 = load_quick_tips()
+        assert t1 == t2
+        assert [t.model_dump() for t in t1] == [t.model_dump() for t in t2]
+
+    def test_repeated_load_problem_forms_is_deterministic(self):
+        f1 = load_problem_forms()
+        f2 = load_problem_forms()
+        assert f1 == f2
+        assert [f.model_dump() for f in f1] == [f.model_dump() for f in f2]
 
 
 class TestK102ContentHashing:

@@ -30,6 +30,7 @@ from mke_product.knowledge.loader import (
     load_theorems,
     validate_knowledge_dataset,
 )
+from mke_product.knowledge.schemas import ProvenanceStatus
 
 _QUICK_TIP_LIST_ADAPTER = TypeAdapter(List[QuickTipKnowledge])
 _PROBLEM_FORM_LIST_ADAPTER = TypeAdapter(List[RelatedProblemFormKnowledge])
@@ -69,7 +70,7 @@ def validate_k1_knowledge_dataset(
     dataset: Dict[str, Any],
     registry_method_ids: Optional[Set[str]] = None,
 ) -> None:
-    """Strictly validates referential integrity and relation invariants across S3 and K1 entities.
+    """Strictly validates referential integrity, ordering, and relation invariants across S3 and K1 entities.
 
     Parameters
     ----------
@@ -91,20 +92,24 @@ def validate_k1_knowledge_dataset(
 
     # Build lookup dictionaries and sets
     prov_map = {p.source_id: p for p in provenances}
-    form_id_set = {f.formula_id for f in formulas}
+    formula_id_set = {f.formula_id for f in formulas}
     thm_id_set = {t.theorem_id for t in theorems}
     concept_id_set = {c.concept_id for c in concepts}
     method_id_set = {m.method_id for m in methods}
 
-    # 2. Duplicate ID validation for K1 entities
+    # 2. Duplicate ID and canonical order validation for K1 entities
     tip_ids = [t.tip_id for t in tips]
     if len(tip_ids) != len(set(tip_ids)):
         raise ValueError(f"Duplicate tip_id found in tips dataset: {tip_ids}")
+    if tip_ids != sorted(tip_ids):
+        raise ValueError("tips dataset must be in canonical lexicographic tip_id order")
     tip_id_set = set(tip_ids)
 
     form_ids = [f.form_id for f in problem_forms]
     if len(form_ids) != len(set(form_ids)):
         raise ValueError(f"Duplicate form_id found in problem_forms dataset: {form_ids}")
+    if form_ids != sorted(form_ids):
+        raise ValueError("problem_forms dataset must be in canonical lexicographic form_id order")
     problem_form_id_set = set(form_ids)
 
     # 3. Referential integrity and provenance status for Quick Tips
@@ -112,7 +117,7 @@ def validate_k1_knowledge_dataset(
         for ref in tip.provenance_refs:
             if ref not in prov_map:
                 raise ValueError(f"QuickTip '{tip.tip_id}' references unknown provenance: '{ref}'")
-            if tip.status == KnowledgeEntityStatus.VERIFIED and prov_map[ref].verification_status != "VERIFIED":
+            if tip.status == KnowledgeEntityStatus.VERIFIED and prov_map[ref].verification_status != ProvenanceStatus.VERIFIED:
                 raise ValueError(
                     f"VERIFIED QuickTip '{tip.tip_id}' references non-VERIFIED provenance '{ref}' "
                     f"(status: '{prov_map[ref].verification_status}')."
@@ -127,7 +132,7 @@ def validate_k1_knowledge_dataset(
                 raise ValueError(f"QuickTip '{tip.tip_id}' references unknown concept: '{ref}'")
 
         for ref in tip.formula_refs:
-            if ref not in form_id_set:
+            if ref not in formula_id_set:
                 raise ValueError(f"QuickTip '{tip.tip_id}' references unknown formula: '{ref}'")
 
         for ref in tip.theorem_refs:
@@ -143,7 +148,7 @@ def validate_k1_knowledge_dataset(
         for ref in form.provenance_refs:
             if ref not in prov_map:
                 raise ValueError(f"ProblemForm '{form.form_id}' references unknown provenance: '{ref}'")
-            if form.status == KnowledgeEntityStatus.VERIFIED and prov_map[ref].verification_status != "VERIFIED":
+            if form.status == KnowledgeEntityStatus.VERIFIED and prov_map[ref].verification_status != ProvenanceStatus.VERIFIED:
                 raise ValueError(
                     f"VERIFIED ProblemForm '{form.form_id}' references non-VERIFIED provenance '{ref}' "
                     f"(status: '{prov_map[ref].verification_status}')."
@@ -188,7 +193,7 @@ def validate_k1_knowledge_dataset(
                 raise ValueError(f"ProblemForm '{form.form_id}' references unknown prerequisite concept: '{ref}'")
 
         for ref in form.formula_refs:
-            if ref not in form_id_set:
+            if ref not in formula_id_set:
                 raise ValueError(f"ProblemForm '{form.form_id}' references unknown formula: '{ref}'")
 
         for ref in form.theorem_refs:
