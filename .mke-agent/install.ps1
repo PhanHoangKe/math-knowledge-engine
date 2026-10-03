@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ControlBranch = "automation/mke-agent-loop"
+$ScheduledTaskName = "MKE Antigravity Agent Runner"
 
 function Write-Step([string]$Message) {
     Write-Host "[MKE] $Message" -ForegroundColor Cyan
@@ -97,6 +98,21 @@ if (-not (Test-Path $Runner)) {
     throw "Runner file not found: $Runner"
 }
 
+$ExistingTask = Get-ScheduledTask -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+if ($ExistingTask) {
+    Write-Step "Stopping the existing runner for a safe in-place upgrade"
+    Stop-ScheduledTask -TaskName $ScheduledTaskName -ErrorAction SilentlyContinue
+}
+
+$EncryptedKey = Join-Path $env:LOCALAPPDATA "MKE\secrets\openai_api_key.dpapi"
+if (-not $env:OPENAI_API_KEY -and -not (Test-Path $EncryptedKey)) {
+    Write-Step "Configuring the OpenAI API credential for event-driven audit"
+    & (Join-Path $ControlPath ".mke-agent\configure-secrets.ps1") -SecretPath $EncryptedKey
+}
+if (-not $env:OPENAI_API_KEY -and -not (Test-Path $EncryptedKey)) {
+    throw "OpenAI API credential was not configured."
+}
+
 Write-Step "Registering per-user scheduled task"
 $Quote = [char]34
 $ArgumentParts = @()
@@ -116,8 +132,8 @@ try {
     $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
     $Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
     $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-    Register-ScheduledTask -TaskName "MKE Antigravity Agent Runner" -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
-    Start-ScheduledTask -TaskName "MKE Antigravity Agent Runner"
+    Register-ScheduledTask -TaskName $ScheduledTaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
+    Start-ScheduledTask -TaskName $ScheduledTaskName
     Write-Step "Scheduled task started"
 }
 catch {
@@ -136,4 +152,5 @@ Write-Host "MKE automation bootstrap completed." -ForegroundColor Green
 Write-Host "Control branch: $ControlBranch"
 Write-Host "Control worktree: $ControlPath"
 Write-Host "Runner log: $ControlPath\.mke-agent\logs\runner.log"
-Write-Host "The queued THPT-COV-P1 task will be picked up automatically."
+Write-Host "Audit history: $ControlPath\.mke-agent\history"
+Write-Host "The runner will deliver READY_FOR_AUDIT/BLOCKED events immediately; the hourly ChatGPT automation remains only a watchdog."

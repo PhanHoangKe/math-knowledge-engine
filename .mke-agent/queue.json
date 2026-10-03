@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "tasks": [
+    {
+      "task_id": "THPT-COV-P2-001",
+      "status": "PENDING",
+      "base_sha": "$ACCEPTED_COMMIT",
+      "target_branch": "product/thpt-cov-p2-verification-acceptance",
+      "prompt_path": ".mke-agent/prompts/THPT_COV_P2.md",
+      "commit_message": "test(coverage): independently harden and accept THPT universal core",
+      "allowed_prefixes": [
+        "src/mke_product/coverage/",
+        "tests/test_thpt_cov_p2_",
+        "docs/acceptance/THPT_COV_P2"
+      ]
+    }
+  ]
+}

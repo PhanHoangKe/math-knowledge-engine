@@ -175,6 +175,7 @@ def update_control_state(control: Path, task_id: str, status: str, result: dict)
         raise RunnerError(f"Unexpected control status while finalizing: {current.get('status')}")
     current["status"] = status
     current["result"] = result
+    current["state_version"] = int(current.get("state_version", 0)) + 1
     current["updated_at"] = utc_now()
     write_json(task_path, current)
     git(control, "add", str(TASK_REL).replace("\\", "/"))
@@ -213,6 +214,7 @@ def mark_running(control: Path, task: dict) -> None:
     if current.get("task_id") != task["task_id"] or current.get("status") != "READY":
         raise RunnerError("Task no longer READY after sync")
     current["status"] = "RUNNING"
+    current["state_version"] = int(current.get("state_version", 0)) + 1
     current["started_at"] = utc_now()
     write_json(task_path, current)
     git(control, "add", str(TASK_REL).replace("\\", "/"))
@@ -352,6 +354,7 @@ def process_task(repo: Path, control: Path, worktree_root: Path) -> None:
         log(f"Task {task_id} completed: {commit_sha}")
 
         git(repo, "worktree", "remove", "--force", str(worktree), timeout=300, check=False)
+        trigger_orchestrator(repo, control)
 
     except Exception as exc:
         result.update({
@@ -364,8 +367,28 @@ def process_task(repo: Path, control: Path, worktree_root: Path) -> None:
         log(f"Task {task_id} BLOCKED at {stage}: {exc}")
         try:
             update_control_state(control, task_id, "BLOCKED", result)
+            trigger_orchestrator(repo, control)
         except Exception as state_exc:
             log(f"Could not publish BLOCKED state: {state_exc}")
+
+
+def trigger_orchestrator(repo: Path, control: Path) -> None:
+    try:
+        orchestrator = control / ".mke-agent" / "orchestrator.py"
+        if not orchestrator.is_file():
+            raise RunnerError(f"Event orchestrator not found: {orchestrator}")
+        cp = run(
+            [sys.executable, str(orchestrator), "--once", "--repo", str(repo), "--control", str(control)],
+            cwd=control,
+            timeout=int(read_json(control / POLICY_REL).get("audit_timeout_seconds", 900)) + 600,
+            check=False,
+        )
+        if cp.returncode != 0:
+            log("Auditor event delivery failed; the daemon will retry: " + tail(cp.stdout + "\n" + cp.stderr, 8000))
+    except Exception as exc:
+        # Event delivery is retried from durable READY_FOR_AUDIT/BLOCKED state.
+        # It must never downgrade a successfully pushed candidate to BLOCKED.
+        log(f"Auditor event delivery raised; the daemon will retry: {exc}")
 
 
 def daemon(repo: Path, control: Path, once: bool) -> int:
@@ -386,6 +409,8 @@ def daemon(repo: Path, control: Path, once: bool) -> int:
                 task = read_json(control / TASK_REL)
                 if task.get("status") == "READY":
                     process_task(repo, control, worktree_root)
+                elif task.get("status") in {"READY_FOR_AUDIT", "BLOCKED"}:
+                    trigger_orchestrator(repo, control)
             except Exception as exc:
                 log(f"Runner loop error: {exc}")
             if once:

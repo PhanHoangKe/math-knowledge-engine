@@ -9,6 +9,8 @@ dist/
 build/
 .venv/
 env/
+.mke-agent/runtime/
+.mke-agent/logs/
 
 # Frontend
 node_modules/
