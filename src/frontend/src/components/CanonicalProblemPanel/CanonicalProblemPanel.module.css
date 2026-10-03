@@ -103,24 +103,24 @@
 .coeffTag {
   font-family: var(--font-sans);
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--text-primary, #333333);
-  background: var(--bg-subtle, #f8fafc);
+  background: var(--bg-subtle, #f4f6f9);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  padding: 0.12rem 0.45rem;
-  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
 }
 
 .discriminantValue {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .deltaValue {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 400;
   font-size: 0.85rem;
   color: var(--text-primary, #333333);
 }
@@ -128,35 +128,27 @@
 .deltaFlags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .flagBadge {
   font-family: var(--font-sans);
-  font-size: 0.78rem;
-  padding: 0.12rem 0.45rem;
-  border-radius: 4px;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 400;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: var(--bg-subtle, #f4f6f9);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  color: var(--text-secondary, #555555);
 }
 
-.flagPositive {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-}
-
-.flagZero {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
-}
-
-.flagNegative {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-}
-
+.flagPositive,
+.flagZero,
+.flagNegative,
 .flagSquare {
-  background: rgba(99, 102, 241, 0.1);
-  color: #4f46e5;
+  background: var(--bg-subtle, #f4f6f9);
+  color: var(--text-secondary, #555555);
 }
 
 .technicalDetails {
