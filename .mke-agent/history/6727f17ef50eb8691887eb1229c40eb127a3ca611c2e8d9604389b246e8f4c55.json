@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "event_id": "6727f17ef50eb8691887eb1229c40eb127a3ca611c2e8d9604389b246e8f4c55",
+  "created_at": "2026-10-03T12:40:39.198957+00:00",
+  "task_snapshot": {
+    "schema_version": "2.0",
+    "state_version": 9,
+    "task_id": "THPT-COV-P1-R1-002",
+    "status": "BLOCKED",
+    "attempt": 3,
+    "base_sha": "ed28edb278ad3993ad1667a715210e7fdd23c705",
+    "target_branch": "product/thpt-cov-p1-r1-contract-remediation-r2-remediation",
+    "prompt_path": ".mke-agent/prompts/THPT-COV-P1-R1-002_R3.md",
+    "commit_message": "fix(thpt-cov-p1-r1-002): audit remediation attempt 3",
+    "allowed_prefixes": [
+      "src/mke_product/coverage/",
+      "tests/test_thpt_cov_p1_",
+      "docs/acceptance/THPT_COV_P1"
+    ],
+    "updated_at": "2026-10-03T12:40:34.523972+00:00",
+    "previous_audit_event_id": "c4ea42b6992d8a22d6309de9a8ebf7f9c58fa8bd35b5331542ed598916ee3ff9",
+    "started_at": "2026-10-03T12:40:26.563864+00:00",
+    "result": {
+      "task_id": "THPT-COV-P1-R1-002",
+      "attempt": 3,
+      "started_at": "2026-10-03T12:40:23.505950+00:00",
+      "status": "BLOCKED",
+      "finished_at": "2026-10-03T12:40:33.380604+00:00",
+      "stage": "frontend-baseline-build",
+      "error": "[WinError 2] The system cannot find the file specified",
+      "worktree_path": "D:\\mke_agent_worktrees\\THPT-COV-P1-R1-002"
+    }
+  },
+  "decision": {
+    "decision": "REMEDIATE",
+    "summary": "Runner failed before a candidate could pass gates.",
+    "findings": [
+      {
+        "severity": "high",
+        "location": "frontend-baseline-build",
+        "problem": "[WinError 2] The system cannot find the file specified",
+        "required_fix": "Retry within the original task scope after correcting the reported failure."
+      }
+    ],
+    "trust_boundary_preserved": true,
+    "frontend_freeze_preserved": true
+  },
+  "source": "deterministic-runner-failure",
+  "applied_at": "2026-10-03T12:40:40.607753+00:00"
+}

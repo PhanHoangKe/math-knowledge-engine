@@ -1,8 +1,8 @@
 {
   "schema_version": "2.0",
-  "state_version": 9,
+  "state_version": 10,
   "task_id": "THPT-COV-P1-R1-002",
-  "status": "BLOCKED",
+  "status": "OWNER_REQUIRED",
   "attempt": 3,
   "base_sha": "ed28edb278ad3993ad1667a715210e7fdd23c705",
   "target_branch": "product/thpt-cov-p1-r1-contract-remediation-r2-remediation",
@@ -13,7 +13,7 @@
     "tests/test_thpt_cov_p1_",
     "docs/acceptance/THPT_COV_P1"
   ],
-  "updated_at": "2026-10-03T12:40:34.523972+00:00",
+  "updated_at": "2026-10-03T12:40:40.607753+00:00",
   "previous_audit_event_id": "c4ea42b6992d8a22d6309de9a8ebf7f9c58fa8bd35b5331542ed598916ee3ff9",
   "started_at": "2026-10-03T12:40:26.563864+00:00",
   "result": {
@@ -25,5 +25,7 @@
     "stage": "frontend-baseline-build",
     "error": "[WinError 2] The system cannot find the file specified",
     "worktree_path": "D:\\mke_agent_worktrees\\THPT-COV-P1-R1-002"
-  }
+  },
+  "owner_reason": "Remediation limit reached after 3 attempts",
+  "audit_event_id": "6727f17ef50eb8691887eb1229c40eb127a3ca611c2e8d9604389b246e8f4c55"
 }
