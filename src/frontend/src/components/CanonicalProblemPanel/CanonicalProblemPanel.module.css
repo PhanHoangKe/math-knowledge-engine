@@ -245,8 +245,7 @@
 }
 
 .card:hover .hoverActionBar,
-.card:focus-within .hoverActionBar,
-.hoverActionBarActive {
+.card:focus-within .hoverActionBar {
   opacity: 1 !important;
   pointer-events: auto !important;
 }

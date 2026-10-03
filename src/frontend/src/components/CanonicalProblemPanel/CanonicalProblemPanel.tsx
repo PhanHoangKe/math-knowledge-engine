@@ -61,11 +61,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
       <div className={styles.cardHeader}>
         <div className={styles.headerLeft}>
           <span className={styles.podTitle}>{t('lbl_input')}</span>
-          <span className={styles.categoryBadge}>{problem.category}</span>
         </div>
-        <span className={styles.classificationBadge}>
-          {problem.classification}
-        </span>
       </div>
 
       <div className={styles.cardBody}>
@@ -149,6 +145,14 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
             </summary>
             <div className={styles.idRow}>
               <div className={styles.idGroup}>
+                <span className={styles.idLabel}>{t('lbl_category') || 'Category'}:</span>
+                <code className={styles.idValue}>{problem.category}</code>
+              </div>
+              <div className={styles.idGroup}>
+                <span className={styles.idLabel}>{t('lbl_classification') || 'Classification'}:</span>
+                <code className={styles.idValue}>{problem.classification}</code>
+              </div>
+              <div className={styles.idGroup}>
                 <span className={styles.idLabel}>{t('lbl_problem_id')}:</span>
                 <code className={styles.idValue}>{problem.problem_id}</code>
               </div>
@@ -170,7 +174,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
 
       {/* WolframAlpha Style Bottom Hover Action Bar */}
       <div
-        className={`${styles.hoverActionBar} ${showCoeffEditor ? styles.hoverActionBarActive : ''}`}
+        className={styles.hoverActionBar}
         data-testid="coefficient-editor-disclosure"
       >
         <button
