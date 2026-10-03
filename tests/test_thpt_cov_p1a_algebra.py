@@ -993,3 +993,245 @@ class TestRootEquivalenceSoundnessRemediation:
         assert are_roots_equal(r_minus, r_plus) is False
         assert len(deduplicate_roots((r_plus, r_minus))) == 2
 
+
+# ===========================================================================
+# 20. Domain-Guard Soundness Remediation Tests (Pack 1-A Retry)
+# ===========================================================================
+
+class TestPack1ADomainGuardSoundnessRemediation:
+    @pytest.fixture
+    def service(self) -> UniversalApplicationService:
+        return UniversalApplicationService()
+
+    @pytest.fixture
+    def adapter(self) -> AlgebraRationalAdapter:
+        return AlgebraRationalAdapter()
+
+    # 1. (x-1)^0 = 1 -> AlgebraRationalAdapter -> ALL_REALS_EXCEPT_FINITE {1} -> EXACT_VERIFIED/ACCEPTED
+    def test_req_behavior_1_x_minus_1_pow_0_eq_1(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("(x - 1)^0 = 1", "req_1")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        ent = res.candidate.parsed_entities[0]
+        assert isinstance(ent, AllRealsExceptFiniteEntity)
+        assert len(ent.excluded_points) == 1
+        assert ent.excluded_points[0].to_rational == Rational(1, 1)
+
+    # 2. (x-1)^0 = 0 -> AlgebraRationalAdapter -> EMPTY_REAL_SOLUTION -> EXACT_VERIFIED/ACCEPTED on domain R\{1}
+    def test_req_behavior_2_x_minus_1_pow_0_eq_0(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("(x - 1)^0 = 0", "req_2")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        assert isinstance(res.candidate.parsed_entities[0], EmptyRealSolutionEntity)
+        step1 = res.trace.steps[0]
+        assert "x \\ne 1" in step1.output_expression_latex
+
+    # 3. (x^2+1)^0 = 1 -> AlgebraRationalAdapter -> ALL_REAL_SOLUTION -> EXACT_VERIFIED/ACCEPTED
+    def test_req_behavior_3_x2_plus_1_pow_0_eq_1(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("(x^2 + 1)^0 = 1", "req_3")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        assert isinstance(res.candidate.parsed_entities[0], AllRealSolutionEntity)
+
+    # 4. 1/((x-1)^0) = 1 -> ALL_REALS_EXCEPT_FINITE {1}, exact
+    def test_req_behavior_4_one_div_x_minus_1_pow_0_eq_1(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("1 / ((x - 1)^0) = 1", "req_4")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        ent = res.candidate.parsed_entities[0]
+        assert isinstance(ent, AllRealsExceptFiniteEntity)
+        assert len(ent.excluded_points) == 1
+        assert ent.excluded_points[0].to_rational == Rational(1, 1)
+
+    # 5. (x-1)^0/(x-2) = 1/(x-2) -> ALL_REALS_EXCEPT_FINITE {1,2}, exact
+    def test_req_behavior_5_pow_0_div_x_minus_2_identity(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("(x - 1)^0 / (x - 2) = 1 / (x - 2)", "req_5")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        ent = res.candidate.parsed_entities[0]
+        assert isinstance(ent, AllRealsExceptFiniteEntity)
+        excl_vals = {p.to_rational for p in ent.excluded_points}
+        assert excl_vals == {Rational(1, 1), Rational(2, 1)}
+
+    # 6. ((x-1)/(x-2))^0 = 1 -> ALL_REALS_EXCEPT_FINITE {1,2}, exact
+    def test_req_behavior_6_fraction_pow_0_eq_1(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("((x - 1) / (x - 2))^0 = 1", "req_6")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        ent = res.candidate.parsed_entities[0]
+        assert isinstance(ent, AllRealsExceptFiniteEntity)
+        excl_vals = {p.to_rational for p in ent.excluded_points}
+        assert excl_vals == {Rational(1, 1), Rational(2, 1)}
+
+    # 7. Plain polynomial routing unchanged (x^2-4=0, 2^0+x=0, x/2-1=0)
+    def test_req_behavior_7_plain_polynomial_routing_unchanged(self, service: UniversalApplicationService):
+        ir_poly = parse_equation_to_ir("x^2 - 4 = 0", "poly_routing")
+        adapter_poly = service.registry.resolve(ir_poly)
+        assert isinstance(adapter_poly, LegacyQuadraticAdapter)
+
+        ir_const = parse_equation_to_ir("2^0 + x = 0", "const_exp0_routing")
+        adapter_const = service.registry.resolve(ir_const)
+        assert isinstance(adapter_const, LegacyQuadraticAdapter)
+        res_const = service.solve(ir_const)
+        assert res_const.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res_const.verification.disposition == VerificationDisposition.ACCEPTED
+        roots_ent = res_const.candidate.parsed_entities[0]
+        assert isinstance(roots_ent, FiniteRootCollectionEntity)
+        assert roots_ent.roots[0].to_rational == Rational(-1, 1)
+
+        ir_scalar = parse_equation_to_ir("x / 2 - 1 = 0", "scalar_div_routing")
+        adapter_scalar = service.registry.resolve(ir_scalar)
+        assert isinstance(adapter_scalar, LegacyQuadraticAdapter)
+
+    # 8. Nested guard: 1/(((x-1)/(x-2))^0) = 1 -> ALL_REALS_EXCEPT_FINITE {1,2}
+    def test_nested_guard_one_div_fraction_pow_0_eq_1(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("1 / (((x - 1) / (x - 2))^0) = 1", "nested_guard_1")
+        adapter = service.registry.resolve(ir)
+        assert isinstance(adapter, AlgebraRationalAdapter)
+        res = service.solve(ir)
+        assert res.verification.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert res.verification.disposition == VerificationDisposition.ACCEPTED
+        ent = res.candidate.parsed_entities[0]
+        assert isinstance(ent, AllRealsExceptFiniteEntity)
+        excl_vals = {p.to_rational for p in ent.excluded_points}
+        assert excl_vals == {Rational(1, 1), Rational(2, 1)}
+
+    # 9. Adversarial: Malicious AllRealSolutionEntity for 1/((x-1)^0) = 1 => REJECTED/not exact
+    def test_adversarial_malicious_all_real_for_one_div_pow_0_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / ((x - 1)^0) = 1", "adv_all_real_one_div_pow0")
+        cand = CandidateSolution(
+            candidate_id="untrusted_all_real",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x in R",
+            parsed_entities=(AllRealSolutionEntity(),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+
+    # 10. Adversarial: Identity (x-1)^0/(x-2) = 1/(x-2) with only exclusion {2} => REJECTED/not exact
+    def test_adversarial_identity_missing_exponent_zero_exclusion_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("(x - 1)^0 / (x - 2) = 1 / (x - 2)", "adv_missing_exp0_excl")
+        cand = CandidateSolution(
+            candidate_id="untrusted_partial_excl",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x in R \\ {2}",
+            parsed_entities=(
+                AllRealsExceptFiniteEntity(
+                    excluded_points=(RationalScalarEntity.from_rational(Rational(2, 1)),),
+                ),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+
+    # 11. Adversarial: Finite candidate containing x=1 where 0^0 occurs => REJECTED
+    def test_adversarial_finite_candidate_containing_zero_to_zero_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("(x - 1)^0 = 1", "adv_finite_zero_to_zero")
+        cand = CandidateSolution(
+            candidate_id="untrusted_x1",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x = 1",
+            parsed_entities=(
+                FiniteRootCollectionEntity(
+                    roots=(RationalScalarEntity.from_rational(Rational(1, 1)),),
+                ),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        assert any(not c.satisfied for c in ver.domain_boundary_checks)
+
+    # 12. Adversarial: Verifier remains sound if candidate-side guard collector is monkeypatched
+    def test_adversarial_verifier_sound_when_candidate_guard_collector_monkeypatched(
+        self, adapter: AlgebraRationalAdapter, monkeypatch: pytest.MonkeyPatch
+    ):
+        def mock_candidate_guards(self_adapter, ir):
+            return self_adapter._extract_denominators(ir)
+
+        monkeypatch.setattr(AlgebraRationalAdapter, "_extract_candidate_guards", mock_candidate_guards)
+
+        # On (x-1)^0 = 1: candidate side omits x=1 and generates AllRealSolutionEntity
+        ir1 = parse_equation_to_ir("(x - 1)^0 = 1", "monkeypatch_test_1")
+        cand1 = adapter.solve_candidates(ir1)[0]
+        assert isinstance(cand1.parsed_entities[0], AllRealSolutionEntity)
+
+        # Verifier must independently detect domain exclusion {1} and reject candidate
+        ver1 = adapter.verify(ir1, cand1)
+        assert ver1.disposition == VerificationDisposition.REJECTED
+        assert ver1.verification_level == VerificationLevel.UNSUPPORTED
+
+        # On (x-1)^0/(x-2) = 1/(x-2): candidate side omits x=1 and only excludes {2}
+        ir2 = parse_equation_to_ir("(x - 1)^0 / (x - 2) = 1 / (x - 2)", "monkeypatch_test_2")
+        cand2 = adapter.solve_candidates(ir2)[0]
+        assert isinstance(cand2.parsed_entities[0], AllRealsExceptFiniteEntity)
+        assert len(cand2.parsed_entities[0].excluded_points) == 1
+
+        # Verifier must independently detect exclusions {1, 2} and reject candidate
+        ver2 = adapter.verify(ir2, cand2)
+        assert ver2.disposition == VerificationDisposition.REJECTED
+        assert ver2.verification_level == VerificationLevel.UNSUPPORTED
+
+    # 13. Exponent-zero base whose required guard proof exceeds degree envelope => UNSUPPORTED/UNSUPPORTED
+    def test_adversarial_exponent_zero_base_degree_overflow_fails_closed(self, adapter: AlgebraRationalAdapter):
+        span = Span(0, 0)
+        num_cube = BinaryOp(
+            op="-",
+            left=Power(base=Variable(name="x", span=span), exponent=IntegerLiteral(2, span=span), span=span),
+            right=IntegerLiteral(1, span=span),
+            span=span,
+        )
+        base_deg3 = BinaryOp(
+            op="*",
+            left=num_cube,
+            right=Variable(name="x", span=span),
+            span=span,
+        )
+        left_ast = Power(base=base_deg3, exponent=IntegerLiteral(0, span=span), span=span)
+        payload = SingleEquationPayload(left=left_ast, right=IntegerLiteral(1, span=span), target_variable="x")
+        ir = ProblemIR(
+            problem_id="adv_exp0_degree_overflow",
+            problem_kind=ProblemKind.ALGEBRA_EQUATION,
+            payload=payload,
+        )
+
+        assert adapter.classify(ir).sub_form == "RATIONAL_OUT_OF_SCOPE"
+        cand = adapter.solve_candidates(ir)[0]
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        assert ver.disposition == VerificationDisposition.UNSUPPORTED
+
+    # 14. Trace step 1 lists every original-domain exclusion, including exponent-zero guards, no invented exclusions
+    def test_trace_step_1_lists_all_original_domain_exclusions_no_invented(self, service: UniversalApplicationService):
+        ir = parse_equation_to_ir("((x - 1) / (x - 2))^0 = 1", "trace_exp0_test")
+        res = service.solve(ir)
+        step1 = res.trace.steps[0]
+        assert step1.operation_kind == "DOMAIN_CONDITIONS"
+        assert "x \\ne 1" in step1.output_expression_latex
+        assert "x \\ne 2" in step1.output_expression_latex
+        assert "3" not in step1.output_expression_latex
+        assert "0" not in step1.output_expression_latex
+

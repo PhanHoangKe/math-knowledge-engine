@@ -677,6 +677,70 @@ class AlgebraRationalAdapter(DomainAdapter):
     def supported_problem_kinds(self) -> Tuple[ProblemKind, ...]:
         return (ProblemKind.ALGEBRA_EQUATION,)
 
+    def _has_variable_denominator(self, ir: ProblemIR) -> bool:
+        """Check if equation has any variable-bearing division denominator."""
+        if not isinstance(ir.payload, SingleEquationPayload):
+            return False
+        target = ir.payload.target_variable
+        for root_node in (ir.payload.left, ir.payload.right):
+            for n in root_node.walk():
+                if isinstance(n, BinaryOp) and n.op == "/":
+                    if target in n.right.variables():
+                        return True
+        return False
+
+    def _has_variable_exponent_zero_guard(self, ir: ProblemIR) -> bool:
+        """Check if equation has any variable-bearing exponent-zero base."""
+        if not isinstance(ir.payload, SingleEquationPayload):
+            return False
+        target = ir.payload.target_variable
+        for root_node in (ir.payload.left, ir.payload.right):
+            for n in root_node.walk():
+                if isinstance(n, Power) and n.exponent.value == 0:
+                    if target in n.base.variables():
+                        return True
+        return False
+
+    def _extract_candidate_guards(self, ir: ProblemIR) -> List[ASTNode]:
+        """Candidate-side structural guard traversal collecting variable-bearing
+        division denominators and variable-bearing exponent-zero bases.
+        """
+        if not isinstance(ir.payload, SingleEquationPayload):
+            return []
+        guards: List[ASTNode] = []
+        target = ir.payload.target_variable
+
+        for root_node in (ir.payload.left, ir.payload.right):
+            for n in root_node.walk():
+                if isinstance(n, BinaryOp) and n.op == "/":
+                    if target in n.right.variables():
+                        guards.append(n.right)
+                elif isinstance(n, Power) and n.exponent.value == 0:
+                    if target in n.base.variables():
+                        guards.append(n.base)
+        return guards
+
+    def _extract_verifier_guards(self, ir: ProblemIR) -> List[ASTNode]:
+        """Independent verifier-side structural guard traversal.
+        
+        Strict Invariant: Verifier must not trust candidate-side guard collection.
+        Collects variable-bearing division denominators and variable-bearing exponent-zero bases.
+        """
+        if not isinstance(ir.payload, SingleEquationPayload):
+            return []
+        guards: List[ASTNode] = []
+        target = ir.payload.target_variable
+
+        for root_node in (ir.payload.left, ir.payload.right):
+            for n in root_node.walk():
+                if isinstance(n, BinaryOp) and n.op == "/":
+                    if target in n.right.variables():
+                        guards.append(n.right)
+                elif isinstance(n, Power) and n.exponent.value == 0:
+                    if target in n.base.variables():
+                        guards.append(n.base)
+        return guards
+
     def _extract_denominators(self, ir: ProblemIR) -> List[ASTNode]:
         """Collect all denominator AST nodes present in the equation."""
         if not isinstance(ir.payload, SingleEquationPayload):
@@ -692,7 +756,7 @@ class AlgebraRationalAdapter(DomainAdapter):
         return denoms
 
     def can_handle(self, ir: ProblemIR) -> bool:
-        """Predicate checking if ProblemIR is a single-variable rational equation."""
+        """Predicate checking if ProblemIR is a supported single-variable rational or guarded equation."""
         if ir.problem_kind != ProblemKind.ALGEBRA_EQUATION:
             return False
         if not isinstance(ir.payload, SingleEquationPayload):
@@ -706,9 +770,10 @@ class AlgebraRationalAdapter(DomainAdapter):
         if ir.variables and not set(ir.variables).issubset({target_var}):
             return False
 
-        # Must have at least one variable-bearing denominator
-        denoms = self._extract_denominators(ir)
-        if not denoms:
+        # Must have either a variable-bearing denominator OR a variable-bearing exponent-zero guard
+        has_denom = self._has_variable_denominator(ir)
+        has_exp0 = self._has_variable_exponent_zero_guard(ir)
+        if not (has_denom or has_exp0):
             return False
 
         # Must not claim pure polynomial equations owned by LegacyQuadraticAdapter
@@ -740,21 +805,41 @@ class AlgebraRationalAdapter(DomainAdapter):
         right_frac = ast_to_rational_fraction(ir.payload.right, target_var)
         diff_frac = left_frac - right_frac
 
-        # Extract domain exclusions from ALL variable denominators in original AST
-        raw_denoms = self._extract_denominators(ir)
+        # Extract domain exclusions from ALL variable guards in original AST
+        raw_guards = self._extract_candidate_guards(ir)
+        guard_polys: List[PolyQ] = []
         all_exclusions: List[Union[RationalScalarEntity, RealQuadraticSurdEntity]] = []
-        for d_node in raw_denoms:
-            d_frac = ast_to_rational_fraction(d_node, target_var)
-            if d_frac.num.degree > 2:
-                raise DegreeOutOfScopeError(f"Denominator degree {d_frac.num.degree} > 2")
-            _, d_roots = solve_poly_degree_le_2(d_frac.num)
-            all_exclusions.extend(d_roots)
+
+        for g_node in raw_guards:
+            g_frac = ast_to_rational_fraction(g_node, target_var)
+            if g_frac.num.degree > 2 or g_frac.den.degree > 2:
+                raise DegreeOutOfScopeError(
+                    f"Guard degree exceeds quadratic bound: num={g_frac.num.degree}, den={g_frac.den.degree}"
+                )
+            if not g_frac.num.is_zero and g_frac.num.degree >= 1:
+                guard_polys.append(g_frac.num)
+                _, g_roots = solve_poly_degree_le_2(g_frac.num)
+                all_exclusions.extend(g_roots)
+            if not g_frac.den.is_zero and g_frac.den.degree >= 1:
+                guard_polys.append(g_frac.den)
 
         # Also include any zeros of the common denominator in diff_frac
         if diff_frac.den.degree > 2:
             raise DegreeOutOfScopeError(f"Common denominator degree {diff_frac.den.degree} > 2")
-        _, den_roots = solve_poly_degree_le_2(diff_frac.den)
-        all_exclusions.extend(den_roots)
+        if not diff_frac.den.is_zero and diff_frac.den.degree >= 1:
+            guard_polys.append(diff_frac.den)
+            _, den_roots = solve_poly_degree_le_2(diff_frac.den)
+            all_exclusions.extend(den_roots)
+
+        domain_poly = PolyQ.constant(1)
+        for gp in guard_polys:
+            domain_poly = poly_lcm(domain_poly, gp)
+            domain_poly = poly_squarefree(domain_poly)
+
+        if domain_poly.degree > 2:
+            raise DegreeOutOfScopeError(
+                f"Domain exclusion polynomial degree {domain_poly.degree} exceeds quadratic bound <= 2"
+            )
 
         unique_exclusions = deduplicate_roots(all_exclusions)
 
@@ -792,8 +877,8 @@ class AlgebraRationalAdapter(DomainAdapter):
             num = diff_frac.num
 
             if num.is_zero:
-                sub_form = "RATIONAL_IDENTITY_WITH_EXCLUSIONS"
-                diff = "MEDIUM"
+                sub_form = "RATIONAL_IDENTITY_WITH_EXCLUSIONS" if exclusions else "RATIONAL_IDENTITY_UNRESTRICTED"
+                diff = "MEDIUM" if exclusions else "EASY"
             elif num.degree == 0 or (len(true_roots) == 0):
                 sub_form = "RATIONAL_CONTRADICTION"
                 diff = "EASY"
@@ -938,29 +1023,29 @@ class AlgebraRationalAdapter(DomainAdapter):
             diff_frac = left_frac - right_frac
             cleared_num = diff_frac.num
 
-            denom_nodes = self._extract_denominators(ir)
-            denom_polys: List[PolyQ] = []
-            for d_node in denom_nodes:
-                d_frac = ast_to_rational_fraction(d_node, target_var)
-                if d_frac.num.degree > 2 or d_frac.den.degree > 2:
+            guard_nodes = self._extract_verifier_guards(ir)
+            guard_polys: List[PolyQ] = []
+            for g_node in guard_nodes:
+                g_frac = ast_to_rational_fraction(g_node, target_var)
+                if g_frac.num.degree > 2 or g_frac.den.degree > 2:
                     raise DegreeOutOfScopeError(
-                        f"Denominator degree exceeds quadratic bound: num={d_frac.num.degree}, den={d_frac.den.degree}"
+                        f"Guard degree exceeds quadratic bound: num={g_frac.num.degree}, den={g_frac.den.degree}"
                     )
-                if not d_frac.num.is_zero and d_frac.num.degree >= 1:
-                    denom_polys.append(d_frac.num)
-                if not d_frac.den.is_zero and d_frac.den.degree >= 1:
-                    denom_polys.append(d_frac.den)
+                if not g_frac.num.is_zero and g_frac.num.degree >= 1:
+                    guard_polys.append(g_frac.num)
+                if not g_frac.den.is_zero and g_frac.den.degree >= 1:
+                    guard_polys.append(g_frac.den)
 
             if diff_frac.den.degree > 2:
                 raise DegreeOutOfScopeError(
                     f"Common denominator degree {diff_frac.den.degree} exceeds quadratic bound <= 2"
                 )
             if not diff_frac.den.is_zero and diff_frac.den.degree >= 1:
-                denom_polys.append(diff_frac.den)
+                guard_polys.append(diff_frac.den)
 
             domain_poly = PolyQ.constant(1)
-            for dp in denom_polys:
-                domain_poly = poly_lcm(domain_poly, dp)
+            for gp in guard_polys:
+                domain_poly = poly_lcm(domain_poly, gp)
                 domain_poly = poly_squarefree(domain_poly)
 
             if not cleared_num.is_zero and cleared_num.degree > 2:
@@ -1056,9 +1141,9 @@ class AlgebraRationalAdapter(DomainAdapter):
                         in_dom = False
 
                     if in_dom:
-                        for d_node in denom_nodes:
-                            d_val = eval_ast_at_point(d_node, pt, target_var)
-                            if d_val.is_zero:
+                        for g_node in guard_nodes:
+                            g_val = eval_ast_at_point(g_node, pt, target_var)
+                            if g_val.is_zero:
                                 in_dom = False
                                 break
 
@@ -1336,9 +1421,9 @@ class AlgebraRationalAdapter(DomainAdapter):
                         invalidates_domain = True
 
                     if not invalidates_domain:
-                        for d_node in denom_nodes:
-                            d_val = eval_ast_at_point(d_node, pt, target_var)
-                            if d_val.is_zero:
+                        for g_node in guard_nodes:
+                            g_val = eval_ast_at_point(g_node, pt, target_var)
+                            if g_val.is_zero:
                                 invalidates_domain = True
                                 break
 
@@ -1504,7 +1589,7 @@ class AlgebraRationalAdapter(DomainAdapter):
         # 1. Điều kiện xác định
         if exclusions:
             conds_latex = ", ".join(f"{target_var} \\ne {r.latex}" for r in exclusions)
-            conds_vi = f"Các mẫu thức phải khác 0: {', '.join(f'{target_var} ≠ {r.latex}' for r in exclusions)}."
+            conds_vi = f"Điều kiện để các mẫu thức và cơ số lũy thừa bậc 0 khác 0: {', '.join(f'{target_var} ≠ {r.latex}' for r in exclusions)}."
         else:
             conds_latex = f"{target_var} \\in \\mathbb{{R}}"
             conds_vi = "Phương trình xác định với mọi số thực x."
@@ -1559,8 +1644,12 @@ class AlgebraRationalAdapter(DomainAdapter):
 
         # 4. Đối chiếu điều kiện xác định
         if num.is_zero:
-            step4_expl = f"Đối chiếu ĐKXĐ: Nghiệm đúng với mọi x ngoại trừ: {', '.join(f'x = {e.latex}' for e in exclusions)}."
-            step4_latex = conds_latex
+            if exclusions:
+                step4_expl = f"Đối chiếu ĐKXĐ: Nghiệm đúng với mọi x ngoại trừ: {', '.join(f'x = {e.latex}' for e in exclusions)}."
+                step4_latex = conds_latex
+            else:
+                step4_expl = "Phương trình xác định và nghiệm đúng với mọi số thực x."
+                step4_latex = "S = \\mathbb{R}"
         elif num.degree == 0:
             step4_expl = "Phương trình vô nghiệm nên không có nghiệm nào thỏa mãn ĐKXĐ."
             step4_latex = "S = \\emptyset"
@@ -1588,8 +1677,12 @@ class AlgebraRationalAdapter(DomainAdapter):
 
         # 5. Kết luận tập nghiệm
         if num.is_zero:
-            conclusion_vi = f"Vậy tập nghiệm của phương trình là: S = ℝ \\ {{{', '.join(e.latex for e in exclusions)}}}."
-            conclusion_latex = f"S = \\mathbb{{R}} \\setminus \\{{{', '.join(e.latex for e in exclusions)}\\}}"
+            if exclusions:
+                conclusion_vi = f"Vậy tập nghiệm của phương trình là: S = ℝ \\ {{{', '.join(e.latex for e in exclusions)}}}."
+                conclusion_latex = f"S = \\mathbb{{R}} \\setminus \\{{{', '.join(e.latex for e in exclusions)}\\}}"
+            else:
+                conclusion_vi = "Vậy tập nghiệm của phương trình là: S = ℝ."
+                conclusion_latex = "S = \\mathbb{R}"
         elif not true_roots:
             conclusion_vi = "Vậy phương trình vô nghiệm: S = ∅."
             conclusion_latex = "S = \\emptyset"
@@ -1625,7 +1718,7 @@ class AlgebraRationalAdapter(DomainAdapter):
 
     def limitations(self) -> Tuple[str, ...]:
         return (
-            "Supports univariate rational equations in single target variable where cleared numerator and denominators have degree <= 2 over Q.",
+            "Supports univariate rational equations in single target variable where cleared numerator, denominators, and exponent-zero bases have degree <= 2 over Q.",
             "Radical, trigonometric, exponential, and logarithmic expressions are not supported.",
             "Equations whose cleared numerator degree exceeds 2 are out of scope for Pack 1-A.",
             "Strictly preserves all domain exclusions and rejects extraneous roots.",

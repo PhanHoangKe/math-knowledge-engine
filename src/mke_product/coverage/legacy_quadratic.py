@@ -65,7 +65,7 @@ from mke_product.domain.models import (
 )
 from mke_product.domain.registry import MethodRegistry
 from mke_product.domain.verifier import HostIndependentVerifier
-from mke_product.parser.ast import Equation
+from mke_product.parser.ast import Equation, Power
 
 
 class LegacyQuadraticAdapter(DomainAdapter):
@@ -101,6 +101,15 @@ class LegacyQuadraticAdapter(DomainAdapter):
             return False
         if ir.payload.target_variable != self.SUPPORTED_VARIABLE:
             return False
+
+        # LegacyQuadraticAdapter MUST return False if either side AST contains
+        # Power(base, exponent=0) where target variable occurs in base.
+        target = ir.payload.target_variable
+        for root_node in (ir.payload.left, ir.payload.right):
+            for n in root_node.walk():
+                if isinstance(n, Power) and n.exponent.value == 0:
+                    if target in n.base.variables():
+                        return False
 
         try:
             a_rat, b_rat, c_rat = self._extract_coefficients_from_payload(ir)
