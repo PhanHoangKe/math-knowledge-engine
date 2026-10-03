@@ -889,10 +889,31 @@ class AlgebraPolynomialInequalityAdapter(DomainAdapter):
                     return self._make_rejected_report(ir, p, "PUNCTURED must be open at puncture point r", residuals=residuals)
                 return self._make_accepted_report(ir, p, candidate, "Verified punctured line (-inf, r) U (r, +inf)", residuals=residuals)
             elif len(intervals) == 1:
-                # Single branch is a verified strict subset
-                return self._make_partial_report(ir, p, candidate, "Candidate is a verified strict subset of punctured line", residuals=residuals)
+                iv = intervals[0]
+                if iv.lower_bound is None and iv.upper_bound is not None:
+                    if iv.upper_closed:
+                        return self._make_rejected_report(
+                            ir, p, "PUNCTURED component must be open at puncture point r", residuals=residuals
+                        )
+                    return self._make_partial_report(
+                        ir, p, candidate, "Candidate (-inf, r) is a verified strict subset of punctured line", residuals=residuals
+                    )
+                elif iv.lower_bound is not None and iv.upper_bound is None:
+                    if iv.lower_closed:
+                        return self._make_rejected_report(
+                            ir, p, "PUNCTURED component must be open at puncture point r", residuals=residuals
+                        )
+                    return self._make_partial_report(
+                        ir, p, candidate, "Candidate (r, +inf) is a verified strict subset of punctured line", residuals=residuals
+                    )
+                else:
+                    return self._make_rejected_report(
+                        ir, p, "Malformed single interval for PUNCTURED topology; only open canonical rays (-inf, r) or (r, +inf) allowed", residuals=residuals
+                    )
             else:
-                return self._make_rejected_report(ir, p, f"PUNCTURED topology requires 2 intervals, got {len(intervals)}", residuals=residuals)
+                return self._make_rejected_report(
+                    ir, p, f"PUNCTURED topology requires at most 2 intervals, got {len(intervals)}", residuals=residuals
+                )
 
         elif expected_shape == "BOUNDED":
             if len(intervals) != 1:
@@ -943,18 +964,57 @@ class AlgebraPolynomialInequalityAdapter(DomainAdapter):
                         return self._make_rejected_report(ir, p, "Boundary point is included but inequality is strict", residuals=residuals)
                     return self._make_accepted_report(ir, p, candidate, "Verified exact union (-inf, r1) U (r2, +inf)", residuals=residuals)
             elif len(intervals) == 1:
-                # One ray of two is a verified strict subset
                 iv = intervals[0]
+                c2 = p.coeff(2)
+                a_pos = c2.is_positive
                 if iv.lower_bound is None and iv.upper_bound is not None:
+                    r = iv.upper_bound
+                    d_sign = self._eval_derivative_sign_at_endpoint(p, r)
+                    is_lower_root = (a_pos and d_sign < 0) or (not a_pos and d_sign > 0)
+                    is_upper_root = (a_pos and d_sign > 0) or (not a_pos and d_sign < 0)
+
+                    if is_upper_root:
+                        return self._make_rejected_report(
+                            ir, p, "Left ray ending at upper root r_high is not a valid subset of TWO_RAYS solution", residuals=residuals
+                        )
+                    if not is_lower_root:
+                        return self._make_rejected_report(
+                            ir, p, "Endpoint is not the lower root of TWO_RAYS solution", residuals=residuals
+                        )
+
                     if not expected_closed and iv.upper_closed:
-                        return self._make_rejected_report(ir, p, "Boundary point included in strict inequality", residuals=residuals)
-                    return self._make_partial_report(ir, p, candidate, "Single ray (-inf, r1] is a verified strict subset", residuals=residuals)
+                        return self._make_rejected_report(
+                            ir, p, "Boundary point is included but inequality is strict", residuals=residuals
+                        )
+                    return self._make_partial_report(
+                        ir, p, candidate, "Single ray (-inf, r1] is a verified strict subset" if iv.upper_closed else "Single ray (-inf, r1) is a verified strict subset", residuals=residuals
+                    )
                 elif iv.lower_bound is not None and iv.upper_bound is None:
+                    r = iv.lower_bound
+                    d_sign = self._eval_derivative_sign_at_endpoint(p, r)
+                    is_lower_root = (a_pos and d_sign < 0) or (not a_pos and d_sign > 0)
+                    is_upper_root = (a_pos and d_sign > 0) or (not a_pos and d_sign < 0)
+
+                    if is_lower_root:
+                        return self._make_rejected_report(
+                            ir, p, "Right ray starting at lower root r_low is not a valid subset of TWO_RAYS solution", residuals=residuals
+                        )
+                    if not is_upper_root:
+                        return self._make_rejected_report(
+                            ir, p, "Endpoint is not the upper root of TWO_RAYS solution", residuals=residuals
+                        )
+
                     if not expected_closed and iv.lower_closed:
-                        return self._make_rejected_report(ir, p, "Boundary point included in strict inequality", residuals=residuals)
-                    return self._make_partial_report(ir, p, candidate, "Single ray [r2, +inf) is a verified strict subset", residuals=residuals)
+                        return self._make_rejected_report(
+                            ir, p, "Boundary point is included but inequality is strict", residuals=residuals
+                        )
+                    return self._make_partial_report(
+                        ir, p, candidate, "Single ray [r2, +inf) is a verified strict subset" if iv.lower_closed else "Single ray (r2, +inf) is a verified strict subset", residuals=residuals
+                    )
                 else:
-                    return self._make_rejected_report(ir, p, "Malformed single interval for TWO_RAYS topology", residuals=residuals)
+                    return self._make_rejected_report(
+                        ir, p, "Malformed single interval for TWO_RAYS topology", residuals=residuals
+                    )
             else:
                 return self._make_rejected_report(
                     ir, p, f"TWO_RAYS requires at most 2 intervals, got {len(intervals)}", residuals=residuals

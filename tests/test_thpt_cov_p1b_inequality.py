@@ -836,5 +836,410 @@ class Test08SurdAliasesAndContracts(unittest.TestCase):
             RealIntervalEntity(lower_bound=r, upper_bound=r, lower_closed=False, upper_closed=True)
 
 
+# ===========================================================================
+# ADVERSARIAL SUBSET SOUNDNESS AUDIT SUITE
+# ===========================================================================
+
+class Test09AdversarialSubsetSoundness(unittest.TestCase):
+    """Adversarial tests for subset soundness remediation (Pack 1-B audit finding)."""
+
+    def setUp(self) -> None:
+        self.adapter = AlgebraPolynomialInequalityAdapter()
+
+    def _make_candidate(self, intervals: Sequence[RealIntervalEntity], raw: str = "test") -> CandidateSolution:
+        return CandidateSolution(
+            candidate_id="cand_adv",
+            generator_engine="adversarial_test",
+            raw_symbolic_output=raw,
+            parsed_entities=(
+                RealIntervalUnionEntity(intervals=tuple(intervals)),
+            ),
+        )
+
+    # 1. x^2-4 >= 0 + (-inf, 2] => REJECTED, not PARTIAL
+    def test_01_two_rays_ge_left_ray_upper_root_rejected(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.REJECTED)
+        self.assertEqual(rep.verification_level, VerificationLevel.UNSUPPORTED)
+
+    # 2. x^2-4 >= 0 + [-2, +inf) => REJECTED
+    def test_02_two_rays_ge_right_ray_lower_root_rejected(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.REJECTED)
+        self.assertEqual(rep.verification_level, VerificationLevel.UNSUPPORTED)
+
+    # 3. x^2-4 >= 0 + (-inf, -2] only => PARTIAL
+    def test_03_two_rays_ge_left_ray_lower_root_partial(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 4. x^2-4 >= 0 + [2, +inf) only => PARTIAL
+    def test_04_two_rays_ge_right_ray_upper_root_partial(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 5. x^2-4 >= 0 + (-inf, -2) only => PARTIAL
+    def test_05_two_rays_ge_left_ray_open_partial(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 6. x^2-4 > 0 + (-inf, 2) => REJECTED
+    def test_06_two_rays_gt_left_ray_upper_root_rejected(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.REJECTED)
+        self.assertEqual(rep.verification_level, VerificationLevel.UNSUPPORTED)
+
+    # 7. x^2-4 > 0 + (-inf, -2) => PARTIAL
+    def test_07_two_rays_gt_left_ray_lower_root_partial(self) -> None:
+        ir = make_inequality_ir("x^2 - 4", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 8. x^2 > 0 + [0, 0] => REJECTED
+    def test_08_punctured_degenerate_point_rejected(self) -> None:
+        ir = make_inequality_ir("x^2", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                upper_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                lower_closed=True,
+                upper_closed=True,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.REJECTED)
+        self.assertEqual(rep.verification_level, VerificationLevel.UNSUPPORTED)
+
+    # 9. x^2 > 0 + (-inf, 0) => PARTIAL
+    def test_09_punctured_left_open_ray_partial(self) -> None:
+        ir = make_inequality_ir("x^2", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 10. x^2 > 0 + (0, +inf) => PARTIAL
+    def test_10_punctured_right_open_ray_partial(self) -> None:
+        ir = make_inequality_ir("x^2", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                upper_bound=None,
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.PARTIAL)
+        self.assertEqual(rep.verification_level, VerificationLevel.PARTIAL)
+
+    # 11. x^2 > 0 + (-inf, 0] => REJECTED
+    def test_11_punctured_closed_at_puncture_rejected(self) -> None:
+        ir = make_inequality_ir("x^2", ConstraintRelation.GT, "0")
+        cand = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        rep = self.adapter.verify(ir, cand)
+        self.assertEqual(rep.disposition, VerificationDisposition.REJECTED)
+        self.assertEqual(rep.verification_level, VerificationLevel.UNSUPPORTED)
+
+    # 12. Existing exact full-union cases remain EXACT_VERIFIED/ACCEPTED
+    def test_12_exact_full_unions_accepted(self) -> None:
+        # Full TWO_RAYS non-strict
+        ir_ge = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        cand_ge = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            ),
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            ),
+        ])
+        rep_ge = self.adapter.verify(ir_ge, cand_ge)
+        self.assertEqual(rep_ge.disposition, VerificationDisposition.ACCEPTED)
+        self.assertEqual(rep_ge.verification_level, VerificationLevel.EXACT_VERIFIED)
+
+        # Full TWO_RAYS strict
+        ir_gt = make_inequality_ir("x^2 - 4", ConstraintRelation.GT, "0")
+        cand_gt = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            ),
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=False,
+                upper_closed=False,
+            ),
+        ])
+        rep_gt = self.adapter.verify(ir_gt, cand_gt)
+        self.assertEqual(rep_gt.disposition, VerificationDisposition.ACCEPTED)
+        self.assertEqual(rep_gt.verification_level, VerificationLevel.EXACT_VERIFIED)
+
+        # Full PUNCTURED
+        ir_punc = make_inequality_ir("(x - 1)^2", ConstraintRelation.GT, "0")
+        cand_punc = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(1, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            ),
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(1, 1)),
+                upper_bound=None,
+                lower_closed=False,
+                upper_closed=False,
+            ),
+        ])
+        rep_punc = self.adapter.verify(ir_punc, cand_punc)
+        self.assertEqual(rep_punc.disposition, VerificationDisposition.ACCEPTED)
+        self.assertEqual(rep_punc.verification_level, VerificationLevel.EXACT_VERIFIED)
+
+    # 13. Inverted parabola (a < 0) adversarial tests
+    def test_13_two_rays_neg_a_adversarial(self) -> None:
+        # -x^2 + 4 <= 0 -> (-inf, -2] U [2, +inf)
+        ir = make_inequality_ir("-x^2 + 4", ConstraintRelation.LE, "0")
+
+        # (-inf, 2] ending at upper root -> REJECTED
+        cand_bad_upper = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_bad_upper).disposition, VerificationDisposition.REJECTED)
+
+        # [-2, +inf) starting at lower root -> REJECTED
+        cand_bad_lower = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_bad_lower).disposition, VerificationDisposition.REJECTED)
+
+        # (-inf, -2] ending at lower root -> PARTIAL
+        cand_ok_lower = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_ok_lower).disposition, VerificationDisposition.PARTIAL)
+
+        # [2, +inf) starting at upper root -> PARTIAL
+        cand_ok_upper = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_ok_upper).disposition, VerificationDisposition.PARTIAL)
+
+        # Strict -x^2 + 4 < 0:
+        ir_strict = make_inequality_ir("-x^2 + 4", ConstraintRelation.LT, "0")
+        # (-inf, 2) ending at upper root -> REJECTED
+        cand_bad_strict = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_strict, cand_bad_strict).disposition, VerificationDisposition.REJECTED)
+
+        # (-inf, -2) ending at lower root -> PARTIAL
+        cand_ok_strict = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_strict, cand_ok_strict).disposition, VerificationDisposition.PARTIAL)
+
+        # (-inf, -2] ending at lower root with closed boundary on strict inequality -> REJECTED
+        cand_closed_strict = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=None,
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=False,
+                upper_closed=True,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_strict, cand_closed_strict).disposition, VerificationDisposition.REJECTED)
+
+    # 14. Additional PUNCTURED edge cases
+    def test_14_punctured_additional_adversarial(self) -> None:
+        ir = make_inequality_ir("x^2", ConstraintRelation.GT, "0")
+        # [0, +inf) closed at 0 -> REJECTED
+        cand_right_closed = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(0, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_right_closed).disposition, VerificationDisposition.REJECTED)
+
+        # Bounded interval [-1, 1] -> REJECTED
+        cand_bounded = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(-1, 1)),
+                upper_bound=RationalScalarEntity.from_rational(Rational(1, 1)),
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir, cand_bounded).disposition, VerificationDisposition.REJECTED)
+
+    # 15. Additional TWO_RAYS edge cases
+    def test_15_two_rays_additional_adversarial(self) -> None:
+        ir_ge = make_inequality_ir("x^2 - 4", ConstraintRelation.GE, "0")
+        # Bounded interval [-2, 2] -> REJECTED
+        cand_bounded = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                upper_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                lower_closed=True,
+                upper_closed=True,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_ge, cand_bounded).disposition, VerificationDisposition.REJECTED)
+
+        # Degenerate interval [-2, -2] -> REJECTED
+        cand_deg = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                upper_bound=RationalScalarEntity.from_rational(Rational(-2, 1)),
+                lower_closed=True,
+                upper_closed=True,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_ge, cand_deg).disposition, VerificationDisposition.REJECTED)
+
+        # Strict x^2 - 4 > 0: right ray closed [2, +inf) -> REJECTED
+        ir_gt = make_inequality_ir("x^2 - 4", ConstraintRelation.GT, "0")
+        cand_right_closed = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=True,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_gt, cand_right_closed).disposition, VerificationDisposition.REJECTED)
+
+        # Strict x^2 - 4 > 0: right ray open (2, +inf) -> PARTIAL
+        cand_right_open = self._make_candidate([
+            RealIntervalEntity(
+                lower_bound=RationalScalarEntity.from_rational(Rational(2, 1)),
+                upper_bound=None,
+                lower_closed=False,
+                upper_closed=False,
+            )
+        ])
+        self.assertEqual(self.adapter.verify(ir_gt, cand_right_open).disposition, VerificationDisposition.PARTIAL)
+
+
 if __name__ == "__main__":
     unittest.main()
