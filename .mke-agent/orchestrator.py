@@ -171,6 +171,78 @@ def resolve_npm() -> str:
     raise AuditError("npm is required for independent frontend preparation but was not found on PATH.")
 
 
+INFRASTRUCTURE_BUILD_FAILURE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"missing script:\s*[\"']?build[\"']?", re.IGNORECASE),
+    re.compile(r"is not recognized as an internal or external command", re.IGNORECASE),
+    re.compile(r"\bcommand not found\b", re.IGNORECASE),
+    re.compile(r":\s*(?:not found|No such file or directory)\b", re.IGNORECASE),
+    re.compile(r"spawn\s+[^\n]*\bENOENT\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+ENOENT\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+EACCES\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+EPERM\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+ENOSPC\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+ETIMEDOUT\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+code\s+ECONNREFUSED\b", re.IGNORECASE),
+    re.compile(r"npm ERR!\s+syscall\b", re.IGNORECASE),
+    re.compile(r"JavaScript heap out of memory\b", re.IGNORECASE),
+]
+
+PRODUCT_BUILD_REGRESSION_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"\berror\s+TS\d+\b", re.IGNORECASE),
+    re.compile(r"\bTS\d+:\s", re.IGNORECASE),
+    re.compile(r"\bFound\s+\d+\s+errors?\b", re.IGNORECASE),
+    re.compile(r"\bTypeScript error\b", re.IGNORECASE),
+    re.compile(r"Cannot find module\b", re.IGNORECASE),
+    re.compile(r"Module not found\b", re.IGNORECASE),
+    re.compile(r"Could not resolve\b", re.IGNORECASE),
+    re.compile(r"Failed to resolve import\b", re.IGNORECASE),
+    re.compile(r"Rollup failed to resolve\b", re.IGNORECASE),
+    re.compile(r"Failed to compile\b", re.IGNORECASE),
+    re.compile(r"\bSyntaxError\b"),
+    re.compile(r"\bTypeError\b"),
+    re.compile(r"\bReferenceError\b"),
+    re.compile(r"\bParsing error\b", re.IGNORECASE),
+    re.compile(r"\[plugin:vite:[^\]]+\]", re.IGNORECASE),
+    re.compile(r"\[vite\]\s+(?:error|internal server error)", re.IGNORECASE),
+    re.compile(r"\[esbuild\]\s+error", re.IGNORECASE),
+    re.compile(r"Module build failed\b", re.IGNORECASE),
+    re.compile(r"Type error:\s", re.IGNORECASE),
+    re.compile(r"Unresolved import\b", re.IGNORECASE),
+]
+
+
+def classify_frontend_build_failure(stdout: str, stderr: str, returncode: int) -> str:
+    """Classifies frontend build failure as PRODUCT_BUILD_REGRESSION or AUDIT_ENVIRONMENT_FAILURE.
+
+    AUDIT_ENVIRONMENT_FAILURE is reserved for infrastructure/tooling/execution failures
+    where meaningful product build validation could not execute.
+    PRODUCT_BUILD_REGRESSION is assigned when the build tool launched and executed,
+    reporting source diagnostics, compiler errors, or type errors.
+    """
+    combined = f"{stdout}\n{stderr}".strip()
+
+    # 1. Source/compiler error diagnostics take precedence
+    for pattern in PRODUCT_BUILD_REGRESSION_PATTERNS:
+        if pattern.search(combined):
+            return "PRODUCT_BUILD_REGRESSION"
+
+    # 2. Known infrastructure/tooling execution failures
+    for pattern in INFRASTRUCTURE_BUILD_FAILURE_PATTERNS:
+        if pattern.search(combined):
+            return "AUDIT_ENVIRONMENT_FAILURE"
+
+    # 3. Standard TypeScript compiler error exit code (2 = syntactic/semantic error)
+    if returncode == 2:
+        return "PRODUCT_BUILD_REGRESSION"
+
+    # 4. Standard shell command-not-found or permission/signal exit codes
+    if returncode in {126, 127} or returncode < 0:
+        return "AUDIT_ENVIRONMENT_FAILURE"
+
+    # 5. Default when build process executed and failed without explicit infra failure signatures
+    return "PRODUCT_BUILD_REGRESSION"
+
+
 def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
     root = Path(tempfile.mkdtemp(prefix="mke-audit-"))
     worktree = root / "worktree"
@@ -289,13 +361,23 @@ def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
                 }
 
             if build_res.returncode != 0:
-                err_msg = f"npm run build failed ({build_res.returncode})"
+                classification = classify_frontend_build_failure(
+                    build_res.stdout, build_res.stderr, build_res.returncode
+                )
+                err_msg = (
+                    f"frontend build regression ({build_res.returncode})"
+                    if classification == "PRODUCT_BUILD_REGRESSION"
+                    else f"npm run build failed ({build_res.returncode})"
+                )
                 frontend_prep["passed"] = False
                 frontend_prep["error"] = err_msg
+                frontend_prep["returncode"] = build_res.returncode
+                frontend_prep["build_stdout_tail"] = redact(build_res.stdout[-8000:])
+                frontend_prep["build_stderr_tail"] = redact(build_res.stderr[-8000:])
                 return {
                     "passed": False,
                     "returncode": build_res.returncode,
-                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "classification": classification,
                     "error": err_msg,
                     "frontend_preparation": frontend_prep,
                     "pytest_evidence": {
@@ -550,9 +632,17 @@ def process_event(repo: Path, control: Path) -> bool:
         result = task.get("result", {})
         stage = str(result.get("stage", "runner"))
         error = str(result.get("error", "runner failure"))
+        is_source_build = (
+            classify_frontend_build_failure(error, "", 1) == "PRODUCT_BUILD_REGRESSION"
+            if stage in {"prepare-frontend"}
+            else False
+        )
         is_infra = (
-            stage in {"frontend-baseline-build", "claim", "fetch-base", "create-worktree", "runner-recovery", "setup-worktree", "prepare-frontend"}
-            or any(term in error.lower() for term in ["npm is required", "winerror", "cannot find the file", "tooling", "not found on path"])
+            not is_source_build
+            and (
+                stage in {"frontend-baseline-build", "claim", "fetch-base", "create-worktree", "runner-recovery", "setup-worktree", "prepare-frontend"}
+                or any(term in error.lower() for term in ["npm is required", "winerror", "cannot find the file", "tooling", "not found on path"])
+            )
         )
         if is_infra:
             decision = {
@@ -583,7 +673,7 @@ def process_event(repo: Path, control: Path) -> bool:
     if gates["passed"] and policy.get("audit_run_independent_tests", True):
         tests = independent_tests(repo, task["result"]["commit_sha"], int(policy.get("test_timeout_seconds", 2400)))
 
-    if tests.get("classification") == "AUDIT_ENVIRONMENT_FAILURE":
+    if tests.get("classification") in {"AUDIT_ENVIRONMENT_FAILURE", "INFRASTRUCTURE_FAILURE"}:
         decision = {
             "decision": "BLOCKED",
             "summary": f"Audit environment failure: {tests.get('error', 'frontend preparation failed')}",
@@ -605,7 +695,7 @@ def process_event(repo: Path, control: Path) -> bool:
             "independent_tests": tests,
             "decision": decision,
             "source": "audit-environment-failure",
-            "classification": "AUDIT_ENVIRONMENT_FAILURE",
+            "classification": tests.get("classification", "AUDIT_ENVIRONMENT_FAILURE"),
         }
         write_json(cache_path, record)
         apply_decision(control, task, decision, record, policy)
@@ -614,12 +704,23 @@ def process_event(repo: Path, control: Path) -> bool:
     if not gates["passed"] or not tests.get("passed", False):
         failures = list(gates.get("failures", []))
         if not tests.get("passed", False):
-            failures.append("independent full regression failed")
+            if tests.get("classification") == "PRODUCT_BUILD_REGRESSION":
+                failures.append(f"independent frontend build regression: {tests.get('error', 'npm run build failed')}")
+            else:
+                failures.append("independent full regression failed")
+        findings = []
+        for item in failures:
+            if "build regression" in item:
+                loc = "frontend-build"
+                req_fix = "Correct source/compiler diagnostics reported by frontend build within allowed scope."
+            else:
+                loc = "deterministic-gates"
+                req_fix = "Correct the failure without broadening the original allowed scope."
+            findings.append({"severity": "high", "location": loc, "problem": item, "required_fix": req_fix})
         decision = {"decision": "REMEDIATE", "summary": "; ".join(failures),
-                    "findings": [{"severity": "high", "location": "deterministic-gates", "problem": item,
-                                  "required_fix": "Correct the failure without broadening the original allowed scope."} for item in failures],
+                    "findings": findings,
                     "trust_boundary_preserved": not any("trust" in x.lower() for x in failures),
-                    "frontend_freeze_preserved": not any("frontend" in x.lower() for x in failures)}
+                    "frontend_freeze_preserved": not any("freeze" in x.lower() for x in failures)}
         response_id = ""
         source = "deterministic-gates"
     else:
@@ -631,6 +732,8 @@ def process_event(repo: Path, control: Path) -> bool:
     record = {"schema_version": "1.0", "event_id": eid, "created_at": utc_now(), "task_snapshot": task,
               "deterministic_gates": gates, "independent_tests": tests, "decision": decision,
               "source": source, "openai_response_id": response_id}
+    if tests.get("classification"):
+        record["classification"] = tests["classification"]
     write_json(cache_path, record)
     apply_decision(control, task, decision, record, policy)
     return True

@@ -72,7 +72,16 @@ In the orchestrator's clean audit path (`independent_tests()`):
 
 ### Infrastructure Failure vs. Product Regression Classification
 Evidence from frontend preparation is captured separately from product pytest evidence:
-- **AUDIT_ENVIRONMENT_FAILURE / INFRASTRUCTURE_FAILURE**: Missing npm executable, `npm ci` failures, build tooling errors, or environment preparation failures before meaningful product tests can run. These failures fail closed as `BLOCKED`. They do **not** yield `ACCEPT` and do **not** consume candidate remediation attempts or generate spurious code-remediation tasks for Antigravity.
-- **PRODUCT_REGRESSION**: Product pytest executes and fails, or an independently verified source defect is detected. These failures produce a `REMEDIATE` finding, increment candidate attempt counts, and generate scoped remediation prompts (escalating to `OWNER_REQUIRED` when max attempts are reached).
+- **AUDIT_ENVIRONMENT_FAILURE / INFRASTRUCTURE_FAILURE (Build Tool Cannot Execute)**:
+  Occurs only when meaningful product build validation could not execute: missing npm executable, subprocess launch exceptions (`FileNotFoundError`, `OSError`), `npm ci` preparation failures, missing build script in `package.json`, missing compiler/bundler executable (`'tsc' is not recognized`, `command not found`, `spawn ENOENT`), or OS-level execution errors.
+  These failures fail closed as `BLOCKED`. They do **not** yield `ACCEPT`, do **not** consume candidate remediation attempts, and do **not** generate spurious code-remediation tasks for Antigravity.
+- **PRODUCT_BUILD_REGRESSION (Build Executes and Reports Source/Compiler Errors)**:
+  Occurs when the build tool successfully launches and executes, but the command returns non-zero because product source or compiler diagnostics are reported (e.g., TypeScript errors such as `TS2304`/`TS2322`, `tsc` exiting with code 2, bundler unresolved imports, syntax errors, or type errors).
+  These failures fail closed (never yielding `ACCEPT`), prevent subsequent product `pytest` execution, capture detailed compiler diagnostics, and are routed to `REMEDIATE` through the existing bounded product-remediation path (incrementing attempt counts and generating scoped remediation prompts, escalating to `OWNER_REQUIRED` when max attempts are reached).
+- **PRODUCT_REGRESSION (Product Test Suite Failure)**:
+  Product pytest executes and fails after successful frontend preparation, or an independently verified product test regression is detected. These failures produce a `REMEDIATE` finding, increment candidate attempt counts, and generate scoped remediation prompts (escalating to `OWNER_REQUIRED` when max attempts are reached).
+
+### Baseline vs. Candidate Attribution
+Build output tails (stdout/stderr) and exit codes are preserved in audit records and evidence snapshots alongside git diffs. This enables the independent auditor to determine whether build failures are pre-existing at baseline or candidate-induced, without automatically blaming a candidate for frontend files it did not modify, while ensuring frontend freeze preservation status remains accurate.
 
 

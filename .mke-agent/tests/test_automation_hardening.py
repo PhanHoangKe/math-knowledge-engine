@@ -413,6 +413,260 @@ class OrchestratorAuditHardeningTests(unittest.TestCase):
             self.assertTrue(updated["target_branch"].endswith("-r1-remediation"))
             self.assertTrue((control / updated["prompt_path"]).is_file())
 
+    def test_npm_run_build_launch_exception_classified_as_audit_environment_failure(self) -> None:
+        cmd_path = r"C:\nodejs\npm.cmd"
+
+        def fake_git_add(cwd, *args, **kwargs):
+            if len(args) >= 3 and args[0] == "worktree" and args[1] == "add":
+                wt = Path(args[3])
+                fe = wt / "src" / "frontend"
+                fe.mkdir(parents=True)
+                (fe / "package-lock.json").write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+        def fake_run(cmd, cwd, timeout=300, check=True):
+            if len(cmd) >= 3 and cmd[1] == "run" and cmd[2] == "build":
+                raise OSError("Tool execution launch error: [WinError 193] %1 is not a valid Win32 application")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ci ok", stderr="")
+
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            repo.mkdir()
+
+            with mock.patch("shutil.which", return_value=cmd_path), \
+                 mock.patch.object(orchestrator, "git", side_effect=fake_git_add), \
+                 mock.patch.object(orchestrator, "run", side_effect=fake_run):
+                res = orchestrator.independent_tests(repo, "b" * 40, timeout=120)
+
+            self.assertFalse(res["passed"])
+            self.assertEqual(res["classification"], "AUDIT_ENVIRONMENT_FAILURE")
+            self.assertIn("npm run build execution error", res["error"])
+            self.assertFalse(res["pytest_evidence"]["performed"])
+
+    def test_npm_ci_launch_exception_classified_as_audit_environment_failure(self) -> None:
+        cmd_path = r"C:\nodejs\npm.cmd"
+
+        def fake_git_add(cwd, *args, **kwargs):
+            if len(args) >= 3 and args[0] == "worktree" and args[1] == "add":
+                wt = Path(args[3])
+                fe = wt / "src" / "frontend"
+                fe.mkdir(parents=True)
+                (fe / "package-lock.json").write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+        def fake_run(cmd, cwd, timeout=300, check=True):
+            if len(cmd) >= 2 and cmd[1] == "ci":
+                raise FileNotFoundError("npm binary not found at launch")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ci ok", stderr="")
+
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            repo.mkdir()
+
+            with mock.patch("shutil.which", return_value=cmd_path), \
+                 mock.patch.object(orchestrator, "git", side_effect=fake_git_add), \
+                 mock.patch.object(orchestrator, "run", side_effect=fake_run):
+                res = orchestrator.independent_tests(repo, "b" * 40, timeout=120)
+
+            self.assertFalse(res["passed"])
+            self.assertEqual(res["classification"], "AUDIT_ENVIRONMENT_FAILURE")
+            self.assertIn("npm ci execution error", res["error"])
+            self.assertFalse(res["pytest_evidence"]["performed"])
+
+    def test_npm_run_build_tooling_infrastructure_failure_classified_as_audit_environment_failure(self) -> None:
+        cmd_path = r"C:\nodejs\npm.cmd"
+
+        def fake_git_add(cwd, *args, **kwargs):
+            if len(args) >= 3 and args[0] == "worktree" and args[1] == "add":
+                wt = Path(args[3])
+                fe = wt / "src" / "frontend"
+                fe.mkdir(parents=True)
+                (fe / "package-lock.json").write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+        tooling_outputs = [
+            ("npm ERR! missing script: build\n", 1),
+            ("'tsc' is not recognized as an internal or external command,\noperable program or batch file.\n", 1),
+            ("sh: 1: tsc: not found\n", 127),
+            ("npm ERR! code ENOENT\nnpm ERR! syscall spawn tsc\n", 1),
+        ]
+
+        for out_text, ret_code in tooling_outputs:
+            def fake_run(cmd, cwd, timeout=300, check=True, text=out_text, code=ret_code):
+                if len(cmd) >= 3 and cmd[1] == "run" and cmd[2] == "build":
+                    return subprocess.CompletedProcess(args=cmd, returncode=code, stdout="", stderr=text)
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ci ok", stderr="")
+
+            with tempfile.TemporaryDirectory() as td:
+                repo = Path(td) / "repo"
+                repo.mkdir()
+
+                with mock.patch("shutil.which", return_value=cmd_path), \
+                     mock.patch.object(orchestrator, "git", side_effect=fake_git_add), \
+                     mock.patch.object(orchestrator, "run", side_effect=fake_run):
+                    res = orchestrator.independent_tests(repo, "b" * 40, timeout=120)
+
+                self.assertFalse(res["passed"])
+                self.assertEqual(res["classification"], "AUDIT_ENVIRONMENT_FAILURE")
+                self.assertFalse(res["pytest_evidence"]["performed"])
+
+    def test_npm_run_build_returns_2_with_tsc_diagnostics_is_product_build_regression(self) -> None:
+        cmd_path = r"C:\nodejs\npm.cmd"
+        commands_executed = []
+
+        def fake_git_add(cwd, *args, **kwargs):
+            if len(args) >= 3 and args[0] == "worktree" and args[1] == "add":
+                wt = Path(args[3])
+                fe = wt / "src" / "frontend"
+                fe.mkdir(parents=True)
+                (fe / "package-lock.json").write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+        tsc_output = (
+            "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.\n"
+            "src/App.tsx:20:10 - error TS2304: Cannot find name 'badIdentifier'.\n"
+            "Found 2 errors in 2 files.\n"
+        )
+
+        def fake_run(cmd, cwd, timeout=300, check=True):
+            commands_executed.append(list(cmd))
+            if len(cmd) >= 3 and cmd[1] == "run" and cmd[2] == "build":
+                return subprocess.CompletedProcess(args=cmd, returncode=2, stdout="", stderr=tsc_output)
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ci ok", stderr="")
+
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            repo.mkdir()
+
+            with mock.patch("shutil.which", return_value=cmd_path), \
+                 mock.patch.object(orchestrator, "git", side_effect=fake_git_add), \
+                 mock.patch.object(orchestrator, "run", side_effect=fake_run):
+                res = orchestrator.independent_tests(repo, "b" * 40, timeout=120)
+
+            self.assertFalse(res["passed"])
+            self.assertEqual(res["classification"], "PRODUCT_BUILD_REGRESSION")
+            self.assertEqual(res["returncode"], 2)
+            self.assertFalse(res["frontend_preparation"]["passed"])
+            self.assertIn("error TS2322", res["frontend_output_tail"])
+
+            # Verify pytest was NOT executed
+            self.assertFalse(res["pytest_evidence"]["performed"])
+            executed_command_names = [c[0] for c in commands_executed]
+            self.assertNotIn(sys.executable, executed_command_names)
+            for c in commands_executed:
+                self.assertNotIn("pytest", c)
+
+    def test_process_event_maps_product_build_regression_to_remediate_not_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
+            mock_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_preparation": {
+                    "performed": True,
+                    "passed": False,
+                    "error": "frontend build regression (2)",
+                    "output_tail": "error TS2322: Type 'string' is not assignable to type 'number'.",
+                },
+                "pytest_evidence": {
+                    "performed": False,
+                    "passed": False,
+                    "returncode": None,
+                    "output_tail": "pytest was not executed because frontend preparation failed",
+                },
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_tests), \
+                 mock.patch.object(orchestrator, "call_openai") as mock_openai:
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            mock_openai.assert_not_called()
+
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            # Must map to REMEDIATE: status READY, attempt 2, new remediation branch, remediation prompt exists
+            self.assertEqual(updated["status"], "READY")
+            self.assertEqual(updated["attempt"], 2)
+            self.assertTrue(updated["target_branch"].endswith("-r1-remediation"))
+            self.assertTrue((control / updated["prompt_path"]).is_file())
+
+            # Verify history record
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertEqual(history["classification"], "PRODUCT_BUILD_REGRESSION")
+            self.assertEqual(history["decision"]["decision"], "REMEDIATE")
+            self.assertTrue(history["decision"]["frontend_freeze_preserved"])
+
+    def test_classify_frontend_build_failure_patterns_and_fallbacks(self) -> None:
+        classify = orchestrator.classify_frontend_build_failure
+
+        # 1. Source / compiler diagnostics => PRODUCT_BUILD_REGRESSION
+        self.assertEqual(
+            classify("src/index.ts:1:1 error TS2304: Cannot find name 'x'", "", 2),
+            "PRODUCT_BUILD_REGRESSION",
+        )
+        self.assertEqual(
+            classify("", "Found 1 error in src/index.ts:1", 2),
+            "PRODUCT_BUILD_REGRESSION",
+        )
+        self.assertEqual(
+            classify("Rollup failed to resolve import 'missing' from 'src/main.ts'", "", 1),
+            "PRODUCT_BUILD_REGRESSION",
+        )
+        self.assertEqual(
+            classify("Module not found: Can't resolve './file'", "", 1),
+            "PRODUCT_BUILD_REGRESSION",
+        )
+        self.assertEqual(
+            classify("SyntaxError: Unexpected token", "", 1),
+            "PRODUCT_BUILD_REGRESSION",
+        )
+
+        # 2. Exit code 2 (tsc error) even without matching message => PRODUCT_BUILD_REGRESSION
+        self.assertEqual(classify("", "", 2), "PRODUCT_BUILD_REGRESSION")
+
+        # 3. Tooling / infrastructure failure patterns => AUDIT_ENVIRONMENT_FAILURE
+        self.assertEqual(
+            classify("", "npm ERR! missing script: build", 1),
+            "AUDIT_ENVIRONMENT_FAILURE",
+        )
+        self.assertEqual(
+            classify("", "'tsc' is not recognized as an internal or external command", 1),
+            "AUDIT_ENVIRONMENT_FAILURE",
+        )
+        self.assertEqual(
+            classify("", "sh: 1: tsc: not found", 127),
+            "AUDIT_ENVIRONMENT_FAILURE",
+        )
+        self.assertEqual(
+            classify("", "npm ERR! code ENOENT\nspawn tsc ENOENT", 1),
+            "AUDIT_ENVIRONMENT_FAILURE",
+        )
+        self.assertEqual(
+            classify("", "npm ERR! code EACCES", 1),
+            "AUDIT_ENVIRONMENT_FAILURE",
+        )
+
+        # 4. Standard shell error exit codes => AUDIT_ENVIRONMENT_FAILURE
+        self.assertEqual(classify("", "", 127), "AUDIT_ENVIRONMENT_FAILURE")
+        self.assertEqual(classify("", "", 126), "AUDIT_ENVIRONMENT_FAILURE")
+        self.assertEqual(classify("", "", -9), "AUDIT_ENVIRONMENT_FAILURE")
+
     def test_fail_closed_no_accept_on_incomplete_validation(self) -> None:
         fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
         mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
@@ -421,6 +675,7 @@ class OrchestratorAuditHardeningTests(unittest.TestCase):
         for idx, incomplete_tests in enumerate([
             {"passed": False, "classification": "AUDIT_ENVIRONMENT_FAILURE", "error": "tooling missing"},
             {"passed": False, "classification": "PRODUCT_REGRESSION", "error": "pytest failed"},
+            {"passed": False, "classification": "PRODUCT_BUILD_REGRESSION", "error": "frontend build regression"},
             {"passed": False, "classification": None, "error": "unknown failure"},
         ]):
             with tempfile.TemporaryDirectory() as td:
