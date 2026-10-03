@@ -1,14 +1,15 @@
 # MKE PRODUCT — THPT-COV-P0 UNIVERSAL PROBLEM IR, DOMAIN ADAPTER & COVERAGE BENCHMARK PREFLIGHT SPECIFICATION
 
 **Document ID:** `MVP_V1_THPT_COV_P0_UNIVERSAL_COVERAGE_PREFLIGHT`  
+**Revision:** R1 (Exact Contract & Source-Truth Closeout)  
 **Status:** DRAFT / PROPOSED FOR INDEPENDENT AUDIT  
 **Date:** 2026-10-03  
 **Role:** Antigravity (“Anty”) — Implementation Engineer / Architecture Analyst  
 **Coordinator / Independent Auditor:** ChatGPT  
 **Project Owner:** Kế Phan Hoàng  
 **Repository:** `PhanHoangKe/math-knowledge-engine`  
-**Base Commit SHA:** `ebcded7234cbefdeded3276fe812f30af7ef9daa`  
-**Target Branch:** `product/thpt-cov-p0-universal-coverage-preflight`  
+**Base Commit SHA:** `d0557197c84c7c7c48d62dee4433bb9eb2e62870`  
+**Target Branch:** `product/thpt-cov-p0-r1-contract-closeout`  
 
 ---
 
@@ -20,7 +21,7 @@ The MKE Product is expanding from a single-domain quadratic demonstrator to the 
 ### 1.2 Core Architectural Principle
 > **"Reuse the mathematical breadth of SymPy; retain MKE control of mathematical trust."**
 
-- **SymPy Role:** A fast, broad **candidate-solution generation and algebraic transformation engine**. SymPy is treated as an *untrusted computational oracle*.
+- **SymPy Role:** A fast, broad **candidate-solution generation and algebraic transformation engine**. SymPy is treated strictly as an *untrusted computational oracle*.
 - **MKE Role:** The **authoritative gateway** governing safe parsing, problem classification, domain boundary enforcement, independent mathematical verification, method/pedagogical traces, knowledge linkage (theorems, formulas, tips, forms), source provenance, and fail-closed security.
 - **Verification Guarantee:** No candidate solution returned by SymPy (or an LLM) is ever granted `EXACT_VERIFIED` or `SYMBOLIC_VERIFIED` status without deterministic, independent proof obligations verified by MKE.
 
@@ -32,20 +33,20 @@ A rigorous audit of the accepted baseline at `ebcded7234cbefdeded3276fe812f30af7
 
 | Component / Subsystem | Current File Path | Current Responsibility | Reusability Classification | Disposition in THPT Architecture |
 | :--- | :--- | :--- | :--- | :--- |
-| **AST Lexer & Parser** | `src/mke_product/parser/lexer.py`, `parser.py`, `ast.py`, `tokens.py` | Recursive descent lexer/parser for polynomial & algebraic expressions, equations, groups, powers, radicals, absolute values. | Generic / Highly Reusable | **Keep & Extend**: Serves as the bedrock for typed AST extraction. |
-| **CAS AST Bridge** | `src/mke_product/cas/ast_bridge.py` | Converts validated immutable MKE AST directly into SymPy expressions via safe constructors without `eval()`/`sympify()`. | Generic / Highly Reusable | **Keep & Extend**: Extend to cover calculus, matrices, piecewise, trigonometric, exponential/logarithmic AST nodes. |
-| **CAS Safety & Bounds** | `src/mke_product/cas/safety.py` | Input length, AST depth, integer bit limits, division by zero detection, structural equality, polynomial checks. | Generic / Highly Reusable | **Keep & Expand**: Reusable across all domain adapters. |
-| **SymPy CAS Adapter** | `src/mke_product/cas/sympy_adapter.py` | Executes SymPy direct operations (`SOLVE`, `SIMPLIFY`, `DIFFERENTIATE`, `INTEGRATE`, `SOLVE_SYSTEM`, `SOLVE_INEQUALITY`). | Partially Generic / Domain-Agnostic Core | **Refactor into Generic Candidate Engine**: Split monolithic operations into modular domain solver routines called by DomainAdapters. |
+| **AST Lexer & Parser** | `src/mke_product/parser/lexer.py`, `parser.py`, `ast.py`, `tokens.py` | Recursive descent lexer/parser for polynomial & algebraic expressions, equations, groups, powers, radicals, absolute values. | **Reusable Secure Foundation with Current Syntax Limits** | **Keep & Extend**: Exponent power currently bounded to $\{0, 1, 2\}$; functions limited to $\{\sin, \cos, \tan, \exp, \log, \ln\}$. Calculus/matrix/vector grammar to be extended incrementally in future packs. |
+| **CAS AST Bridge** | `src/mke_product/cas/ast_bridge.py` | Converts validated immutable MKE AST directly into SymPy expressions via safe constructors without `eval()`/`sympify()`. | Generic / Highly Reusable | **Keep & Extend**: Extend safely to cover calculus, matrices, piecewise, trigonometric, and transcendental AST nodes. |
+| **CAS Safety & Bounds** | `src/mke_product/cas/safety.py` | Input length (4096 chars), AST depth, integer bit limits (256 digits), division by zero detection, structural equality. | Generic / Highly Reusable | **Keep & Expand**: Reusable across all domain adapters. |
+| **SymPy CAS Adapter** | `src/mke_product/cas/sympy_adapter.py` | Direct execution of SymPy algorithms (`SOLVE`, `SIMPLIFY`, `DIFFERENTIATE`, `INTEGRATE`, `SOLVE_SYSTEM`, `SOLVE_INEQUALITY`). | Domain-Agnostic Algorithm Set | **Refactor into Modular Candidate Engines**: Candidate routines called by DomainAdapters; output parsed into typed entities. |
 | **CAS Contracts** | `src/mke_product/cas/contracts.py` | `OperationType`, `EngineStatus`, `VerificationStatus`, `ExecutionRequest`, `ExecutionResponse`. | Generic | **Keep & Modernize**: Evolve into universal `CandidateSolution` and `VerificationReport` contracts. |
-| **Quadratic Normalizer** | `src/mke_product/application/normalizer.py` | Canonical expansion and coefficient extraction in $\mathbb{Q}[x]$ for quadratic/linear polynomials. | Quadratic/Polynomial-Specific | **Encapsulate in LegacyQuadraticAdapter**: Keep for algebraic polynomials; new normalizers will operate per `ProblemKind`. |
-| **Host Independent Verifier** | `src/mke_product/domain/verifier.py` | Exact rational and surd $\mathbb{Q}(\sqrt{d})$ verification for quadratics (residuals, Viète, derivative multiplicity). | Quadratic-Specific | **Keep as Quadratic Verifier**: Becomes the reference implementation for domain-specific verifiers. |
-| **Degenerate Solver/Verifier** | `src/mke_product/application/degenerate.py` | Exact solve and verification for $ax+b=0$ and $0x=c$. | Linear/Degenerate Specific | **Encapsulate in Linear/Quadratic Adapter**: Keep for $a=0$ fallback. |
-| **Quadratic Orchestrator** | `src/mke_product/application/orchestrator.py` | End-to-end pipeline for quadratic equations (RAW_TEXT/COEFFICIENTS -> SolvedResponse). | Quadratic-Specific | **Wrap behind LegacyQuadraticAdapter**: Preserve existing `/api/v1/algebra/solve` routing without disruption. |
-| **Method Registry & Traces** | `src/mke_product/domain/registry.py`, `src/mke_product/application/traces/` | Quadratic method assessment and step-by-step trace generation (`QUAD_FORMULA_STANDARD`, `VIETE_SUM`, etc.). | Architecture Generic, Implementations Quadratic | **Keep Framework, Generalize Registry**: Extend method registry to support multi-domain method IDs. |
-| **Worker Process Controller** | `src/mke_product/worker/controller.py`, `appcontainer.py`, `win32.py` | Windows Job Object & AppContainer sandbox for isolated, out-of-process computation with handle quarantine. | Generic / Production-Grade | **Keep & Reuse**: Authoritative host-level CAS execution sandbox; zero rewrite needed. |
-| **AI Intake & MKE-IR** | `src/mke_product/ai/contracts.py`, `ir.py`, `adapter.py` | Pydantic v2 schemas for raw Vietnamese student queries, problem categories, source spans, metadata. | Generic / Pedagogical | **Align with Universal ProblemIR**: Bridge MKE-IR into the universal `ProblemIR` pipeline. |
-| **K1 Knowledge Layer** | `src/mke_product/knowledge/k1_schemas.py`, `k1_loader.py`, `data/*.json` | Immutable, verified Quick Tips and Related Problem Forms with S3 graph referential integrity. | Generic Schema Pattern | **Preserve & Park**: Keep frozen; design future generic entity relationships. |
-| **Transport / API Routers** | `src/mke_product/transport/routers/algebra.py`, `knowledge.py` | FastAPI endpoints for `/api/v1/algebra/solve` and `/api/v1/knowledge/*`. | Protocol Generic | **Preserve Unchanged**: New `/api/v1/math/solve` router added in later packs alongside legacy routes. |
+| **Worker Process Controller** | `src/mke_product/worker/controller.py`, `appcontainer.py`, `win32.py`, `constants.py` | Windows Job Object & AppContainer sandbox for isolated out-of-process computation with handle quarantine. | **Accepted Windows Containment Foundation** | **Reuse Containment Implementation**: Extend protocol/allowlist incrementally under dedicated tests. |
+| **Quadratic Normalizer** | `src/mke_product/application/normalizer.py` | Canonical expansion and coefficient extraction in $\mathbb{Q}[x]$ for quadratic/linear polynomials. | Quadratic/Polynomial-Specific | **Encapsulate in LegacyQuadraticAdapter**: Preserved for polynomial algebra; new normalizers operate per `ProblemKind`. |
+| **Host Independent Verifier** | `src/mke_product/domain/verifier.py` | Exact rational and surd $\mathbb{Q}(\sqrt{d})$ verification for quadratics (residuals, Viète, derivative multiplicity). | Quadratic-Specific | **Keep as Quadratic Verifier**: Reference implementation for first-principles domain verifiers. |
+| **Degenerate Solver/Verifier** | `src/mke_product/application/degenerate.py` | Exact solve and verification for $ax+b=0$ and $0x=c$. | Linear/Degenerate Specific | **Encapsulate in Legacy Adapter**: Preserved for $a=0$ fallback. |
+| **Quadratic Orchestrator** | `src/mke_product/application/orchestrator.py` | End-to-end pipeline for quadratic equations (RAW_TEXT/COEFFICIENTS -> SolvedResponse). | Quadratic-Specific | **Wrap behind LegacyQuadraticAdapter**: Preserves existing `/api/v1/algebra/solve` routing without disruption. |
+| **Method Registry & Traces** | `src/mke_product/domain/registry.py`, `src/mke_product/application/traces/` | Method assessment and step-by-step trace generation (`QUAD_FORMULA_STANDARD`, `VIETE_SUM`, etc.). | Framework Generic, Catalog Quadratic | **Keep Framework, Generalize Registry**: Extend method registry to multi-domain method catalogs. |
+| **AI Intake & MKE-IR** | `src/mke_product/ai/contracts.py`, `ir.py`, `adapter.py` | Pydantic v2 schemas for raw Vietnamese student queries, problem categories, source spans, metadata. | Generic / Pedagogical | **Align with Universal ProblemIR**: Bridge validated MKE-IR into the universal `ProblemIR` pipeline. |
+| **K1 Knowledge Layer** | `src/mke_product/knowledge/k1_schemas.py`, `k1_loader.py`, `data/*.json` | Immutable, verified Quick Tips and Related Problem Forms with S3 graph referential integrity. | Generic Schema Pattern | **Preserve & Park**: Retain byte-frozen datasets; design future additive domain metadata. |
+| **Transport / API Routers** | `src/mke_product/transport/routers/algebra.py`, `knowledge.py` | FastAPI endpoints for `/api/v1/algebra/solve` and `/api/v1/knowledge/*`. | Protocol Generic | **Preserve Unchanged**: Zero route changes in P0/P1. |
 
 ---
 
@@ -81,10 +82,10 @@ flowchart TD
 | Architecture Layer | Core / Shared Components | Domain-Specific Components |
 | :--- | :--- | :--- |
 | **Intake & AST** | Tokenizer, recursive-descent parser, AST data classes, AST-to-SymPy bridge, input bounds check. | Domain-specific notation extensions (e.g. $\int$, $\lim$, $\det$, vectors $\vec{u}$). |
-| **Intermediate Representation** | `ProblemIR` envelope, metadata, provenance, variable bindings, target spec. | Discriminated problem payloads (e.g. `SystemOfEquationsPayload`, `DefiniteIntegralPayload`). |
+| **Intermediate Representation** | `ProblemIR` envelope, metadata, provenance, typed assumptions, variable bindings. | Discriminated problem payloads (`SingleEquationPayload`, `CalculusOperationPayload`, etc.). |
 | **Classification & Dispatch** | `AdapterRegistry`, `ProblemClassifier`, capability matching, fallback policies. | Domain predicate matchers, heuristic form detectors. |
 | **Candidate Generation** | Windows Job Object worker controller, IPC framing, timeout/memory bounds, SymPy safe wrapper. | SymPy algorithm invocation routines (`solveset`, `diff`, `integrate`, `linsolve`). |
-| **Verification & Trust** | `VerificationReport`, `VerificationLevel`, certificate signing, tamper hash generation. | Domain verifiers (e.g. substitution/residual checker, derivative/antiderivative verifier, interval sign prover). |
+| **Verification & Trust** | `VerificationReport`, `VerificationLevel`, `VerificationDisposition`, deterministic certificate hash. | Domain verifiers (e.g. residual checker, derivative/antiderivative verifier, interval sign prover). |
 | **Trace & Knowledge** | `SolutionTrace`, `TraceStep`, `MethodRegistry`, `QuickTipKnowledge`, `RelatedProblemFormKnowledge`. | Domain-specific trace generators and pedagogical rules. |
 | **Transport & API** | FastAPI application, rate-limiting, error sanitization, standard response serializers. | Domain-specific DTO projections (if any). |
 
@@ -92,44 +93,146 @@ flowchart TD
 
 ## 4. Universal ProblemIR Specification
 
-### 4.1 Root Structure
-The `ProblemIR` is a typed, frozen Pydantic v2 model representing an unambiguous, parsed, and validated mathematical problem before domain dispatch.
+### 4.1 Root Envelope Structure
+The `ProblemIR` is a typed, deeply immutable Pydantic v2 model representing an unambiguous, parsed, and validated mathematical problem. It contains a mandatory discriminated `payload` field:
 
 ```python
 class ProblemIR(BaseModel):
     """Authoritative Universal Mathematical Problem Intermediate Representation."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    problem_id: str = Field(..., description="Unique deterministic UUID or content-hash ID")
+    problem_id: str = Field(..., description="Unique deterministic content-hash or UUID")
     ir_version: str = Field(default="mke.problem_ir.v1", description="Schema version")
     problem_kind: ProblemKind = Field(..., description="Discriminated mathematical problem family")
     source_input_kind: SourceInputKind = Field(..., description="Origin format: RAW_TEXT, LATEX, AST, AI_EXTRACTED")
     target: ProblemTarget = Field(..., description="Objective: SOLVE, SIMPLIFY, PROVE, COMPUTE_EXTREMA, EVALUATE")
-    variables: Tuple[str, ...] = Field(default_factory=tuple, description="Primary unknown/free variables, e.g. ('x', 'y')")
+    variables: Tuple[str, ...] = Field(default_factory=tuple, description="Primary unknown variables, e.g. ('x', 'y')")
     parameters: Tuple[str, ...] = Field(default_factory=tuple, description="Constant parameters, e.g. ('m', 'k')")
-    domain_spec: DomainSpecification = Field(default_factory=DomainSpecification, description="Assumed mathematical domain: REAL, COMPLEX, INTEGER, POSITIVE_REALS")
-    assumptions: Tuple[str, ...] = Field(default_factory=tuple, description="Explicit problem conditions, e.g. ('x > 0', 'm != 1')")
+    domain_spec: DomainSpecification = Field(default_factory=DomainSpecification, description="Assumed domain: REAL, COMPLEX, INTEGER, POSITIVE_REALS")
+    assumptions: Tuple[AssumptionSpec, ...] = Field(default_factory=tuple, description="Typed mathematical assumptions")
+    payload: ProblemPayload = Field(..., description="Discriminated mathematical payload matching problem_kind")
     ast_payload: Optional[ASTNode] = Field(default=None, description="Typed AST tree if available")
-    raw_source_text: str = Field(default="", description="Original student/benchmark text")
-    provenance: Optional[SourceProvenance] = Field(default=None, description="Origin textbook, exam, or benchmark metadata")
+    raw_source_text: str = Field(default="", description="Original text for provenance/display only (never parsed by math authority)")
+    provenance: Optional[SourceProvenance] = Field(default=None, description="Origin citation metadata")
     normalization_trace: Tuple[str, ...] = Field(default_factory=tuple, description="Auditable record of intake transformations")
 ```
 
-### 4.2 Discriminated Payloads
-Rather than a single untyped dictionary, specific problem families provide structured payload models:
-- `SingleEquationPayload(left: ASTNode, right: ASTNode, target_var: str)`
-- `SystemOfEquationsPayload(equations: Tuple[ASTNode, ...], target_vars: Tuple[str, ...])`
-- `SingleInequalityPayload(left: ASTNode, right: ASTNode, relation: str, target_var: str)`
-- `FunctionAnalysisPayload(function_expr: ASTNode, var: str, interval: Optional[IntervalSpec])`
-- `CalculusOperationPayload(expression: ASTNode, operation: CalculusOpKind, var: str, lower_bound: Optional[ASTNode], upper_bound: Optional[ASTNode])`
-- `MatrixOperationPayload(matrix_data: Tuple[Tuple[ASTNode, ...], ...], operation: MatrixOpKind)`
-- `GeometryCoordinatePayload(dimension: int, elements: Tuple[GeometricElementSpec, ...], query: str)`
+### 4.2 Typed Assumption Specification
+Assumptions are strictly structured and never represented as free-form strings that bypass parser validation:
+
+```python
+class ConstraintRelation(str, Enum):
+    EQ = "EQ"
+    NEQ = "NEQ"
+    LT = "LT"
+    LE = "LE"
+    GT = "GT"
+    GE = "GE"
+    IN_SET = "IN_SET"
+    NOT_IN_SET = "NOT_IN_SET"
+
+
+class AssumptionSpec(BaseModel):
+    """Deeply immutable typed mathematical assumption/constraint."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    variable: str = Field(..., min_length=1, description="Target variable or parameter identifier")
+    relation: ConstraintRelation = Field(..., description="Constraint relation operator")
+    bound_expression: Optional[ASTNode] = Field(default=None, description="Bound expression AST")
+    target_domain: Optional[DomainCategory] = Field(default=None, description="Target set: REALS, INTEGERS, POSITIVE_REALS")
+    description_vi: str = Field(default="", description="Human-readable Vietnamese description for display only")
+```
+
+### 4.3 Discriminated Payload Variants
+Payloads are strongly typed with an explicit `payload_kind` discriminator. Arbitrary dictionaries (`Dict[str, Any]`) are strictly prohibited:
+
+```python
+class PayloadKind(str, Enum):
+    SINGLE_EQUATION = "SINGLE_EQUATION"
+    SYSTEM_OF_EQUATIONS = "SYSTEM_OF_EQUATIONS"
+    SINGLE_INEQUALITY = "SINGLE_INEQUALITY"
+    FUNCTION_ANALYSIS = "FUNCTION_ANALYSIS"
+    CALCULUS_OPERATION = "CALCULUS_OPERATION"
+    MATRIX_OPERATION = "MATRIX_OPERATION"
+    GEOMETRY_COORDINATE = "GEOMETRY_COORDINATE"
+
+
+class SingleEquationPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.SINGLE_EQUATION] = PayloadKind.SINGLE_EQUATION
+    left: ASTNode
+    right: ASTNode
+    target_variable: str
+
+
+class SystemOfEquationsPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.SYSTEM_OF_EQUATIONS] = PayloadKind.SYSTEM_OF_EQUATIONS
+    equations: Tuple[ASTNode, ...]
+    target_variables: Tuple[str, ...]
+
+
+class SingleInequalityPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.SINGLE_INEQUALITY] = PayloadKind.SINGLE_INEQUALITY
+    left: ASTNode
+    right: ASTNode
+    relation: ConstraintRelation
+    target_variable: str
+
+
+class FunctionAnalysisPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.FUNCTION_ANALYSIS] = PayloadKind.FUNCTION_ANALYSIS
+    expression: ASTNode
+    variable: str
+    target_interval: Optional[IntervalSpec] = None
+
+
+class CalculusOperationPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.CALCULUS_OPERATION] = PayloadKind.CALCULUS_OPERATION
+    expression: ASTNode
+    operation: CalculusOpKind  # DERIVATIVE, LIMIT, ANTIDERIVATIVE, DEFINITE_INTEGRAL
+    variable: str
+    point_or_lower_bound: Optional[ASTNode] = None
+    upper_bound: Optional[ASTNode] = None
+
+
+class MatrixOperationPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.MATRIX_OPERATION] = PayloadKind.MATRIX_OPERATION
+    matrix_elements: Tuple[Tuple[ASTNode, ...], ...]
+    operation: MatrixOpKind  # INVERSE, DETERMINANT, RANK, TRANSPOSE
+
+
+class GeometryCoordinatePayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload_kind: Literal[PayloadKind.GEOMETRY_COORDINATE] = PayloadKind.GEOMETRY_COORDINATE
+    dimension: int  # 2 or 3
+    elements: Tuple[GeometricElementSpec, ...]
+    query_target: str
+
+
+ProblemPayload = Annotated[
+    Union[
+        SingleEquationPayload,
+        SystemOfEquationsPayload,
+        SingleInequalityPayload,
+        FunctionAnalysisPayload,
+        CalculusOperationPayload,
+        MatrixOperationPayload,
+        GeometryCoordinatePayload,
+    ],
+    Field(discriminator="payload_kind"),
+]
+```
 
 ---
 
 ## 5. ProblemKind Taxonomy (Vietnamese THPT Curriculum)
 
-The conceptual taxonomy encompasses the complete scope of Vietnamese High School Mathematics (Grades 10–12, Chuẩn & Nâng cao):
+The conceptual taxonomy encompasses the complete scope of Vietnamese High School Mathematics (Grades 10–12):
 
 ```
 ProblemKind
@@ -203,7 +306,7 @@ class DomainAdapter(ABC):
         pass
 
     @abstractmethod
-    def solve_candidates(self, ir: ProblemIR, options: ExecutionOptions) -> List[CandidateSolution]:
+    def solve_candidates(self, ir: ProblemIR, options: ExecutionOptions) -> Tuple[CandidateSolution, ...]:
         """Generate candidate solutions using SymPy/CAS via worker containment."""
         pass
 
@@ -224,12 +327,12 @@ class DomainAdapter(ABC):
         pass
 
     @abstractmethod
-    def supported_methods(self, ir: ProblemIR) -> List[MethodAssessment]:
+    def supported_methods(self, ir: ProblemIR) -> Tuple[MethodAssessment, ...]:
         """List available pedagogical methods for this problem."""
         pass
 
     @abstractmethod
-    def limitations(self) -> List[str]:
+    def limitations(self) -> Tuple[str, ...]:
         """Document known mathematical boundaries and edge cases."""
         pass
 ```
@@ -240,27 +343,46 @@ class DomainAdapter(ABC):
 
 ## 7. CandidateSolution & Verification Separation
 
-### 7.1 CandidateSolution Contract
-`CandidateSolution` represents untrusted output generated by SymPy or an algorithmic engine. It explicitly **does not imply truth**:
+### 7.1 CandidateSolution Contract (Deeply Immutable)
+`CandidateSolution` represents untrusted output generated by SymPy or an algorithmic engine. It explicitly **does not imply truth**.
 
 ```python
+class CandidateMetadata(BaseModel):
+    """Deeply immutable typed metadata for candidate generation."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    engine_version: str = ""
+    transformation_steps: Tuple[str, ...] = Field(default_factory=tuple)
+    flags: Tuple[Tuple[str, str], ...] = Field(default_factory=tuple)
+
+
 class CandidateSolution(BaseModel):
     """Untrusted candidate solution generated by CAS or computational oracle."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     candidate_id: str
     generator_engine: str  # e.g. "sympy.solveset", "sympy.integrate"
-    raw_symbolic_output: str
-    parsed_entities: Tuple[SymbolicEntity, ...]  # Structured roots, expressions, intervals, matrices
-    assumptions_used: Tuple[str, ...]
-    execution_time_ms: float
-    raw_metadata: Dict[str, Any] = Field(default_factory=dict)
+    raw_symbolic_output: str = Field(..., description="Diagnostic/audit log string ONLY. NEVER reparsed as authoritative math input.")
+    parsed_entities: Tuple[SymbolicEntity, ...] = Field(..., description="Authoritative structured roots, intervals, matrices consumed by verifier.")
+    assumptions_used: Tuple[str, ...] = Field(default_factory=tuple)
+    execution_time_ms: float = Field(default=0.0, ge=0.0)
+    metadata: CandidateMetadata = Field(default_factory=CandidateMetadata)
 ```
 
-### 7.2 VerificationReport Contract
-`VerificationReport` is produced exclusively by independent MKE verification routines:
+**Diagnostic-Only Raw CAS Output Rule:**  
+`CandidateSolution.raw_symbolic_output` exists purely for auditing, diagnostics, and debugging.  
+**STRICT PROHIBITION:** Downstream verifiers MUST NEVER call `sympy.sympify(raw_symbolic_output)` or `parse_expr(raw_symbolic_output)`. Verification routines strictly inspect `parsed_entities`.
+
+### 7.2 VerificationReport Contract & Explicit Disposition
+To eliminate boolean ambiguity and prevent contradictions, `VerificationReport` uses an explicit `VerificationDisposition`:
 
 ```python
+class VerificationDisposition(str, Enum):
+    ACCEPTED = "ACCEPTED"        # Result passed all required obligations
+    PARTIAL = "PARTIAL"          # Valid partial/subdomain claim; incomplete
+    REJECTED = "REJECTED"        # Candidate proved mathematically false or invalid
+    UNSUPPORTED = "UNSUPPORTED"  # System cannot verify obligations
+
+
 class VerificationReport(BaseModel):
     """Deterministic, independent verification outcome produced by MKE."""
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -268,14 +390,14 @@ class VerificationReport(BaseModel):
     verification_id: str
     verifier_name: str  # e.g. "MKE_ALGEBRAIC_RESIDUAL_VERIFIER_V1"
     verification_level: VerificationLevel
-    passed: bool
+    disposition: VerificationDisposition
     proof_obligations: Tuple[ProofObligationResult, ...]
-    identities_checked: Tuple[str, ...]
+    identities_checked: Tuple[str, ...] = Field(default_factory=tuple)
     counterexamples: Tuple[str, ...] = Field(default_factory=tuple)
     residual_evaluations: Tuple[ResidualCheck, ...] = Field(default_factory=tuple)
     domain_boundary_checks: Tuple[DomainCheck, ...] = Field(default_factory=tuple)
-    certificate_hash: str
-    details: str
+    certificate_hash: str = Field(..., description="Deterministic unkeyed SHA-256 integrity fingerprint")
+    details: str = ""
 ```
 
 ### 7.3 SolutionTrace Contract
@@ -294,24 +416,39 @@ class SolutionTrace(BaseModel):
 
 ---
 
-## 8. VerificationLevel Semantics
+## 8. VerificationLevel Semantics & Legal Truth Table
 
-| Level | Formal Definition | Criteria for Assignment | Failure Mode Handling |
+### 8.1 Exact Verification Level Definitions
+The verification taxonomy consists of exactly 5 levels (no `UNRESOLVED` level):
+
+| Level | Formal Definition | Criteria for Assignment |
+| :--- | :--- | :--- |
+| `EXACT_VERIFIED` | Exact mathematical truth over exact algebraic field (e.g. $\mathbb{Q}, \mathbb{Q}(\sqrt{d})$) with full completeness proof. | 1. All candidate roots satisfy exact residual $\equiv 0$.<br>2. Multiplicities verified via derivatives or factorization.<br>3. Completeness proven (degree bound / Fundamental Theorem of Algebra).<br>4. Domain boundary conditions strictly satisfied. |
+| `SYMBOLIC_VERIFIED` | Symbolic equivalence verified via exact algebraic or calculus identities. | 1. Indefinite integrals: $\frac{d}{dx} F(x) \equiv f(x)$ over common domain.<br>2. Derivatives: $g(x) - f'(x) \equiv 0$ via canonical zero-testing.<br>3. Matrix inverses: $A \cdot A^{-1} = I$ and $A^{-1} \cdot A = I$.<br>4. Trig identities: exact reduction to zero. |
+| `CROSS_CHECKED` | Candidate reproduced across multiple distinct deterministic algorithms or symbolic/numeric checks. | 1. Dual-method consistency (e.g. algebraic solve + numerical interval bisection).<br>2. No formal completeness proof available, but candidate points verified without contradiction. |
+| `PARTIAL` | Result is mathematically valid over a sub-domain, or partial roots/branches found, but full completeness/boundary proof is missing. | 1. Candidate is a valid root/antiderivative on an open interval, but boundary points or secondary branches remain unproved.<br>2. Never presented as complete truth. |
+| `UNSUPPORTED` | System cannot make a mathematically sound, verifiable claim. | 1. Problem outside domain boundary.<br>2. Resource limit exceeded.<br>3. Solver timed out or verification failed closed. |
+
+### 8.2 Legal Verification Combinations (Truth Table)
+The following state combinations are strictly enforced:
+
+| Verification Level | Permitted Dispositions | Meaning / User-Facing Presentation | Contradictory / Forbidden Combinations |
 | :--- | :--- | :--- | :--- |
-| `EXACT_VERIFIED` | Exact mathematical truth over exact algebraic field (e.g. $\mathbb{Q}, \mathbb{Q}(\sqrt{d})$) with full completeness proof. | 1. All candidate roots satisfy exact residual $\equiv 0$.<br>2. Multiplicities verified via derivatives or factorization.<br>3. Completeness proven (e.g. Fundamental Theorem of Algebra / degree bound).<br>4. Domain boundary conditions strictly satisfied. | Any failed obligation downgrades to `PARTIAL` or `UNSUPPORTED`. |
-| `SYMBOLIC_VERIFIED` | Symbolic equivalence verified via exact algebraic or calculus identities. | 1. Indefinite integrals: $\frac{d}{dx} F(x) \equiv f(x)$ over common domain.<br>2. Derivatives: $g(x) - f'(x) \equiv 0$ via canonical zero-testing.<br>3. Matrix inverses: $A \cdot A^{-1} = I$ and $A^{-1} \cdot A = I$.<br>4. Trig identities: exact reduction to zero. | Non-zero symbolic difference marks candidate invalid. |
-| `CROSS_CHECKED` | Candidate reproduced across multiple distinct deterministic algorithms or symbolic/numeric checks. | 1. Dual-method consistency (e.g. algebraic solve + numerical interval bisection).<br>2. No formal completeness proof available, but candidate points verified without contradiction. | Inconsistent results result in fail-closed `UNRESOLVED`. |
-| `PARTIAL` | Result is mathematically valid over a sub-domain, or partial roots/branches found, but full completeness/boundary proof is missing. | 1. Candidate is a valid root/antiderivative on an open interval, but boundary points or secondary branches remain unproved.<br>2. Never presented as complete truth. | User is explicitly informed of unverified obligations. |
-| `UNSUPPORTED` | System cannot make a mathematically sound, verifiable claim. | 1. Problem outside domain boundary.<br>2. Resource limit exceeded.<br>3. Solver timed out or verification failed closed. | Safe fallback; counted as coverage gap, NOT correctness failure. |
+| `EXACT_VERIFIED` | `ACCEPTED` | Complete exact proof; fully verified solution. | `EXACT_VERIFIED` + `REJECTED`, `EXACT_VERIFIED` + `UNSUPPORTED` |
+| `SYMBOLIC_VERIFIED`| `ACCEPTED` | Complete symbolic equivalence verified. | `SYMBOLIC_VERIFIED` + `REJECTED`, `SYMBOLIC_VERIFIED` + `UNSUPPORTED` |
+| `CROSS_CHECKED` | `ACCEPTED` | Weaker cross-checked claim (reproduced across oracles). If oracles disagree, candidate is `REJECTED`. | `CROSS_CHECKED` + `REJECTED` (must drop to `UNSUPPORTED` / `REJECTED`) |
+| `PARTIAL` | `PARTIAL` | Valid sub-domain result; unproved obligations explicitly listed. | `PARTIAL` + `ACCEPTED` (cannot claim full acceptance) |
+| `UNSUPPORTED` | `UNSUPPORTED`, `REJECTED` | No claim made; capability boundary or rejected candidate. | `UNSUPPORTED` + `ACCEPTED`, `UNSUPPORTED` + `PARTIAL` |
 
 ---
 
 ## 9. False-Verified Safety Gate
 
-$$\text{FALSE\_VERIFIED} = 0 \quad \text{on all locked benchmark suites (Release Blocker)}$$
+$$\text{FALSE\_VERIFIED\_COUNT} = 0 \quad \text{on all locked benchmark suites (Release Blocker)}$$
 
-- **Definition of FALSE_VERIFIED:** Any response where `verification_level` is `EXACT_VERIFIED` or `SYMBOLIC_VERIFIED`, but the returned answer is mathematically incorrect, incomplete (missing valid roots), contains extraneous roots, or violates domain boundaries.
-- **Enforcement:** If a test case or benchmark run yields $\text{FALSE\_VERIFIED} > 0$, CI/CD fails immediately and deployment is blocked.
+- **Explicit Definition:**
+  $$\text{FALSE\_VERIFIED\_COUNT} = \text{COUNT}\left( \text{level} \in \{\text{EXACT\_VERIFIED}, \text{SYMBOLIC\_VERIFIED}\} \land \text{is\_incorrect\_or\_incomplete}(\text{response}) \right)$$
+- **Enforcement:** If any benchmark run or test suite produces $\text{FALSE\_VERIFIED\_COUNT} > 0$, CI/CD fails immediately and release is blocked.
 
 ---
 
@@ -324,9 +461,9 @@ $$\text{FALSE\_VERIFIED} = 0 \quad \text{on all locked benchmark suites (Release
 | `linsolve` | Linear systems ($n \times m$) | Rank deficiency handling may return parametric sets that need domain restriction. | `FiniteSet` of tuples | Low | Matrix residual $A x - b = 0$ + rank verification. |
 | `nonlinsolve` | Non-linear systems | High risk of timeout or complex-field extraneous roots. | `FiniteSet` of tuples | Critical | Strict time budget + multivariate substitution verifier. |
 | `reduce_inequalities` | Univariate inequalities | Branch cuts on radical/logarithmic expressions can be fragile. | `Or`, `And`, `Relational` | Medium | Boundary point verification + test point evaluation in open intervals. |
-| `diff` | Differentiation | Relatively robust; can produce unsimplified expressions. | `Expr` | Low | Canonical algebraic simplification and zero-testing against candidate. |
-| `limit` | Limits of functions | Can fail or oscillate on exotic essential singularities; Gruntz algorithm can hang. | `Expr`, `oo`, `-oo` | Medium | Dual-sided limit evaluation + series expansion cross-check. |
-| `integrate` | Antiderivatives & Definite Integrals | Risch algorithm may fail on elementary functions; definite integrals may miss branch singularities. | `Expr`, `Integral` | High | Differentiate candidate $\frac{d}{dx}F(x) - f(x) \equiv 0$; check continuity over integration interval. |
+| `diff` | Differentiation | Relatively robust; can produce unsimplified expressions. | `Expr` | Low | Canonical algebraic zero-testing against candidate. |
+| `limit` | Limits of functions | Can fail or oscillate on essential singularities; Gruntz algorithm can hang. | `Expr`, `oo`, `-oo` | Medium | Dual-sided limit evaluation + series expansion cross-check. |
+| `integrate` | Antiderivatives & Definite Integrals | Risch algorithm may fail on elementary functions; definite integrals may miss branch singularities. | `Expr`, `Integral` | High | Differentiate candidate $\frac{d}{dx}F(x) - f(x) \equiv 0$; check continuity over interval. |
 | `Matrix` ops | Inverses, determinants, eigenvalues | Polynomial characteristic equations can blow up for $n \ge 4$. | `Matrix`, `Expr` | Low | $A \cdot A^{-1} = I$, $\det(A)$ via cofactor/Gaussian reduction double-check. |
 | `stats` / `combinatorics` | Permutations, combinations, distributions | Combinatorial explosion on large integers. | `Integer`, `Rational` | Low | Bit-length checks, exact factorial arithmetic. |
 
@@ -363,15 +500,20 @@ User String / Math Input
 
 ---
 
-## 12. Resource Bounding & Process Isolation
+## 12. Resource Bounding & Process Isolation (Worker Source Truth)
 
-The existing production-grade Windows Job Object and AppContainer infrastructure in `src/mke_product/worker/` will be reused directly:
+### 12.1 Accepted Source-Truth Constants (`src/mke_product/worker/constants.py`)
+- **Process Memory Limit:** `PROCESS_MEMORY_LIMIT_BYTES = 256 * 1024 * 1024` (256 MB per process)
+- **Job Object Memory Limit:** `JOB_MEMORY_LIMIT_BYTES = 512 * 1024 * 1024` (512 MB per job object)
+- **Default Worker Timeout:** `DEFAULT_WORKER_TIMEOUT_SEC = 10.0` (10.0 seconds)
+- **IPC Max Request Buffer:** `IPC_MAX_REQUEST_BYTES = 4096` (4 KB)
+- **IPC Max Response Buffer:** `IPC_MAX_RESPONSE_BYTES = 16384` (16 KB)
 
-- **Per-Request Hard Timeout:** Configurable between `0.5s` and `5.0s` (default `2.0s`).
-- **Memory Commitment Limit:** `JOB_MEMORY_LIMIT_BYTES = 256MB` per worker process.
-- **Pipe Buffer Bound:** `IPC_MAX_REQUEST_BYTES = 64KB`, `IPC_MAX_RESPONSE_BYTES = 64KB`.
-- **Handle Quarantine & Settling:** Zero kernel handle leaks on abrupt termination.
-- **Fail-Closed Behavior:** Any hung or memory-exhausted CAS process is killed; the orchestrator returns `EngineStatus.RESOURCE_EXHAUSTED` and verification level `UNSUPPORTED`.
+### 12.2 Operation Allowlist & Extension Plan
+- **Current Worker Controller Allowlist (`controller.py`):**
+  $$\text{ALLOWED\_OPERATIONS} = \{\text{"SOLVE"}, \text{"CHECK\_CANDIDATE"}, \text{"SOLVE\_QUADRATIC"}, \text{"SOLVE\_QUADRATIC\_SURD"}\}$$
+- **SymPy Adapter Vocabulary:** Exposes `SIMPLIFY`, `DIFFERENTIATE`, `INTEGRATE`, `SOLVE_SYSTEM`, `SOLVE_INEQUALITY`.
+- **Architectural Policy:** The worker containment implementation is an *accepted Windows containment foundation*. It will be reused directly, and its protocol/operation allowlist will be **extended incrementally under dedicated tests** as each coverage pack is implemented.
 
 ---
 
@@ -424,12 +566,12 @@ classDiagram
    - Degree bound checking for completeness proof.
 2. **Algebraic Systems ($\{f_i(x_1, \dots, x_n) = 0\}$):**
    - Substitute candidate solution tuple $(v_1, \dots, v_n)$ into every equation $f_i$; verify all residuals $\equiv 0$.
-   - For linear systems, check rank $(A) == \text{rank}(A|b) == n$.
+   - For linear systems, check $\text{rank}(A) == \text{rank}(A|b) == n$.
 3. **Inequalities ($f(x) \ge 0$):**
    - Verify boundary points solve $f(x) = 0$ or are domain poles.
    - Sample deterministic test points within each partitioned open interval $(a_k, a_{k+1})$ to prove sign constancy.
 4. **Derivatives ($g(x) = \frac{d}{dx}f(x)$):**
-   - Compute formal derivative via internal rule engine or independent dual-CAS differentiation; test algebraic zero equivalence $g(x) - f'(x) \equiv 0$.
+   - Compute formal derivative via internal rule engine; test algebraic zero equivalence $g(x) - f'(x) \equiv 0$.
 5. **Antiderivatives ($\int f(x)dx = F(x) + C$):**
    - Compute $\frac{d}{dx}F(x)$ and prove $\frac{d}{dx}F(x) - f(x) \equiv 0$ over maximal continuity domain.
 6. **Definite Integrals ($\int_a^b f(x)dx = I$):**
@@ -482,6 +624,26 @@ Structured MKE-IR Payload
 ## 16. MKE THPT Coverage Benchmark Schema
 
 ```python
+class ExpectedAnswerType(str, Enum):
+    FINITE_SET = "FINITE_SET"
+    INTERVAL_SET = "INTERVAL_SET"
+    EXPRESSION = "EXPRESSION"
+    SCALAR = "SCALAR"
+    TUPLE_SET = "TUPLE_SET"
+    MATRIX = "MATRIX"
+    BOOLEAN = "BOOLEAN"
+    STATISTICAL_VALUE = "STATISTICAL_VALUE"
+    STRUCTURED = "STRUCTURED"
+
+
+class BenchmarkRightsStatus(str, Enum):
+    PROJECT_AUTHORED = "PROJECT_AUTHORED"
+    OPEN_LICENSED = "OPEN_LICENSED"
+    PUBLIC_DOMAIN_CONFIRMED = "PUBLIC_DOMAIN_CONFIRMED"
+    PERMISSION_GRANTED = "PERMISSION_GRANTED"
+    SOURCE_LOCATOR_ONLY = "SOURCE_LOCATOR_ONLY"
+
+
 class BenchmarkCase(BaseModel):
     """Authoritative schema for THPT coverage benchmark evaluation."""
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -494,11 +656,12 @@ class BenchmarkCase(BaseModel):
     subfamily: str  # e.g. "SQRT_LINEAR_EQ_LINEAR"
     source_type: BenchmarkSourceType  # OFFICIAL_PUBLIC, OPEN_LICENSED, PROJECT_AUTHORED, DERIVED_METAMORPHIC
     source_locator: str  # Exact citation (e.g. "De_Thi_TN_THPT_2024_Ma_101_Cau_35")
-    license_status: str  # CC-BY, PUBLIC_DOMAIN, FAIR_USE_ASSESSMENT
+    rights_status: BenchmarkRightsStatus
     input_mode: InputMode  # RAW_TEXT, LATEX, STRUCTURED_IR
     problem_text: str
-    structured_input: Optional[Dict[str, Any]] = None
+    structured_problem: Optional[ProblemIR] = None
     expected_answer: ExpectedAnswerSpec
+    expected_answer_type: ExpectedAnswerType
     expected_domain: str
     required_verification_obligations: Tuple[str, ...]
     split: BenchmarkSplit  # DEV, HOLDOUT, ADVERSARIAL
@@ -520,37 +683,39 @@ class BenchmarkCase(BaseModel):
   - High degree polynomial explosions ($x^{100} - 1 = 0$).
   - Undefined operations ($\log(x)$ at $x \le 0$).
 
-### 17.2 Sourcing & Licensing Integrity
+### 17.2 Sourcing & Rights Policy
 - **Permitted Sources:** Official public national exams (BGD&ĐT đề thi công khai), open educational repositories, project-authored parametric generators, and metamorphic permutations.
-- **Prohibited Sources:** Proprietary, copyrighted question banks or commercial tutoring systems without explicit licensing.
+- **Rights Separation:** Source availability is strictly separated from licensing. If reuse rights are uncertain, the benchmark stores `SOURCE_LOCATOR_ONLY` and uses project-authored or metamorphic structured representations rather than claiming an open license.
 
 ---
 
 ## 18. Benchmark Metrics & Success Criteria
 
 ### 18.1 Formal Metric Definitions
-All rates are calculated with the denominator equal to the **total count of eligible benchmark cases ($N$)**, preventing metric gaming:
+All rates are calculated with the denominator equal to the **total count of eligible benchmark cases ($N$)**:
 
 $$\text{OVERALL\_CORRECT\_RATE} = \frac{\text{Count of Correct Responses}}{N}$$
 
-$$\text{VERIFIED\_CORRECT\_RATE} = \frac{\text{Count of Correct Responses with Level } \ge \text{SYMBOLIC\_VERIFIED}}{N}$$
+$$\text{VERIFIED\_CORRECT\_RATE} = \frac{\text{Count of Correct Responses with level } \in \{\text{EXACT\_VERIFIED}, \text{SYMBOLIC\_VERIFIED}\}}{N}$$
 
-$$\text{EXACT\_VERIFIED\_RATE} = \frac{\text{Count with Level } == \text{EXACT\_VERIFIED}}{N}$$
+$$\text{EXACT\_VERIFIED\_RATE} = \frac{\text{Count with level } == \text{EXACT\_VERIFIED}}{N}$$
 
-$$\text{SYMBOLIC\_VERIFIED\_RATE} = \frac{\text{Count with Level } == \text{SYMBOLIC\_VERIFIED}}{N}$$
+$$\text{SYMBOLIC\_VERIFIED\_RATE} = \frac{\text{Count with level } == \text{SYMBOLIC\_VERIFIED}}{N}$$
 
-$$\text{PARTIAL\_RATE} = \frac{\text{Count with Level } == \text{PARTIAL}}{N}$$
+$$\text{CROSS\_CHECKED\_RATE} = \frac{\text{Count with level } == \text{CROSS\_CHECKED}}{N}$$
 
-$$\text{UNSUPPORTED\_RATE} = \frac{\text{Count with Level } == \text{UNSUPPORTED}}{N}$$
+$$\text{PARTIAL\_RATE} = \frac{\text{Count with level } == \text{PARTIAL}}{N}$$
 
-$$\text{COVERAGE\_RATE} = \frac{N - \text{Count with Level } == \text{UNSUPPORTED}}{N}$$
+$$\text{UNSUPPORTED\_RATE} = \frac{\text{Count with level } == \text{UNSUPPORTED}}{N}$$
 
-$$\text{FALSE\_VERIFIED\_COUNT} = \text{Count of Incorrect/Incomplete Responses with Level } \ge \text{SYMBOLIC\_VERIFIED}$$
+$$\text{COVERAGE\_RATE} = \frac{N - \text{COUNT}(\text{level} == \text{UNSUPPORTED})}{N}$$
+
+$$\text{FALSE\_VERIFIED\_COUNT} = \text{COUNT}\left( \text{level} \in \{\text{EXACT\_VERIFIED}, \text{SYMBOLIC\_VERIFIED}\} \land \text{is\_incorrect\_or\_incomplete}(\text{response}) \right)$$
 
 ### 18.2 8-Week Benchmark Targets (Computational THPT Suite)
 - **Overall Correctness Target:** $\ge 90\%$
 - **Verified Correctness Stretch Target:** $\ge 80\%$
-- **Safety Gate:** $\text{FALSE\_VERIFIED\_COUNT} = 0$ (Zero tolerance)
+- **Safety Gate:** $\text{FALSE\_VERIFIED\_COUNT} = 0$ (Zero tolerance / Release blocker)
 - **Latency Budget:** $\text{Median} \le 150\text{ms}$, $\text{P95} \le 800\text{ms}$.
 
 ---
@@ -587,7 +752,7 @@ Harness      Systems       dental        Analysis      Probability   & Review
 
 ## 20. Three-Stage Domain Expansion Template
 
-To maintain rapid development without sacrificing quality, every future pack executes a standard 3-stage lifecycle:
+Every future pack executes a standard 3-stage lifecycle:
 
 ```mermaid
 stateDiagram-v2
@@ -602,7 +767,7 @@ stateDiagram-v2
 2. **Phase P1 (Implementation):**
    - Implement `DomainAdapter`, safe AST conversions, candidate solver routines, and independent MKE verifier.
 3. **Phase P2 (Verification & Benchmark Acceptance):**
-   - Execute benchmark suite, audit `FALSE_VERIFIED == 0`, verify latency metrics, and freeze pack release.
+   - Execute benchmark suite, audit $\text{FALSE\_VERIFIED} == 0$, verify latency metrics, and freeze pack release.
 
 ---
 
@@ -621,12 +786,11 @@ The existing quadratic engine in `src/mke_product/application/orchestrator.py`, 
 
 ## 22. API Strategy & Frontend Policy
 
-### 22.1 API Strategy
-- **Existing Route:** `POST /api/v1/algebra/solve` remains permanently supported for quadratic requests.
-- **Future Unified Route (Pack 1+):** `POST /api/v1/math/solve`
-  - Accepts `SolveRequest` with either raw text, LaTeX, or structured IR.
-  - Automatically dispatches to the appropriate `DomainAdapter`.
-  - Returns `UniversalSolveResponse` containing the `SolutionTrace`, `VerificationReport`, and associated knowledge tips.
+### 22.1 API Strategy Comparison & Recommendation
+- **Option A:** Legacy `POST /api/v1/algebra/solve` + new `POST /api/v1/math/solve`.
+- **Option B:** New versioned `POST /api/v2/math/solve`.
+- **Option C:** Internal universal application service first; transport route introduced in later coverage packs.
+- **Recommendation:** **Option C $\to$ Option A Strategy**. In P1, build the pure internal `UniversalApplicationService` without altering transport routes. In Pack 1, expose `POST /api/v1/math/solve` alongside legacy `/api/v1/algebra/solve`. Zero public routes will be added or modified in P0 or P1.
 
 ### 22.2 Frontend Freeze
 - `src/frontend/` remains **100% frozen**.
@@ -638,7 +802,7 @@ The existing quadratic engine in `src/mke_product/application/orchestrator.py`, 
 
 | Risk Identified | Severity | Mitigation Strategy |
 | :--- | :--- | :--- |
-| **SymPy Performance Explosion** | High | Strict Windows Job Object memory (256MB) and timeout (2.0s) bounds; immediate process kill and fallback to `UNSUPPORTED`. |
+| **SymPy Performance Explosion** | High | Strict Windows Job Object memory (512MB job / 256MB process) and timeout (10.0s default / tighter per-operation) bounds; immediate process kill and fallback to `UNSUPPORTED`. |
 | **Extraneous Roots from CAS** | High | Mandatory independent substitution of candidate solutions into the *original unsimplified* equation AST. |
 | **Domain Boundary Violations** | High | Static domain restrictions extracted from AST (denominators, logarithms, radicals) checked before verification. |
 | **LLM Hallucinations** | Medium | LLM is strictly an intake parser; extracted IR is mathematically validated and deterministically solved. |
@@ -659,15 +823,35 @@ The following anti-patterns are explicitly rejected:
 
 ---
 
-## 25. Scope Boundary for Next Phase (THPT-COV-P1)
+## 25. Scope Boundary & Invariants for THPT-COV-P1
 
+### 25.1 Exact P1 Implementation Scope
 **THPT-COV-P1 is strictly scoped to Core Infrastructure:**
-- Create `ProblemIR` and `ProblemKind` contracts.
+- Create `ProblemIR` with discriminated `ProblemPayload` variants.
+- Create `ProblemKind` and common core enums (`ExpectedAnswerType`, `VerificationDisposition`, `VerificationLevel`).
+- Create deeply immutable `CandidateSolution` (with typed metadata).
+- Create `VerificationReport` with disposition truth table enforcement.
+- Create `SolutionTrace` transport-neutral contracts.
 - Create `DomainAdapter` interface and `AdapterRegistry`.
 - Implement `LegacyQuadraticAdapter` facade wrapping existing quadratic services.
 - Create `BenchmarkCase` schema and runner harness skeleton.
-- Create transport-neutral verification and solution trace models.
-- **NO new mathematical domains will be implemented in P1.**
+- **NO new mathematical domains in P1.**
+- **NO public universal API in P1.**
+- **NO worker operation expansion in P1.**
+- **NO parser grammar expansion in P1.**
+- **NO SymPy feature expansion in P1.**
+- **NO K1 dataset modifications in P1.**
+- **NO frontend changes in P1.**
+
+### 25.2 Mandatory P1 Immutability & Safety Test Invariants
+P1 test suites must prove:
+1. Tuple collections cannot be mutated in place after construction.
+2. Zero mutable `dict` or `list` instances inside frozen authoritative models.
+3. `ProblemIR` discriminator consistency: mismatched `problem_kind` and `payload.payload_kind` are rejected fail-closed.
+4. Raw CAS output is never parsed as authoritative math input.
+5. Contradictory verification level/disposition pairs are rejected.
+6. `BenchmarkCase` structured input is strongly typed and frozen.
+7. `LegacyQuadraticAdapter` produces identical outputs to `QuadraticOrchestrator` on baseline test matrices.
 
 ---
 
