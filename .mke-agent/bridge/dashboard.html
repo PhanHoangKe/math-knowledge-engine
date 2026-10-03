@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MKE Agent Operation Center — ChatGPT & Antigravity</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a', 900: '#14532d' },
+            slate: { 850: '#0f172a', 900: '#0b0f19', 950: '#05070d' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.75; transform: scale(1.03); }
+    }
+    .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+    .glass {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP NAVIGATION / HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur-md px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 font-bold text-slate-950 text-lg">
+          MKE
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            MKE Autonomous Operation Center
+            <span id="bridge-status-pill" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Bridge Live
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Vietnamese High-School Math Coverage Engine • 24/7 Pair Orchestration</p>
+        </div>
+      </div>
+
+      <!-- RIGHT CONTROLS & 24/7 OVERNIGHT STATUS -->
+      <div class="flex items-center gap-4">
+        <!-- Anti-Sleep / Keep-Awake Widget -->
+        <div class="glass px-4 py-2 rounded-xl flex items-center gap-3 border border-emerald-500/20">
+          <div class="relative flex items-center justify-center">
+            <span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute opacity-75"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500 relative"></span>
+          </div>
+          <div class="text-left">
+            <div class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+              🌙 Chống tắt màn hình: <span class="text-white font-bold">BẬT (15p/lần)</span>
+            </div>
+            <div id="nudge-info" class="text-[10px] text-slate-400">Đã chạm: 0 lần • Sẵn sàng xuyên đêm</div>
+          </div>
+        </div>
+
+        <button onclick="fetchData()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-xs flex items-center gap-1.5 font-medium border border-slate-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Làm mới
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- 1. TWIN AGENT STATUS CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- CHATGPT POD -->
+      <div class="glass p-6 rounded-2xl border border-slate-800 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm border border-cyan-500/30">
+              GPT
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-white">ChatGPT</h2>
+              <span class="text-xs text-cyan-400 font-medium">Independent Auditor & Controller</span>
+            </div>
+          </div>
+          <span id="gpt-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+            SẴN SÀNG
+          </span>
+        </div>
+        <p id="gpt-desc" class="text-xs text-slate-300 leading-relaxed mb-3">
+          Lắng nghe kết quả từ Anty, thực hiện kiểm toán độc lập về tính đúng đắn toán học, tính bất biến sâu và tự động giao milestone tiếp theo.
+        </p>
+        <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/80">
+          <span>Kênh: <strong class="text-slate-200">Bridge API / Remote MCP</strong></span>
+          <span>Chế độ: <strong class="text-slate-200">Autonomous 24/7</strong></span>
+        </div>
+      </div>
+
+      <!-- ANTIGRAVITY (ANTY) POD -->
+      <div class="glass p-6 rounded-2xl border border-slate-800 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm border border-emerald-500/30">
+              AGY
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-white">Antigravity (“Anty”)</h2>
+              <span class="text-xs text-emerald-400 font-medium">Implementation Engineer (Headless)</span>
+            </div>
+          </div>
+          <span id="anty-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+            SẴN SÀNG
+          </span>
+        </div>
+        <p id="anty-desc" class="text-xs text-slate-300 leading-relaxed mb-3">
+          Tự động khởi tạo worktree cô lập, viết mã nguồn coverage THPT, chạy trọn bộ 1,586 regression tests và tự động commit/push GitHub.
+        </p>
+        <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/80">
+          <span>Engine: <strong class="text-slate-200">agy v1.2.16 (Headless)</strong></span>
+          <span>Khóa Frontend: <strong class="text-emerald-400 font-bold">100% Bảo Toàn</strong></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 2. CURRENT ACTIVE TASK PIPELINE HERO -->
+    <div class="glass p-6 rounded-2xl border border-slate-800 relative shadow-2xl">
+      <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Nhiệm vụ đang thực thi</div>
+          <div id="active-task-id" class="text-xl font-black text-white tracking-tight flex items-center gap-2 mt-0.5">
+            Chưa có task chạy ngầm
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Thời gian thực thi</div>
+            <div id="active-task-time" class="text-sm font-bold text-emerald-400 font-mono">00:00</div>
+          </div>
+          <span id="active-task-status" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+            IDLE
+          </span>
+        </div>
+      </div>
+
+      <!-- 5-STAGE PIPELINE TRACKER -->
+      <div class="py-6">
+        <div class="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">Tiến trình các bước (Live Pipeline)</div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+          
+          <!-- Stage 1 -->
+          <div id="step-setup" class="p-3 rounded-xl bg-slate-900 border border-slate-800 transition">
+            <div class="text-[10px] font-bold text-slate-500 uppercase">Bước 1</div>
+            <div class="text-xs font-semibold text-slate-300 mt-1">Dựng Worktree</div>
+            <div id="step-setup-badge" class="mt-2 text-[10px] text-slate-500 font-mono">Chờ</div>
+          </div>
+
+          <!-- Stage 2 -->
+          <div id="step-code" class="p-3 rounded-xl bg-slate-900 border border-slate-800 transition">
+            <div class="text-[10px] font-bold text-slate-500 uppercase">Bước 2</div>
+            <div class="text-xs font-semibold text-slate-300 mt-1">Anty Code</div>
+            <div id="step-code-badge" class="mt-2 text-[10px] text-slate-500 font-mono">Chờ</div>
+          </div>
+
+          <!-- Stage 3 -->
+          <div id="step-scope" class="p-3 rounded-xl bg-slate-900 border border-slate-800 transition">
+            <div class="text-[10px] font-bold text-slate-500 uppercase">Bước 3</div>
+            <div class="text-xs font-semibold text-slate-300 mt-1">Kiểm Scope/UI</div>
+            <div id="step-scope-badge" class="mt-2 text-[10px] text-slate-500 font-mono">Chờ</div>
+          </div>
+
+          <!-- Stage 4 -->
+          <div id="step-test" class="p-3 rounded-xl bg-slate-900 border border-slate-800 transition">
+            <div class="text-[10px] font-bold text-slate-500 uppercase">Bước 4</div>
+            <div class="text-xs font-semibold text-slate-300 mt-1">Full Tests (1586+)</div>
+            <div id="step-test-badge" class="mt-2 text-[10px] text-slate-500 font-mono">Chờ</div>
+          </div>
+
+          <!-- Stage 5 -->
+          <div id="step-commit" class="p-3 rounded-xl bg-slate-900 border border-slate-800 transition">
+            <div class="text-[10px] font-bold text-slate-500 uppercase">Bước 5</div>
+            <div class="text-xs font-semibold text-slate-300 mt-1">Commit & Push</div>
+            <div id="step-commit-badge" class="mt-2 text-[10px] text-slate-500 font-mono">Chờ</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- DETAILS METADATA -->
+      <div id="active-task-meta" class="hidden bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-xs space-y-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-300">
+          <div>Nhánh đích: <code id="active-branch" class="text-emerald-400 font-mono font-bold">-</code></div>
+          <div>Base Commit: <code id="active-base" class="text-cyan-400 font-mono">-</code></div>
+        </div>
+        <div>
+          <span class="text-slate-400">Yêu cầu nhiệm vụ:</span>
+          <p id="active-prompt-preview" class="text-slate-200 mt-1 italic line-clamp-2 bg-slate-950 p-2 rounded border border-slate-800"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. TASK HISTORY & LOGS TABLE -->
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          Lịch sử các Task đã thực hiện
+          <span id="history-count" class="text-xs font-normal text-slate-400">0 tasks</span>
+        </h3>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="text-[11px] uppercase bg-slate-900/80 text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-4">Task ID</th>
+              <th class="py-3 px-4">Trạng thái</th>
+              <th class="py-3 px-4">Nhánh / Commit</th>
+              <th class="py-3 px-4">Thời gian</th>
+              <th class="py-3 px-4">Files đổi</th>
+            </tr>
+          </thead>
+          <tbody id="history-rows" class="divide-y divide-slate-800/60 font-mono">
+            <tr>
+              <td colspan="5" class="py-6 text-center text-slate-500">Chưa có dữ liệu task nào</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT AUTO-REFRESH & RENDER LOGIC -->
+  <script>
+    let activeStartTime = null;
+    let timerInterval = null;
+
+    async function fetchData() {
+      try {
+        const [tasksRes, healthRes, keepAwakeRes] = await Promise.all([
+          fetch('/api/tasks/list').then(r => r.json()).catch(() => []),
+          fetch('/api/health').then(r => r.json()).catch(() => ({})),
+          fetch('/api/keep-awake').then(r => r.json()).catch(() => ({}))
+        ]);
+
+        // 1. Update Keep-Awake UI
+        if (keepAwakeRes && keepAwakeRes.nudge_count !== undefined) {
+          document.getElementById('nudge-info').innerText = 
+            `Đã chạm: ${keepAwakeRes.nudge_count} lần • Chu kỳ: ${keepAwakeRes.interval_minutes}p • Sẵn sàng xuyên đêm`;
+        }
+
+        // 2. Determine Running Task
+        const runningTask = tasksRes.find(t => t.status === 'RUNNING' || t.status === 'QUEUED');
+
+        if (runningTask) {
+          renderActiveTask(runningTask);
+          document.getElementById('anty-badge').className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse";
+          document.getElementById('anty-badge').innerText = `ĐANG LÀM: ${runningTask.stage}`;
+          document.getElementById('gpt-badge').className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700";
+          document.getElementById('gpt-badge').innerText = "CHỜ ANTY XONG";
+        } else {
+          resetActiveTask();
+          document.getElementById('anty-badge').className = "px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30";
+          document.getElementById('anty-badge').innerText = "SẴN SÀNG";
+          document.getElementById('gpt-badge').className = "px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30";
+          document.getElementById('gpt-badge').innerText = "SẴN SÀNG";
+        }
+
+        // 3. Render History
+        renderHistory(tasksRes);
+
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      }
+    }
+
+    function renderActiveTask(t) {
+      document.getElementById('active-task-id').innerText = t.task_id;
+      document.getElementById('active-task-status').innerText = t.status;
+      document.getElementById('active-task-status').className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse";
+      document.getElementById('active-branch').innerText = t.target_branch;
+      document.getElementById('active-base').innerText = (t.base_sha || '').substring(0, 8);
+      document.getElementById('active-prompt-preview').innerText = t.prompt || 'Không có prompt';
+      document.getElementById('active-task-meta').classList.remove('hidden');
+
+      // Update Pipeline Steps
+      const stages = ['setup-worktree', 'run-antigravity', 'scope-validation', 'test-regression', 'commit-push'];
+      const curIdx = stages.indexOf(t.stage);
+
+      stages.forEach((st, idx) => {
+        const el = document.getElementById(`step-${st.split('-')[1] || st}`);
+        const badge = document.getElementById(`step-${st.split('-')[1] || st}-badge`);
+        if (!el || !badge) return;
+
+        if (idx < curIdx) {
+          el.className = "p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300";
+          badge.className = "mt-2 text-[10px] text-emerald-400 font-bold font-mono";
+          badge.innerText = "✓ Xong";
+        } else if (idx === curIdx) {
+          el.className = "p-3 rounded-xl bg-amber-950/40 border border-amber-500/60 text-amber-200 animate-pulse";
+          badge.className = "mt-2 text-[10px] text-amber-300 font-bold font-mono";
+          badge.innerText = "Đang chạy...";
+        } else {
+          el.className = "p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-500";
+          badge.className = "mt-2 text-[10px] text-slate-600 font-mono";
+          badge.innerText = "Chờ";
+        }
+      });
+
+      // Timer
+      if (!timerInterval && t.started_at) {
+        activeStartTime = new Date(t.started_at).getTime();
+        timerInterval = setInterval(() => {
+          const now = Date.now();
+          const diff = Math.floor((now - activeStartTime) / 1000);
+          const mins = String(Math.floor(diff / 60)).padStart(2, '0');
+          const secs = String(diff % 60).padStart(2, '0');
+          document.getElementById('active-task-time').innerText = `${mins}:${secs}`;
+        }, 1000);
+      }
+    }
+
+    function resetActiveTask() {
+      document.getElementById('active-task-id').innerText = "Tất cả task đã hoàn thành • Sẵn sàng nhận việc mới";
+      document.getElementById('active-task-status').innerText = "IDLE";
+      document.getElementById('active-task-status').className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700";
+      document.getElementById('active-task-time').innerText = "00:00";
+      document.getElementById('active-task-meta').classList.add('hidden');
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+
+      ['setup', 'code', 'scope', 'test', 'commit'].forEach(id => {
+        const el = document.getElementById(`step-${id}`);
+        const badge = document.getElementById(`step-${id}-badge`);
+        if (el) el.className = "p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-500";
+        if (badge) {
+          badge.className = "mt-2 text-[10px] text-slate-600 font-mono";
+          badge.innerText = "Chờ";
+        }
+      });
+    }
+
+    function renderHistory(tasks) {
+      document.getElementById('history-count').innerText = `${tasks.length} tasks`;
+      const tbody = document.getElementById('history-rows');
+      if (!tasks || tasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Chưa có task nào</td></tr>';
+        return;
+      }
+
+      const rowsHtml = tasks.slice().reverse().map(t => {
+        let statusBadge = '';
+        if (t.status === 'SUCCESS') statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">SUCCESS</span>';
+        else if (t.status === 'RUNNING') statusBadge = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold animate-pulse">RUNNING</span>';
+        else if (t.status === 'FAILED') statusBadge = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">FAILED</span>';
+        else statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400">${t.status}</span>`;
+
+        const shortCommit = t.commit_sha ? `<span class="text-cyan-400">${t.commit_sha.substring(0, 8)}</span>` : '<span class="text-slate-600">-</span>';
+        const changedCount = (t.changed_files && t.changed_files.length) ? `${t.changed_files.length} files` : '-';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition">
+            <td class="py-3 px-4 font-bold text-white">${t.task_id}</td>
+            <td class="py-3 px-4">${statusBadge}</td>
+            <td class="py-3 px-4 text-slate-400">${t.target_branch}<br/>${shortCommit}</td>
+            <td class="py-3 px-4 text-slate-400">${t.finished_at ? new Date(t.finished_at).toLocaleTimeString() : '-'}</td>
+            <td class="py-3 px-4 text-slate-400">${changedCount}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = rowsHtml;
+    }
+
+    // Auto-polling every 2 seconds
+    fetchData();
+    setInterval(fetchData, 2000);
+  </script>
+</body>
+</html>

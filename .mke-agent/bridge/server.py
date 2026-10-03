@@ -15,10 +15,12 @@ from urllib.parse import parse_qs, urlparse
 if __package__ or "." in __name__:
     from .models import BridgeTaskRequest, TaskStatus
     from .worker import TaskWorker, find_agy
+    from .keep_awake import keep_awake_service
 else:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from bridge.models import BridgeTaskRequest, TaskStatus
     from bridge.worker import TaskWorker, find_agy
+    from bridge.keep_awake import keep_awake_service
 
 MCP_TOOLS_SPEC = [
     {
@@ -195,16 +197,27 @@ def create_handler_class(worker: TaskWorker):
 
         def do_OPTIONS(self):
             self.send_response(204)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "*")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        def _send_html(self, status: int, html_content: str):
+            body = html_content.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
+            self.wfile.write(body)
 
         def do_GET(self):
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/")
 
-            if path == "/api/health" or path == "":
+            if path == "" or path == "/dashboard":
+                dashboard_file = Path(__file__).parent / "dashboard.html"
+                if dashboard_file.is_file():
+                    self._send_html(200, dashboard_file.read_text(encoding="utf-8"))
+                else:
+                    self._send_html(200, "<h1>MKE Agent Bridge Active</h1><p>Dashboard HTML not found.</p>")
+                return
+
+            if path == "/api/health":
                 try:
                     agy_path = find_agy()
                     agy_ok = True
@@ -218,7 +231,12 @@ def create_handler_class(worker: TaskWorker):
                     "agy_path": agy_path,
                     "repo": str(worker.repo_path),
                     "total_tasks": len(worker.list_tasks()),
+                    "keep_awake": keep_awake_service.get_status(),
                 })
+                return
+
+            if path == "/api/keep-awake":
+                self._send_json(200, keep_awake_service.get_status())
                 return
 
             if path == "/api/tasks/list":
@@ -288,6 +306,14 @@ def create_handler_class(worker: TaskWorker):
                 self._send_json(200, {"task_id": task_id, "cancelled": cancelled})
                 return
 
+            if path == "/api/keep-awake/toggle":
+                if keep_awake_service.is_running:
+                    keep_awake_service.stop()
+                else:
+                    keep_awake_service.start()
+                self._send_json(200, keep_awake_service.get_status())
+                return
+
             if path == "/mcp":
                 # JSON-RPC 2.0 Handler for MCP over HTTP
                 method = payload.get("method")
@@ -346,6 +372,7 @@ def create_handler_class(worker: TaskWorker):
 
 def run_stdio_mcp(worker: TaskWorker):
     """Run MCP server over standard input/output JSON-RPC."""
+    keep_awake_service.start()
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -401,6 +428,9 @@ def main():
     worktrees = Path(args.worktrees).resolve()
     worker = TaskWorker(repo, worktrees)
 
+    # Automatically start the 24/7 keep-awake anti-sleep daemon
+    keep_awake_service.start()
+
     if args.stdio:
         run_stdio_mcp(worker)
         return
@@ -408,12 +438,15 @@ def main():
     handler_class = create_handler_class(worker)
     server = ThreadingHTTPServer((args.host, args.port), handler_class)
     print(f"[MKE BRIDGE] Server active on http://{args.host}:{args.port}")
+    print(f"[MKE BRIDGE] Web Dashboard: http://{args.host}:{args.port}/dashboard")
     print(f"[MKE BRIDGE] REST API: http://{args.host}:{args.port}/api/health")
     print(f"[MKE BRIDGE] MCP Endpoint: http://{args.host}:{args.port}/mcp")
+    print(f"[MKE BRIDGE] Keep-Awake 24/7 Anti-Sleep: ACTIVE (15 min interval)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n[MKE BRIDGE] Shutting down...")
+        keep_awake_service.stop()
         server.shutdown()
 
 
