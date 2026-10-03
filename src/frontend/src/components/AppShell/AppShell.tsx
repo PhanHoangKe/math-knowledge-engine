@@ -9,7 +9,6 @@ import { RootPlotPod } from '../RootPlotPod/RootPlotPod';
 import { AlternateFormsPod } from '../AlternateFormsPod/AlternateFormsPod';
 import { NumberLinePod } from '../NumberLinePod/NumberLinePod';
 import { RootPropertiesPod } from '../RootPropertiesPod/RootPropertiesPod';
-import { ProBannerWidget } from '../ProBannerWidget/ProBannerWidget';
 import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
 import { SolutionSummaryPanel } from '../SolutionSummaryPanel/SolutionSummaryPanel';
 import { SelectedMethodPod } from '../SelectedMethodPod/SelectedMethodPod';
@@ -263,90 +262,81 @@ export const AppShell: React.FC = () => {
                     };
 
                     return (
-                      <div className={styles.workspaceSplit}>
-                        <div className={styles.podsMainColumn}>
-                          <div className={styles.solvedLayout} data-testid="solved-workspace">
-                            {/* Pod 1: Canonical Problem / Input */}
-                            <CanonicalProblemPanel problem={resp.problem} />
+                      <div className={styles.solvedLayout} data-testid="solved-workspace">
+                        {/* Pod 1: Canonical Problem / Input */}
+                        <CanonicalProblemPanel problem={resp.problem} />
 
-                            {/* Pod 2: Root Plot (if quadratic) */}
-                            {quad && <RootPlotPod quad={quad} roots={resp.solution.roots} />}
+                        {/* Pod 2: Root Plot (if quadratic) */}
+                        {quad && <RootPlotPod quad={quad} roots={resp.solution.roots} />}
 
-                            {/* Pod 3: Alternate forms (if quadratic) */}
-                            {quad && <AlternateFormsPod quad={quad} roots={resp.solution.roots} />}
+                        {/* Pod 3: Alternate forms (if quadratic) */}
+                        {quad && <AlternateFormsPod quad={quad} roots={resp.solution.roots} />}
 
-                            {/* Pod 4: Number line (if quadratic) */}
-                            {quad && <NumberLinePod quad={quad} roots={resp.solution.roots} />}
+                        {/* Pod 4: Number line (if quadratic) */}
+                        {quad && <NumberLinePod quad={quad} roots={resp.solution.roots} />}
 
-                            {/* Pod 5: Solution Summary & Roots */}
-                            <SolutionSummaryPanel
-                              solution={resp.solution}
-                              onOpenStepByStep={scrollToTrace}
-                            />
+                        {/* Pod 5: Solution Summary & Roots */}
+                        <SolutionSummaryPanel
+                          solution={resp.solution}
+                          onOpenStepByStep={scrollToTrace}
+                        />
 
-                            {/* Pod 6: Sum & Product of roots (if quadratic) */}
-                            {quad && <RootPropertiesPod quad={quad} />}
+                        {/* Pod 6: Sum & Product of roots (if quadratic) */}
+                        {quad && <RootPropertiesPod quad={quad} />}
 
-                            {/* Pod 7: Independent Verification Summary */}
-                            <VerificationSummaryPod
-                              certificate={resp.solution.certificate}
-                              verificationScope={resp.solution.verification_scope}
-                              solutionOutcome={resp.solution.outcome}
-                            />
+                        {/* Pod 7: Independent Verification Summary */}
+                        <VerificationSummaryPod
+                          certificate={resp.solution.certificate}
+                          verificationScope={resp.solution.verification_scope}
+                          solutionOutcome={resp.solution.outcome}
+                        />
 
-                            {/* Pod 8: Selected Method Summary + Expandable Catalog */}
-                            <SelectedMethodPod
-                              methods={resp.available_methods}
-                              selectedMethodId={resp.selected_method_id}
-                              onSelectMethod={switchMethod}
-                              showAllMethods={showAllMethods}
-                              onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
-                              isLoading={reactiveStatus === 'recomputing'}
-                            />
+                        {/* Pod 8: Selected Method Summary + Expandable Catalog */}
+                        <SelectedMethodPod
+                          methods={resp.available_methods}
+                          selectedMethodId={resp.selected_method_id}
+                          onSelectMethod={switchMethod}
+                          showAllMethods={showAllMethods}
+                          onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
+                          isLoading={reactiveStatus === 'recomputing'}
+                        />
 
-                            {/* Pod 9: Step-by-Step Solution Trace */}
-                            <div id="step-by-step-trace-section">
-                              <TraceSummaryPod trace={resp.solution.trace} />
-                            </div>
-
-                            {/* Pod 10: Reactive Coefficient Editor (Collapsible) */}
-                            <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
-                              <button
-                                type="button"
-                                className={styles.disclosureBtn}
-                                onClick={() => setShowCoeffEditor(!showCoeffEditor)}
-                                aria-expanded={showCoeffEditor}
-                                data-testid="toggle-coeff-editor-btn"
-                              >
-                                <FontAwesomeIcon icon={faGear} className={styles.disclosureIcon} />
-                                <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
-                              </button>
-                              {showCoeffEditor && (
-                                <div className={styles.disclosureContent}>
-                                  <CoefficientEditorPanel
-                                    draft={coeffDraft}
-                                    errors={coeffValidationErrors}
-                                    reactiveStatus={reactiveStatus}
-                                    sourceMode={sourceMode}
-                                    isLoading={reactiveStatus === 'recomputing'}
-                                    isDegenerate={false}
-                                    onUpdateField={updateCoefficientField}
-                                    onReset={resetCoefficientsToBackend}
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Powered by Engine Watermark */}
-                            <div className={styles.engineWatermark}>
-                              <span>POWERED BY THE MATH KNOWLEDGE ENGINE (MKE)</span>
-                            </div>
-                          </div>
+                        {/* Pod 9: Step-by-Step Solution Trace */}
+                        <div id="step-by-step-trace-section">
+                          <TraceSummaryPod trace={resp.solution.trace} />
                         </div>
 
-                        {/* Wolfram-style Pro / Step-by-step Sidebar */}
-                        <div className={styles.proSidebarColumn}>
-                          <ProBannerWidget onOpenStepByStep={scrollToTrace} />
+                        {/* Pod 10: Reactive Coefficient Editor (Collapsible) */}
+                        <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
+                          <button
+                            type="button"
+                            className={styles.disclosureBtn}
+                            onClick={() => setShowCoeffEditor(!showCoeffEditor)}
+                            aria-expanded={showCoeffEditor}
+                            data-testid="toggle-coeff-editor-btn"
+                          >
+                            <FontAwesomeIcon icon={faGear} className={styles.disclosureIcon} />
+                            <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
+                          </button>
+                          {showCoeffEditor && (
+                            <div className={styles.disclosureContent}>
+                              <CoefficientEditorPanel
+                                draft={coeffDraft}
+                                errors={coeffValidationErrors}
+                                reactiveStatus={reactiveStatus}
+                                sourceMode={sourceMode}
+                                isLoading={reactiveStatus === 'recomputing'}
+                                isDegenerate={false}
+                                onUpdateField={updateCoefficientField}
+                                onReset={resetCoefficientsToBackend}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Powered by Engine Watermark */}
+                        <div className={styles.engineWatermark}>
+                          <span>POWERED BY THE MATH KNOWLEDGE ENGINE (MKE)</span>
                         </div>
                       </div>
                     );

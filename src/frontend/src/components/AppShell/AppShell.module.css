@@ -55,33 +55,6 @@
   margin: 0;
 }
 
-.workspaceSplit {
-  display: flex;
-  gap: 1.5rem;
-  align-items: flex-start;
-  width: 100%;
-}
-
-.podsMainColumn {
-  flex: 1;
-  min-width: 0;
-}
-
-.proSidebarColumn {
-  width: 280px;
-  flex-shrink: 0;
-}
-
-@media (max-width: 900px) {
-  .workspaceSplit {
-    flex-direction: column;
-  }
-  .proSidebarColumn {
-    width: 100%;
-    max-width: none;
-  }
-}
-
 .solvedLayout,
 .degenerateLayout,
 .analyzedLayout {
