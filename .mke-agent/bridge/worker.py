@@ -17,10 +17,27 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 if __package__ or "." in __name__:
-    from .models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
+    from .models import (
+        BridgeTaskRecord,
+        BridgeTaskRequest,
+        TaskStatus,
+        utc_now_iso,
+        SUPPORTED_VALIDATION_PROFILES,
+        VALIDATION_PROFILE_AUTO,
+        VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND,
+    )
 else:
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from bridge.models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
+    from bridge.models import (
+        BridgeTaskRecord,
+        BridgeTaskRequest,
+        TaskStatus,
+        utc_now_iso,
+        SUPPORTED_VALIDATION_PROFILES,
+        VALIDATION_PROFILE_AUTO,
+        VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND,
+    )
+
 
 
 def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
@@ -90,6 +107,24 @@ def git(cwd: Path, *args: str, timeout: int = 300, check: bool = True) -> subpro
 def allowed_path(path: str, prefixes: List[str]) -> bool:
     norm = path.replace("\\", "/")
     return any(norm.startswith(p.replace("\\", "/")) for p in prefixes)
+
+
+def check_frozen_frontend_allowed_prefixes(allowed_prefixes: List[str]) -> None:
+    """Fails closed if allowed_prefixes contains frontend or ui paths."""
+    for prefix in allowed_prefixes:
+        norm = prefix.replace("\\", "/").strip()
+        if (
+            norm == "src/frontend"
+            or norm.startswith("src/frontend/")
+            or "src/frontend/" in norm
+            or norm == "ui"
+            or norm.startswith("ui/")
+            or "ui/" in norm
+        ):
+            raise WorkerError(
+                f"backend_frozen_frontend validation profile rejects frontend/ui prefix in allowed_prefixes: {prefix}"
+            )
+
 
 
 try:
@@ -318,6 +353,14 @@ class TaskWorker:
             if req.task_id in self.tasks or task_file.exists():
                 raise WorkerError(f"Task '{req.task_id}' already exists.")
 
+            if req.validation_profile not in SUPPORTED_VALIDATION_PROFILES:
+                raise WorkerError(
+                    f"Invalid validation_profile '{req.validation_profile}'. Supported values: {sorted(SUPPORTED_VALIDATION_PROFILES)}"
+                )
+
+            if req.validation_profile == VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND:
+                check_frozen_frontend_allowed_prefixes(req.allowed_prefixes)
+
             record = BridgeTaskRecord(
                 task_id=req.task_id,
                 prompt=req.prompt,
@@ -327,6 +370,7 @@ class TaskWorker:
                 commit_message=req.commit_message or f"feat(auto): execute {req.task_id}",
                 timeout_seconds=req.timeout_seconds,
                 callback_url=req.callback_url,
+                validation_profile=req.validation_profile,
             )
             self.tasks[req.task_id] = record
             self._cancel_flags[req.task_id] = False
@@ -377,6 +421,10 @@ class TaskWorker:
 
         try:
             # 1. Validation
+            if record.validation_profile not in SUPPORTED_VALIDATION_PROFILES:
+                raise WorkerError(f"Unsupported validation_profile: {record.validation_profile}")
+            if record.validation_profile == VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND:
+                check_frozen_frontend_allowed_prefixes(record.allowed_prefixes)
             if not SHA_RE.fullmatch(record.base_sha):
                 raise WorkerError("base_sha must be a full 40-character hex string.")
             if not BRANCH_RE.fullmatch(record.target_branch):
@@ -424,56 +472,100 @@ class TaskWorker:
             self._persist_task(record)
             all_changed = collect_changed_files(worktree_path, record.base_sha)
             validate_scope(all_changed, record.allowed_prefixes)
+            if record.validation_profile == VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND:
+                for path in all_changed:
+                    norm = path.replace("\\", "/")
+                    if (
+                        norm == "src/frontend"
+                        or norm.startswith("src/frontend/")
+                        or "src/frontend/" in norm
+                        or norm == "ui"
+                        or norm.startswith("ui/")
+                        or "ui/" in norm
+                    ):
+                        raise WorkerError(
+                            f"Frontend freeze violation in backend_frozen_frontend profile: {path} cannot be modified."
+                        )
             record.changed_files = all_changed
             self._persist_task(record)
 
             # 5. Validation profile
             py_bin = sys.executable
-            if is_control_plane_only(record.changed_files):
-                # Control-plane-only tasks cannot affect product/frontend behavior. Running the
-                # product build here can fail on unrelated baseline defects and falsely blame
-                # the automation change. Validate the control plane itself instead.
-                record.stage = "test-control-plane"
+            if record.validation_profile == VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND:
+                record.stage = "test-backend-frozen-frontend"
                 self._persist_task(record)
                 test_res = run_cmd(
-                    [py_bin, "-m", "pytest", ".mke-agent/tests", "-q"],
-                    cwd=worktree_path,
-                    timeout=300,
-                    check=True,
-                )
-                record.test_output_tail = (test_res.stdout + "\n" + test_res.stderr)[-8000:]
-                record.changed_files = cleanup_test_side_effects(
-                    worktree_path, record.base_sha, record.allowed_prefixes
-                )
-                self._persist_task(record)
-            else:
-                # Product tasks keep the full fail-closed validation path.
-                record.stage = "prepare-frontend"
-                self._persist_task(record)
-                frontend_prep_tail = prepare_frontend(worktree_path)
-
-                # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
-                post_build_changed = collect_changed_files(worktree_path, record.base_sha)
-                validate_scope(post_build_changed, record.allowed_prefixes)
-
-                record.stage = "test-regression"
-                self._persist_task(record)
-                test_res = run_cmd(
-                    [py_bin, "-m", "pytest", "tests/", "-q"],
+                    [
+                        py_bin,
+                        "-m",
+                        "pytest",
+                        "tests/",
+                        "-q",
+                        "--ignore=tests/test_mvp_v1_product_app.py",
+                        "--ignore=tests/test_mvp_v1_react_e2e.py",
+                    ],
                     cwd=worktree_path,
                     timeout=600,
-                    check=True,
+                    check=False,
                 )
-                prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
-                record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
-
-                # Regression tests may create screenshots/evidence/cache files outside the task scope.
-                # Pre-test scope validation already proved task-authored changes were allowed, so
-                # clean only those post-test out-of-scope side effects before staging.
+                marker = "[validation_profile: backend_frozen_frontend]\n"
+                record.test_output_tail = (marker + test_res.stdout + "\n" + test_res.stderr)[-8000:]
+                if test_res.returncode != 0:
+                    raise WorkerError(
+                        f"Backend regression tests failed ({test_res.returncode}):\n{record.test_output_tail}"
+                    )
                 record.changed_files = cleanup_test_side_effects(
                     worktree_path, record.base_sha, record.allowed_prefixes
                 )
                 self._persist_task(record)
+            elif record.validation_profile == VALIDATION_PROFILE_AUTO:
+                if is_control_plane_only(record.changed_files):
+                    # Control-plane-only tasks cannot affect product/frontend behavior. Running the
+                    # product build here can fail on unrelated baseline defects and falsely blame
+                    # the automation change. Validate the control plane itself instead.
+                    record.stage = "test-control-plane"
+                    self._persist_task(record)
+                    test_res = run_cmd(
+                        [py_bin, "-m", "pytest", ".mke-agent/tests", "-q"],
+                        cwd=worktree_path,
+                        timeout=300,
+                        check=True,
+                    )
+                    record.test_output_tail = (test_res.stdout + "\n" + test_res.stderr)[-8000:]
+                    record.changed_files = cleanup_test_side_effects(
+                        worktree_path, record.base_sha, record.allowed_prefixes
+                    )
+                    self._persist_task(record)
+                else:
+                    # Product tasks keep the full fail-closed validation path.
+                    record.stage = "prepare-frontend"
+                    self._persist_task(record)
+                    frontend_prep_tail = prepare_frontend(worktree_path)
+
+                    # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
+                    post_build_changed = collect_changed_files(worktree_path, record.base_sha)
+                    validate_scope(post_build_changed, record.allowed_prefixes)
+
+                    record.stage = "test-regression"
+                    self._persist_task(record)
+                    test_res = run_cmd(
+                        [py_bin, "-m", "pytest", "tests/", "-q"],
+                        cwd=worktree_path,
+                        timeout=600,
+                        check=True,
+                    )
+                    prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
+                    record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
+
+                    # Regression tests may create screenshots/evidence/cache files outside the task scope.
+                    # Pre-test scope validation already proved task-authored changes were allowed, so
+                    # clean only those post-test out-of-scope side effects before staging.
+                    record.changed_files = cleanup_test_side_effects(
+                        worktree_path, record.base_sha, record.allowed_prefixes
+                    )
+                    self._persist_task(record)
+            else:
+                raise WorkerError(f"Unsupported validation_profile: {record.validation_profile}")
 
             # 6. Commit & Push
             record.stage = "commit-push"

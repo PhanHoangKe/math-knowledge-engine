@@ -124,5 +124,25 @@ Compiler diagnostics are normalized deterministically across environments to com
   - State transition: `READY_FOR_AUDIT` -> `BLOCKED` (infrastructure).
   - No candidate blame, no attempt burn.
 
+## Validation Profiles
 
+MKE Antigravity Bridge supports explicit validation profiles configurable on task submission (`validation_profile`):
 
+- **`auto`** (Default):
+  - Preserves standard fail-closed validation behavior exactly.
+  - Control-plane-only tasks (`.mke-agent/`) validate by executing the control-plane test suite (`python -m pytest .mke-agent/tests -q`).
+  - All other product tasks execute full frontend preparation (`prepare_frontend()` running `npm ci` and `npm run build`) followed by the full test suite (`python -m pytest tests/ -q`).
+
+- **`backend_frozen_frontend`**:
+  - Coordinator-explicit profile designed for backend-only product tasks to proceed without being falsely blocked by known pre-existing frontend build debt, while preserving strict fail-closed defaults.
+  - Safety contract:
+    - **Rejects frontend allowed prefixes**: Fails closed immediately if `allowed_prefixes` contains `src/frontend/` or `ui/`.
+    - **Rejects actual frontend diff**: Fails closed after Antigravity execution if any modified or untracked file is under `src/frontend/` or `ui/`.
+    - **Frontend build preparation skipped**: Never calls `prepare_frontend()` in this profile.
+    - **Scoped regression execution**: Runs backend regression with:
+      `python -m pytest tests/ -q --ignore=tests/test_mvp_v1_product_app.py --ignore=tests/test_mvp_v1_react_e2e.py`
+      (these two ignored suites depend on compiled frontend/E2E artifacts and are not valid gates for a frozen-frontend backend-only task).
+    - **Scope validation & cleanup**: Enforces strict scope validation and cleans up post-test side effects (`cleanup_test_side_effects()`).
+    - **Explicit audit markers**: Records clear markers in `stage` (`test-backend-frozen-frontend`) and `test_output_tail` (`[validation_profile: backend_frozen_frontend]`).
+    - **No silent auto-selection**: Must be explicitly requested by the coordinator; never silently inferred from changed files.
+  - **Scope & Trust Warning**: This profile provides coordinator-explicit, scoped backend acceptance only. It is **not** proof that the whole product or frontend is green. Full product/frontend verification remains gated on resolving frontend build debt.

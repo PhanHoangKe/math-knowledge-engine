@@ -11,7 +11,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from bridge.models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus
+from bridge.models import (
+    BridgeTaskRecord,
+    BridgeTaskRequest,
+    TaskStatus,
+    SUPPORTED_VALIDATION_PROFILES,
+    VALIDATION_PROFILE_AUTO,
+    VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND,
+)
 from bridge.server import MCP_TOOLS_SPEC, create_handler_class, handle_mcp_call
 from bridge.worker import (
     TaskWorker,
@@ -22,6 +29,7 @@ from bridge.worker import (
     collect_changed_files,
     validate_scope,
     allowed_path,
+    check_frozen_frontend_allowed_prefixes,
 )
 
 
@@ -35,6 +43,10 @@ class DummyWorker:
         return list(self.corrupt_records)
 
     def submit_task(self, req: BridgeTaskRequest) -> BridgeTaskRecord:
+        if req.validation_profile not in SUPPORTED_VALIDATION_PROFILES:
+            raise WorkerError(f"Invalid validation_profile: {req.validation_profile}")
+        if req.validation_profile == VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND:
+            check_frozen_frontend_allowed_prefixes(req.allowed_prefixes)
         rec = BridgeTaskRecord(
             task_id=req.task_id,
             prompt=req.prompt,
@@ -44,9 +56,11 @@ class DummyWorker:
             commit_message=req.commit_message,
             timeout_seconds=req.timeout_seconds,
             status=TaskStatus.QUEUED,
+            validation_profile=req.validation_profile,
         )
         self.tasks[req.task_id] = rec
         return rec
+
 
     def get_task(self, task_id: str):
         return self.tasks.get(task_id)
@@ -597,3 +611,517 @@ def test_api_tasks_list_includes_recovered_records(tmp_path: Path):
     assert tasks[0].task_id == "RECOVERED-001"
     assert tasks[0].status == TaskStatus.SUCCESS
     assert tasks[0].to_dict()["status"] == "SUCCESS"
+
+
+def test_old_request_and_record_defaults_to_auto():
+    # 1. BridgeTaskRequest defaults to "auto"
+    req = BridgeTaskRequest(
+        task_id="TEST-DEFAULT-001",
+        prompt="Test prompt",
+        base_sha="a" * 40,
+        target_branch="product/test-default",
+    )
+    assert req.validation_profile == "auto"
+
+    # 2. BridgeTaskRecord defaults to "auto"
+    rec = BridgeTaskRecord(
+        task_id="TEST-DEFAULT-001",
+        prompt="Test prompt",
+        base_sha="a" * 40,
+        target_branch="product/test-default",
+        allowed_prefixes=["src/mke_product/coverage/"],
+        commit_message="feat: default",
+        timeout_seconds=900,
+    )
+    assert rec.validation_profile == "auto"
+
+    # 3. Old persisted dictionary without validation_profile field loads as "auto"
+    old_data = {
+        "task_id": "TEST-OLD-001",
+        "prompt": "Old task",
+        "base_sha": "b" * 40,
+        "target_branch": "product/test-old",
+        "allowed_prefixes": ["src/mke_product/coverage/"],
+        "commit_message": "feat: old",
+        "timeout_seconds": 900,
+        "status": "SUCCESS",
+    }
+    rec_from_old = BridgeTaskRecord.from_dict(old_data)
+    assert rec_from_old.validation_profile == "auto"
+
+    # 4. Explicit None or empty string also defaults to "auto"
+    data_with_none = dict(old_data, validation_profile=None)
+    assert BridgeTaskRecord.from_dict(data_with_none).validation_profile == "auto"
+    data_with_empty = dict(old_data, validation_profile="")
+    assert BridgeTaskRecord.from_dict(data_with_empty).validation_profile == "auto"
+
+
+def test_durable_round_trip_and_recovery_preserves_validation_profile(tmp_path: Path):
+    state_dir = tmp_path / "runtime" / "bridge-state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Round-trip serialization with validation_profile
+    rec = BridgeTaskRecord(
+        task_id="TASK-PROFILE-RT",
+        prompt="Task prompt",
+        base_sha="c" * 40,
+        target_branch="product/test-rt",
+        allowed_prefixes=["src/mke_product/coverage/"],
+        commit_message="feat: profile rt",
+        timeout_seconds=900,
+        status=TaskStatus.SUCCESS,
+        finished_at="2026-10-04T02:00:00+00:00",
+        validation_profile="backend_frozen_frontend",
+    )
+    rec_dict = rec.to_dict()
+    assert rec_dict["validation_profile"] == "backend_frozen_frontend"
+
+    # Save to disk
+    _atomic_write_json(state_dir / "TASK-PROFILE-RT.json", rec_dict)
+
+    # Write an old record without validation_profile to test recovery
+    old_task = {
+        "task_id": "TASK-OLD-RECOVERED",
+        "prompt": "Old task without profile",
+        "base_sha": "d" * 40,
+        "target_branch": "product/test-old",
+        "allowed_prefixes": ["src/mke_product/coverage/"],
+        "commit_message": "feat: old",
+        "timeout_seconds": 900,
+        "status": "SUCCESS",
+        "finished_at": "2026-10-04T02:05:00+00:00",
+    }
+    (state_dir / "TASK-OLD-RECOVERED.json").write_text(json.dumps(old_task), encoding="utf-8")
+
+    # Recover state with fresh worker
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=state_dir)
+    loaded_rt = worker.get_task("TASK-PROFILE-RT")
+    assert loaded_rt is not None
+    assert loaded_rt.validation_profile == "backend_frozen_frontend"
+    assert loaded_rt.status == TaskStatus.SUCCESS
+
+    loaded_old = worker.get_task("TASK-OLD-RECOVERED")
+    assert loaded_old is not None
+    assert loaded_old.validation_profile == "auto"
+    assert loaded_old.status == TaskStatus.SUCCESS
+
+
+def test_rest_and_mcp_submit_accepts_validation_profile(tmp_path: Path):
+    worker = DummyWorker()
+
+    # 1. MCP submit accepts validation_profile
+    mcp_args = {
+        "task_id": "MCP-SUBMIT-PROFILE",
+        "prompt": "Test MCP submit with profile",
+        "base_sha": "e" * 40,
+        "target_branch": "product/mcp-profile",
+        "validation_profile": "backend_frozen_frontend",
+    }
+    mcp_res = handle_mcp_call(worker, "anty_submit_task", mcp_args)
+    mcp_data = json.loads(mcp_res["content"][0]["text"])
+    assert mcp_data["status"] == "SUBMITTED"
+    assert mcp_data["task"]["validation_profile"] == "backend_frozen_frontend"
+    assert worker.get_task("MCP-SUBMIT-PROFILE").validation_profile == "backend_frozen_frontend"
+
+    # 2. REST submit accepts validation_profile
+    import io
+    handler_cls = create_handler_class(worker)
+    rest_body = json.dumps({
+        "task_id": "REST-SUBMIT-PROFILE",
+        "prompt": "Test REST submit with profile",
+        "base_sha": "f" * 40,
+        "target_branch": "product/rest-profile",
+        "validation_profile": "backend_frozen_frontend",
+    }).encode("utf-8")
+
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(rest_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(rest_body))}
+    handler.path = "/api/tasks/submit"
+    responses = []
+    headers = []
+    handler.send_response = lambda code: responses.append(code)
+    handler.send_header = lambda k, v: headers.append((k, v))
+    handler.end_headers = lambda: None
+
+    handler.do_POST()
+    assert responses == [202]
+    rest_resp = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert rest_resp["status"] == "QUEUED"
+    assert rest_resp["task"]["validation_profile"] == "backend_frozen_frontend"
+    assert worker.get_task("REST-SUBMIT-PROFILE").validation_profile == "backend_frozen_frontend"
+
+    # Test GET /api/tasks/{task_id}/status includes validation_profile
+    get_handler = handler_cls.__new__(handler_cls)
+    get_handler.rfile = io.BytesIO()
+    get_handler.wfile = io.BytesIO()
+    get_handler.headers = {"Content-Length": "0"}
+    get_handler.path = "/api/tasks/REST-SUBMIT-PROFILE/status"
+    get_responses = []
+    get_handler.send_response = lambda code: get_responses.append(code)
+    get_handler.send_header = lambda k, v: None
+    get_handler.end_headers = lambda: None
+
+    get_handler.do_GET()
+    assert get_responses == [200]
+    status_resp = json.loads(get_handler.wfile.getvalue().decode("utf-8"))
+    assert status_resp["validation_profile"] == "backend_frozen_frontend"
+
+
+def test_backend_frozen_frontend_rejects_frontend_and_ui_allowed_prefixes(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    # 1. Direct submit_task with src/frontend/ prefix
+    with pytest.raises(WorkerError, match="rejects frontend/ui prefix"):
+        worker.submit_task(BridgeTaskRequest(
+            task_id="TASK-REJECT-PREF-1",
+            prompt="test",
+            base_sha="a" * 40,
+            target_branch="product/rej-1",
+            allowed_prefixes=["src/frontend/"],
+            validation_profile="backend_frozen_frontend",
+        ))
+
+    # 2. Direct submit_task with ui/ prefix
+    with pytest.raises(WorkerError, match="rejects frontend/ui prefix"):
+        worker.submit_task(BridgeTaskRequest(
+            task_id="TASK-REJECT-PREF-2",
+            prompt="test",
+            base_sha="a" * 40,
+            target_branch="product/rej-2",
+            allowed_prefixes=["ui/"],
+            validation_profile="backend_frozen_frontend",
+        ))
+
+    # 3. Direct submit_task with src/frontend sub-directory prefix
+    with pytest.raises(WorkerError, match="rejects frontend/ui prefix"):
+        worker.submit_task(BridgeTaskRequest(
+            task_id="TASK-REJECT-PREF-3",
+            prompt="test",
+            base_sha="a" * 40,
+            target_branch="product/rej-3",
+            allowed_prefixes=["src/mke_product/coverage/", "src/frontend/components/"],
+            validation_profile="backend_frozen_frontend",
+        ))
+
+    # 4. REST submit with ui/ prefix fails closed with 400
+    import io
+    handler_cls = create_handler_class(worker)
+    rest_body = json.dumps({
+        "task_id": "REST-REJECT-UI",
+        "prompt": "test",
+        "base_sha": "a" * 40,
+        "target_branch": "product/rej-ui",
+        "allowed_prefixes": ["ui/components/"],
+        "validation_profile": "backend_frozen_frontend",
+    }).encode("utf-8")
+
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(rest_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(rest_body))}
+    handler.path = "/api/tasks/submit"
+    responses = []
+    handler.send_response = lambda code: responses.append(code)
+    handler.send_header = lambda k, v: None
+    handler.end_headers = lambda: None
+
+    handler.do_POST()
+    assert responses == [400]
+    resp_data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert "rejects frontend/ui prefix" in resp_data["error"]
+
+
+def test_backend_frozen_frontend_rejects_actual_frontend_and_ui_diff(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    # 1. Test rejection when actual diff touches src/frontend/
+    rec = BridgeTaskRecord(
+        task_id="TASK-DIFF-FE",
+        prompt="test",
+        base_sha="1" * 40,
+        target_branch="product/diff-fe",
+        allowed_prefixes=["src/mke_product/coverage/"],
+        commit_message="feat: test",
+        timeout_seconds=900,
+        validation_profile="backend_frozen_frontend",
+    )
+    worker.tasks[rec.task_id] = rec
+
+    with mock.patch("bridge.worker.git"), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.run_cmd", return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["src/mke_product/coverage/test.py", "src/frontend/App.tsx"]):
+        worker._execute_task(rec)
+
+    assert rec.status == TaskStatus.FAILED
+    assert "Frontend freeze violation" in rec.error
+    assert "src/frontend/App.tsx" in rec.error
+
+    # 2. Test rejection when actual diff touches ui/
+    rec_ui = BridgeTaskRecord(
+        task_id="TASK-DIFF-UI",
+        prompt="test",
+        base_sha="2" * 40,
+        target_branch="product/diff-ui",
+        allowed_prefixes=["src/mke_product/coverage/"],
+        commit_message="feat: test",
+        timeout_seconds=900,
+        validation_profile="backend_frozen_frontend",
+    )
+    worker.tasks[rec_ui.task_id] = rec_ui
+
+    with mock.patch("bridge.worker.git"), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.run_cmd", return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["ui/index.html"]):
+        worker._execute_task(rec_ui)
+
+    assert rec_ui.status == TaskStatus.FAILED
+    assert "Frontend freeze violation" in rec_ui.error
+    assert "ui/index.html" in rec_ui.error
+
+
+def test_backend_profile_does_not_call_prepare_frontend_and_invokes_exact_command(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    rec = BridgeTaskRecord(
+        task_id="TASK-BACKEND-PASS",
+        prompt="backend product task",
+        base_sha="3" * 40,
+        target_branch="product/backend-task",
+        allowed_prefixes=["src/mke_product/coverage/", "tests/test_thpt_cov_"],
+        commit_message="feat(coverage): backend only",
+        timeout_seconds=900,
+        validation_profile="backend_frozen_frontend",
+    )
+    worker.tasks[rec.task_id] = rec
+
+    commands_executed = []
+
+    def fake_run_cmd(cmd, cwd, timeout=None, check=True):
+        commands_executed.append((list(cmd), Path(cwd)))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="12 backend tests passed\n", stderr="")
+
+    def fake_git(cwd, *args, **kwargs):
+        if args and args[0] == "rev-parse":
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="c" * 40 + "\n", stderr="")
+        if args and args[0] == "diff" and "--cached" in args:
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="src/mke_product/coverage/math.py\n", stderr="")
+        return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+    with mock.patch("bridge.worker.git", side_effect=fake_git), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.prepare_frontend") as mock_prep, \
+         mock.patch("bridge.worker.run_cmd", side_effect=fake_run_cmd), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["src/mke_product/coverage/math.py"]), \
+         mock.patch("bridge.worker.cleanup_test_side_effects", return_value=["src/mke_product/coverage/math.py"]):
+        worker._execute_task(rec)
+
+    # 1. prepare_frontend must NOT be called
+    mock_prep.assert_not_called()
+
+    # 2. Task must succeed
+    assert rec.status == TaskStatus.SUCCESS
+    assert rec.commit_sha == "c" * 40
+
+    # 3. Exact regression command with the two ignores must be executed
+    expected_cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/",
+        "-q",
+        "--ignore=tests/test_mvp_v1_product_app.py",
+        "--ignore=tests/test_mvp_v1_react_e2e.py",
+    ]
+    pytest_calls = [c[0] for c in commands_executed if "-m" in c[0] and "pytest" in c[0]]
+    assert len(pytest_calls) == 1
+    assert pytest_calls[0] == expected_cmd
+
+    # 4. Marker must be present in test_output_tail
+    assert "[validation_profile: backend_frozen_frontend]" in rec.test_output_tail
+    assert "12 backend tests passed" in rec.test_output_tail
+
+
+def test_auto_product_profile_calls_frontend_prep_and_full_tests(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    rec = BridgeTaskRecord(
+        task_id="TASK-AUTO-PRODUCT",
+        prompt="auto product task",
+        base_sha="4" * 40,
+        target_branch="product/auto-task",
+        allowed_prefixes=["src/mke_product/coverage/", "tests/test_thpt_cov_"],
+        commit_message="feat(coverage): auto product",
+        timeout_seconds=900,
+        validation_profile="auto",
+    )
+    worker.tasks[rec.task_id] = rec
+
+    commands_executed = []
+
+    def fake_run_cmd(cmd, cwd, timeout=None, check=True):
+        commands_executed.append((list(cmd), Path(cwd)))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="all tests passed\n", stderr="")
+
+    def fake_git(cwd, *args, **kwargs):
+        if args and args[0] == "rev-parse":
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="d" * 40 + "\n", stderr="")
+        if args and args[0] == "diff" and "--cached" in args:
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="src/mke_product/coverage/algo.py\n", stderr="")
+        return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+    with mock.patch("bridge.worker.git", side_effect=fake_git), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.prepare_frontend", return_value="mock frontend build tail") as mock_prep, \
+         mock.patch("bridge.worker.run_cmd", side_effect=fake_run_cmd), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["src/mke_product/coverage/algo.py"]), \
+         mock.patch("bridge.worker.cleanup_test_side_effects", return_value=["src/mke_product/coverage/algo.py"]):
+        worker._execute_task(rec)
+
+    # 1. prepare_frontend MUST be called for auto product task
+    mock_prep.assert_called_once()
+
+    # 2. Pytest command must be full tests without ignores
+    expected_full_cmd = [sys.executable, "-m", "pytest", "tests/", "-q"]
+    pytest_calls = [c[0] for c in commands_executed if "-m" in c[0] and "pytest" in c[0]]
+    assert len(pytest_calls) == 1
+    assert pytest_calls[0] == expected_full_cmd
+
+    # 3. Status is SUCCESS and frontend prep tail is in test_output_tail
+    assert rec.status == TaskStatus.SUCCESS
+    assert "[frontend-prepare]" in rec.test_output_tail
+    assert "mock frontend build tail" in rec.test_output_tail
+
+
+def test_control_plane_profile_remains_unchanged(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    rec = BridgeTaskRecord(
+        task_id="TASK-CONTROL-PLANE",
+        prompt="control plane task",
+        base_sha="5" * 40,
+        target_branch="automation/test-cp",
+        allowed_prefixes=[".mke-agent/"],
+        commit_message="chore(agent): control plane",
+        timeout_seconds=900,
+        validation_profile="auto",
+    )
+    worker.tasks[rec.task_id] = rec
+
+    commands_executed = []
+
+    def fake_run_cmd(cmd, cwd, timeout=None, check=True):
+        commands_executed.append((list(cmd), Path(cwd)))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="control plane tests passed\n", stderr="")
+
+    def fake_git(cwd, *args, **kwargs):
+        if args and args[0] == "rev-parse":
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="e" * 40 + "\n", stderr="")
+        if args and args[0] == "diff" and "--cached" in args:
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout=".mke-agent/bridge/models.py\n", stderr="")
+        return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+    with mock.patch("bridge.worker.git", side_effect=fake_git), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.prepare_frontend") as mock_prep, \
+         mock.patch("bridge.worker.run_cmd", side_effect=fake_run_cmd), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=[".mke-agent/bridge/models.py"]), \
+         mock.patch("bridge.worker.cleanup_test_side_effects", return_value=[".mke-agent/bridge/models.py"]):
+        worker._execute_task(rec)
+
+    # 1. prepare_frontend must NOT be called for control-plane
+    mock_prep.assert_not_called()
+
+    # 2. Pytest command must target .mke-agent/tests
+    expected_cp_cmd = [sys.executable, "-m", "pytest", ".mke-agent/tests", "-q"]
+    pytest_calls = [c[0] for c in commands_executed if "-m" in c[0] and "pytest" in c[0]]
+    assert len(pytest_calls) == 1
+    assert pytest_calls[0] == expected_cp_cmd
+    assert rec.status == TaskStatus.SUCCESS
+
+
+def test_invalid_validation_profile_fails_closed(tmp_path: Path):
+    # 1. BridgeTaskRequest rejects invalid profile
+    with pytest.raises(ValueError, match="Invalid validation_profile"):
+        BridgeTaskRequest(
+            task_id="TASK-INVALID-1",
+            prompt="test",
+            base_sha="a" * 40,
+            target_branch="product/test",
+            validation_profile="unsupported_profile",
+        )
+
+    # 2. BridgeTaskRecord rejects invalid profile
+    with pytest.raises(ValueError, match="Invalid validation_profile"):
+        BridgeTaskRecord(
+            task_id="TASK-INVALID-2",
+            prompt="test",
+            base_sha="a" * 40,
+            target_branch="product/test",
+            allowed_prefixes=["src/"],
+            commit_message="test",
+            timeout_seconds=900,
+            validation_profile="invalid_profile",
+        )
+
+    # 3. from_dict rejects invalid profile
+    with pytest.raises(ValueError, match="Invalid validation_profile"):
+        BridgeTaskRecord.from_dict({
+            "task_id": "TASK-INVALID-3",
+            "prompt": "test",
+            "base_sha": "a" * 40,
+            "target_branch": "product/test",
+            "allowed_prefixes": ["src/"],
+            "commit_message": "test",
+            "timeout_seconds": 900,
+            "validation_profile": "unsupported_xyz",
+        })
+
+    # 4. REST submit rejects invalid profile with 400
+    import io
+    worker = DummyWorker()
+    handler_cls = create_handler_class(worker)
+    rest_body = json.dumps({
+        "task_id": "REST-INVALID-PROFILE",
+        "prompt": "test",
+        "base_sha": "a" * 40,
+        "target_branch": "product/test",
+        "validation_profile": "bad_profile",
+    }).encode("utf-8")
+
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(rest_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(rest_body))}
+    handler.path = "/api/tasks/submit"
+    responses = []
+    handler.send_response = lambda code: responses.append(code)
+    handler.send_header = lambda k, v: None
+    handler.end_headers = lambda: None
+
+    handler.do_POST()
+    assert responses == [400]
+    resp_data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert "Invalid validation_profile" in resp_data["error"]
+
+    # 5. _execute_task fails closed if record somehow had unsupported profile
+    real_worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+    rec = BridgeTaskRecord(
+        task_id="TASK-EXEC-INVALID",
+        prompt="test",
+        base_sha="a" * 40,
+        target_branch="product/test",
+        allowed_prefixes=["src/"],
+        commit_message="test",
+        timeout_seconds=900,
+    )
+    object.__setattr__(rec, "validation_profile", "unsupported_profile_direct")
+    real_worker.tasks[rec.task_id] = rec
+
+    real_worker._execute_task(rec)
+    assert rec.status == TaskStatus.FAILED
+    assert "Unsupported validation_profile" in rec.error
+

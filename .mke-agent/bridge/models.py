@@ -19,6 +19,14 @@ def utc_now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+VALIDATION_PROFILE_AUTO = "auto"
+VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND = "backend_frozen_frontend"
+SUPPORTED_VALIDATION_PROFILES = {
+    VALIDATION_PROFILE_AUTO,
+    VALIDATION_PROFILE_BACKEND_FROZEN_FRONTEND,
+}
+
+
 @dataclass
 class BridgeTaskRequest:
     task_id: str
@@ -29,6 +37,16 @@ class BridgeTaskRequest:
     commit_message: str = ""
     timeout_seconds: int = 900
     callback_url: Optional[str] = None
+    validation_profile: str = VALIDATION_PROFILE_AUTO
+
+    def __post_init__(self):
+        if self.validation_profile is None or self.validation_profile == "":
+            self.validation_profile = VALIDATION_PROFILE_AUTO
+        if self.validation_profile not in SUPPORTED_VALIDATION_PROFILES:
+            raise ValueError(
+                f"Invalid validation_profile: '{self.validation_profile}'. "
+                f"Supported values: {sorted(SUPPORTED_VALIDATION_PROFILES)}"
+            )
 
 
 @dataclass
@@ -51,6 +69,16 @@ class BridgeTaskRecord:
     agent_output_tail: str = ""
     test_output_tail: str = ""
     callback_url: Optional[str] = None
+    validation_profile: str = VALIDATION_PROFILE_AUTO
+
+    def __post_init__(self):
+        if self.validation_profile is None or self.validation_profile == "":
+            self.validation_profile = VALIDATION_PROFILE_AUTO
+        if self.validation_profile not in SUPPORTED_VALIDATION_PROFILES:
+            raise ValueError(
+                f"Invalid validation_profile: '{self.validation_profile}'. "
+                f"Supported values: {sorted(SUPPORTED_VALIDATION_PROFILES)}"
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -72,6 +100,17 @@ class BridgeTaskRecord:
         else:
             raise ValueError(f"Invalid status value: {raw_status}")
 
+        raw_profile = data.get("validation_profile")
+        if raw_profile is None or raw_profile == "":
+            validation_profile = VALIDATION_PROFILE_AUTO
+        elif raw_profile not in SUPPORTED_VALIDATION_PROFILES:
+            raise ValueError(
+                f"Invalid validation_profile: '{raw_profile}'. "
+                f"Supported values: {sorted(SUPPORTED_VALIDATION_PROFILES)}"
+            )
+        else:
+            validation_profile = str(raw_profile)
+
         return cls(
             task_id=str(data["task_id"]),
             prompt=str(data.get("prompt", "")),
@@ -91,4 +130,6 @@ class BridgeTaskRecord:
             agent_output_tail=str(data.get("agent_output_tail") or ""),
             test_output_tail=str(data.get("test_output_tail") or ""),
             callback_url=data.get("callback_url"),
+            validation_profile=validation_profile,
         )
+

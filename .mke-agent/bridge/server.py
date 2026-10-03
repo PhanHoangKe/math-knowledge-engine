@@ -42,6 +42,12 @@ MCP_TOOLS_SPEC = [
                 "commit_message": {"type": "string", "description": "Optional Git commit message"},
                 "timeout_seconds": {"type": "integer", "description": "Maximum execution time in seconds", "default": 900},
                 "callback_url": {"type": "string", "description": "Optional webhook URL to receive completion event"},
+                "validation_profile": {
+                    "type": "string",
+                    "enum": ["auto", "backend_frozen_frontend"],
+                    "description": "Validation profile to use: 'auto' (default) or 'backend_frozen_frontend'",
+                    "default": "auto",
+                },
             },
             "required": ["task_id", "prompt", "base_sha", "target_branch"],
         },
@@ -101,6 +107,7 @@ def handle_mcp_call(worker: TaskWorker, tool_name: str, arguments: Dict[str, Any
             commit_message=arguments.get("commit_message", ""),
             timeout_seconds=int(arguments.get("timeout_seconds", 900)),
             callback_url=arguments.get("callback_url"),
+            validation_profile=arguments.get("validation_profile", "auto"),
         )
         rec = worker.submit_task(req)
         return {
@@ -111,6 +118,7 @@ def handle_mcp_call(worker: TaskWorker, tool_name: str, arguments: Dict[str, Any
                 }
             ]
         }
+
 
     elif tool_name == "anty_task_status":
         rec = worker.get_task(arguments["task_id"])
@@ -297,6 +305,7 @@ def create_handler_class(worker: TaskWorker):
                         "finished_at": rec.finished_at,
                         "commit_sha": rec.commit_sha,
                         "error": rec.error,
+                        "validation_profile": rec.validation_profile,
                     })
                 return
 
@@ -343,6 +352,7 @@ def create_handler_class(worker: TaskWorker):
                         commit_message=payload.get("commit_message", ""),
                         timeout_seconds=int(payload.get("timeout_seconds", 900)),
                         callback_url=payload.get("callback_url"),
+                        validation_profile=payload.get("validation_profile", "auto"),
                     )
                     rec = worker.submit_task(req)
                     self._send_json(202, {"status": "QUEUED", "task": rec.to_dict()})
