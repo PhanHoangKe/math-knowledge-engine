@@ -1,11 +1,18 @@
 .card {
+  position: relative;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-  margin-bottom: 1rem;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  margin-bottom: 2rem;
+  overflow: visible;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover,
+.card:focus-within {
+  border-color: #ffc845;
+  box-shadow: 0 0 0 1px #ffc845, 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .cardHeader {
@@ -217,38 +224,22 @@
 /* WolframAlpha Bottom-Right Hover Action Bar */
 .hoverActionBar {
   position: absolute;
-  bottom: -1px;
+  top: 100%;
   right: -1px;
   display: flex;
   align-items: center;
   background: var(--bg-surface, #ffffff);
   border: 1px solid #ffc845;
-  border-top-left-radius: 6px;
+  border-top: 1px solid var(--bg-surface, #ffffff);
+  border-bottom-left-radius: 6px;
   border-bottom-right-radius: 4px;
   padding: 2px 6px;
   gap: 2px;
-  z-index: 10;
+  z-index: 20;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.card {
-  position: relative;
-  background: var(--bg-surface, #ffffff);
-  border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-  margin-bottom: 1rem;
-  overflow: visible;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.card:hover,
-.card:focus-within {
-  border-color: #ffc845;
-  box-shadow: 0 0 0 1px #ffc845, 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
 
 .card:hover .hoverActionBar,
