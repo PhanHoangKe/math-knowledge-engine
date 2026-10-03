@@ -1,8 +1,8 @@
 {
   "schema_version": "2.0",
-  "state_version": 7,
+  "state_version": 8,
   "task_id": "THPT-COV-P1-R1-002",
-  "status": "READY",
+  "status": "RUNNING",
   "attempt": 3,
   "base_sha": "ed28edb278ad3993ad1667a715210e7fdd23c705",
   "target_branch": "product/thpt-cov-p1-r1-contract-remediation-r2-remediation",
@@ -14,5 +14,6 @@
     "docs/acceptance/THPT_COV_P1"
   ],
   "updated_at": "2026-10-03T11:50:53.543256+00:00",
-  "previous_audit_event_id": "c4ea42b6992d8a22d6309de9a8ebf7f9c58fa8bd35b5331542ed598916ee3ff9"
+  "previous_audit_event_id": "c4ea42b6992d8a22d6309de9a8ebf7f9c58fa8bd35b5331542ed598916ee3ff9",
+  "started_at": "2026-10-03T12:40:26.563864+00:00"
 }
