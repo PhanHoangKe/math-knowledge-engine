@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "task_id": "THPT-COV-P1-001",
-  "status": "RUNNING",
+  "status": "BLOCKED",
   "attempt": 1,
   "base_sha": "37cc383631600853381da0ce8e5457ab746e1da1",
   "target_branch": "product/thpt-cov-p1-universal-core",
@@ -12,6 +12,16 @@
     "tests/test_thpt_cov_p1_",
     "docs/acceptance/THPT_COV_P1"
   ],
-  "result": null,
-  "started_at": "2026-10-03T09:28:50.367160+00:00"
+  "result": {
+    "task_id": "THPT-COV-P1-001",
+    "attempt": 1,
+    "started_at": "2026-10-03T09:28:49.389961+00:00",
+    "status": "BLOCKED",
+    "finished_at": "2026-10-03T09:28:55.867115+00:00",
+    "stage": "fetch-base",
+    "error": "Remote target branch already exists: product/thpt-cov-p1-universal-core",
+    "worktree_path": "D:\\mke_agent_worktrees\\THPT-COV-P1-001"
+  },
+  "started_at": "2026-10-03T09:28:50.367160+00:00",
+  "updated_at": "2026-10-03T09:28:56.908194+00:00"
 }
