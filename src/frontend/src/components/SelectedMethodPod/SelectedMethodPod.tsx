@@ -45,10 +45,8 @@ export const SelectedMethodPod: React.FC<SelectedMethodPodProps> = ({
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <div>
-              <h2 className={styles.podTitle}>{t('pod_method_title')}</h2>
-              <span className={styles.methodTitle}>{selectedMethod.title_vi}</span>
-            </div>
+            <span className={styles.podTitle}>{t('pod_method_title')}:</span>
+            <span className={styles.methodTitle}>{selectedMethod.title_vi}</span>
           </div>
           <code className={styles.methodId}>{selectedMethod.method_id}</code>
         </div>

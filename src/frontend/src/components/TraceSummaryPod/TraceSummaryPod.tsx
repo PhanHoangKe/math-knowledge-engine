@@ -21,12 +21,9 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <div>
-              <h2 className={styles.podTitle}>{t('pod_trace_title')}</h2>
-              <span className={styles.stepCount}>
-                {stepsCount} {t('lbl_trace_steps_unit')}
-              </span>
-            </div>
+            <span className={styles.podTitle}>
+              {t('pod_trace_title')} ({stepsCount} {t('lbl_trace_steps_unit')})
+            </span>
           </div>
           <code className={styles.methodCode}>{trace.method_id}</code>
         </div>

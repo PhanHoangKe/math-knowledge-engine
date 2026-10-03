@@ -32,8 +32,9 @@
 }
 
 .outcomeBadge {
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
   padding: 0.15rem 0.5rem;
   border-radius: 9999px;
   background: rgba(16, 185, 129, 0.1);
@@ -45,8 +46,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
   color: #f96932;
   background: #ffffff;
   border: 1px solid #f96932;
@@ -60,10 +62,6 @@
   background: #fff5f2;
   color: #ec561a;
   border-color: #ec561a;
-}
-
-.stepBtnIcon {
-  font-size: 0.82rem;
 }
 
 .cardBody {
@@ -103,19 +101,19 @@
   align-items: center;
   gap: 0.4rem;
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--text-muted, #718096);
 }
 
 .approxLabel {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--text-muted, #718096);
 }
 
 .approxValue {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--text-primary, #333333);
   background: var(--bg-subtle, #f8fafc);
   padding: 0.1rem 0.4rem;
@@ -131,7 +129,7 @@
 
 .sectionLabel {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-muted, #64748b);
   display: block;

@@ -25,7 +25,7 @@
 .cardTitle {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--col-pod-header-title, #4a709c);
   letter-spacing: 0.01em;
@@ -39,7 +39,7 @@
 
 .sourceBadge {
   font-family: var(--font-sans);
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   font-weight: 600;
   padding: 0.1rem 0.4rem;
   border-radius: 9999px;
@@ -57,7 +57,7 @@
   color: var(--text-secondary, #475569);
   padding: 0.15rem 0.45rem;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 500;
   border-radius: 4px;
   cursor: pointer;
@@ -94,7 +94,7 @@
 .coeffBox {
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: 5px;
+  border-radius: 4px;
   padding: 6px 8px;
   display: flex;
   align-items: center;
@@ -104,7 +104,7 @@
 
 .coeffSymbol {
   font-family: var(--font-sans);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 500;
   font-style: italic;
   color: var(--text-primary, #333333);
@@ -125,7 +125,7 @@
   height: 26px;
   padding: 1px 2px;
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 500;
   text-align: center;
   border-radius: 4px;
@@ -182,22 +182,22 @@
 
 .fieldError {
   font-family: var(--font-sans);
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   color: #dc2626;
   text-align: center;
-  line-height: 1.15;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .statusBar {
   margin-top: 0.4rem;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 500;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
@@ -229,12 +229,12 @@
 
 .degenerateNotice {
   margin-top: 0.4rem;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 4px;
   background: #fffbeb;
   border: 1px solid #fef3c7;
   color: #92400e;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
-  line-height: 1.3;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }

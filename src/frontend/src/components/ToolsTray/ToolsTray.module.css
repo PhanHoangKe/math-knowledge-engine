@@ -40,7 +40,7 @@
   gap: 6px;
   padding: 6px 12px;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-secondary, #334155);
   background: var(--bg-subtle, #f8fafc);
@@ -63,22 +63,8 @@
   font-weight: 600;
 }
 
-.toolIcon {
-  color: #64748b;
-  font-size: 0.85rem;
-}
-
-.toolIconSuccess {
-  color: #16a34a;
-  font-size: 0.85rem;
-}
-
-.toolTabActive .toolIcon {
-  color: #1d4ed8;
-}
-
 .chevronIcon {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: #94a3b8;
   margin-left: 2px;
 }
