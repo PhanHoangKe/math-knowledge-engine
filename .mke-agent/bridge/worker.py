@@ -503,6 +503,7 @@ class TaskWorker:
                         "-q",
                         "--ignore=tests/test_mvp_v1_product_app.py",
                         "--ignore=tests/test_mvp_v1_react_e2e.py",
+                        "--ignore=tests/test_browser_canonical_ui.py",
                     ],
                     cwd=worktree_path,
                     timeout=600,

@@ -140,8 +140,12 @@ MKE Antigravity Bridge supports explicit validation profiles configurable on tas
     - **Rejects actual frontend diff**: Fails closed after Antigravity execution if any modified or untracked file is under `src/frontend/` or `ui/`.
     - **Frontend build preparation skipped**: Never calls `prepare_frontend()` in this profile.
     - **Scoped regression execution**: Runs backend regression with:
-      `python -m pytest tests/ -q --ignore=tests/test_mvp_v1_product_app.py --ignore=tests/test_mvp_v1_react_e2e.py`
-      (these two ignored suites depend on compiled frontend/E2E artifacts and are not valid gates for a frozen-frontend backend-only task).
+      `python -m pytest tests/ -q --ignore=tests/test_mvp_v1_product_app.py --ignore=tests/test_mvp_v1_react_e2e.py --ignore=tests/test_browser_canonical_ui.py`
+      Ignored frontend/browser test suites:
+      - `tests/test_mvp_v1_product_app.py`: verifies FastAPI static serving of compiled frontend assets (`index.html`, `/assets/*`, KaTeX fonts/CSS).
+      - `tests/test_mvp_v1_react_e2e.py`: verifies React frontend E2E workflows requiring compiled frontend dist.
+      - `tests/test_browser_canonical_ui.py`: starts Selenium Headless Chrome, spins up a live HTTP server, exercises canonical frontend DOM, KaTeX rendering, UI tabs/themes, and captures UI screenshots.
+      These three suites perform frontend/browser UI validation and are not valid gates for an explicit `backend_frozen_frontend` task whose frontend/UI is frozen and forbidden from changing.
     - **Scope validation & cleanup**: Enforces strict scope validation and cleans up post-test side effects (`cleanup_test_side_effects()`).
     - **Explicit audit markers**: Records clear markers in `stage` (`test-backend-frozen-frontend`) and `test_output_tail` (`[validation_profile: backend_frozen_frontend]`).
     - **No silent auto-selection**: Must be explicitly requested by the coordinator; never silently inferred from changed files.

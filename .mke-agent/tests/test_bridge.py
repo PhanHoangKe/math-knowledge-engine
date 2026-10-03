@@ -926,7 +926,7 @@ def test_backend_profile_does_not_call_prepare_frontend_and_invokes_exact_comman
     assert rec.status == TaskStatus.SUCCESS
     assert rec.commit_sha == "c" * 40
 
-    # 3. Exact regression command with the two ignores must be executed
+    # 3. Exact regression command with the three ignores must be executed
     expected_cmd = [
         sys.executable,
         "-m",
@@ -935,10 +935,14 @@ def test_backend_profile_does_not_call_prepare_frontend_and_invokes_exact_comman
         "-q",
         "--ignore=tests/test_mvp_v1_product_app.py",
         "--ignore=tests/test_mvp_v1_react_e2e.py",
+        "--ignore=tests/test_browser_canonical_ui.py",
     ]
     pytest_calls = [c[0] for c in commands_executed if "-m" in c[0] and "pytest" in c[0]]
     assert len(pytest_calls) == 1
     assert pytest_calls[0] == expected_cmd
+    assert "--ignore=tests/test_mvp_v1_product_app.py" in pytest_calls[0]
+    assert "--ignore=tests/test_mvp_v1_react_e2e.py" in pytest_calls[0]
+    assert "--ignore=tests/test_browser_canonical_ui.py" in pytest_calls[0]
 
     # 4. Marker must be present in test_output_tail
     assert "[validation_profile: backend_frozen_frontend]" in rec.test_output_tail
@@ -989,6 +993,9 @@ def test_auto_product_profile_calls_frontend_prep_and_full_tests(tmp_path: Path)
     pytest_calls = [c[0] for c in commands_executed if "-m" in c[0] and "pytest" in c[0]]
     assert len(pytest_calls) == 1
     assert pytest_calls[0] == expected_full_cmd
+    assert "--ignore=tests/test_browser_canonical_ui.py" not in pytest_calls[0]
+    assert "--ignore=tests/test_mvp_v1_product_app.py" not in pytest_calls[0]
+    assert "--ignore=tests/test_mvp_v1_react_e2e.py" not in pytest_calls[0]
 
     # 3. Status is SUCCESS and frontend prep tail is in test_output_tail
     assert rec.status == TaskStatus.SUCCESS
@@ -1124,4 +1131,118 @@ def test_invalid_validation_profile_fails_closed(tmp_path: Path):
     real_worker._execute_task(rec)
     assert rec.status == TaskStatus.FAILED
     assert "Unsupported validation_profile" in rec.error
+
+
+def test_canonical_browser_ui_suite_skipped_only_under_backend_frozen_frontend(tmp_path: Path):
+    worker = TaskWorker(tmp_path, tmp_path / "worktrees", state_dir=tmp_path / "state")
+
+    # 1. Under backend_frozen_frontend, exact command has all three ignores and excludes browser canonical UI
+    backend_rec = BridgeTaskRecord(
+        task_id="TASK-BACKEND-CANONICAL-EXCLUDE",
+        prompt="backend only task",
+        base_sha="1" * 40,
+        target_branch="product/backend-task",
+        allowed_prefixes=["src/mke_product/coverage/", "tests/test_thpt_cov_"],
+        commit_message="feat(coverage): backend logic",
+        timeout_seconds=900,
+        validation_profile="backend_frozen_frontend",
+    )
+    worker.tasks[backend_rec.task_id] = backend_rec
+
+    backend_cmds = []
+
+    def fake_backend_run(cmd, cwd, timeout=None, check=True):
+        backend_cmds.append(list(cmd))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="backend tests pass\n", stderr="")
+
+    def fake_git(cwd, *args, **kwargs):
+        if args and args[0] == "rev-parse":
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="f" * 40 + "\n", stderr="")
+        if args and args[0] == "diff" and "--cached" in args:
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="src/mke_product/coverage/algebra_rational.py\n", stderr="")
+        return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+    with mock.patch("bridge.worker.git", side_effect=fake_git), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.prepare_frontend") as mock_prep_backend, \
+         mock.patch("bridge.worker.run_cmd", side_effect=fake_backend_run), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["src/mke_product/coverage/algebra_rational.py"]), \
+         mock.patch("bridge.worker.cleanup_test_side_effects", return_value=["src/mke_product/coverage/algebra_rational.py"]):
+        worker._execute_task(backend_rec)
+
+    mock_prep_backend.assert_not_called()
+    assert backend_rec.status == TaskStatus.SUCCESS
+    backend_pytest_calls = [c for c in backend_cmds if "-m" in c and "pytest" in c]
+    assert len(backend_pytest_calls) == 1
+    backend_cmd = backend_pytest_calls[0]
+    expected_backend_cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/",
+        "-q",
+        "--ignore=tests/test_mvp_v1_product_app.py",
+        "--ignore=tests/test_mvp_v1_react_e2e.py",
+        "--ignore=tests/test_browser_canonical_ui.py",
+    ]
+    assert backend_cmd == expected_backend_cmd
+    assert "--ignore=tests/test_browser_canonical_ui.py" in backend_cmd
+    assert "--ignore=tests/test_mvp_v1_product_app.py" in backend_cmd
+    assert "--ignore=tests/test_mvp_v1_react_e2e.py" in backend_cmd
+    # Ensure no additional ignores were broadened
+    ignores = [arg for arg in backend_cmd if arg.startswith("--ignore=")]
+    assert ignores == [
+        "--ignore=tests/test_mvp_v1_product_app.py",
+        "--ignore=tests/test_mvp_v1_react_e2e.py",
+        "--ignore=tests/test_browser_canonical_ui.py",
+    ]
+
+    # 2. Under auto profile, canonical browser UI is NOT ignored and full tests/ runs
+    auto_rec = BridgeTaskRecord(
+        task_id="TASK-AUTO-CANONICAL-INCLUDED",
+        prompt="auto product task",
+        base_sha="2" * 40,
+        target_branch="product/auto-task",
+        allowed_prefixes=["src/mke_product/coverage/"],
+        commit_message="feat(coverage): auto task",
+        timeout_seconds=900,
+        validation_profile="auto",
+    )
+    worker.tasks[auto_rec.task_id] = auto_rec
+
+    auto_cmds = []
+
+    def fake_auto_run(cmd, cwd, timeout=None, check=True):
+        auto_cmds.append(list(cmd))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="all product tests pass\n", stderr="")
+
+    with mock.patch("bridge.worker.git", side_effect=fake_git), \
+         mock.patch("bridge.worker.find_agy", return_value="agy"), \
+         mock.patch("bridge.worker.prepare_frontend", return_value="prepared") as mock_prep_auto, \
+         mock.patch("bridge.worker.run_cmd", side_effect=fake_auto_run), \
+         mock.patch("bridge.worker.collect_changed_files", return_value=["src/mke_product/coverage/algebra_rational.py"]), \
+         mock.patch("bridge.worker.cleanup_test_side_effects", return_value=["src/mke_product/coverage/algebra_rational.py"]):
+        worker._execute_task(auto_rec)
+
+    mock_prep_auto.assert_called_once()
+    assert auto_rec.status == TaskStatus.SUCCESS
+    auto_pytest_calls = [c for c in auto_cmds if "-m" in c and "pytest" in c]
+    assert len(auto_pytest_calls) == 1
+    auto_cmd = auto_pytest_calls[0]
+    assert auto_cmd == [sys.executable, "-m", "pytest", "tests/", "-q"]
+    assert "--ignore=tests/test_browser_canonical_ui.py" not in auto_cmd
+    assert "--ignore=tests/test_mvp_v1_product_app.py" not in auto_cmd
+    assert "--ignore=tests/test_mvp_v1_react_e2e.py" not in auto_cmd
+
+    # 3. Verify frontend freeze guards still reject frontend paths under backend_frozen_frontend
+    with pytest.raises(WorkerError, match="rejects frontend/ui prefix"):
+        worker.submit_task(BridgeTaskRequest(
+            task_id="TASK-GUARD-PREFIX",
+            prompt="test",
+            base_sha="3" * 40,
+            target_branch="product/guard",
+            allowed_prefixes=["src/frontend/"],
+            validation_profile="backend_frozen_frontend",
+        ))
+
 
