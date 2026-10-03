@@ -213,6 +213,15 @@ def create_handler_class(worker: TaskWorker):
             self.end_headers()
             self.wfile.write(body)
 
+        def _send_text(self, status: int, content: str, content_type: str = "text/plain; charset=utf-8"):
+            body = content.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self):
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/")
@@ -253,6 +262,18 @@ def create_handler_class(worker: TaskWorker):
 
             if path == "/api/browser-diagnostics":
                 self._send_json(200, browser_diagnostics)
+                return
+
+            if path == "/api/browser/autowake.user.js":
+                script_path = Path(__file__).parent.parent / "browser" / "mke_chatgpt_autowake.user.js"
+                if not script_path.is_file():
+                    self._send_json(404, {"error": "auto-wake userscript not found"})
+                else:
+                    self._send_text(
+                        200,
+                        script_path.read_text(encoding="utf-8"),
+                        "application/javascript; charset=utf-8",
+                    )
                 return
 
             if path.startswith("/api/tasks/") and path.endswith("/status"):
