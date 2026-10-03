@@ -112,163 +112,139 @@ export const CoefficientEditorPanel: React.FC<CoefficientEditorPanelProps> = ({
         <div className={styles.grid}>
           {/* Coefficient a */}
           <div className={styles.coeffBox} data-testid="coeff-box-a">
-            <div className={styles.coeffHeader}>
-              <h3 className={styles.coeffTitle}>{t('lbl_coeff_a')}</h3>
-            </div>
-            <div className={styles.fractionInputs}>
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-a-num">
-                  {t('lbl_numerator')}
-                </label>
-                <input
-                  id="coeff-a-num"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.a_numerator ? styles.inputError : ''}`}
-                  value={draft.a.numeratorStr}
-                  onChange={(e) => onUpdateField('a', 'numerator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-a-num"
-                  aria-describedby={errors.a_numerator ? 'err-a-num' : undefined}
-                />
-                {errors.a_numerator && (
-                  <span id="err-a-num" className={styles.fieldError} data-testid="error-a-num">
-                    {t(errors.a_numerator)}
-                  </span>
-                )}
-              </div>
-
-              <span className={styles.fractionSlash}>/</span>
-
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-a-den">
-                  {t('lbl_denominator')}
-                </label>
-                <input
-                  id="coeff-a-den"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.a_denominator ? styles.inputError : ''}`}
-                  value={draft.a.denominatorStr}
-                  onChange={(e) => onUpdateField('a', 'denominator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-a-den"
-                  aria-describedby={errors.a_denominator ? 'err-a-den' : undefined}
-                />
-                {errors.a_denominator && (
-                  <span id="err-a-den" className={styles.fieldError} data-testid="error-a-den">
-                    {t(errors.a_denominator)}
-                  </span>
-                )}
-              </div>
+            <span className={styles.coeffSymbol}>a =</span>
+            <div className={styles.fractionWidget}>
+              <input
+                id="coeff-a-num"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.numInput} ${errors.a_numerator ? styles.inputError : ''}`}
+                value={draft.a.numeratorStr}
+                onChange={(e) => onUpdateField('a', 'numerator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-a-num"
+                aria-label={t('lbl_numerator')}
+                aria-describedby={errors.a_numerator ? 'err-a-num' : undefined}
+              />
+              <div className={styles.fractionBar} />
+              <input
+                id="coeff-a-den"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.denInput} ${errors.a_denominator ? styles.inputError : ''}`}
+                value={draft.a.denominatorStr}
+                onChange={(e) => onUpdateField('a', 'denominator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-a-den"
+                aria-label={t('lbl_denominator')}
+                aria-describedby={errors.a_denominator ? 'err-a-den' : undefined}
+              />
+              {(errors.a_numerator || errors.a_denominator) && (
+                <div className={styles.errorStack}>
+                  {errors.a_numerator && (
+                    <span id="err-a-num" className={styles.fieldError} data-testid="error-a-num">
+                      {t(errors.a_numerator)}
+                    </span>
+                  )}
+                  {errors.a_denominator && (
+                    <span id="err-a-den" className={styles.fieldError} data-testid="error-a-den">
+                      {t(errors.a_denominator)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Coefficient b */}
           <div className={styles.coeffBox} data-testid="coeff-box-b">
-            <div className={styles.coeffHeader}>
-              <h3 className={styles.coeffTitle}>{t('lbl_coeff_b')}</h3>
-            </div>
-            <div className={styles.fractionInputs}>
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-b-num">
-                  {t('lbl_numerator')}
-                </label>
-                <input
-                  id="coeff-b-num"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.b_numerator ? styles.inputError : ''}`}
-                  value={draft.b.numeratorStr}
-                  onChange={(e) => onUpdateField('b', 'numerator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-b-num"
-                  aria-describedby={errors.b_numerator ? 'err-b-num' : undefined}
-                />
-                {errors.b_numerator && (
-                  <span id="err-b-num" className={styles.fieldError} data-testid="error-b-num">
-                    {t(errors.b_numerator)}
-                  </span>
-                )}
-              </div>
-
-              <span className={styles.fractionSlash}>/</span>
-
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-b-den">
-                  {t('lbl_denominator')}
-                </label>
-                <input
-                  id="coeff-b-den"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.b_denominator ? styles.inputError : ''}`}
-                  value={draft.b.denominatorStr}
-                  onChange={(e) => onUpdateField('b', 'denominator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-b-den"
-                  aria-describedby={errors.b_denominator ? 'err-b-den' : undefined}
-                />
-                {errors.b_denominator && (
-                  <span id="err-b-den" className={styles.fieldError} data-testid="error-b-den">
-                    {t(errors.b_denominator)}
-                  </span>
-                )}
-              </div>
+            <span className={styles.coeffSymbol}>b =</span>
+            <div className={styles.fractionWidget}>
+              <input
+                id="coeff-b-num"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.numInput} ${errors.b_numerator ? styles.inputError : ''}`}
+                value={draft.b.numeratorStr}
+                onChange={(e) => onUpdateField('b', 'numerator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-b-num"
+                aria-label={t('lbl_numerator')}
+                aria-describedby={errors.b_numerator ? 'err-b-num' : undefined}
+              />
+              <div className={styles.fractionBar} />
+              <input
+                id="coeff-b-den"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.denInput} ${errors.b_denominator ? styles.inputError : ''}`}
+                value={draft.b.denominatorStr}
+                onChange={(e) => onUpdateField('b', 'denominator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-b-den"
+                aria-label={t('lbl_denominator')}
+                aria-describedby={errors.b_denominator ? 'err-b-den' : undefined}
+              />
+              {(errors.b_numerator || errors.b_denominator) && (
+                <div className={styles.errorStack}>
+                  {errors.b_numerator && (
+                    <span id="err-b-num" className={styles.fieldError} data-testid="error-b-num">
+                      {t(errors.b_numerator)}
+                    </span>
+                  )}
+                  {errors.b_denominator && (
+                    <span id="err-b-den" className={styles.fieldError} data-testid="error-b-den">
+                      {t(errors.b_denominator)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Coefficient c */}
           <div className={styles.coeffBox} data-testid="coeff-box-c">
-            <div className={styles.coeffHeader}>
-              <h3 className={styles.coeffTitle}>{t('lbl_coeff_c')}</h3>
-            </div>
-            <div className={styles.fractionInputs}>
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-c-num">
-                  {t('lbl_numerator')}
-                </label>
-                <input
-                  id="coeff-c-num"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.c_numerator ? styles.inputError : ''}`}
-                  value={draft.c.numeratorStr}
-                  onChange={(e) => onUpdateField('c', 'numerator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-c-num"
-                  aria-describedby={errors.c_numerator ? 'err-c-num' : undefined}
-                />
-                {errors.c_numerator && (
-                  <span id="err-c-num" className={styles.fieldError} data-testid="error-c-num">
-                    {t(errors.c_numerator)}
-                  </span>
-                )}
-              </div>
-
-              <span className={styles.fractionSlash}>/</span>
-
-              <div className={styles.fractionCol}>
-                <label className={styles.fieldLabel} htmlFor="coeff-c-den">
-                  {t('lbl_denominator')}
-                </label>
-                <input
-                  id="coeff-c-den"
-                  type="text"
-                  inputMode="numeric"
-                  className={`${styles.inputField} ${errors.c_denominator ? styles.inputError : ''}`}
-                  value={draft.c.denominatorStr}
-                  onChange={(e) => onUpdateField('c', 'denominator', e.target.value)}
-                  disabled={isLoading}
-                  data-testid="coeff-c-den"
-                  aria-describedby={errors.c_denominator ? 'err-c-den' : undefined}
-                />
-                {errors.c_denominator && (
-                  <span id="err-c-den" className={styles.fieldError} data-testid="error-c-den">
-                    {t(errors.c_denominator)}
-                  </span>
-                )}
-              </div>
+            <span className={styles.coeffSymbol}>c =</span>
+            <div className={styles.fractionWidget}>
+              <input
+                id="coeff-c-num"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.numInput} ${errors.c_numerator ? styles.inputError : ''}`}
+                value={draft.c.numeratorStr}
+                onChange={(e) => onUpdateField('c', 'numerator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-c-num"
+                aria-label={t('lbl_numerator')}
+                aria-describedby={errors.c_numerator ? 'err-c-num' : undefined}
+              />
+              <div className={styles.fractionBar} />
+              <input
+                id="coeff-c-den"
+                type="text"
+                inputMode="numeric"
+                className={`${styles.fractionInput} ${styles.denInput} ${errors.c_denominator ? styles.inputError : ''}`}
+                value={draft.c.denominatorStr}
+                onChange={(e) => onUpdateField('c', 'denominator', e.target.value)}
+                disabled={isLoading}
+                data-testid="coeff-c-den"
+                aria-label={t('lbl_denominator')}
+                aria-describedby={errors.c_denominator ? 'err-c-den' : undefined}
+              />
+              {(errors.c_numerator || errors.c_denominator) && (
+                <div className={styles.errorStack}>
+                  {errors.c_numerator && (
+                    <span id="err-c-num" className={styles.fieldError} data-testid="error-c-num">
+                      {t(errors.c_numerator)}
+                    </span>
+                  )}
+                  {errors.c_denominator && (
+                    <span id="err-c-den" className={styles.fieldError} data-testid="error-c-den">
+                      {t(errors.c_denominator)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
