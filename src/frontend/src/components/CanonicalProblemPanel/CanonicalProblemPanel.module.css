@@ -12,7 +12,7 @@
 .card:hover,
 .card:focus-within {
   border-color: #ffc845;
-  box-shadow: 0 0 0 1px #ffc845, 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 .cardHeader {
@@ -74,9 +74,9 @@
 .metaGrid {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
   border-top: 1px solid var(--border-subtle, #edf2f7);
-  padding-top: 0.75rem;
+  padding-top: 0.65rem;
 }
 
 .metaItem {
@@ -88,8 +88,8 @@
 
 .metaLabel {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: var(--text-muted, #64748b);
   min-width: 120px;
 }
@@ -102,11 +102,12 @@
 
 .coeffTag {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 500;
+  color: var(--text-primary, #333333);
   background: var(--bg-subtle, #f8fafc);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  padding: 0.15rem 0.5rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 4px;
 }
 
@@ -119,8 +120,9 @@
 
 .deltaValue {
   font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 0.88rem;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-primary, #333333);
 }
 
 .deltaFlags {
@@ -131,10 +133,10 @@
 
 .flagBadge {
   font-family: var(--font-sans);
-  font-size: 0.8rem;
-  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 4px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .flagPositive {
@@ -158,14 +160,14 @@
 }
 
 .technicalDetails {
-  margin-top: 0.4rem;
-  padding-top: 0.4rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
 }
 
 .technicalSummary {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--text-muted, #64748b);
   cursor: pointer;
   user-select: none;

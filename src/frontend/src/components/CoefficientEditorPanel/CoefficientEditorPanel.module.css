@@ -1,7 +1,7 @@
 .card {
-  background: var(--bg-subtle, #f8fafc);
+  background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
   margin-top: 0.5rem;
   transition: all 0.15s ease;
@@ -11,9 +11,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 10px;
-  background: var(--bg-surface, #ffffff);
-  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  padding: 5px 12px;
+  background: var(--col-pod-header-bg, #f4f6f9);
+  border-bottom: 1px solid var(--col-pod-border, #e2e8f0);
   gap: 0.5rem;
 }
 
@@ -26,8 +26,9 @@
   margin: 0;
   font-family: var(--font-sans);
   font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-primary, #334155);
+  font-weight: 500;
+  color: var(--col-pod-header-title, #4a709c);
+  letter-spacing: 0.01em;
 }
 
 .headerRight {
@@ -104,9 +105,9 @@
 .coeffSymbol {
   font-family: var(--font-sans);
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 500;
   font-style: italic;
-  color: var(--text-primary, #1e293b);
+  color: var(--text-primary, #333333);
   user-select: none;
 }
 
@@ -124,14 +125,14 @@
   height: 26px;
   padding: 1px 2px;
   font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 500;
   text-align: center;
   border-radius: 4px;
   box-sizing: border-box;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #cbd5e1);
-  color: var(--text-primary, #0f172a);
+  color: var(--text-primary, #111827);
   transition: all 0.12s ease;
 }
 
