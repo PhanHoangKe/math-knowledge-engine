@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "task_id": "THPT-COV-P1-001",
+  "status": "READY",
+  "attempt": 1,
+  "base_sha": "37cc383631600853381da0ce8e5457ab746e1da1",
+  "target_branch": "product/thpt-cov-p1-universal-core",
+  "prompt_path": ".mke-agent/prompts/THPT_COV_P1.md",
+  "commit_message": "feat(coverage): implement THPT-COV-P1 universal core",
+  "allowed_prefixes": [
+    "src/mke_product/coverage/",
+    "tests/test_thpt_cov_p1_",
+    "docs/acceptance/THPT_COV_P1"
+  ],
+  "result": null
+}
