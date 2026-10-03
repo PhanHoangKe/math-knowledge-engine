@@ -56,3 +56,23 @@ The only one-time local setup is running install.ps1. Antigravity CLI may requir
 
 Browser Auto-Wake v1.2 diagnostics were verified active against the local Bridge on 2026-10-03.
 
+## Tooling & Audit Classification
+
+### Resolved npm Path on Windows
+Windows execution environments require resolving the full executable path (supporting `npm.cmd`, `npm.bat`, and `npm.exe` via `shutil.which` and absolute path normalization). Direct invocation of literal `"npm"` without extension resolution causes `[WinError 2]` failures under Windows `subprocess.run(shell=False)`. All execution contexts (`worker.py`, `runner.py`, `orchestrator.py`, and `npm_resolver.py`) resolve npm to an absolute path once before invoking subcommands and fail closed if no npm executable is resolved.
+
+### Clean-Audit Frontend Preparation Sequence
+In the orchestrator's clean audit path (`independent_tests()`):
+1. If `src/frontend/package-lock.json` exists:
+   a. Resolve the absolute npm executable path (`resolve_npm()`).
+   b. Execute `[resolved_npm, "ci"]` in `src/frontend`.
+   c. Execute `[resolved_npm, "run", "build"]` in `src/frontend`.
+   d. Only after frontend preparation succeeds, run product regression `[python, "-m", "pytest", "tests/", "-q"]`.
+2. If `src/frontend/package-lock.json` does not exist, frontend preparation is skipped and product pytest runs directly.
+
+### Infrastructure Failure vs. Product Regression Classification
+Evidence from frontend preparation is captured separately from product pytest evidence:
+- **AUDIT_ENVIRONMENT_FAILURE / INFRASTRUCTURE_FAILURE**: Missing npm executable, `npm ci` failures, build tooling errors, or environment preparation failures before meaningful product tests can run. These failures fail closed as `BLOCKED`. They do **not** yield `ACCEPT` and do **not** consume candidate remediation attempts or generate spurious code-remediation tasks for Antigravity.
+- **PRODUCT_REGRESSION**: Product pytest executes and fails, or an independently verified source defect is detected. These failures produce a `REMEDIATE` finding, increment candidate attempt counts, and generate scoped remediation prompts (escalating to `OWNER_REQUIRED` when max attempts are reached).
+
+

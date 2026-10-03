@@ -92,11 +92,35 @@ def allowed_path(path: str, prefixes: List[str]) -> bool:
     return any(norm.startswith(p.replace("\\", "/")) for p in prefixes)
 
 
-def find_npm() -> str:
+try:
+    from npm_resolver import resolve_npm as _shared_resolve_npm
+except ImportError:
+    try:
+        from ..npm_resolver import resolve_npm as _shared_resolve_npm
+    except (ImportError, ValueError):
+        _shared_resolve_npm = None
+
+
+def resolve_npm() -> str:
+    """Resolve the absolute path to the npm executable.
+
+    Uses shutil.which, checks Windows npm.cmd / npm.bat as needed,
+    resolves to full executable path, and fails closed if not found.
+    """
+    if _shared_resolve_npm is not None:
+        return _shared_resolve_npm(error_cls=WorkerError)
+    candidates = ["npm.cmd", "npm.bat", "npm.exe", "npm"] if os.name == "nt" else ["npm", "npm.cmd", "npm.bat"]
+    for candidate in candidates:
+        found = shutil.which(candidate)
+        if found:
+            return os.path.abspath(found)
     found = shutil.which("npm")
     if found:
-        return found
+        return os.path.abspath(found)
     raise WorkerError("npm is required for frontend build but was not found on PATH.")
+
+
+find_npm = resolve_npm
 
 
 def prepare_frontend(worktree_path: Path, timeout: int = 600) -> str:
@@ -110,7 +134,7 @@ def prepare_frontend(worktree_path: Path, timeout: int = 600) -> str:
     if not lockfile.is_file():
         return "frontend package-lock absent; skipping frontend build preparation"
 
-    npm_bin = find_npm()
+    npm_bin = resolve_npm()
     ci_res = run_cmd([npm_bin, "ci"], cwd=frontend_dir, timeout=timeout, check=True)
     build_res = run_cmd([npm_bin, "run", "build"], cwd=frontend_dir, timeout=timeout, check=True)
     combined = (ci_res.stdout + "\n" + ci_res.stderr + "\n" + build_res.stdout + "\n" + build_res.stderr).strip()

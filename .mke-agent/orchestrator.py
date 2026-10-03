@@ -143,14 +143,196 @@ def deterministic_gates(repo: Path, task: dict[str, Any], policy: dict[str, Any]
             "remote_head": remote[0] if remote else None, "base_sha": base, "commit_sha": commit}
 
 
+try:
+    from npm_resolver import resolve_npm as _shared_resolve_npm
+except ImportError:
+    try:
+        from .npm_resolver import resolve_npm as _shared_resolve_npm
+    except (ImportError, ValueError):
+        _shared_resolve_npm = None
+
+
+def resolve_npm() -> str:
+    """Resolve the absolute path to the npm executable.
+
+    Uses shutil.which, checks Windows npm.cmd / npm.bat as needed,
+    resolves to full executable path, and fails closed if not found.
+    """
+    if _shared_resolve_npm is not None:
+        return _shared_resolve_npm(error_cls=AuditError)
+    candidates = ["npm.cmd", "npm.bat", "npm.exe", "npm"] if os.name == "nt" else ["npm", "npm.cmd", "npm.bat"]
+    for candidate in candidates:
+        found = shutil.which(candidate)
+        if found:
+            return os.path.abspath(found)
+    found = shutil.which("npm")
+    if found:
+        return os.path.abspath(found)
+    raise AuditError("npm is required for independent frontend preparation but was not found on PATH.")
+
+
 def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
     root = Path(tempfile.mkdtemp(prefix="mke-audit-"))
     worktree = root / "worktree"
     try:
         git(repo, "worktree", "add", "--detach", str(worktree), commit, timeout=300)
-        cp = run([sys.executable, "-m", "pytest", "tests/", "-q"], worktree, timeout=timeout, check=False)
-        return {"passed": cp.returncode == 0, "returncode": cp.returncode,
-                "output_tail": redact((cp.stdout + "\n" + cp.stderr)[-16000:])}
+        frontend_dir = worktree / "src" / "frontend"
+        lockfile = frontend_dir / "package-lock.json"
+
+        frontend_prep: dict[str, Any] = {
+            "performed": False,
+            "passed": True,
+            "error": None,
+            "output_tail": "",
+        }
+
+        if lockfile.is_file():
+            frontend_prep["performed"] = True
+            # a) resolve npm
+            try:
+                npm_bin = resolve_npm()
+            except Exception as exc:
+                err_msg = f"npm resolution failed: {exc}"
+                frontend_prep["passed"] = False
+                frontend_prep["error"] = err_msg
+                frontend_prep["output_tail"] = redact(str(exc))
+                return {
+                    "passed": False,
+                    "returncode": -1,
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "error": err_msg,
+                    "frontend_preparation": frontend_prep,
+                    "pytest_evidence": {
+                        "performed": False,
+                        "passed": False,
+                        "returncode": None,
+                        "output_tail": "pytest was not executed because frontend preparation failed",
+                    },
+                    "frontend_output_tail": frontend_prep["output_tail"],
+                    "pytest_output_tail": "",
+                    "output_tail": frontend_prep["output_tail"],
+                }
+
+            # b) run npm ci
+            try:
+                ci_res = run([npm_bin, "ci"], cwd=frontend_dir, timeout=timeout, check=False)
+                ci_out = redact((ci_res.stdout + "\n" + ci_res.stderr)[-8000:])
+            except Exception as exc:
+                err_msg = f"npm ci execution error: {exc}"
+                frontend_prep["passed"] = False
+                frontend_prep["error"] = err_msg
+                frontend_prep["output_tail"] = redact(str(exc))
+                return {
+                    "passed": False,
+                    "returncode": -1,
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "error": err_msg,
+                    "frontend_preparation": frontend_prep,
+                    "pytest_evidence": {
+                        "performed": False,
+                        "passed": False,
+                        "returncode": None,
+                        "output_tail": "pytest was not executed because frontend preparation failed",
+                    },
+                    "frontend_output_tail": frontend_prep["output_tail"],
+                    "pytest_output_tail": "",
+                    "output_tail": frontend_prep["output_tail"],
+                }
+
+            if ci_res.returncode != 0:
+                err_msg = f"npm ci failed ({ci_res.returncode})"
+                frontend_prep["passed"] = False
+                frontend_prep["error"] = err_msg
+                frontend_prep["output_tail"] = ci_out
+                return {
+                    "passed": False,
+                    "returncode": ci_res.returncode,
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "error": err_msg,
+                    "frontend_preparation": frontend_prep,
+                    "pytest_evidence": {
+                        "performed": False,
+                        "passed": False,
+                        "returncode": None,
+                        "output_tail": "pytest was not executed because frontend preparation failed",
+                    },
+                    "frontend_output_tail": ci_out,
+                    "pytest_output_tail": "",
+                    "output_tail": ci_out,
+                }
+
+            # c) run npm run build
+            try:
+                build_res = run([npm_bin, "run", "build"], cwd=frontend_dir, timeout=timeout, check=False)
+                combined_tail = redact((ci_res.stdout + "\n" + ci_res.stderr + "\n" + build_res.stdout + "\n" + build_res.stderr)[-8000:])
+                frontend_prep["output_tail"] = combined_tail
+            except Exception as exc:
+                err_msg = f"npm run build execution error: {exc}"
+                frontend_prep["passed"] = False
+                frontend_prep["error"] = err_msg
+                frontend_prep["output_tail"] = redact(str(exc))
+                return {
+                    "passed": False,
+                    "returncode": -1,
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "error": err_msg,
+                    "frontend_preparation": frontend_prep,
+                    "pytest_evidence": {
+                        "performed": False,
+                        "passed": False,
+                        "returncode": None,
+                        "output_tail": "pytest was not executed because frontend preparation failed",
+                    },
+                    "frontend_output_tail": frontend_prep["output_tail"],
+                    "pytest_output_tail": "",
+                    "output_tail": frontend_prep["output_tail"],
+                }
+
+            if build_res.returncode != 0:
+                err_msg = f"npm run build failed ({build_res.returncode})"
+                frontend_prep["passed"] = False
+                frontend_prep["error"] = err_msg
+                return {
+                    "passed": False,
+                    "returncode": build_res.returncode,
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "error": err_msg,
+                    "frontend_preparation": frontend_prep,
+                    "pytest_evidence": {
+                        "performed": False,
+                        "passed": False,
+                        "returncode": None,
+                        "output_tail": "pytest was not executed because frontend preparation failed",
+                    },
+                    "frontend_output_tail": combined_tail,
+                    "pytest_output_tail": "",
+                    "output_tail": combined_tail,
+                }
+
+            frontend_prep["passed"] = True
+
+        # d) only after successful frontend preparation run product pytest
+        cp = run([sys.executable, "-m", "pytest", "tests/", "-q"], cwd=worktree, timeout=timeout, check=False)
+        passed = (cp.returncode == 0)
+        pytest_tail = redact((cp.stdout + "\n" + cp.stderr)[-16000:])
+        res = {
+            "passed": passed,
+            "returncode": cp.returncode,
+            "classification": None if passed else "PRODUCT_REGRESSION",
+            "frontend_preparation": frontend_prep,
+            "pytest_evidence": {
+                "performed": True,
+                "passed": passed,
+                "returncode": cp.returncode,
+                "output_tail": pytest_tail,
+            },
+            "frontend_output_tail": frontend_prep["output_tail"],
+            "pytest_output_tail": pytest_tail,
+            "output_tail": pytest_tail,
+        }
+        if not passed:
+            res["error"] = f"product pytest regression failed ({cp.returncode})"
+        return res
     finally:
         git(repo, "worktree", "remove", "--force", str(worktree), timeout=300, check=False)
         shutil.rmtree(root, ignore_errors=True)
@@ -304,6 +486,13 @@ def apply_decision(control: Path, expected: dict[str, Any], decision: dict[str, 
             current["audit_event_id"] = eid
             current["state_version"] = int(current.get("state_version", 0)) + 1
             current["updated_at"] = now
+    elif decision["decision"] in {"BLOCKED", "AUDIT_ENVIRONMENT_FAILURE", "INFRASTRUCTURE_FAILURE"}:
+        current["status"] = "BLOCKED"
+        current["audit_event_id"] = eid
+        current["state_version"] = int(current.get("state_version", 0)) + 1
+        current["updated_at"] = now
+        if "summary" in decision:
+            current["blocked_reason"] = decision["summary"]
     else:
         max_attempts = int(policy.get("max_attempts_before_owner", 3))
         if attempt >= max_attempts:
@@ -359,13 +548,33 @@ def process_event(repo: Path, control: Path) -> bool:
         return True
     if task["status"] == "BLOCKED":
         result = task.get("result", {})
-        decision = {"decision": "REMEDIATE", "summary": "Runner failed before a candidate could pass gates.",
-                    "findings": [{"severity": "high", "location": str(result.get("stage", "runner")),
-                                  "problem": str(result.get("error", "runner failure"))[-4000:],
-                                  "required_fix": "Retry within the original task scope after correcting the reported failure."}],
-                    "trust_boundary_preserved": True, "frontend_freeze_preserved": True}
-        record = {"schema_version": "1.0", "event_id": eid, "created_at": utc_now(), "task_snapshot": task,
-                  "decision": decision, "source": "deterministic-runner-failure"}
+        stage = str(result.get("stage", "runner"))
+        error = str(result.get("error", "runner failure"))
+        is_infra = (
+            stage in {"frontend-baseline-build", "claim", "fetch-base", "create-worktree", "runner-recovery", "setup-worktree", "prepare-frontend"}
+            or any(term in error.lower() for term in ["npm is required", "winerror", "cannot find the file", "tooling", "not found on path"])
+        )
+        if is_infra:
+            decision = {
+                "decision": "BLOCKED",
+                "summary": f"Infrastructure failure at {stage}: {error}"[-4000:],
+                "findings": [{"severity": "high", "location": stage,
+                              "problem": error[-4000:],
+                              "required_fix": "Resolve tooling or infrastructure failure before restarting runner."}],
+                "trust_boundary_preserved": True,
+                "frontend_freeze_preserved": True,
+            }
+            record = {"schema_version": "1.0", "event_id": eid, "created_at": utc_now(), "task_snapshot": task,
+                      "decision": decision, "source": "infrastructure-failure",
+                      "classification": "INFRASTRUCTURE_FAILURE"}
+        else:
+            decision = {"decision": "REMEDIATE", "summary": "Runner failed before a candidate could pass gates.",
+                        "findings": [{"severity": "high", "location": stage,
+                                      "problem": error[-4000:],
+                                      "required_fix": "Retry within the original task scope after correcting the reported failure."}],
+                        "trust_boundary_preserved": True, "frontend_freeze_preserved": True}
+            record = {"schema_version": "1.0", "event_id": eid, "created_at": utc_now(), "task_snapshot": task,
+                      "decision": decision, "source": "deterministic-runner-failure"}
         write_json(cache_path, record)
         apply_decision(control, task, decision, record, policy)
         return True
@@ -373,6 +582,35 @@ def process_event(repo: Path, control: Path) -> bool:
     tests = {"passed": True, "skipped": True}
     if gates["passed"] and policy.get("audit_run_independent_tests", True):
         tests = independent_tests(repo, task["result"]["commit_sha"], int(policy.get("test_timeout_seconds", 2400)))
+
+    if tests.get("classification") == "AUDIT_ENVIRONMENT_FAILURE":
+        decision = {
+            "decision": "BLOCKED",
+            "summary": f"Audit environment failure: {tests.get('error', 'frontend preparation failed')}",
+            "findings": [{
+                "severity": "high",
+                "location": "audit-environment",
+                "problem": str(tests.get("error", "frontend preparation failed"))[-4000:],
+                "required_fix": "Resolve audit environment / npm tooling before retrying independent audit.",
+            }],
+            "trust_boundary_preserved": True,
+            "frontend_freeze_preserved": True,
+        }
+        record = {
+            "schema_version": "1.0",
+            "event_id": eid,
+            "created_at": utc_now(),
+            "task_snapshot": task,
+            "deterministic_gates": gates,
+            "independent_tests": tests,
+            "decision": decision,
+            "source": "audit-environment-failure",
+            "classification": "AUDIT_ENVIRONMENT_FAILURE",
+        }
+        write_json(cache_path, record)
+        apply_decision(control, task, decision, record, policy)
+        return True
+
     if not gates["passed"] or not tests.get("passed", False):
         failures = list(gates.get("failures", []))
         if not tests.get("passed", False):

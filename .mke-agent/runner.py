@@ -237,15 +237,42 @@ def enforce_scope(paths: Iterable[str], allowed_prefixes: list[str]) -> None:
         raise RunnerError("Scope violation. Files outside allowed prefixes: " + ", ".join(bad))
 
 
+try:
+    from npm_resolver import resolve_npm as _shared_resolve_npm
+except ImportError:
+    try:
+        from .npm_resolver import resolve_npm as _shared_resolve_npm
+    except (ImportError, ValueError):
+        _shared_resolve_npm = None
+
+
+def resolve_npm() -> str:
+    """Resolve the absolute path to the npm executable.
+
+    Uses shutil.which, checks Windows npm.cmd / npm.bat as needed,
+    resolves to full executable path, and fails closed if not found.
+    """
+    if _shared_resolve_npm is not None:
+        return _shared_resolve_npm(error_cls=RunnerError)
+    candidates = ["npm.cmd", "npm.bat", "npm.exe", "npm"] if os.name == "nt" else ["npm", "npm.cmd", "npm.bat"]
+    for candidate in candidates:
+        found = shutil.which(candidate)
+        if found:
+            return os.path.abspath(found)
+    found = shutil.which("npm")
+    if found:
+        return os.path.abspath(found)
+    raise RunnerError("npm is required for full regression but was not found on PATH.")
+
+
 def ensure_frontend_dist(worktree: Path, timeout: int) -> str:
     frontend = worktree / "src" / "frontend"
     lockfile = frontend / "package-lock.json"
     if not lockfile.is_file():
         return "frontend package-lock absent; no build performed"
-    if shutil.which("npm") is None:
-        raise RunnerError("npm is required for full regression but was not found")
-    install = run(["npm", "ci"], cwd=frontend, timeout=timeout)
-    build = run(["npm", "run", "build"], cwd=frontend, timeout=timeout)
+    npm_bin = resolve_npm()
+    install = run([npm_bin, "ci"], cwd=frontend, timeout=timeout)
+    build = run([npm_bin, "run", "build"], cwd=frontend, timeout=timeout)
     return tail(install.stdout + "\n" + install.stderr + "\n" + build.stdout + "\n" + build.stderr)
 
 
@@ -328,6 +355,8 @@ def process_task(repo: Path, control: Path, worktree_root: Path) -> None:
         result["changed_files"] = paths
 
         stage = "final-regression"
+        if any(p.startswith("src/frontend/") for p in paths):
+            result["final_frontend_build_tail"] = ensure_frontend_dist(worktree, int(policy["test_timeout_seconds"]))
         result["final_test_tail"] = run_full_tests(worktree, int(policy["test_timeout_seconds"]))
 
         stage = "commit"
