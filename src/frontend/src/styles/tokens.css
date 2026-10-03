@@ -70,9 +70,35 @@
   --font-mono: "Source Code Pro", "Fira Code", "Cascadia Code", Consolas, monospace;
 
   --transition-speed: 0.18s;
+  --transition-fast: 0.15s;
+  --transition-normal: 0.25s;
   --radius-capsule: 14px;
   --radius-card: 6px;
   --radius-btn: 8px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  /* Spacing Tokens */
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* Semantic Aliases (Light) */
+  --color-surface: #ffffff;
+  --color-surface-hover: #f4f6f9;
+  --color-bg-base: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text-main: #1e293b;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-primary: #6b21a8;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 /* Charcoal Dark Theme Tokens */
@@ -113,6 +139,17 @@
   --badge-demo-bg: #451a03;
   --badge-demo-text: #fde68a;
   --badge-demo-border: #78350f;
+
+  --color-surface: #2e2e2e;
+  --color-surface-hover: #363636;
+  --color-bg-base: #262626;
+  --color-border: #3d3d3d;
+  --color-text-main: #f3f4f6;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-primary: #a78bfa;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
 
   --shadow-input: 0 4px 20px rgba(0, 0, 0, 0.5);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);

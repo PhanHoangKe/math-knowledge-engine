@@ -1,121 +1,132 @@
 .podContainer {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: 0.75rem;
   width: 100%;
 }
 
 .summaryCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid #2e7d32;
-  border-radius: var(--radius-md);
-  padding: var(--space-lg);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  margin-bottom: 1rem;
+  overflow: hidden;
+  transition: all 0.2s ease;
 }
 
 .cardHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 6px 14px;
+  background: var(--bg-subtle, #f4f6f9);
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  gap: 0.75rem;
   flex-wrap: wrap;
-  gap: var(--space-md);
 }
 
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: 0.6rem;
 }
 
 .shieldIcon {
-  color: #2e7d32;
-  flex-shrink: 0;
+  color: #16a34a;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
 }
 
 .podTitle {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  margin: 0 0 var(--space-2xs) 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted, #555555);
+  margin: 0;
+  letter-spacing: 0.01em;
 }
 
 .verifierName {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 500;
+  margin-left: 0.4rem;
 }
 
 .outcomeBadge {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-2xs) var(--space-sm);
-  font-size: 0.8rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
 }
 
 .badgeSuccess {
-  background: rgba(46, 125, 50, 0.12);
-  color: #2e7d32;
-  border: 1px solid rgba(46, 125, 50, 0.25);
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
 .badgeFailed {
-  background: rgba(211, 47, 47, 0.12);
-  color: #d32f2f;
-  border: 1px solid rgba(211, 47, 47, 0.25);
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .disclaimerBox {
-  background: var(--color-surface-hover);
-  border-left: 3px solid var(--color-primary);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
+  background: var(--bg-subtle, #f8fafc);
+  border-left: 3px solid #16a34a;
+  padding: 8px 12px;
+  margin: 12px 18px 8px 18px;
+  border-radius: 4px;
   font-size: 0.75rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary, #475569);
+}
+
+.disclaimerText {
+  line-height: 1.4;
 }
 
 .criteriaGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 8px 18px;
 }
 
 .checkItem {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-subtle, #e2e8f0);
 }
 
 .checkPass {
-  background: rgba(46, 125, 50, 0.08);
-  color: #2e7d32;
-  border: 1px solid rgba(46, 125, 50, 0.2);
+  background: rgba(22, 163, 74, 0.08);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.25);
 }
 
 .checkFail {
-  background: rgba(211, 47, 47, 0.08);
-  color: #d32f2f;
-  border: 1px solid rgba(211, 47, 47, 0.2);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.25);
 }
 
 .checkNeutral {
-  background: var(--color-surface-hover);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
+  background: var(--bg-subtle, #f8fafc);
+  color: var(--text-muted, #64748b);
+  border-color: var(--border-subtle, #e2e8f0);
 }
 
 .checkIcon {
   font-weight: 700;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
 .checkLabel {
@@ -123,103 +134,106 @@
 }
 
 .technicalDetails {
-  margin-top: var(--space-xs);
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 0.75rem;
+  margin: 8px 18px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle, #edf2f7);
 }
 
 .technicalSummary {
-  cursor: pointer;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s ease;
 }
 
 .technicalSummary:hover {
-  color: var(--color-primary);
+  color: #16a34a;
 }
 
 .metaGrid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
-  margin-top: var(--space-xs);
-  padding-top: var(--space-xs);
-  border-top: 1px solid var(--color-border);
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 8px 12px;
+  background: var(--bg-subtle, #f8fafc);
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
 }
 
 .metaRow {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 0.5rem;
+  font-size: 0.75rem;
   flex-wrap: wrap;
 }
 
 .metaLabel {
-  color: var(--color-text-muted);
+  color: var(--text-muted, #64748b);
   min-width: 120px;
 }
 
 .metaValue {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--color-text-primary);
-  background: var(--color-surface);
-  padding: 2px 4px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  background: var(--bg-surface, #ffffff);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
   word-break: break-all;
 }
 
 .verifierText {
-  color: var(--color-text-primary);
+  color: var(--text-primary, #1e293b);
+  font-weight: 600;
 }
 
 .metaText {
-  color: var(--color-text-secondary);
-  font-family: var(--font-mono);
+  color: var(--text-secondary, #475569);
+  font-family: var(--font-mono, monospace);
 }
 
 .scopeBadge {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono, monospace);
   font-size: 0.7rem;
-  padding: 2px 6px;
+  padding: 0.1rem 0.4rem;
   background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
-  border-radius: var(--radius-sm);
+  border-radius: 3px;
 }
 
 .actionRow {
   display: flex;
   justify-content: flex-start;
-  padding-top: var(--space-xs);
-  border-top: 1px solid var(--color-border);
+  padding: 10px 18px 14px 18px;
 }
 
 .toggleVerificationBtn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-md);
-  font-size: 0.85rem;
-  font-weight: 500;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-secondary, #475569);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
 }
 
 .toggleVerificationBtn:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-  border-color: var(--color-text-muted);
+  background: var(--bg-subtle, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+  border-color: #16a34a;
 }
 
 .expandedVerificationSection {
-  margin-top: var(--space-xs);
+  margin-top: 0.5rem;
 }
