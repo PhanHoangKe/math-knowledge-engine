@@ -8,14 +8,14 @@ Defines the Python Single Source of Truth (SSOT) data contracts for:
 - Associated K1 Enumerations (KnowledgeEntityStatus, TipCategory, DifficultyLevel, etc.)
 
 All models use Pydantic v2 with strict validation, extra field rejection (extra="forbid"),
-and immutability (frozen=True).
+immutability (frozen=True), and deep immutability via immutable tuples for all collection fields.
 """
 
 from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import List, Optional, Set
+from typing import Sequence, Set
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mke_product.knowledge.schemas import CurriculumRef, LocalizedText
@@ -104,11 +104,11 @@ class PredicateId(str, Enum):
 
 
 # ============================================================================
-# 2. HELPER VALIDATORS FOR STRING LISTS
+# 2. HELPER VALIDATORS FOR STRING SEQUENCES
 # ============================================================================
 
-def _validate_id_list(ids: List[str], field_name: str) -> None:
-    """Validates that a list of IDs contains non-empty strings and no duplicates."""
+def _validate_id_sequence(ids: Sequence[str], field_name: str) -> None:
+    """Validates that a sequence of IDs contains non-empty strings and no duplicates."""
     seen: Set[str] = set()
     for item in ids:
         if not isinstance(item, str) or not item.strip():
@@ -119,13 +119,14 @@ def _validate_id_list(ids: List[str], field_name: str) -> None:
 
 
 # ============================================================================
-# 3. CLOSED CONDITION DSL MODEL
+# 3. CLOSED CONDITION DSL MODEL (DEEP IMMUTABLE)
 # ============================================================================
 
 class ConditionExpr(BaseModel):
     """
     Closed boolean predicate expression container.
     Immutable declarative data representation for static applicability/recognition conditions.
+    Deeply immutable via tuple collections and frozen configuration.
     """
 
     model_config = ConfigDict(
@@ -134,17 +135,17 @@ class ConditionExpr(BaseModel):
         frozen=True,
     )
 
-    all_of: List[PredicateId] = Field(
-        default_factory=list,
-        description="All predicates in this list must evaluate to TRUE",
+    all_of: tuple[PredicateId, ...] = Field(
+        default=(),
+        description="All predicates in this tuple must evaluate to TRUE",
     )
-    any_of: List[PredicateId] = Field(
-        default_factory=list,
-        description="If non-empty, at least one predicate in this list must evaluate to TRUE",
+    any_of: tuple[PredicateId, ...] = Field(
+        default=(),
+        description="If non-empty, at least one predicate in this tuple must evaluate to TRUE",
     )
-    none_of: List[PredicateId] = Field(
-        default_factory=list,
-        description="All predicates in this list must evaluate to FALSE",
+    none_of: tuple[PredicateId, ...] = Field(
+        default=(),
+        description="All predicates in this tuple must evaluate to FALSE",
     )
 
     @model_validator(mode="after")
@@ -173,13 +174,14 @@ class ConditionExpr(BaseModel):
 
 
 # ============================================================================
-# 4. STATIC KNOWLEDGE ENTITY MODELS
+# 4. STATIC KNOWLEDGE ENTITY MODELS (DEEP IMMUTABLE)
 # ============================================================================
 
 class QuickTipKnowledge(BaseModel):
     """
     Static pedagogical knowledge entity describing an authoritative solving shortcut.
     Immutable, source-backed, bilingual, and linked to machine-readable conditions.
+    Deeply immutable via tuple collections and frozen configuration.
     """
 
     model_config = ConfigDict(
@@ -220,7 +222,7 @@ class QuickTipKnowledge(BaseModel):
         ...,
         description="Rigorous mathematical explanation and proof of why the shortcut is correct",
     )
-    quick_steps: List[LocalizedText] = Field(
+    quick_steps: tuple[LocalizedText, ...] = Field(
         ...,
         description="Ordered sequence of execution steps when applying this tip",
     )
@@ -236,33 +238,33 @@ class QuickTipKnowledge(BaseModel):
     )
 
     # Relational Graph Foreign Keys
-    related_method_ids: List[str] = Field(
-        default_factory=list,
+    related_method_ids: tuple[str, ...] = Field(
+        default=(),
         description="Canonical method IDs related to this shortcut (e.g. QUAD_VIETE_SPECIAL_SUM)",
     )
-    related_concept_ids: List[str] = Field(
-        default_factory=list,
+    related_concept_ids: tuple[str, ...] = Field(
+        default=(),
         description="Prerequisite ConceptKnowledge IDs",
     )
-    formula_refs: List[str] = Field(
-        default_factory=list,
+    formula_refs: tuple[str, ...] = Field(
+        default=(),
         description="Referenced FormulaKnowledge IDs",
     )
-    theorem_refs: List[str] = Field(
-        default_factory=list,
+    theorem_refs: tuple[str, ...] = Field(
+        default=(),
         description="Referenced TheoremKnowledge IDs",
     )
-    related_problem_form_ids: List[str] = Field(
-        default_factory=list,
+    related_problem_form_ids: tuple[str, ...] = Field(
+        default=(),
         description="Problem forms where this shortcut is applicable or candidate",
     )
 
     # Provenance & Curriculum
-    curriculum_refs: List[CurriculumRef] = Field(
-        default_factory=list,
+    curriculum_refs: tuple[CurriculumRef, ...] = Field(
+        default=(),
         description="National curriculum standards mapping with source_locator",
     )
-    provenance_refs: List[str] = Field(
+    provenance_refs: tuple[str, ...] = Field(
         ...,
         description="List of authoritative source IDs in centralized provenance.json",
     )
@@ -289,14 +291,14 @@ class QuickTipKnowledge(BaseModel):
         # provenance_refs validation
         if len(self.provenance_refs) == 0:
             raise ValueError("provenance_refs must contain at least one source provenance reference.")
-        _validate_id_list(self.provenance_refs, "provenance_refs")
+        _validate_id_sequence(self.provenance_refs, "provenance_refs")
 
-        # relation ID list hygiene
-        _validate_id_list(self.related_method_ids, "related_method_ids")
-        _validate_id_list(self.related_concept_ids, "related_concept_ids")
-        _validate_id_list(self.formula_refs, "formula_refs")
-        _validate_id_list(self.theorem_refs, "theorem_refs")
-        _validate_id_list(self.related_problem_form_ids, "related_problem_form_ids")
+        # relation ID sequence hygiene
+        _validate_id_sequence(self.related_method_ids, "related_method_ids")
+        _validate_id_sequence(self.related_concept_ids, "related_concept_ids")
+        _validate_id_sequence(self.formula_refs, "formula_refs")
+        _validate_id_sequence(self.theorem_refs, "theorem_refs")
+        _validate_id_sequence(self.related_problem_form_ids, "related_problem_form_ids")
 
         # version format validation
         if not SEMVER_REGEX.match(self.version):
@@ -308,6 +310,7 @@ class QuickTipKnowledge(BaseModel):
 class RelatedProblemFormKnowledge(BaseModel):
     """
     Static pedagogical entity defining a problem archetype / form (Dạng bài).
+    Deeply immutable via tuple collections and frozen configuration.
     """
 
     model_config = ConfigDict(
@@ -342,53 +345,53 @@ class RelatedProblemFormKnowledge(BaseModel):
     )
 
     # Strategy & Tool Connections (Distinct Semantics)
-    related_method_ids: List[str] = Field(
-        default_factory=list,
+    related_method_ids: tuple[str, ...] = Field(
+        default=(),
         description="Methods conceptually related or applicable to this form",
     )
-    guaranteed_method_ids: List[str] = Field(
-        default_factory=list,
+    guaranteed_method_ids: tuple[str, ...] = Field(
+        default=(),
         description="Methods mathematically guaranteed to solve all equations of this form",
     )
-    related_tip_ids: List[str] = Field(
-        default_factory=list,
+    related_tip_ids: tuple[str, ...] = Field(
+        default=(),
         description="Candidate quick tips worth evaluating at runtime for instances of this form",
     )
-    guaranteed_tip_ids: List[str] = Field(
-        default_factory=list,
+    guaranteed_tip_ids: tuple[str, ...] = Field(
+        default=(),
         description="Quick tips mathematically guaranteed by this form's recognition condition",
     )
 
     # Foundations
-    prerequisite_concept_ids: List[str] = Field(
-        default_factory=list,
+    prerequisite_concept_ids: tuple[str, ...] = Field(
+        default=(),
         description="Prerequisite concept IDs",
     )
-    formula_refs: List[str] = Field(
-        default_factory=list,
+    formula_refs: tuple[str, ...] = Field(
+        default=(),
         description="Formula IDs used when solving this form",
     )
-    theorem_refs: List[str] = Field(
-        default_factory=list,
+    theorem_refs: tuple[str, ...] = Field(
+        default=(),
         description="Theorem IDs supporting this form",
     )
 
     # Curated Example Reference Placeholders (Deferred Policy)
-    worked_example_ids: List[str] = Field(
-        default_factory=list,
+    worked_example_ids: tuple[str, ...] = Field(
+        default=(),
         description="Stable IDs to curated worked examples (MUST be empty in K1-02 until Example Registry exists)",
     )
-    practice_example_ids: List[str] = Field(
-        default_factory=list,
+    practice_example_ids: tuple[str, ...] = Field(
+        default=(),
         description="Stable IDs to curated practice problems (MUST be empty in K1-02 until Example Registry exists)",
     )
 
     # Curriculum & Governance
-    curriculum_refs: List[CurriculumRef] = Field(
-        default_factory=list,
+    curriculum_refs: tuple[CurriculumRef, ...] = Field(
+        default=(),
         description="Curriculum standards references with source_locator",
     )
-    provenance_refs: List[str] = Field(
+    provenance_refs: tuple[str, ...] = Field(
         ...,
         description="Authoritative source provenance IDs in centralized provenance.json",
     )
@@ -418,18 +421,18 @@ class RelatedProblemFormKnowledge(BaseModel):
         # provenance_refs validation
         if len(self.provenance_refs) == 0:
             raise ValueError("provenance_refs must contain at least one source provenance reference.")
-        _validate_id_list(self.provenance_refs, "provenance_refs")
+        _validate_id_sequence(self.provenance_refs, "provenance_refs")
 
-        # relation ID list hygiene
-        _validate_id_list(self.related_method_ids, "related_method_ids")
-        _validate_id_list(self.guaranteed_method_ids, "guaranteed_method_ids")
-        _validate_id_list(self.related_tip_ids, "related_tip_ids")
-        _validate_id_list(self.guaranteed_tip_ids, "guaranteed_tip_ids")
-        _validate_id_list(self.prerequisite_concept_ids, "prerequisite_concept_ids")
-        _validate_id_list(self.formula_refs, "formula_refs")
-        _validate_id_list(self.theorem_refs, "theorem_refs")
-        _validate_id_list(self.worked_example_ids, "worked_example_ids")
-        _validate_id_list(self.practice_example_ids, "practice_example_ids")
+        # relation ID sequence hygiene
+        _validate_id_sequence(self.related_method_ids, "related_method_ids")
+        _validate_id_sequence(self.guaranteed_method_ids, "guaranteed_method_ids")
+        _validate_id_sequence(self.related_tip_ids, "related_tip_ids")
+        _validate_id_sequence(self.guaranteed_tip_ids, "guaranteed_tip_ids")
+        _validate_id_sequence(self.prerequisite_concept_ids, "prerequisite_concept_ids")
+        _validate_id_sequence(self.formula_refs, "formula_refs")
+        _validate_id_sequence(self.theorem_refs, "theorem_refs")
+        _validate_id_sequence(self.worked_example_ids, "worked_example_ids")
+        _validate_id_sequence(self.practice_example_ids, "practice_example_ids")
 
         # version format validation
         if not SEMVER_REGEX.match(self.version):
@@ -439,16 +442,16 @@ class RelatedProblemFormKnowledge(BaseModel):
 
 
 # ============================================================================
-# 5. DYNAMIC RUNTIME ASSESSMENT CONTRACT DTOs
+# 5. DYNAMIC RUNTIME ASSESSMENT CONTRACT DTOs (DEEP IMMUTABLE)
 # ============================================================================
 
 def _validate_predicate_partition(
-    matched: List[PredicateId],
-    failed: List[PredicateId],
-    unknown: List[PredicateId],
+    matched: Sequence[PredicateId],
+    failed: Sequence[PredicateId],
+    unknown: Sequence[PredicateId],
 ) -> None:
-    """Validates that predicate evidence lists are disjoint and contain no internal duplicates."""
-    # Check internal list duplicates
+    """Validates that predicate evidence sequences are disjoint and contain no internal duplicates."""
+    # Check internal sequence duplicates
     if len(matched) != len(set(matched)):
         raise ValueError("matched_predicates contains duplicate predicates.")
     if len(failed) != len(set(failed)):
@@ -456,7 +459,7 @@ def _validate_predicate_partition(
     if len(unknown) != len(set(unknown)):
         raise ValueError("unknown_predicates contains duplicate predicates.")
 
-    # Check cross-list overlap
+    # Check cross-sequence overlap
     set_m = set(matched)
     set_f = set(failed)
     set_u = set(unknown)
@@ -480,7 +483,7 @@ def _validate_predicate_partition(
 class QuickTipAssessmentView(BaseModel):
     """
     Runtime assessment DTO representing the evaluation of a quick tip against a specific normalized equation.
-    Immutable, strictly typed, with disjoint evidence partition validation.
+    Immutable, strictly typed, with disjoint evidence partition validation and deep immutability.
     """
 
     model_config = ConfigDict(
@@ -493,10 +496,10 @@ class QuickTipAssessmentView(BaseModel):
     mathematical_applicability: TipApplicability = Field(..., description="Objective mathematical applicability")
     pedagogical_recommendation: TipRecommendation = Field(..., description="Pedagogical recommendation state")
     execution_availability: TipExecutionAvailability = Field(..., description="Backend execution availability")
-    matched_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to TRUE")
-    failed_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to FALSE")
-    unknown_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to UNKNOWN")
-    reason_codes: List[str] = Field(default_factory=list, description="Canonical deterministic reason codes")
+    matched_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to TRUE")
+    failed_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to FALSE")
+    unknown_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to UNKNOWN")
+    reason_codes: tuple[str, ...] = Field(default=(), description="Canonical deterministic reason codes")
 
     @model_validator(mode="after")
     def _validate_assessment_integrity(self) -> QuickTipAssessmentView:
@@ -504,14 +507,14 @@ class QuickTipAssessmentView(BaseModel):
             raise ValueError(f"tip_id '{self.tip_id}' is invalid. Must match pattern '^[A-Z][A-Z0-9_]*$'.")
 
         _validate_predicate_partition(self.matched_predicates, self.failed_predicates, self.unknown_predicates)
-        _validate_id_list(self.reason_codes, "reason_codes")
+        _validate_id_sequence(self.reason_codes, "reason_codes")
         return self
 
 
 class ProblemFormAssessmentView(BaseModel):
     """
     Runtime assessment DTO representing the evaluation of a problem archetype against a specific equation.
-    Immutable, strictly typed, with disjoint evidence partition validation.
+    Immutable, strictly typed, with disjoint evidence partition validation and deep immutability.
     """
 
     model_config = ConfigDict(
@@ -522,10 +525,10 @@ class ProblemFormAssessmentView(BaseModel):
 
     form_id: str = Field(..., description="Target form identifier")
     mathematical_match: FormMatchStatus = Field(..., description="Whether equation matches this form archetype")
-    matched_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to TRUE")
-    failed_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to FALSE")
-    unknown_predicates: List[PredicateId] = Field(default_factory=list, description="Predicates that evaluated to UNKNOWN")
-    reason_codes: List[str] = Field(default_factory=list, description="Canonical deterministic reason codes")
+    matched_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to TRUE")
+    failed_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to FALSE")
+    unknown_predicates: tuple[PredicateId, ...] = Field(default=(), description="Predicates that evaluated to UNKNOWN")
+    reason_codes: tuple[str, ...] = Field(default=(), description="Canonical deterministic reason codes")
 
     @model_validator(mode="after")
     def _validate_assessment_integrity(self) -> ProblemFormAssessmentView:
@@ -533,5 +536,5 @@ class ProblemFormAssessmentView(BaseModel):
             raise ValueError(f"form_id '{self.form_id}' is invalid. Must match pattern '^[A-Z][A-Z0-9_]*$'.")
 
         _validate_predicate_partition(self.matched_predicates, self.failed_predicates, self.unknown_predicates)
-        _validate_id_list(self.reason_codes, "reason_codes")
+        _validate_id_sequence(self.reason_codes, "reason_codes")
         return self
