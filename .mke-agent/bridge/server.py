@@ -183,6 +183,8 @@ def handle_mcp_call(worker: TaskWorker, tool_name: str, arguments: Dict[str, Any
 
 
 def create_handler_class(worker: TaskWorker):
+    browser_diagnostics: Dict[str, Any] = {}
+
     class BridgeHTTPHandler(BaseHTTPRequestHandler):
         def _send_json(self, status: int, data: Any):
             body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
@@ -249,6 +251,10 @@ def create_handler_class(worker: TaskWorker):
                 self._send_json(200, [t.to_dict() for t in worker.list_tasks()])
                 return
 
+            if path == "/api/browser-diagnostics":
+                self._send_json(200, browser_diagnostics)
+                return
+
             if path.startswith("/api/tasks/") and path.endswith("/status"):
                 task_id = path.split("/")[3]
                 rec = worker.get_task(task_id)
@@ -287,6 +293,16 @@ def create_handler_class(worker: TaskWorker):
                 payload = json.loads(raw_body)
             except Exception:
                 payload = {}
+
+            if path == "/api/browser-diagnostics":
+                if not isinstance(payload, dict):
+                    self._send_json(400, {"error": "diagnostics payload must be an object"})
+                    return
+                browser_diagnostics.clear()
+                browser_diagnostics.update(payload)
+                browser_diagnostics["received_at"] = time.time()
+                self._send_json(200, {"status": "ok"})
+                return
 
             if path == "/api/tasks/submit":
                 try:
