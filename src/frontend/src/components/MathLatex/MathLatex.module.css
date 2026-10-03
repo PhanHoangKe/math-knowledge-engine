@@ -1,17 +1,23 @@
 .mathContainer {
-  font-family: var(--font-mono);
   display: inline-block;
   vertical-align: middle;
 }
 
 .inlineMath {
   padding: 0 0.15rem;
+  font-size: inherit;
 }
 
 .displayMath {
   display: block;
-  text-align: center;
-  margin: 0.75rem 0;
+  text-align: left;
+  margin: 0.2rem 0;
   overflow-x: auto;
   overflow-y: hidden;
+  font-size: 1rem;
+}
+
+.displayMath :global(.katex-display) {
+  margin: 0.2rem 0;
+  text-align: left;
 }

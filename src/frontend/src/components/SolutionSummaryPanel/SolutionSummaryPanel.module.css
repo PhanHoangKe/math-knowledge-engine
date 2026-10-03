@@ -94,7 +94,7 @@
 }
 
 .rootLatex {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -141,7 +141,7 @@
 .finalAnswerDisplay {
   background: transparent;
   padding: 0.2rem 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
 }
 
 .noRootsNotice {
