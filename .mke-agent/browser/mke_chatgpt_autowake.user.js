@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         MKE ChatGPT Auto-Wake
 // @namespace    mke-datn
-// @version      1.1.0
+// @version      1.2.0
 // @description  Wake the current ChatGPT conversation when a new MKE Bridge task reaches a terminal state.
 // @match        https://chatgpt.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @connect      127.0.0.1
+// @updateURL    http://127.0.0.1:8765/api/browser/autowake.user.js
+// @downloadURL  http://127.0.0.1:8765/api/browser/autowake.user.js
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -15,6 +17,7 @@
   'use strict';
 
   const ENDPOINT = 'http://127.0.0.1:8765/api/tasks/list';
+  const DIAG_ENDPOINT = 'http://127.0.0.1:8765/api/browser-diagnostics';
   const POLL_MS = 5000;
   const TERMINAL = new Set(['SUCCESS', 'FAILED', 'CANCELLED']);
   const KEY = 'mke_autowake_handled_v1';
@@ -53,7 +56,7 @@
   }
 
   function setEditorText(text) {
-    const el = document.querySelector('#prompt-textarea, textarea, div[contenteditable="true"]');
+    const el = getEditor();
     if (!el) return false;
     el.focus();
 
@@ -62,17 +65,34 @@
       if (setter) setter.call(el, text);
       else el.value = text;
       el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     }
 
     try {
-      document.execCommand('selectAll', false, null);
-      document.execCommand('insertText', false, text);
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const ok = document.execCommand('insertText', false, text);
+      if (!ok) {
+        el.textContent = text;
+        el.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: text
+        }));
+      }
     } catch {
       el.textContent = text;
+      el.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: text
+      }));
     }
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-    return true;
+    return editorText(el).trim().length > 0;
   }
 
   function getEditor() {
@@ -95,6 +115,55 @@
       await new Promise(r => setTimeout(r, 150));
     }
     return false;
+  }
+
+  function postDiagnostics(reason) {
+    try {
+      const editor = getEditor();
+      const form = editor?.closest('form') || null;
+      const buttons = Array.from((form || document).querySelectorAll('button')).slice(-40).map((b, idx) => ({
+        idx,
+        aria: b.getAttribute('aria-label'),
+        testid: b.getAttribute('data-testid'),
+        type: b.getAttribute('type'),
+        disabled: !!b.disabled,
+        text: (b.innerText || b.textContent || '').trim().slice(0, 120),
+        className: String(b.className || '').slice(0, 300)
+      }));
+      const payload = {
+        reason,
+        href: location.href,
+        ts: new Date().toISOString(),
+        editor: editor ? {
+          tag: editor.tagName,
+          id: editor.id,
+          className: String(editor.className || '').slice(0, 300),
+          contenteditable: editor.getAttribute('contenteditable'),
+          textLength: editorText(editor).length,
+          aria: editor.getAttribute('aria-label')
+        } : null,
+        form: form ? {
+          className: String(form.className || '').slice(0, 300),
+          action: form.getAttribute('action'),
+          method: form.getAttribute('method')
+        } : null,
+        activeElement: document.activeElement ? {
+          tag: document.activeElement.tagName,
+          id: document.activeElement.id,
+          aria: document.activeElement.getAttribute?.('aria-label') || null
+        } : null,
+        buttons
+      };
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: DIAG_ENDPOINT,
+        data: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 3000
+      });
+    } catch (e) {
+      console.debug('[MKE AUTO-WAKE] diagnostics failed', e);
+    }
   }
 
   function findSendButton(editor) {
@@ -121,31 +190,49 @@
     const editor = getEditor();
     if (!editor) return false;
 
+    postDiagnostics('before-submit');
+
     const button = findSendButton(editor);
     if (button) {
-      button.click();
-      if (await waitComposerCleared(text)) return true;
+      try {
+        for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
+          button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+        }
+        button.click();
+      } catch (_) {
+        try { button.click(); } catch (_) {}
+      }
+      if (await waitComposerCleared(text)) {
+        postDiagnostics('submit-button-success');
+        return true;
+      }
     }
 
     const form = editor.closest('form');
     if (form && typeof form.requestSubmit === 'function') {
       try {
         form.requestSubmit();
-        if (await waitComposerCleared(text)) return true;
+        if (await waitComposerCleared(text)) {
+          postDiagnostics('request-submit-success');
+          return true;
+        }
       } catch (_) {}
     }
 
-    for (const type of ['keydown', 'keypress', 'keyup']) {
-      editor.dispatchEvent(new KeyboardEvent(type, {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-        cancelable: true
-      }));
-    }
-    return await waitComposerCleared(text);
+    const keyOptions = {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      cancelable: true
+    };
+    editor.dispatchEvent(new KeyboardEvent('keydown', keyOptions));
+    editor.dispatchEvent(new KeyboardEvent('keypress', keyOptions));
+    editor.dispatchEvent(new KeyboardEvent('keyup', keyOptions));
+    const sent = await waitComposerCleared(text);
+    postDiagnostics(sent ? 'enter-success' : 'submit-failed');
+    return sent;
   }
 
   async function sendMessage(text) {
@@ -228,6 +315,8 @@
   }
 
   console.log('[MKE AUTO-WAKE] active');
+  postDiagnostics('startup');
+  setInterval(() => postDiagnostics('heartbeat'), 15000);
   setInterval(tick, POLL_MS);
   tick();
 })();
