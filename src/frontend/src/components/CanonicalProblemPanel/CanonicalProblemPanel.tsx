@@ -81,22 +81,22 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
               {isQuadratic && quad ? (
                 <>
                   <span className={styles.coeffTag}>
-                    a = {formatRational(quad.a)}
+                    <MathLatex latex={`a = ${formatRational(quad.a)}`} />
                   </span>
                   <span className={styles.coeffTag}>
-                    b = {formatRational(quad.b)}
+                    <MathLatex latex={`b = ${formatRational(quad.b)}`} />
                   </span>
                   <span className={styles.coeffTag}>
-                    c = {formatRational(quad.c)}
+                    <MathLatex latex={`c = ${formatRational(quad.c)}`} />
                   </span>
                 </>
               ) : degen ? (
                 <>
                   <span className={styles.coeffTag}>
-                    b = {formatRational(degen.b)}
+                    <MathLatex latex={`b = ${formatRational(degen.b)}`} />
                   </span>
                   <span className={styles.coeffTag}>
-                    c = {formatRational(degen.c)}
+                    <MathLatex latex={`c = ${formatRational(degen.c)}`} />
                   </span>
                 </>
               ) : null}
