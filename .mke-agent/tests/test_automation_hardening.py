@@ -726,6 +726,401 @@ class OrchestratorAuditHardeningTests(unittest.TestCase):
                 self.assertEqual(applied_decision, "REMEDIATE")
 
 
+class BaselineAttributionTests(unittest.TestCase):
+    def test_diagnostics_normalization_deduplicates_windows_and_timestamps_to_exact_count(self) -> None:
+        """Focused test for Task 013 retry: ensure 2 Windows/timestamp diagnostics yield exactly 2 signatures."""
+        raw = (
+            "[10:00:00 AM] C:\\repo\\worktree\\src\\frontend\\src\\index.ts(14,5): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+            "[10:00:00 AM] C:\\repo\\worktree\\src\\frontend\\src\\App.tsx(20,10): error TS2304: Cannot find name 'badIdentifier'.\n"
+            "Found 2 errors in 2 files.\n"
+        )
+        sigs = orchestrator.normalize_diagnostics(raw)
+        self.assertEqual(len(sigs), 2, f"Expected exactly 2 signatures, got {len(sigs)}: {sigs}")
+        self.assertEqual(sigs[0], "src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'.")
+        self.assertEqual(sigs[1], "src/App.tsx: error TS2304: Cannot find name 'badIdentifier'.")
+        self.assertNotIn("Found 2 errors in 2 files.", sigs)
+
+    def test_diagnostics_normalization_canonicalizes_windows_unix_colon_and_parentheses_identically(self) -> None:
+        expected = "src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'."
+        variants = [
+            # Windows parenthesized with timestamp and drive
+            r"[12:00:00 PM] C:\worktree\src\frontend\src\index.ts(14,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+            # Unix colon format without timestamp
+            "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.",
+            # Relative with src/frontend and colon
+            "src/frontend/src/index.ts:14:5: error TS2322: Type 'string' is not assignable to type 'number'.",
+            # Windows relative with backslashes and parentheses
+            r"src\index.ts(14,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+            # Unix with ISO timestamp
+            "2026-10-04T00:43:06.123Z [ERROR] src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.",
+        ]
+        for variant in variants:
+            sigs = orchestrator.normalize_diagnostics(variant)
+            self.assertEqual(len(sigs), 1, f"Expected 1 signature for '{variant}', got {len(sigs)}: {sigs}")
+            self.assertEqual(sigs[0], expected, f"Variant '{variant}' did not match canonical signature")
+
+    def test_generic_fallback_skips_primary_lines_and_uses_same_canonical_path(self) -> None:
+        raw = (
+            "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.\n"
+            '[plugin:vite:resolve] Failed to resolve import "missing" from "src/frontend/src/App.tsx". Does the file exist?\n'
+            "Found 1 error in 1 file.\n"
+        )
+        sigs = orchestrator.normalize_diagnostics(raw)
+        self.assertEqual(len(sigs), 2, f"Expected exactly 2 signatures, got {len(sigs)}: {sigs}")
+        self.assertEqual(sigs[0], "src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'.")
+        self.assertTrue(sigs[1].startswith("src/App.tsx:"), f"Expected canonical path src/App.tsx, got {sigs[1]}")
+        self.assertNotIn("src/frontend/src/App.tsx", sigs[1])
+
+    def test_summary_lines_ignored_when_specific_diagnostics_extracted_but_used_as_fallback(self) -> None:
+        with_diags = (
+            "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.\n"
+            "Found 1 error in 1 file.\n"
+        )
+        sigs = orchestrator.normalize_diagnostics(with_diags)
+        self.assertEqual(len(sigs), 1)
+        self.assertNotIn("Found 1 error", sigs[0])
+
+        summary_only = "Found 2 errors in 2 files."
+        sigs_fallback = orchestrator.normalize_diagnostics(summary_only)
+        self.assertEqual(len(sigs_fallback), 1)
+        self.assertEqual(sigs_fallback[0], "Found 2 errors in 2 files.")
+
+    def test_identical_base_candidate_diagnostics_and_no_frontend_diff_blocks_without_remediate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
+
+            tsc_diag = "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'."
+            mock_candidate_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_output_tail": tsc_diag,
+                "normalized_signatures": ["src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'."],
+                "fingerprint": "cand_fp",
+                "frontend_preparation": {
+                    "performed": True,
+                    "passed": False,
+                    "error": "frontend build regression (2)",
+                    "output_tail": tsc_diag,
+                },
+                "pytest_evidence": {"performed": False, "passed": False},
+            }
+
+            mock_baseline_check = {
+                "performed": True,
+                "passed": False,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "returncode": 2,
+                "error": "baseline frontend build regression (2)",
+                "output_tail": tsc_diag,
+                "normalized_signatures": ["src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'."],
+                "fingerprint": "base_fp",
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_candidate_tests), \
+                 mock.patch.object(orchestrator, "baseline_build_check", return_value=mock_baseline_check) as mock_base, \
+                 mock.patch.object(orchestrator, "call_openai") as mock_openai:
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            mock_openai.assert_not_called()
+            mock_base.assert_called_once()
+
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            # Rule 4A: Preexisting baseline regression => BLOCKED, no attempt burn, no remediation prompt
+            self.assertEqual(updated["status"], "BLOCKED")
+            self.assertEqual(updated["attempt"], 1)
+            self.assertIn("Pre-existing baseline frontend build regression", updated["blocked_reason"])
+            self.assertFalse((control / ".mke-agent" / "prompts" / "TEST-HARDEN-001_R2.md").exists())
+
+            # Verify history record
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertEqual(history["classification"], "PREEXISTING_BASELINE_BUILD_REGRESSION")
+            self.assertEqual(history["attribution"], "PREEXISTING_BASELINE_BUILD_REGRESSION")
+            self.assertEqual(history["decision"]["decision"], "BLOCKED")
+            self.assertTrue(history["baseline_build_attribution"]["performed"])
+            self.assertFalse(history["baseline_build_attribution"]["candidate_has_frontend_diff"])
+            self.assertTrue(history["baseline_build_attribution"]["comparison"]["is_equivalent"])
+
+    def test_baseline_passes_while_candidate_fails_yields_remediate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
+
+            mock_candidate_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_output_tail": "src/index.ts:14:5 - error TS2322: Type 'string' is not assignable to type 'number'.",
+                "normalized_signatures": ["src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'."],
+                "fingerprint": "cand_fp",
+                "frontend_preparation": {"performed": True, "passed": False},
+                "pytest_evidence": {"performed": False},
+            }
+
+            mock_baseline_check = {
+                "performed": True,
+                "passed": True,
+                "classification": None,
+                "returncode": 0,
+                "error": None,
+                "output_tail": "build passed",
+                "normalized_signatures": [],
+                "fingerprint": "",
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_candidate_tests), \
+                 mock.patch.object(orchestrator, "baseline_build_check", return_value=mock_baseline_check) as mock_base:
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            mock_base.assert_called_once()
+
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            # Rule 4B: Candidate caused regression => REMEDIATE, attempt 2, remediation prompt
+            self.assertEqual(updated["status"], "READY")
+            self.assertEqual(updated["attempt"], 2)
+            self.assertTrue(updated["target_branch"].endswith("-r1-remediation"))
+            self.assertTrue((control / updated["prompt_path"]).is_file())
+
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertEqual(history["classification"], "PRODUCT_BUILD_REGRESSION")
+            self.assertEqual(history["attribution"], "CANDIDATE_BUILD_REGRESSION")
+            self.assertEqual(history["decision"]["decision"], "REMEDIATE")
+
+    def test_candidate_with_frontend_diff_skips_baseline_check_and_yields_remediate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/frontend/src/App.tsx"]}
+
+            mock_candidate_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_output_tail": "src/App.tsx:20:10 - error TS2304: Cannot find name 'x'.",
+                "normalized_signatures": ["src/App.tsx: error TS2304: Cannot find name 'x'."],
+                "fingerprint": "cand_fp",
+                "frontend_preparation": {"performed": True, "passed": False},
+                "pytest_evidence": {"performed": False},
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_candidate_tests), \
+                 mock.patch.object(orchestrator, "baseline_build_check") as mock_base:
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            # Rule 1: candidate changed frontend => baseline check SKIPPED
+            mock_base.assert_not_called()
+
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            self.assertEqual(updated["status"], "READY")
+            self.assertEqual(updated["attempt"], 2)
+
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertFalse(history["baseline_build_attribution"]["performed"])
+            self.assertTrue(history["baseline_build_attribution"]["candidate_has_frontend_diff"])
+            self.assertEqual(history["decision"]["decision"], "REMEDIATE")
+
+    def test_materially_different_diagnostics_yields_remediate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
+
+            mock_candidate_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_output_tail": "src/index.ts:14:5 - error TS2322\nsrc/models.ts:1:1 - error TS2305",
+                "normalized_signatures": [
+                    "src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'.",
+                    "src/models.ts: error TS2305: Module has no exported member 'Foo'.",
+                ],
+                "fingerprint": "cand_fp",
+                "frontend_preparation": {"performed": True, "passed": False},
+                "pytest_evidence": {"performed": False},
+            }
+
+            mock_baseline_check = {
+                "performed": True,
+                "passed": False,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "returncode": 2,
+                "error": "baseline frontend build regression (2)",
+                "output_tail": "src/index.ts:14:5 - error TS2322",
+                "normalized_signatures": [
+                    "src/index.ts: error TS2322: Type 'string' is not assignable to type 'number'.",
+                ],
+                "fingerprint": "base_fp",
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_candidate_tests), \
+                 mock.patch.object(orchestrator, "baseline_build_check", return_value=mock_baseline_check):
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            # Rule 4B: Candidate introduced new diagnostics => REMEDIATE
+            self.assertEqual(updated["status"], "READY")
+            self.assertEqual(updated["attempt"], 2)
+
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertEqual(history["classification"], "PRODUCT_BUILD_REGRESSION")
+            self.assertEqual(history["attribution"], "CANDIDATE_BUILD_REGRESSION")
+            self.assertEqual(history["decision"]["decision"], "REMEDIATE")
+            self.assertIn("TS2305", history["decision"]["summary"])
+
+    def test_baseline_attribution_tooling_failure_blocks_without_attempt_burn(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            control = Path(td) / "control"
+            repo = Path(td) / "repo"
+            control.mkdir()
+            repo.mkdir()
+
+            t = sample_task("READY_FOR_AUDIT", attempt=1)
+            orchestrator.write_json(control / orchestrator.TASK_REL, t)
+            orchestrator.write_json(control / orchestrator.POLICY_REL, sample_policy())
+
+            fake_git = SimpleNamespace(returncode=0, stdout="", stderr="")
+            mock_gates = {"passed": True, "failures": [], "changed_files": ["src/mke_product/coverage/c.py"]}
+
+            mock_candidate_tests = {
+                "passed": False,
+                "returncode": 2,
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "error": "frontend build regression (2)",
+                "frontend_output_tail": "src/index.ts:14:5 - error TS2322",
+                "normalized_signatures": ["src/index.ts: error TS2322: Type 'string' is not assignable."],
+                "fingerprint": "cand_fp",
+                "frontend_preparation": {"performed": True, "passed": False},
+                "pytest_evidence": {"performed": False},
+            }
+
+            mock_baseline_check = {
+                "performed": True,
+                "passed": False,
+                "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                "returncode": -1,
+                "error": "npm is required for frontend build but was not found on PATH.",
+                "output_tail": "npm not found",
+                "normalized_signatures": [],
+                "fingerprint": "",
+            }
+
+            with mock.patch.object(orchestrator, "sync_control"), \
+                 mock.patch.object(orchestrator, "git", return_value=fake_git), \
+                 mock.patch.object(orchestrator, "deterministic_gates", return_value=mock_gates), \
+                 mock.patch.object(orchestrator, "independent_tests", return_value=mock_candidate_tests), \
+                 mock.patch.object(orchestrator, "baseline_build_check", return_value=mock_baseline_check):
+                processed = orchestrator.process_event(repo, control)
+
+            self.assertTrue(processed)
+            updated = orchestrator.read_json(control / orchestrator.TASK_REL)
+            # Rule 4C: Tooling failure at baseline => BLOCKED infra, attempt remains 1
+            self.assertEqual(updated["status"], "BLOCKED")
+            self.assertEqual(updated["attempt"], 1)
+
+            eid = orchestrator.event_id(t)
+            history = orchestrator.read_json(control / orchestrator.HISTORY_REL / f"{eid}.json")
+            self.assertEqual(history["classification"], "AUDIT_ENVIRONMENT_FAILURE")
+            self.assertEqual(history["attribution"], "AUDIT_ENVIRONMENT_FAILURE")
+            self.assertEqual(history["decision"]["decision"], "BLOCKED")
+
+    def test_baseline_build_check_executes_npm_ci_then_build_and_never_pytest(self) -> None:
+        cmd_path = r"C:\nodejs\npm.cmd"
+        commands_executed = []
+
+        def fake_git_add(cwd, *args, **kwargs):
+            if len(args) >= 3 and args[0] == "worktree" and args[1] == "add":
+                wt = Path(args[3])
+                fe = wt / "src" / "frontend"
+                fe.mkdir(parents=True)
+                (fe / "package-lock.json").write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args=["git", *args], returncode=0, stdout="", stderr="")
+
+        def fake_run(cmd, cwd, timeout=300, check=True):
+            commands_executed.append((list(cmd), Path(cwd)))
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="out ok", stderr="")
+
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            repo.mkdir()
+
+            with mock.patch("shutil.which", return_value=cmd_path), \
+                 mock.patch.object(orchestrator, "git", side_effect=fake_git_add), \
+                 mock.patch.object(orchestrator, "run", side_effect=fake_run):
+                res = orchestrator.baseline_build_check(repo, "a" * 40, timeout=120)
+
+            self.assertTrue(res["passed"])
+            self.assertTrue(res["performed"])
+            self.assertEqual(len(commands_executed), 2)
+            self.assertEqual(commands_executed[0][0], [cmd_path, "ci"])
+            self.assertEqual(commands_executed[1][0], [cmd_path, "run", "build"])
+
+            # Verify pytest is NEVER executed during baseline build attribution
+            for cmd_tuple in commands_executed:
+                cmd_list = cmd_tuple[0]
+                self.assertNotIn("pytest", cmd_list)
+                self.assertNotIn(sys.executable, cmd_list)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

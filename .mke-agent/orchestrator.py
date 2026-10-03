@@ -243,6 +243,353 @@ def classify_frontend_build_failure(stdout: str, stderr: str, returncode: int) -
     return "PRODUCT_BUILD_REGRESSION"
 
 
+TIMESTAMP_PREFIX_RE = re.compile(
+    r"^(?:\[\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]|"
+    r"\[\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]|"
+    r"\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s*",
+    re.IGNORECASE,
+)
+LOG_PREFIX_RE = re.compile(r"^(?:\[(?:ERROR|WARN|WARNING|INFO|DEBUG|VITE)\]:?\s*)+", re.IGNORECASE)
+
+SUMMARY_LINE_RE = re.compile(
+    r"^\s*(?:Found\s+\d+\s+errors?|\d+\s+errors?\s+found|error\s+command\s+failed)\b",
+    re.IGNORECASE,
+)
+
+TS_DIAGNOSTIC_RE = re.compile(
+    r"^(?:\[plugin:[^\]]+\]\s*)?"
+    r"(?P<path>(?:[A-Za-z]:[\\/])?[^:\(\)\r\n]+?)"
+    r"(?::(?P<line>\d+)(?::(?P<col>\d+))?|\((?P<pline>\d+)(?:,(?P<pcol>\d+))?\))"
+    r"(?:\s*-\s*|\s*:\s*|\s+)"
+    r"(?:error\s+)?(?P<code>TS\d+):\s*"
+    r"(?P<msg>.+)$",
+    re.IGNORECASE,
+)
+
+TS_GLOBAL_ERROR_RE = re.compile(r"^(?:error\s+)?(?P<code>TS\d+):\s*(?P<msg>.+)$", re.IGNORECASE)
+
+VITE_ROLLUP_RE = re.compile(
+    r"(?:\[plugin:vite:[^\]]+\]\s*)?"
+    r"(?:Rollup failed to resolve import|Failed to resolve import|Could not resolve)\s+"
+    r"['\"](?P<target>[^'\"]+)['\"]\s+from\s+['\"](?P<path>[^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+
+GENERIC_FILE_ERROR_RE = re.compile(
+    r"^(?:\[plugin:[^\]]+\]\s*)?"
+    r"(?P<path>(?:[A-Za-z]:[\\/])?[^:\(\)\r\n]+?)"
+    r"(?::(?P<line>\d+)(?::(?P<col>\d+))?|\((?P<pline>\d+)(?:,(?P<pcol>\d+))?\))"
+    r"(?:\s*-\s*|\s*:\s*|\s+)"
+    r"(?:error:\s*|Error:\s*)?"
+    r"(?P<msg>.+)$",
+    re.IGNORECASE,
+)
+
+SYNTAX_ERROR_RE = re.compile(
+    r"^(?P<errtype>SyntaxError|TypeError|ReferenceError|Parsing error):\s+"
+    r"(?P<path>(?:[A-Za-z]:[\\/])?[^:\r\n]+?)(?::\s*|\s+)(?P<msg>.+)$",
+    re.IGNORECASE,
+)
+
+SYNTAX_ERROR_RE2 = re.compile(
+    r"^(?P<path>(?:[A-Za-z]:[\\/])?[^:\r\n]+?):\s*"
+    r"(?P<errtype>SyntaxError|TypeError|ReferenceError|Parsing error):\s*(?P<msg>.+)$",
+    re.IGNORECASE,
+)
+
+
+def canonicalize_path(path_str: str) -> str:
+    """Normalize file path to canonical relative form across Windows, Unix, and prefixes."""
+    p = path_str.strip().strip("'\"`")
+    p = p.replace("\\", "/")
+    p = re.sub(r"^[A-Za-z]:", "", p)
+    if "src/frontend/" in p:
+        p = p.split("src/frontend/")[-1]
+    elif "worktree/" in p:
+        p = p.split("worktree/")[-1]
+    p = re.sub(r"^(?:\./|/)+", "", p)
+    return p
+
+
+def clean_message(msg: str) -> str:
+    """Normalize diagnostic message by stripping absolute temp/worktree paths and timestamps."""
+    m = msg.strip()
+    m = m.replace("\\", "/")
+    m = re.sub(r"\b[A-Za-z]:/[^\s'\"]*?src/frontend/", "", m)
+    m = re.sub(r"\b[A-Za-z]:/[^\s'\"]*?worktree/", "", m)
+    m = re.sub(r"/(?:tmp|temp|[A-Za-z0-9._-]+)/[^\s'\"]*?src/frontend/", "", m)
+    m = re.sub(r"/(?:tmp|temp|[A-Za-z0-9._-]+)/[^\s'\"]*?worktree/", "", m)
+    m = re.sub(r"(?<=['\"\s])src/frontend/", "", m)
+    m = re.sub(r"\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b", "", m)
+    m = re.sub(r"\[\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]", "", m)
+    m = re.sub(r"\s+", " ", m).strip()
+    return m
+
+
+def normalize_diagnostics(output: str) -> list[str]:
+    """Deterministically extracts canonical diagnostic signatures from build output.
+
+    Handles TypeScript tsc, Vite, Rollup, esbuild, and SyntaxError diagnostics.
+    Yields exactly one canonical signature per source diagnostic across Windows, Unix,
+    colon-location, and parenthesized-location formats.
+    Generic fallback explicitly skips lines recognized by primary parser and uses
+    the same canonical path normalizer. Summary lines (Found N errors) are ignored
+    when specific diagnostics are extracted.
+    """
+    if not output:
+        return []
+
+    lines = output.splitlines()
+    handled_line_indices: set[int] = set()
+    signatures: list[str] = []
+    summary_lines: list[str] = []
+
+    cleaned_lines: list[str] = []
+    for line in lines:
+        cl = line.strip()
+        cl = TIMESTAMP_PREFIX_RE.sub("", cl).strip()
+        cl = LOG_PREFIX_RE.sub("", cl).strip()
+        cleaned_lines.append(cl)
+
+    # Pass 1: Primary TypeScript parser
+    for idx, cl in enumerate(cleaned_lines):
+        if not cl:
+            continue
+        if SUMMARY_LINE_RE.search(cl):
+            summary_lines.append(cl)
+            continue
+        m = TS_DIAGNOSTIC_RE.match(cl)
+        if m:
+            handled_line_indices.add(idx)
+            raw_path = m.group("path")
+            code = m.group("code").upper()
+            msg = clean_message(m.group("msg"))
+            canon_path = canonicalize_path(raw_path)
+            sig = f"{canon_path}: error {code}: {msg}"
+            signatures.append(sig)
+            continue
+
+        m_global = TS_GLOBAL_ERROR_RE.match(cl)
+        if m_global:
+            handled_line_indices.add(idx)
+            code = m_global.group("code").upper()
+            msg = clean_message(m_global.group("msg"))
+            sig = f"tsconfig.json: error {code}: {msg}"
+            signatures.append(sig)
+            continue
+
+    # Pass 2: Generic fallback parser (skips lines already recognized by primary parser)
+    for idx, cl in enumerate(cleaned_lines):
+        if idx in handled_line_indices or not cl:
+            continue
+        if SUMMARY_LINE_RE.search(cl):
+            continue
+
+        # Skip source code snippet / caret lines
+        if re.match(r"^\d+\s*\|", cl) or re.match(r"^[\^~]+$", cl):
+            continue
+
+        m_vite = VITE_ROLLUP_RE.search(cl)
+        if m_vite:
+            handled_line_indices.add(idx)
+            raw_path = m_vite.group("path")
+            canon_path = canonicalize_path(raw_path)
+            clean_msg = clean_message(cl)
+            sig = f"{canon_path}: {clean_msg}"
+            signatures.append(sig)
+            continue
+
+        m_syntax = SYNTAX_ERROR_RE.match(cl)
+        if m_syntax:
+            handled_line_indices.add(idx)
+            raw_path = m_syntax.group("path")
+            canon_path = canonicalize_path(raw_path)
+            clean_msg = clean_message(f"{m_syntax.group('errtype')}: {m_syntax.group('msg')}")
+            sig = f"{canon_path}: {clean_msg}"
+            signatures.append(sig)
+            continue
+
+        m_syntax2 = SYNTAX_ERROR_RE2.match(cl)
+        if m_syntax2:
+            handled_line_indices.add(idx)
+            raw_path = m_syntax2.group("path")
+            canon_path = canonicalize_path(raw_path)
+            clean_msg = clean_message(f"{m_syntax2.group('errtype')}: {m_syntax2.group('msg')}")
+            sig = f"{canon_path}: {clean_msg}"
+            signatures.append(sig)
+            continue
+
+        m_gen = GENERIC_FILE_ERROR_RE.match(cl)
+        if m_gen:
+            raw_path = m_gen.group("path")
+            if re.search(r"\.(?:tsx?|jsx?|json|vue|css|html|svelte)\b", raw_path, re.IGNORECASE):
+                if any(k in cl.lower() for k in ["error", "failed", "exception", "cannot", "syntax"]):
+                    handled_line_indices.add(idx)
+                    canon_path = canonicalize_path(raw_path)
+                    clean_msg = clean_message(m_gen.group("msg"))
+                    sig = f"{canon_path}: {clean_msg}"
+                    signatures.append(sig)
+                    continue
+
+    unique_signatures: list[str] = []
+    seen: set[str] = set()
+    for s in signatures:
+        if s not in seen:
+            seen.add(s)
+            unique_signatures.append(s)
+
+    # Ignore summary lines if specific diagnostics were extracted
+    if not unique_signatures and summary_lines:
+        for sl in summary_lines:
+            clean_sl = clean_message(sl)
+            if clean_sl and clean_sl not in seen:
+                seen.add(clean_sl)
+                unique_signatures.append(clean_sl)
+
+    return unique_signatures
+
+
+def compare_build_diagnostics(
+    candidate_sigs: list[str],
+    baseline_sigs: list[str],
+    candidate_tail: str = "",
+    baseline_tail: str = "",
+) -> dict[str, Any]:
+    """Deterministically compares candidate and baseline build diagnostic signature sets."""
+    cand_set = set(candidate_sigs)
+    base_set = set(baseline_sigs)
+    new_in_candidate = sorted(cand_set - base_set)
+    fixed_in_candidate = sorted(base_set - cand_set)
+    if cand_set and base_set:
+        is_equivalent = (cand_set == base_set)
+    elif not cand_set and not base_set:
+        c_clean = clean_message(candidate_tail[-2000:])
+        b_clean = clean_message(baseline_tail[-2000:])
+        is_equivalent = bool(c_clean and b_clean and c_clean == b_clean)
+    else:
+        is_equivalent = False
+
+    return {
+        "is_equivalent": is_equivalent,
+        "new_diagnostics": new_in_candidate,
+        "fixed_diagnostics": fixed_in_candidate,
+        "candidate_signature_count": len(candidate_sigs),
+        "baseline_signature_count": len(baseline_sigs),
+    }
+
+
+def baseline_build_check(repo: Path, base_sha: str, timeout: int) -> dict[str, Any]:
+    """Runs a clean build-only check at task.base_sha (npm resolve -> npm ci -> npm run build).
+
+    Never runs baseline pytest for attribution.
+    Captures baseline classification, return code, and bounded diagnostics separately.
+    """
+    root = Path(tempfile.mkdtemp(prefix="mke-baseline-audit-"))
+    worktree = root / "worktree"
+    try:
+        git(repo, "worktree", "add", "--detach", str(worktree), base_sha, timeout=300)
+        frontend_dir = worktree / "src" / "frontend"
+        lockfile = frontend_dir / "package-lock.json"
+
+        baseline_res: dict[str, Any] = {
+            "performed": False,
+            "passed": True,
+            "classification": None,
+            "returncode": 0,
+            "error": None,
+            "output_tail": "",
+            "normalized_signatures": [],
+            "fingerprint": "",
+        }
+
+        if not lockfile.is_file():
+            baseline_res["output_tail"] = "frontend package-lock absent at baseline; no build performed"
+            return baseline_res
+
+        baseline_res["performed"] = True
+
+        # a) resolve npm
+        try:
+            npm_bin = resolve_npm()
+        except Exception as exc:
+            err_msg = f"npm resolution failed: {exc}"
+            baseline_res.update({
+                "passed": False,
+                "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                "returncode": -1,
+                "error": err_msg,
+                "output_tail": redact(str(exc)),
+            })
+            return baseline_res
+
+        # b) run npm ci
+        try:
+            ci_res = run([npm_bin, "ci"], cwd=frontend_dir, timeout=timeout, check=False)
+            ci_out = redact((ci_res.stdout + "\n" + ci_res.stderr)[-8000:])
+        except Exception as exc:
+            err_msg = f"npm ci execution error: {exc}"
+            baseline_res.update({
+                "passed": False,
+                "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                "returncode": -1,
+                "error": err_msg,
+                "output_tail": redact(str(exc)),
+            })
+            return baseline_res
+
+        if ci_res.returncode != 0:
+            err_msg = f"npm ci failed ({ci_res.returncode})"
+            baseline_res.update({
+                "passed": False,
+                "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                "returncode": ci_res.returncode,
+                "error": err_msg,
+                "output_tail": ci_out,
+            })
+            return baseline_res
+
+        # c) run npm run build
+        try:
+            build_res = run([npm_bin, "run", "build"], cwd=frontend_dir, timeout=timeout, check=False)
+            combined_tail = redact((ci_res.stdout + "\n" + ci_res.stderr + "\n" + build_res.stdout + "\n" + build_res.stderr)[-8000:])
+            baseline_res["output_tail"] = combined_tail
+        except Exception as exc:
+            err_msg = f"npm run build execution error: {exc}"
+            baseline_res.update({
+                "passed": False,
+                "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                "returncode": -1,
+                "error": err_msg,
+                "output_tail": redact(str(exc)),
+            })
+            return baseline_res
+
+        if build_res.returncode != 0:
+            classification = classify_frontend_build_failure(build_res.stdout, build_res.stderr, build_res.returncode)
+            err_msg = (
+                f"baseline frontend build regression ({build_res.returncode})"
+                if classification == "PRODUCT_BUILD_REGRESSION"
+                else f"baseline npm run build failed ({build_res.returncode})"
+            )
+            signatures = normalize_diagnostics(build_res.stdout + "\n" + build_res.stderr)
+            fingerprint = hashlib.sha256("\n".join(sorted(signatures)).encode("utf-8")).hexdigest()
+            baseline_res.update({
+                "passed": False,
+                "classification": classification,
+                "returncode": build_res.returncode,
+                "error": err_msg,
+                "normalized_signatures": sorted(signatures),
+                "fingerprint": fingerprint,
+            })
+            return baseline_res
+
+        baseline_res["passed"] = True
+        return baseline_res
+    finally:
+        git(repo, "worktree", "remove", "--force", str(worktree), timeout=300, check=False)
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
     root = Path(tempfile.mkdtemp(prefix="mke-audit-"))
     worktree = root / "worktree"
@@ -369,11 +716,15 @@ def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
                     if classification == "PRODUCT_BUILD_REGRESSION"
                     else f"npm run build failed ({build_res.returncode})"
                 )
+                signatures = normalize_diagnostics(build_res.stdout + "\n" + build_res.stderr)
+                fingerprint = hashlib.sha256("\n".join(sorted(signatures)).encode("utf-8")).hexdigest()
                 frontend_prep["passed"] = False
                 frontend_prep["error"] = err_msg
                 frontend_prep["returncode"] = build_res.returncode
                 frontend_prep["build_stdout_tail"] = redact(build_res.stdout[-8000:])
                 frontend_prep["build_stderr_tail"] = redact(build_res.stderr[-8000:])
+                frontend_prep["normalized_signatures"] = sorted(signatures)
+                frontend_prep["fingerprint"] = fingerprint
                 return {
                     "passed": False,
                     "returncode": build_res.returncode,
@@ -389,6 +740,8 @@ def independent_tests(repo: Path, commit: str, timeout: int) -> dict[str, Any]:
                     "frontend_output_tail": combined_tail,
                     "pytest_output_tail": "",
                     "output_tail": combined_tail,
+                    "normalized_signatures": sorted(signatures),
+                    "fingerprint": fingerprint,
                 }
 
             frontend_prep["passed"] = True
@@ -700,6 +1053,191 @@ def process_event(repo: Path, control: Path) -> bool:
         write_json(cache_path, record)
         apply_decision(control, task, decision, record, policy)
         return True
+
+    if tests.get("classification") == "PRODUCT_BUILD_REGRESSION":
+        changed_files = list(gates.get("changed_files", []))
+        changed_frontend = [p for p in changed_files if p.startswith("src/frontend/") or p.startswith("ui/")]
+
+        if changed_frontend:
+            baseline_attribution = {
+                "performed": False,
+                "candidate_has_frontend_diff": True,
+                "changed_frontend_files": changed_frontend,
+                "classification": None,
+                "returncode": None,
+                "normalized_signatures": [],
+                "fingerprint": "",
+                "output_tail": "Baseline comparison skipped: candidate changed frontend/UI files",
+            }
+            problem_msg = f"candidate frontend build regression ({tests.get('returncode', 1)}): candidate modified frontend/UI files"
+            decision = {
+                "decision": "REMEDIATE",
+                "summary": problem_msg,
+                "findings": [{
+                    "severity": "high",
+                    "location": "frontend-build",
+                    "problem": problem_msg,
+                    "required_fix": "Correct source/compiler diagnostics reported by frontend build within allowed scope.",
+                }],
+                "trust_boundary_preserved": True,
+                "frontend_freeze_preserved": False,
+            }
+            record = {
+                "schema_version": "1.0",
+                "event_id": eid,
+                "created_at": utc_now(),
+                "task_snapshot": task,
+                "deterministic_gates": gates,
+                "independent_tests": tests,
+                "baseline_build_attribution": baseline_attribution,
+                "decision": decision,
+                "source": "candidate-frontend-build-regression",
+                "classification": "PRODUCT_BUILD_REGRESSION",
+                "attribution": "CANDIDATE_BUILD_REGRESSION",
+            }
+            write_json(cache_path, record)
+            apply_decision(control, task, decision, record, policy)
+            return True
+        else:
+            timeout = int(policy.get("test_timeout_seconds", 2400))
+            base_check = baseline_build_check(repo, str(task["base_sha"]), timeout)
+            base_check["candidate_has_frontend_diff"] = False
+            base_check["changed_frontend_files"] = []
+            baseline_attribution = base_check
+
+            if base_check.get("classification") in {"AUDIT_ENVIRONMENT_FAILURE", "INFRASTRUCTURE_FAILURE"}:
+                decision = {
+                    "decision": "BLOCKED",
+                    "summary": f"Audit environment failure during baseline build attribution at {task['base_sha'][:12]}: {base_check.get('error', 'tooling unavailable')}",
+                    "findings": [{
+                        "severity": "high",
+                        "location": "audit-environment",
+                        "problem": str(base_check.get("error", "baseline build preparation failed"))[-4000:],
+                        "required_fix": "Resolve audit environment / npm tooling before retrying baseline attribution.",
+                    }],
+                    "trust_boundary_preserved": True,
+                    "frontend_freeze_preserved": True,
+                }
+                record = {
+                    "schema_version": "1.0",
+                    "event_id": eid,
+                    "created_at": utc_now(),
+                    "task_snapshot": task,
+                    "deterministic_gates": gates,
+                    "independent_tests": tests,
+                    "baseline_build_attribution": baseline_attribution,
+                    "decision": decision,
+                    "source": "baseline-attribution-environment-failure",
+                    "classification": "AUDIT_ENVIRONMENT_FAILURE",
+                    "attribution": "AUDIT_ENVIRONMENT_FAILURE",
+                }
+                write_json(cache_path, record)
+                apply_decision(control, task, decision, record, policy)
+                return True
+
+            elif base_check.get("classification") == "PRODUCT_BUILD_REGRESSION":
+                cand_sigs = tests.get("normalized_signatures") or normalize_diagnostics(tests.get("frontend_output_tail", ""))
+                base_sigs = base_check.get("normalized_signatures") or normalize_diagnostics(base_check.get("output_tail", ""))
+                comparison = compare_build_diagnostics(
+                    cand_sigs, base_sigs,
+                    candidate_tail=tests.get("frontend_output_tail", ""),
+                    baseline_tail=base_check.get("output_tail", "")
+                )
+                baseline_attribution["comparison"] = comparison
+
+                if comparison["is_equivalent"]:
+                    decision = {
+                        "decision": "BLOCKED",
+                        "summary": f"Pre-existing baseline frontend build regression at {task['base_sha'][:12]}: candidate changed no frontend files and build diagnostics match baseline.",
+                        "findings": [{
+                            "severity": "high",
+                            "location": "frontend-build",
+                            "problem": f"Pre-existing baseline build regression at {task['base_sha'][:12]}. Diagnostics: " + "; ".join(cand_sigs[:5]),
+                            "required_fix": f"Resolve pre-existing frontend build regression in a separate baseline/frontend debt task. Candidate is not blamed.",
+                        }],
+                        "trust_boundary_preserved": True,
+                        "frontend_freeze_preserved": True,
+                    }
+                    record = {
+                        "schema_version": "1.0",
+                        "event_id": eid,
+                        "created_at": utc_now(),
+                        "task_snapshot": task,
+                        "deterministic_gates": gates,
+                        "independent_tests": tests,
+                        "baseline_build_attribution": baseline_attribution,
+                        "decision": decision,
+                        "source": "baseline-attribution-preexisting-debt",
+                        "classification": "PREEXISTING_BASELINE_BUILD_REGRESSION",
+                        "attribution": "PREEXISTING_BASELINE_BUILD_REGRESSION",
+                    }
+                    write_json(cache_path, record)
+                    apply_decision(control, task, decision, record, policy)
+                    return True
+                else:
+                    new_sigs = comparison.get("new_diagnostics", [])
+                    problem_desc = (
+                        f"Candidate introduced new frontend build diagnostics compared to baseline {task['base_sha'][:12]}: "
+                        + "; ".join(new_sigs[:5])
+                    )
+                    decision = {
+                        "decision": "REMEDIATE",
+                        "summary": problem_desc,
+                        "findings": [{
+                            "severity": "high",
+                            "location": "frontend-build",
+                            "problem": problem_desc,
+                            "required_fix": "Correct source/compiler diagnostics reported by frontend build within allowed scope.",
+                        }],
+                        "trust_boundary_preserved": True,
+                        "frontend_freeze_preserved": True,
+                    }
+                    record = {
+                        "schema_version": "1.0",
+                        "event_id": eid,
+                        "created_at": utc_now(),
+                        "task_snapshot": task,
+                        "deterministic_gates": gates,
+                        "independent_tests": tests,
+                        "baseline_build_attribution": baseline_attribution,
+                        "decision": decision,
+                        "source": "baseline-attribution-candidate-regression",
+                        "classification": "PRODUCT_BUILD_REGRESSION",
+                        "attribution": "CANDIDATE_BUILD_REGRESSION",
+                    }
+                    write_json(cache_path, record)
+                    apply_decision(control, task, decision, record, policy)
+                    return True
+            else:
+                problem_desc = f"Candidate frontend build regression: candidate fails frontend build while baseline {task['base_sha'][:12]} passed."
+                decision = {
+                    "decision": "REMEDIATE",
+                    "summary": problem_desc,
+                    "findings": [{
+                        "severity": "high",
+                        "location": "frontend-build",
+                        "problem": problem_desc,
+                        "required_fix": "Correct source/compiler diagnostics reported by frontend build within allowed scope.",
+                    }],
+                    "trust_boundary_preserved": True,
+                    "frontend_freeze_preserved": True,
+                }
+                record = {
+                    "schema_version": "1.0",
+                    "event_id": eid,
+                    "created_at": utc_now(),
+                    "task_snapshot": task,
+                    "deterministic_gates": gates,
+                    "independent_tests": tests,
+                    "baseline_build_attribution": baseline_attribution,
+                    "decision": decision,
+                    "source": "baseline-attribution-candidate-regression",
+                    "classification": "PRODUCT_BUILD_REGRESSION",
+                    "attribution": "CANDIDATE_BUILD_REGRESSION",
+                }
+                write_json(cache_path, record)
+                apply_decision(control, task, decision, record, policy)
+                return True
 
     if not gates["passed"] or not tests.get("passed", False):
         failures = list(gates.get("failures", []))

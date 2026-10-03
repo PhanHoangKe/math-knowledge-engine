@@ -81,7 +81,48 @@ Evidence from frontend preparation is captured separately from product pytest ev
 - **PRODUCT_REGRESSION (Product Test Suite Failure)**:
   Product pytest executes and fails after successful frontend preparation, or an independently verified product test regression is detected. These failures produce a `REMEDIATE` finding, increment candidate attempt counts, and generate scoped remediation prompts (escalating to `OWNER_REQUIRED` when max attempts are reached).
 
-### Baseline vs. Candidate Attribution
-Build output tails (stdout/stderr) and exit codes are preserved in audit records and evidence snapshots alongside git diffs. This enables the independent auditor to determine whether build failures are pre-existing at baseline or candidate-induced, without automatically blaming a candidate for frontend files it did not modify, while ensuring frontend freeze preservation status remains accurate.
+### Baseline vs. Candidate Attribution for Frontend Build Regressions
+Build output tails (stdout/stderr), exit codes, and normalized compiler diagnostics are preserved in audit records and evidence snapshots alongside git diffs. This enables the independent auditor to determine deterministically whether build failures are pre-existing at baseline or candidate-induced, without automatically blaming a candidate for frontend files it did not modify, while ensuring frontend freeze preservation status remains accurate.
+
+#### Attribution Workflow & Evaluation Rules
+1. **Candidate Changed Frontend/UI Files**:
+   If candidate build fails with `PRODUCT_BUILD_REGRESSION` and git diff shows candidate modified files under `src/frontend/` or `ui/`:
+   - Treated as candidate-attributable regression (`CANDIDATE_BUILD_REGRESSION`).
+   - Routes directly to `REMEDIATE` under existing bounded attempt semantics.
+   - Baseline attribution comparison is skipped (`performed: false`).
+
+2. **Candidate Modified No Frontend/UI Files**:
+   If candidate build fails with `PRODUCT_BUILD_REGRESSION` and git diff proves candidate changed no frontend/UI files:
+   - Auditor executes an independent clean build-only check at `task.base_sha`:
+     `resolve_npm()` -> `npm ci` -> `npm run build` in an isolated detached worktree.
+   - Baseline product `pytest` is **never** executed for build attribution.
+   - Baseline classification, exit code, bounded output tail, and normalized signatures are captured separately.
+
+#### Deterministic Diagnostics Normalization
+Compiler diagnostics are normalized deterministically across environments to compare baseline and candidate error sets:
+- **Canonical Paths**: Strips temporary/worktree root prefixes, Windows drive letters (`C:`), and redundant folder prefixes (e.g. `src/frontend/src/App.tsx`, `C:\worktree\src\frontend\src\App.tsx`, and `.\src\App.tsx` all canonicalize to `src/App.tsx`).
+- **Timestamp & Prefix Stripping**: Strips unstable wall-clock timestamps (`[12:34:56 PM]`, ISO 8601 strings) and log prefixes (`[ERROR]`).
+- **Unified Location Signatures**: Normalizes Windows parenthesized locations (`path(line,col): error TS...`) and Unix colon locations (`path:line:col - error TS...`) into canonical signatures retaining relative source path, compiler error code (`TS\d+`), and core message.
+- **Two-Pass Non-Overlapping Parser**: Primary TypeScript regex handles standard and parenthesized diagnostics. Generic fallback handles bundler/Rollup/syntax diagnostics, explicitly skipping lines already recognized by the primary parser and using the identical canonical path normalizer.
+- **Summary Suppression**: Summary lines such as `Found N errors in N files` are suppressed when specific source diagnostics are extracted. Each source diagnostic yields exactly one canonical signature across Windows and Unix platforms.
+
+#### Attribution Outcomes & State Transitions
+- **PREEXISTING_BASELINE_BUILD_REGRESSION**:
+  No candidate frontend/UI diff, baseline also yields `PRODUCT_BUILD_REGRESSION`, and normalized diagnostic signatures are materially equivalent.
+  - State transition: `READY_FOR_AUDIT` -> `BLOCKED`.
+  - Whole-product acceptance is blocked, but candidate is **not blamed**.
+  - Attempt count is **not incremented** (no attempt burn).
+  - No candidate remediation prompt is generated (`prompts/` untouched).
+  - Recorded finding specifies that the fix must be addressed in a separate baseline/frontend debt task.
+- **CANDIDATE_BUILD_REGRESSION**:
+  Frontend/UI diff exists, OR baseline build passed while candidate failed, OR candidate introduced materially new/different diagnostics.
+  - State transition: `READY_FOR_AUDIT` -> `READY` (remediation attempt incremented, e.g. attempt 2).
+  - Candidate is routed to `REMEDIATE` within allowed scope.
+  - Monotonic branch progression (e.g. `-r1-remediation`) and targeted remediation prompt generated.
+- **AUDIT_ENVIRONMENT_FAILURE**:
+  Baseline attribution cannot complete because npm, tooling, or environment is unavailable.
+  - State transition: `READY_FOR_AUDIT` -> `BLOCKED` (infrastructure).
+  - No candidate blame, no attempt burn.
+
 
 
