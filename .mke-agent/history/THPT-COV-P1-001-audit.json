@@ -1,0 +1,16 @@
+{
+  "task_id": "THPT-COV-P1-001",
+  "attempt": 1,
+  "base_sha": "37cc383631600853381da0ce8e5457ab746e1da1",
+  "audited_sha": "85e21b6823c6c56a4f349a1b5579a03695385b3a",
+  "verdict": "REMEDIATE",
+  "findings": [
+    "ProblemIR provenance uses Optional Dict and violates recursive deep immutability.",
+    "DomainAdapter supported_problem_kinds returns mutable Set instead of an immutable collection.",
+    "Benchmark false_verified_count trusts a supplied is_false_verified field instead of deriving it from correctness and verification level.",
+    "ExpectedAnswerType has nine values but ExpectedAnswerSpec implements only five typed variants and does not enforce type consistency."
+  ],
+  "lineage": "PASS: exactly one commit ahead of accepted P0 base",
+  "scope": "PASS: changes limited to coverage package and THPT-COV-P1 tests",
+  "ci": "No GitHub status checks or workflow runs were available; runner PASS is local evidence only."
+}
