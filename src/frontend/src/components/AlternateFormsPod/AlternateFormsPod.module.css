@@ -18,7 +18,8 @@
 }
 
 .podTitle {
-  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-muted, #555555);
   letter-spacing: 0.01em;
