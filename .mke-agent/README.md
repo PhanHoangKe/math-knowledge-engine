@@ -51,3 +51,8 @@ git show origin/automation/mke-agent-loop:.mke-agent/install.ps1 | powershell -N
 If neither an environment key nor the DPAPI file exists, the installer asks once for the OpenAI API key. API billing is separate from ChatGPT. Re-running the installer upgrades the existing control worktree and scheduled task without asking for the key again.
 
 The only one-time local setup is running install.ps1. Antigravity CLI may require one interactive sign-in if its cached credentials are not already available.
+
+## Auto-Wake Smoke Test 006
+
+Browser Auto-Wake v1.2 diagnostics were verified active against the local Bridge on 2026-10-03.
+
