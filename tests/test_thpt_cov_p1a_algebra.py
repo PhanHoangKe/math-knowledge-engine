@@ -512,3 +512,307 @@ class TestImmutabilityAndTrace:
         assert trace.steps[4].operation_kind == "VERIFIED_CONCLUSION"
         assert "S = \\{-1\\}" in trace.steps[4].output_expression_latex
         assert trace.conclusion_vi != ""
+
+
+# ===========================================================================
+# 18. Adversarial Verifier Soundness Remediation R2
+# ===========================================================================
+
+class TestAdversarialVerifierSoundnessR2:
+    @pytest.fixture
+    def adapter(self) -> AlgebraRationalAdapter:
+        return AlgebraRationalAdapter()
+
+    # 1. identity + FiniteRootCollectionEntity(roots=()) => NOT EXACT_VERIFIED; PARTIAL is acceptable.
+    def test_identity_with_empty_finite_candidate_not_exact_verified(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / (x - 1) = 1 / (x - 1)", "adv_id_empty_roots")
+        cand = CandidateSolution(
+            candidate_id="cand_empty_roots",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="{}",
+            parsed_entities=(FiniteRootCollectionEntity(roots=()),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level != VerificationLevel.EXACT_VERIFIED
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+
+    # 2. identity + finite valid subset => PARTIAL at most.
+    def test_identity_with_finite_valid_subset_yields_partial(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / (x - 1) = 1 / (x - 1)", "adv_id_subset")
+        cand = CandidateSolution(
+            candidate_id="cand_valid_subset",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="{2, 3}",
+            parsed_entities=(
+                FiniteRootCollectionEntity(
+                    roots=(
+                        RationalScalarEntity.from_rational(Rational(2, 1)),
+                        RationalScalarEntity.from_rational(Rational(3, 1)),
+                    )
+                ),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+
+    # 3. candidate with two parsed_entities, first correct and second malicious => REJECTED.
+    def test_candidate_with_two_parsed_entities_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("x / (x - 1) = 0", "adv_two_entities")
+        cand = CandidateSolution(
+            candidate_id="cand_two_entities",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x = 0; malicious = 999",
+            parsed_entities=(
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(0, 1)),)),
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(999, 1)),)),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        entity_obs = [o for o in ver.proof_obligations if o.obligation_id == "SINGLE_AUTHORITATIVE_ENTITY"]
+        assert len(entity_obs) == 1
+        assert entity_obs[0].passed is False
+
+    # 4. candidate with zero parsed_entities on a supported in-envelope equation => REJECTED.
+    def test_candidate_with_zero_parsed_entities_on_supported_equation_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("x / (x - 1) = 0", "adv_zero_entities")
+        cand = CandidateSolution(
+            candidate_id="cand_zero_entities",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="",
+            parsed_entities=(),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        entity_obs = [o for o in ver.proof_obligations if o.obligation_id == "SINGLE_AUTHORITATIVE_ENTITY"]
+        assert len(entity_obs) == 1
+        assert entity_obs[0].passed is False
+
+    # 5. incomplete finite candidate for a two-root equation => PARTIAL.
+    def test_incomplete_finite_candidate_two_root_equation_yields_partial(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("(x^2 - 5*x + 6) / (x - 4) = 0", "adv_incomplete_two_root")
+        cand = CandidateSolution(
+            candidate_id="cand_incomplete",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x = 2",
+            parsed_entities=(
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(2, 1)),)),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+        comp_obs = [o for o in ver.proof_obligations if o.obligation_id == "SOLUTION_COMPLETENESS"]
+        assert len(comp_obs) == 1
+        assert comp_obs[0].passed is False
+
+    # 6. monkeypatch solve_poly_degree_le_2 to raise or return deliberately wrong data;
+    # direct verify() of a manual correct candidate must still prove completeness without calling/trusting it.
+    def test_verifier_completeness_independent_of_solver_monkeypatch(
+        self, adapter: AlgebraRationalAdapter, monkeypatch: pytest.MonkeyPatch
+    ):
+        def forbidden_solver(*args, **kwargs):
+            raise RuntimeError("solve_poly_degree_le_2 MUST NOT be called during verifier completeness check!")
+
+        monkeypatch.setattr("mke_product.coverage.algebra_rational.solve_poly_degree_le_2", forbidden_solver)
+
+        ir = parse_equation_to_ir("(x + 1) / (x - 2) = 0", "adv_solver_independent")
+        correct_cand = CandidateSolution(
+            candidate_id="cand_correct_independent",
+            generator_engine="manual",
+            raw_symbolic_output="x = -1",
+            parsed_entities=(
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(-1, 1)),)),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, correct_cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 7. x/x=0 + EmptyRealSolutionEntity => EXACT_VERIFIED.
+    def test_x_div_x_eq_0_empty_solution_exact_verified(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("x / x = 0", "adv_x_div_x_empty")
+        cand = CandidateSolution(
+            candidate_id="cand_empty_verified",
+            generator_engine="mke_solver",
+            raw_symbolic_output="S = \\emptyset",
+            parsed_entities=(EmptyRealSolutionEntity(),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 8. 1/(x^2-1)=1/(x^2-1) + correct {-1,1} exclusions => EXACT_VERIFIED.
+    def test_identity_x2_minus_1_with_correct_exclusions_exact_verified(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / (x^2 - 1) = 1 / (x^2 - 1)", "adv_id_x2_minus_1")
+        cand = CandidateSolution(
+            candidate_id="cand_exclusions_exact",
+            generator_engine="mke_solver",
+            raw_symbolic_output="x in R \\ {-1, 1}",
+            parsed_entities=(
+                AllRealsExceptFiniteEntity(
+                    excluded_points=(
+                        RationalScalarEntity.from_rational(Rational(-1, 1)),
+                        RationalScalarEntity.from_rational(Rational(1, 1)),
+                    )
+                ),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 9. same identity with one missing exclusion => REJECTED/not exact.
+    def test_identity_x2_minus_1_missing_one_exclusion_rejected(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / (x^2 - 1) = 1 / (x^2 - 1)", "adv_id_missing_excl")
+        cand = CandidateSolution(
+            candidate_id="cand_missing_excl",
+            generator_engine="untrusted_cas",
+            raw_symbolic_output="x in R \\ {1}",
+            parsed_entities=(
+                AllRealsExceptFiniteEntity(
+                    excluded_points=(RationalScalarEntity.from_rational(Rational(1, 1)),)
+                ),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+
+    # 10. 1/(x^2+1)=1/(x^2+1) + AllRealSolutionEntity => EXACT_VERIFIED.
+    def test_identity_no_real_exclusions_all_real_exact_verified(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("1 / (x^2 + 1) = 1 / (x^2 + 1)", "adv_id_all_real")
+        cand = CandidateSolution(
+            candidate_id="cand_all_real_verified",
+            generator_engine="mke_solver",
+            raw_symbolic_output="x in R",
+            parsed_entities=(AllRealSolutionEntity(),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 11. (x^2-2)/(x-3)=0 with both surd roots => EXACT_VERIFIED.
+    def test_quadratic_surd_roots_exact_verified(self, adapter: AlgebraRationalAdapter):
+        ir = parse_equation_to_ir("(x^2 - 2) / (x - 3) = 0", "adv_surd_roots")
+        r_minus = RealQuadraticSurdEntity(p=0, q=-1, d=2, r=1, latex="-\\sqrt{2}")
+        r_plus = RealQuadraticSurdEntity(p=0, q=1, d=2, r=1, latex="\\sqrt{2}")
+        cand = CandidateSolution(
+            candidate_id="cand_surds",
+            generator_engine="mke_solver",
+            raw_symbolic_output="x = -sqrt(2), x = sqrt(2)",
+            parsed_entities=(FiniteRootCollectionEntity(roots=(r_minus, r_plus)),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition == VerificationDisposition.ACCEPTED
+
+    # 12. unsupported Radical => UNSUPPORTED/UNSUPPORTED.
+    def test_unsupported_radical_preserves_unsupported_unsupported(self, adapter: AlgebraRationalAdapter):
+        span = Span(0, 0)
+        left_ast = BinaryOp(
+            op="/",
+            left=Radical(radicand=Variable(name="x", span=span), span=span),
+            right=BinaryOp(op="-", left=Variable(name="x", span=span), right=IntegerLiteral(1, span=span), span=span),
+            span=span,
+        )
+        payload = SingleEquationPayload(left=left_ast, right=IntegerLiteral(0, span=span), target_variable="x")
+        ir = ProblemIR(
+            problem_id="adv_radical_test",
+            problem_kind=ProblemKind.ALGEBRA_EQUATION,
+            payload=payload,
+        )
+        cand = CandidateSolution(
+            candidate_id="cand_malformed",
+            generator_engine="error",
+            raw_symbolic_output="",
+            parsed_entities=(),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        assert ver.disposition == VerificationDisposition.UNSUPPORTED
+
+    # 13. degree overflow => UNSUPPORTED/UNSUPPORTED.
+    def test_degree_overflow_preserves_unsupported_unsupported(self, adapter: AlgebraRationalAdapter):
+        span = Span(0, 0)
+        num_ast = BinaryOp(
+            op="*",
+            left=Power(base=Variable(name="x", span=span), exponent=IntegerLiteral(2, span=span), span=span),
+            right=Variable(name="x", span=span),
+            span=span,
+        )
+        left_ast = BinaryOp(
+            op="/",
+            left=num_ast,
+            right=BinaryOp(op="-", left=Variable(name="x", span=span), right=IntegerLiteral(1, span=span), span=span),
+            span=span,
+        )
+        payload = SingleEquationPayload(left=left_ast, right=IntegerLiteral(0, span=span), target_variable="x")
+        ir = ProblemIR(
+            problem_id="adv_degree_overflow",
+            problem_kind=ProblemKind.ALGEBRA_EQUATION,
+            payload=payload,
+        )
+        cand = CandidateSolution(
+            candidate_id="cand_empty_overflow",
+            generator_engine="error",
+            raw_symbolic_output="",
+            parsed_entities=(),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, cand)
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+        assert ver.disposition == VerificationDisposition.UNSUPPORTED
+
+    # 14. Original false-verified attacks are explicit regression tests.
+    def test_regression_original_false_verified_attack_1_identity_empty_roots(self, adapter: AlgebraRationalAdapter):
+        # Attack 1: Identity 1/(x-1) = 1/(x-1) with FiniteRootCollectionEntity(roots=())
+        # MUST NOT be EXACT_VERIFIED / ACCEPTED!
+        ir = parse_equation_to_ir("1 / (x - 1) = 1 / (x - 1)", "regression_attack_1")
+        bad_cand = CandidateSolution(
+            candidate_id="attack_1_cand",
+            generator_engine="untrusted_adversary",
+            raw_symbolic_output="{}",
+            parsed_entities=(FiniteRootCollectionEntity(roots=()),),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, bad_cand)
+        assert ver.verification_level != VerificationLevel.EXACT_VERIFIED
+        assert ver.disposition != VerificationDisposition.ACCEPTED
+        assert ver.verification_level == VerificationLevel.PARTIAL
+        assert ver.disposition == VerificationDisposition.PARTIAL
+
+    def test_regression_original_false_verified_attack_2_multi_entity_bypass(self, adapter: AlgebraRationalAdapter):
+        # Attack 2: Correct first entity followed by malicious second entity
+        # MUST NOT verify parsed_entities[0] and ignore parsed_entities[1]!
+        ir = parse_equation_to_ir("(x + 1) / (x - 2) = 0", "regression_attack_2")
+        multi_cand = CandidateSolution(
+            candidate_id="attack_2_cand",
+            generator_engine="untrusted_adversary",
+            raw_symbolic_output="x = -1; x = 99999",
+            parsed_entities=(
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(-1, 1)),)),
+                FiniteRootCollectionEntity(roots=(RationalScalarEntity.from_rational(Rational(99999, 1)),)),
+            ),
+            metadata=CandidateMetadata(),
+        )
+        ver = adapter.verify(ir, multi_cand)
+        assert ver.disposition == VerificationDisposition.REJECTED
+        assert ver.verification_level == VerificationLevel.UNSUPPORTED
+

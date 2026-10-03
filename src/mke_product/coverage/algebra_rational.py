@@ -532,6 +532,70 @@ def deduplicate_roots(
 
 
 # ---------------------------------------------------------------------------
+# Verifier-Only Exact Algebraic Certificate Helpers
+# ---------------------------------------------------------------------------
+
+def distinct_real_root_count(poly: PolyQ) -> int:
+    """Verifier-only exact distinct real root count for deg <= 2 without solving roots."""
+    if poly.is_zero:
+        raise ValueError("Zero polynomial does not have a finite root count")
+    if poly.degree == 0:
+        return 0
+    if poly.degree == 1:
+        return 1
+    if poly.degree == 2:
+        c0 = poly.coeff(0)
+        c1 = poly.coeff(1)
+        c2 = poly.coeff(2)
+        delta = c1 * c1 - Rational(4, 1) * c2 * c0
+        if delta.is_negative:
+            return 0
+        if delta.is_zero:
+            return 1
+        return 2
+    raise DegreeOutOfScopeError(f"Polynomial degree {poly.degree} > 2 exceeds quadratic proof envelope")
+
+
+def poly_lcm(p1: PolyQ, p2: PolyQ) -> PolyQ:
+    """Compute monic least common multiple of two polynomials in Q[x]."""
+    if p1.is_zero or p2.is_zero:
+        return PolyQ.zero()
+    if p1.degree == 0:
+        return p2.scale(Rational(1, 1) / p2.leading_coeff)
+    if p2.degree == 0:
+        return p1.scale(Rational(1, 1) / p1.leading_coeff)
+    g = p1.gcd_poly(p2)
+    p1_div_g, _ = p1.divmod_poly(g)
+    prod = p1_div_g * p2
+    return prod.scale(Rational(1, 1) / prod.leading_coeff)
+
+
+def poly_squarefree(p: PolyQ) -> PolyQ:
+    """Make a polynomial in Q[x] square-free for deg <= 2."""
+    if p.is_zero or p.degree <= 1:
+        return p if p.is_zero else p.scale(Rational(1, 1) / p.leading_coeff)
+    if p.degree == 2:
+        c0 = p.coeff(0)
+        c1 = p.coeff(1)
+        c2 = p.coeff(2)
+        delta = c1 * c1 - Rational(4, 1) * c2 * c0
+        if delta.is_zero:
+            r = -c1 / (Rational(2, 1) * c2)
+            return PolyQ((-r, Rational(1, 1)))
+        return p.scale(Rational(1, 1) / p.leading_coeff)
+    return p
+
+
+def eval_poly_at_point(poly: PolyQ, pt: NumberFieldElement) -> NumberFieldElement:
+    """Exact polynomial evaluation at a NumberFieldElement."""
+    res = NumberFieldElement.from_rational(Rational(0, 1), pt.d)
+    for c in reversed(poly.coeffs):
+        res = res * pt + NumberFieldElement.from_rational(c, pt.d)
+    return res
+
+
+
+# ---------------------------------------------------------------------------
 # AlgebraRationalAdapter Implementation
 # ---------------------------------------------------------------------------
 
@@ -766,21 +830,84 @@ class AlgebraRationalAdapter(DomainAdapter):
 
     def verify(self, ir: ProblemIR, candidate: CandidateSolution) -> VerificationReport:
         """Independently verify candidate solution using deterministic MKE logic."""
+        # 1. Validate IR / payload shape enough to inspect the typed AST
+        if ir.problem_kind != ProblemKind.ALGEBRA_EQUATION:
+            return VerificationReport(
+                verification_id=f"ver_{ir.problem_id}",
+                verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                verification_level=VerificationLevel.UNSUPPORTED,
+                disposition=VerificationDisposition.UNSUPPORTED,
+                certificate_hash=hashlib.sha256(f"fail_kind_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                details="Requires ALGEBRA_EQUATION problem kind",
+            )
+
         if not isinstance(ir.payload, SingleEquationPayload):
             return VerificationReport(
                 verification_id=f"ver_{ir.problem_id}",
                 verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
                 verification_level=VerificationLevel.UNSUPPORTED,
                 disposition=VerificationDisposition.UNSUPPORTED,
-                certificate_hash=hashlib.sha256(f"fail_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                certificate_hash=hashlib.sha256(f"fail_payload_{ir.problem_id}".encode("utf-8")).hexdigest(),
                 details="Requires SingleEquationPayload",
             )
 
         target_var = ir.payload.target_variable
+        all_vars = ir.payload.left.variables() | ir.payload.right.variables()
+        if not all_vars or not all_vars.issubset({target_var}):
+            return VerificationReport(
+                verification_id=f"ver_{ir.problem_id}",
+                verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                verification_level=VerificationLevel.UNSUPPORTED,
+                disposition=VerificationDisposition.UNSUPPORTED,
+                certificate_hash=hashlib.sha256(f"fail_vars_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                details=f"Equation variables {all_vars} incompatible with target variable {target_var!r}",
+            )
 
+        # 2 & 3. Independently normalize/rebuild the exact rational equation and
+        # determine whether it is inside the supported proof envelope.
+        # If the problem itself is outside the proof envelope (unsupported AST node,
+        # degree overflow, etc.), return UNSUPPORTED / UNSUPPORTED regardless of candidate.
         try:
-            diff_frac, true_exclusions, true_roots = self._analyze_equation(ir)
-        except (DegreeOutOfScopeError, UnsupportedNodeError, Exception) as exc:
+            left_frac = ast_to_rational_fraction(ir.payload.left, target_var)
+            right_frac = ast_to_rational_fraction(ir.payload.right, target_var)
+            diff_frac = left_frac - right_frac
+            cleared_num = diff_frac.num
+
+            denom_nodes = self._extract_denominators(ir)
+            denom_polys: List[PolyQ] = []
+            for d_node in denom_nodes:
+                d_frac = ast_to_rational_fraction(d_node, target_var)
+                if d_frac.num.degree > 2 or d_frac.den.degree > 2:
+                    raise DegreeOutOfScopeError(
+                        f"Denominator degree exceeds quadratic bound: num={d_frac.num.degree}, den={d_frac.den.degree}"
+                    )
+                if not d_frac.num.is_zero and d_frac.num.degree >= 1:
+                    denom_polys.append(d_frac.num)
+                if not d_frac.den.is_zero and d_frac.den.degree >= 1:
+                    denom_polys.append(d_frac.den)
+
+            if diff_frac.den.degree > 2:
+                raise DegreeOutOfScopeError(
+                    f"Common denominator degree {diff_frac.den.degree} exceeds quadratic bound <= 2"
+                )
+            if not diff_frac.den.is_zero and diff_frac.den.degree >= 1:
+                denom_polys.append(diff_frac.den)
+
+            domain_poly = PolyQ.constant(1)
+            for dp in denom_polys:
+                domain_poly = poly_lcm(domain_poly, dp)
+                domain_poly = poly_squarefree(domain_poly)
+
+            if not cleared_num.is_zero and cleared_num.degree > 2:
+                raise DegreeOutOfScopeError(
+                    f"Cleared numerator degree {cleared_num.degree} exceeds quadratic bound <= 2"
+                )
+            if domain_poly.degree > 2:
+                raise DegreeOutOfScopeError(
+                    f"Domain exclusion polynomial degree {domain_poly.degree} exceeds quadratic bound <= 2"
+                )
+
+        except (DegreeOutOfScopeError, UnsupportedNodeError, ZeroDivisionError, Exception) as exc:
             return VerificationReport(
                 verification_id=f"ver_{ir.problem_id}",
                 verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
@@ -798,21 +925,27 @@ class AlgebraRationalAdapter(DomainAdapter):
                 details=f"Problem outside proof envelope: {exc}",
             )
 
-        # Independent candidate inspection
-        if not candidate.parsed_entities:
+        # 4. ONLY AFTER the problem is proven inside the supported proof envelope,
+        # validate candidate shape and content.
+        if len(candidate.parsed_entities) != 1:
             return VerificationReport(
                 verification_id=f"ver_{ir.problem_id}",
                 verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
                 verification_level=VerificationLevel.UNSUPPORTED,
                 disposition=VerificationDisposition.REJECTED,
-                certificate_hash=hashlib.sha256(f"empty_cand_{ir.problem_id}".encode("utf-8")).hexdigest(),
-                details="Candidate contains no mathematical entities",
+                proof_obligations=(
+                    ProofObligationResult(
+                        obligation_id="SINGLE_AUTHORITATIVE_ENTITY",
+                        description="Candidate solution must contain exactly one parsed entity",
+                        passed=False,
+                        details=f"Found {len(candidate.parsed_entities)} entities",
+                    ),
+                ),
+                certificate_hash=hashlib.sha256(f"entity_count_mismatch_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                details=f"Expected exactly 1 parsed solution entity, found {len(candidate.parsed_entities)}",
             )
 
         cand_entity = candidate.parsed_entities[0]
-        obligations: List[ProofObligationResult] = []
-        residuals: List[ResidualCheck] = []
-        domain_checks: List[DomainCheck] = []
 
         # -------------------------------------------------------------------
         # Case 1: Candidate is FiniteRootCollectionEntity
@@ -820,45 +953,64 @@ class AlgebraRationalAdapter(DomainAdapter):
         if isinstance(cand_entity, FiniteRootCollectionEntity):
             all_in_domain = True
             all_satisfied = True
-            all_exclusions_rejected = True
+            residuals: List[ResidualCheck] = []
+            domain_checks: List[DomainCheck] = []
 
-            # Check each candidate root
             for idx, r in enumerate(cand_entity.roots):
-                # 1. Domain check: must NOT match any true exclusion
-                if is_root_in_collection(r, true_exclusions):
+                if isinstance(r, RationalScalarEntity):
+                    pt = NumberFieldElement.from_rational(r.to_rational)
+                elif isinstance(r, RealQuadraticSurdEntity):
+                    pt = NumberFieldElement.from_surd_entity(r)
+                else:
                     all_in_domain = False
-                    all_exclusions_rejected = False
+                    all_satisfied = False
                     domain_checks.append(
                         DomainCheck(
-                            condition_desc=f"Root {idx} ({r.latex}) not in excluded set",
+                            condition_desc=f"Root {idx} of unsupported type {type(r).__name__}",
                             satisfied=False,
                         )
                     )
-                else:
-                    domain_checks.append(
-                        DomainCheck(
-                            condition_desc=f"Root {idx} ({r.latex}) in valid domain",
-                            satisfied=True,
-                        )
-                    )
+                    continue
 
-                # 2. Residual check: evaluate AST LHS - RHS at point
-                if isinstance(r, RationalScalarEntity):
-                    pt = NumberFieldElement.from_rational(r.to_rational)
-                else:
-                    pt = NumberFieldElement.from_surd_entity(r)
-
+                # 1. Exact-check original domain
+                in_dom = True
                 try:
-                    lhs_val = eval_ast_at_point(ir.payload.left, pt, target_var)
-                    rhs_val = eval_ast_at_point(ir.payload.right, pt, target_var)
-                    diff_val = lhs_val - rhs_val
-                    is_zero = diff_val.is_zero
+                    dp_val = eval_poly_at_point(domain_poly, pt)
+                    if dp_val.is_zero:
+                        in_dom = False
+
+                    if in_dom:
+                        for d_node in denom_nodes:
+                            d_val = eval_ast_at_point(d_node, pt, target_var)
+                            if d_val.is_zero:
+                                in_dom = False
+                                break
+
+                    if in_dom:
+                        lhs_val = eval_ast_at_point(ir.payload.left, pt, target_var)
+                        rhs_val = eval_ast_at_point(ir.payload.right, pt, target_var)
                 except ZeroDivisionError:
-                    # Domain violation during AST evaluation
-                    all_in_domain = False
-                    is_zero = False
+                    in_dom = False
                 except Exception:
-                    is_zero = False
+                    in_dom = False
+
+                domain_checks.append(
+                    DomainCheck(
+                        condition_desc=f"Root {idx} ({r.latex}) in valid domain",
+                        satisfied=in_dom,
+                    )
+                )
+                if not in_dom:
+                    all_in_domain = False
+
+                # 2. Exact-check original AST equation satisfaction
+                is_zero = False
+                if in_dom:
+                    try:
+                        diff_val = lhs_val - rhs_val
+                        is_zero = diff_val.is_zero
+                    except Exception:
+                        is_zero = False
 
                 residuals.append(
                     ResidualCheck(
@@ -870,9 +1022,9 @@ class AlgebraRationalAdapter(DomainAdapter):
                 if not is_zero:
                     all_satisfied = False
 
-            # Check if any candidate root violates domain or equation
+            # If any candidate root violates domain or equation, reject immediately
             if not all_in_domain or not all_satisfied:
-                obligations.extend([
+                obligations = [
                     ProofObligationResult(
                         obligation_id="ORIGINAL_DOMAIN_CONSTRAINTS",
                         description="Candidate roots lie in the original domain",
@@ -883,7 +1035,7 @@ class AlgebraRationalAdapter(DomainAdapter):
                         description="Candidate roots satisfy original LHS = RHS",
                         passed=all_satisfied,
                     ),
-                ])
+                ]
                 cert_hash = hashlib.sha256(f"rej_{ir.problem_id}".encode("utf-8")).hexdigest()
                 return VerificationReport(
                     verification_id=f"ver_{ir.problem_id}",
@@ -897,13 +1049,60 @@ class AlgebraRationalAdapter(DomainAdapter):
                     details="Candidate root violates domain condition or equation equality",
                 )
 
-            # Completeness check
             cand_unique = deduplicate_roots(cand_entity.roots)
-            is_complete = (len(cand_unique) == len(true_roots)) and all(
-                is_root_in_collection(r, true_roots) for r in cand_unique
-            )
 
-            obligations.extend([
+            # Section C: Identity vs finite candidate handling
+            if cleared_num.is_zero:
+                # For identity, FiniteRootCollectionEntity can never be complete.
+                # All supplied points are valid solutions on domain, so result is at most PARTIAL/PARTIAL.
+                # An empty finite set on an identity must never be EXACT_VERIFIED.
+                obligations = [
+                    ProofObligationResult(
+                        obligation_id="ORIGINAL_DOMAIN_CONSTRAINTS",
+                        description="All accepted roots satisfy original domain constraints",
+                        passed=True,
+                    ),
+                    ProofObligationResult(
+                        obligation_id="EQUATION_SATISFACTION",
+                        description="All accepted roots satisfy original LHS = RHS",
+                        passed=True,
+                    ),
+                    ProofObligationResult(
+                        obligation_id="SOLUTION_COMPLETENESS",
+                        description="Finite root collection cannot be complete for an identity",
+                        passed=False,
+                        details="Identity equation has infinitely many solutions on its domain",
+                    ),
+                ]
+                cert_payload = {
+                    "problem_id": ir.problem_id,
+                    "verifier": "MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    "level": VerificationLevel.PARTIAL.value,
+                    "disposition": VerificationDisposition.PARTIAL.value,
+                    "roots": [r.model_dump() for r in cand_unique],
+                }
+                cert_hash = hashlib.sha256(json.dumps(cert_payload, sort_keys=True).encode("utf-8")).hexdigest()
+                return VerificationReport(
+                    verification_id=f"ver_{ir.problem_id}",
+                    verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    verification_level=VerificationLevel.PARTIAL,
+                    disposition=VerificationDisposition.PARTIAL,
+                    proof_obligations=tuple(obligations),
+                    residual_evaluations=tuple(residuals),
+                    domain_boundary_checks=tuple(domain_checks),
+                    certificate_hash=cert_hash,
+                    details="Identity equation has infinite solutions; finite root set is at most partial",
+                )
+
+            # Section D point 6: Non-zero cleared numerator completeness certificate
+            num_root_count = distinct_real_root_count(cleared_num)
+            g_poly = cleared_num.gcd_poly(domain_poly)
+            g_root_count = distinct_real_root_count(g_poly)
+            expected_valid_count = num_root_count - g_root_count
+
+            is_complete = (len(cand_unique) == expected_valid_count)
+
+            obligations = [
                 ProofObligationResult(
                     obligation_id="ORIGINAL_DOMAIN_CONSTRAINTS",
                     description="All accepted roots satisfy original domain constraints",
@@ -923,8 +1122,9 @@ class AlgebraRationalAdapter(DomainAdapter):
                     obligation_id="SOLUTION_COMPLETENESS",
                     description="Candidate solution set is complete for Q[x] degree <= 2",
                     passed=is_complete,
+                    details=f"Candidate roots {len(cand_unique)}, expected valid roots {expected_valid_count}",
                 ),
-            ])
+            ]
 
             if is_complete:
                 level = VerificationLevel.EXACT_VERIFIED
@@ -960,15 +1160,39 @@ class AlgebraRationalAdapter(DomainAdapter):
         # Case 2: Candidate is EmptyRealSolutionEntity
         # -------------------------------------------------------------------
         elif isinstance(cand_entity, EmptyRealSolutionEntity):
-            is_truly_empty = (len(true_roots) == 0 and not diff_frac.num.is_zero)
-            obligations.append(
+            if cleared_num.is_zero:
+                obligations = [
+                    ProofObligationResult(
+                        obligation_id="CONTRADICTION_OR_NO_ROOTS",
+                        description="Equation has no real solutions on domain",
+                        passed=False,
+                        details="Cleared numerator is identically zero (identity, not empty set)",
+                    ),
+                ]
+                return VerificationReport(
+                    verification_id=f"ver_{ir.problem_id}",
+                    verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    verification_level=VerificationLevel.UNSUPPORTED,
+                    disposition=VerificationDisposition.REJECTED,
+                    proof_obligations=tuple(obligations),
+                    certificate_hash=hashlib.sha256(f"empty_claim_identity_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                    details="False empty set claim: equation is an identity on its domain",
+                )
+
+            num_root_count = distinct_real_root_count(cleared_num)
+            g_poly = cleared_num.gcd_poly(domain_poly)
+            g_root_count = distinct_real_root_count(g_poly)
+            expected_valid_count = num_root_count - g_root_count
+
+            is_truly_empty = (expected_valid_count == 0)
+            obligations = [
                 ProofObligationResult(
                     obligation_id="CONTRADICTION_OR_NO_ROOTS",
                     description="Equation has no real solutions on domain",
                     passed=is_truly_empty,
-                    details="Cleared equation has no valid roots on domain" if is_truly_empty else "Valid roots exist",
-                )
-            )
+                    details="Cleared equation has no valid roots on domain" if is_truly_empty else f"Equation has {expected_valid_count} valid roots",
+                ),
+            ]
 
             if is_truly_empty:
                 level = VerificationLevel.EXACT_VERIFIED
@@ -977,7 +1201,7 @@ class AlgebraRationalAdapter(DomainAdapter):
             else:
                 level = VerificationLevel.UNSUPPORTED
                 disp = VerificationDisposition.REJECTED
-                details = "False empty set claim: equation has valid roots or is an identity"
+                details = "False empty set claim: equation has valid roots"
 
             cert_payload = {
                 "problem_id": ir.problem_id,
@@ -1002,33 +1226,90 @@ class AlgebraRationalAdapter(DomainAdapter):
         # Case 3: Candidate is AllRealsExceptFiniteEntity
         # -------------------------------------------------------------------
         elif isinstance(cand_entity, AllRealsExceptFiniteEntity):
-            is_identity = diff_frac.num.is_zero
-            cand_exclusions = deduplicate_roots(cand_entity.excluded_points)
-            exclusions_match = (len(cand_exclusions) == len(true_exclusions)) and all(
-                is_root_in_collection(e, true_exclusions) for e in cand_exclusions
-            )
+            if not cleared_num.is_zero:
+                return VerificationReport(
+                    verification_id=f"ver_{ir.problem_id}",
+                    verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    verification_level=VerificationLevel.UNSUPPORTED,
+                    disposition=VerificationDisposition.REJECTED,
+                    certificate_hash=hashlib.sha256(f"false_identity_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                    details="False identity claim: cleared numerator is not identically zero",
+                )
 
-            obligations.extend([
+            cand_exclusions = deduplicate_roots(cand_entity.excluded_points)
+
+            # Each candidate exclusion must actually invalidate the original domain
+            all_exclusions_valid = True
+            for idx, e in enumerate(cand_exclusions):
+                if isinstance(e, RationalScalarEntity):
+                    pt = NumberFieldElement.from_rational(e.to_rational)
+                elif isinstance(e, RealQuadraticSurdEntity):
+                    pt = NumberFieldElement.from_surd_entity(e)
+                else:
+                    all_exclusions_valid = False
+                    break
+
+                invalidates_domain = False
+                try:
+                    dp_val = eval_poly_at_point(domain_poly, pt)
+                    if dp_val.is_zero:
+                        invalidates_domain = True
+
+                    if not invalidates_domain:
+                        for d_node in denom_nodes:
+                            d_val = eval_ast_at_point(d_node, pt, target_var)
+                            if d_val.is_zero:
+                                invalidates_domain = True
+                                break
+
+                    if not invalidates_domain:
+                        _ = eval_ast_at_point(ir.payload.left, pt, target_var)
+                        _ = eval_ast_at_point(ir.payload.right, pt, target_var)
+                except ZeroDivisionError:
+                    invalidates_domain = True
+                except Exception:
+                    pass
+
+                if not invalidates_domain:
+                    all_exclusions_valid = False
+                    break
+
+            if not all_exclusions_valid:
+                return VerificationReport(
+                    verification_id=f"ver_{ir.problem_id}",
+                    verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    verification_level=VerificationLevel.UNSUPPORTED,
+                    disposition=VerificationDisposition.REJECTED,
+                    certificate_hash=hashlib.sha256(f"invalid_exclusion_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                    details="Candidate excluded point does not invalidate the original domain",
+                )
+
+            # Independently certify candidate excluded points exactly cover all real zeros of domain constraints
+            expected_exclusion_count = distinct_real_root_count(domain_poly)
+            exclusions_exact_match = (len(cand_exclusions) == expected_exclusion_count)
+
+            obligations = [
                 ProofObligationResult(
                     obligation_id="IDENTITY_ON_DOMAIN",
                     description="Cleared numerator is identically zero",
-                    passed=is_identity,
+                    passed=True,
                 ),
                 ProofObligationResult(
                     obligation_id="DOMAIN_EXCLUSIONS_MATCH",
-                    description="All domain exclusions are accurately identified",
-                    passed=exclusions_match,
+                    description="All domain exclusions are accurately and completely identified",
+                    passed=exclusions_exact_match,
+                    details=f"Candidate exclusions: {len(cand_exclusions)}, expected: {expected_exclusion_count}",
                 ),
-            ])
+            ]
 
-            if is_identity and exclusions_match:
+            if exclusions_exact_match:
                 level = VerificationLevel.EXACT_VERIFIED
                 disp = VerificationDisposition.ACCEPTED
                 details = "Verified identity on domain with exact finite exclusions"
             else:
                 level = VerificationLevel.UNSUPPORTED
                 disp = VerificationDisposition.REJECTED
-                details = "Invalid identity claim or domain exclusions mismatch"
+                details = "Domain exclusions mismatch: missing or extra excluded points"
 
             cert_payload = {
                 "problem_id": ir.problem_id,
@@ -1053,28 +1334,36 @@ class AlgebraRationalAdapter(DomainAdapter):
         # Case 4: Candidate is AllRealSolutionEntity
         # -------------------------------------------------------------------
         elif isinstance(cand_entity, AllRealSolutionEntity):
-            # All real solutions without exclusions is valid ONLY if there are no domain exclusions
-            if true_exclusions:
-                # Denominators exist with roots, claiming AllReal is an extraneous-root domain violation
-                obligations.append(
-                    ProofObligationResult(
-                        obligation_id="UNRESTRICTED_DOMAIN_INVALID",
-                        description="Equation has denominator exclusions but candidate claimed unrestricted R",
-                        passed=False,
-                    )
+            if not cleared_num.is_zero:
+                return VerificationReport(
+                    verification_id=f"ver_{ir.problem_id}",
+                    verifier_name="MKE_RATIONAL_INDEPENDENT_VERIFIER_V1",
+                    verification_level=VerificationLevel.UNSUPPORTED,
+                    disposition=VerificationDisposition.REJECTED,
+                    certificate_hash=hashlib.sha256(f"false_all_real_not_id_{ir.problem_id}".encode("utf-8")).hexdigest(),
+                    details="False identity claim: cleared numerator is not identically zero",
                 )
-                level = VerificationLevel.UNSUPPORTED
-                disp = VerificationDisposition.REJECTED
-                details = "Domain violation: equation is undefined at denominator zeros"
-            elif diff_frac.num.is_zero:
+
+            exclusion_count = distinct_real_root_count(domain_poly)
+            if exclusion_count == 0:
                 level = VerificationLevel.EXACT_VERIFIED
                 disp = VerificationDisposition.ACCEPTED
-                details = "Verified identity on all of R"
+                details = "Verified identity on all of R with zero domain exclusions"
+                passed = True
             else:
                 level = VerificationLevel.UNSUPPORTED
                 disp = VerificationDisposition.REJECTED
-                details = "False identity claim"
+                details = f"Domain violation: equation has {exclusion_count} real excluded points"
+                passed = False
 
+            obligations = [
+                ProofObligationResult(
+                    obligation_id="UNRESTRICTED_DOMAIN_VALID",
+                    description="Original domain has zero real excluded points",
+                    passed=passed,
+                    details=details,
+                ),
+            ]
             cert_hash = hashlib.sha256(f"all_real_{ir.problem_id}_{level.value}".encode("utf-8")).hexdigest()
             return VerificationReport(
                 verification_id=f"ver_{ir.problem_id}",
@@ -1095,6 +1384,7 @@ class AlgebraRationalAdapter(DomainAdapter):
                 certificate_hash=hashlib.sha256(f"unhandled_{ir.problem_id}".encode("utf-8")).hexdigest(),
                 details=f"Unhandled candidate entity kind: {type(cand_entity).__name__}",
             )
+
 
     def build_trace(
         self,
