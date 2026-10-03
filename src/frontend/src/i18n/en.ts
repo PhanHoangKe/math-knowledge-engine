@@ -169,6 +169,11 @@ export const en: Translations = {
   lbl_step_by_step_solution: 'Step-by-step solution',
   lbl_download_page: 'Download Page',
   lbl_powered_by: 'POWERED BY MATH KNOWLEDGE ENGINE (MKE)',
+  act_zoom: 'Enlarge',
+  act_data: 'Data',
+  act_customize: 'Customize',
+  act_plain_text: 'Plain text',
+  act_copied: 'Copied!',
 
 
 

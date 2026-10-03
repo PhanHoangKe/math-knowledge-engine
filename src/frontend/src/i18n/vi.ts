@@ -167,6 +167,11 @@ export const vi = {
   lbl_step_by_step_solution: 'Giải pháp từng bước',
   lbl_download_page: 'Trang Tải xuống',
   lbl_powered_by: 'ĐƯỢC PHÁT TRIỂN BỞI MATH KNOWLEDGE ENGINE (MKE)',
+  act_zoom: 'Phóng to',
+  act_data: 'Dữ liệu',
+  act_customize: 'Tùy chỉnh',
+  act_plain_text: 'Văn bản thuần túy',
+  act_copied: 'Đã sao chép!',
 
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 nghiệm thực phân biệt',

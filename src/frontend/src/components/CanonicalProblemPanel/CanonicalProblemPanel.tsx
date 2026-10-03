@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type {
   CanonicalQuadraticProblemView,
   CanonicalDegenerateProblemView,
@@ -7,18 +7,54 @@ import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { formatRational } from '../../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSliders, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSliders,
+  faCircleInfo,
+  faMagnifyingGlassPlus,
+  faDownload,
+  faPalette,
+  faFont,
+  faCheck,
+} from '@fortawesome/free-solid-svg-icons';
 import styles from './CanonicalProblemPanel.module.css';
 
 export interface CanonicalProblemPanelProps {
   problem: CanonicalQuadraticProblemView | CanonicalDegenerateProblemView;
+  showCoeffEditor?: boolean;
+  onToggleCoeffEditor?: () => void;
+  coeffEditorSlot?: React.ReactNode;
 }
 
-export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ problem }) => {
+export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
+  problem,
+  showCoeffEditor,
+  onToggleCoeffEditor,
+  coeffEditorSlot,
+}) => {
   const { t } = usePreferences();
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [copiedState, setCopiedState] = useState<'data' | 'text' | null>(null);
+
   const isQuadratic = problem.problem_type === 'QUADRATIC';
   const quad = isQuadratic ? (problem as CanonicalQuadraticProblemView) : null;
   const degen = !isQuadratic ? (problem as CanonicalDegenerateProblemView) : null;
+
+  const handleCopyData = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(problem.equation_latex);
+      setCopiedState('data');
+      setTimeout(() => setCopiedState(null), 2000);
+    }
+  };
+
+  const handleCopyPlainText = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      const plain = problem.equation_latex.replace(/\\left|\\right|[\{\}]/g, '');
+      navigator.clipboard.writeText(plain);
+      setCopiedState('text');
+      setTimeout(() => setCopiedState(null), 2000);
+    }
+  };
 
   return (
     <div className={styles.card} data-testid="canonical-problem-panel">
@@ -34,7 +70,10 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
 
       <div className={styles.cardBody}>
         {/* Canonical Equation Render */}
-        <div className={styles.equationDisplay} data-testid="canonical-equation-latex">
+        <div
+          className={`${styles.equationDisplay} ${isZoomed ? styles.equationZoomed : ''}`}
+          data-testid="canonical-equation-latex"
+        >
           <MathLatex latex={problem.equation_latex} displayMode />
         </div>
 
@@ -120,6 +159,69 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
             </div>
           </details>
         </div>
+
+        {/* Embedded Reactive Coefficient Editor (Toggled via Hover Action Bar) */}
+        {showCoeffEditor && coeffEditorSlot && (
+          <div className={styles.coeffEditorContainer} data-testid="embedded-coefficient-editor">
+            {coeffEditorSlot}
+          </div>
+        )}
+      </div>
+
+      {/* WolframAlpha Style Bottom Hover Action Bar */}
+      <div
+        className={`${styles.hoverActionBar} ${showCoeffEditor ? styles.hoverActionBarActive : ''}`}
+        data-testid="coefficient-editor-disclosure"
+      >
+        <button
+          type="button"
+          className={`${styles.actionItemBtn} ${isZoomed ? styles.actionItemActive : ''}`}
+          onClick={() => setIsZoomed(!isZoomed)}
+          title={t('act_zoom')}
+        >
+          <FontAwesomeIcon icon={faMagnifyingGlassPlus} className={styles.actionItemIcon} />
+          <span>{t('act_zoom')}</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.actionItemBtn}
+          onClick={handleCopyData}
+          title={t('act_data')}
+        >
+          <FontAwesomeIcon
+            icon={copiedState === 'data' ? faCheck : faDownload}
+            className={styles.actionItemIcon}
+          />
+          <span>{copiedState === 'data' ? t('act_copied') : t('act_data')}</span>
+        </button>
+
+        {onToggleCoeffEditor && (
+          <button
+            type="button"
+            className={`${styles.actionItemBtn} ${showCoeffEditor ? styles.actionItemActive : ''}`}
+            onClick={onToggleCoeffEditor}
+            aria-expanded={showCoeffEditor}
+            data-testid="toggle-coeff-editor-btn"
+            title={t('act_customize')}
+          >
+            <FontAwesomeIcon icon={faPalette} className={styles.actionItemIcon} />
+            <span>{t('act_customize')}</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          className={styles.actionItemBtn}
+          onClick={handleCopyPlainText}
+          title={t('act_plain_text')}
+        >
+          <FontAwesomeIcon
+            icon={copiedState === 'text' ? faCheck : faFont}
+            className={styles.actionItemIcon}
+          />
+          <span>{copiedState === 'text' ? t('act_copied') : t('act_plain_text')}</span>
+        </button>
       </div>
     </div>
   );

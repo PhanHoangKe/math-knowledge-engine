@@ -263,8 +263,24 @@ export const AppShell: React.FC = () => {
 
                     return (
                       <div className={styles.solvedLayout} data-testid="solved-workspace">
-                        {/* Pod 1: Canonical Problem / Input */}
-                        <CanonicalProblemPanel problem={resp.problem} />
+                        {/* Pod 1: Canonical Problem / Input with Hover Action Bar & Integrated Coeff Editor */}
+                        <CanonicalProblemPanel
+                          problem={resp.problem}
+                          showCoeffEditor={showCoeffEditor}
+                          onToggleCoeffEditor={() => setShowCoeffEditor(!showCoeffEditor)}
+                          coeffEditorSlot={
+                            <CoefficientEditorPanel
+                              draft={coeffDraft}
+                              errors={coeffValidationErrors}
+                              reactiveStatus={reactiveStatus}
+                              sourceMode={sourceMode}
+                              isLoading={reactiveStatus === 'recomputing'}
+                              isDegenerate={false}
+                              onUpdateField={updateCoefficientField}
+                              onReset={resetCoefficientsToBackend}
+                            />
+                          }
+                        />
 
                         {/* Pod 2: Root Plot (if quadratic) */}
                         {quad && <RootPlotPod quad={quad} roots={resp.solution.roots} />}
@@ -304,34 +320,6 @@ export const AppShell: React.FC = () => {
                         {/* Pod 9: Step-by-Step Solution Trace */}
                         <div id="step-by-step-trace-section">
                           <TraceSummaryPod trace={resp.solution.trace} />
-                        </div>
-
-                        {/* Pod 10: Reactive Coefficient Editor (Collapsible) */}
-                        <div className={styles.disclosurePod} data-testid="coefficient-editor-disclosure">
-                          <button
-                            type="button"
-                            className={styles.disclosureBtn}
-                            onClick={() => setShowCoeffEditor(!showCoeffEditor)}
-                            aria-expanded={showCoeffEditor}
-                            data-testid="toggle-coeff-editor-btn"
-                          >
-                            <FontAwesomeIcon icon={faGear} className={styles.disclosureIcon} />
-                            <span>{showCoeffEditor ? t('btn_hide_coeff_editor') : t('btn_show_coeff_editor')}</span>
-                          </button>
-                          {showCoeffEditor && (
-                            <div className={styles.disclosureContent}>
-                              <CoefficientEditorPanel
-                                draft={coeffDraft}
-                                errors={coeffValidationErrors}
-                                reactiveStatus={reactiveStatus}
-                                sourceMode={sourceMode}
-                                isLoading={reactiveStatus === 'recomputing'}
-                                isDegenerate={false}
-                                onUpdateField={updateCoefficientField}
-                                onReset={resetCoefficientsToBackend}
-                              />
-                            </div>
-                          )}
                         </div>
 
                         {/* Powered by Engine Watermark */}
