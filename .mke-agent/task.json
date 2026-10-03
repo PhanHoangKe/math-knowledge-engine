@@ -1,42 +1,17 @@
 {
   "schema_version": "2.0",
-  "state_version": 4,
-  "task_id": "THPT-COV-P1-001",
-  "status": "READY_FOR_AUDIT",
-  "attempt": 1,
-  "base_sha": "37cc383631600853381da0ce8e5457ab746e1da1",
-  "target_branch": "product/thpt-cov-p1-universal-core",
-  "prompt_path": ".mke-agent/prompts/THPT_COV_P1.md",
-  "commit_message": "feat(coverage): implement THPT universal core contracts, adapter registry, legacy quadratic facade, and benchmark harness",
+  "state_version": 5,
+  "task_id": "THPT-COV-P1-R1-002",
+  "status": "READY",
+  "attempt": 2,
+  "base_sha": "85e21b6823c6c56a4f349a1b5579a03695385b3a",
+  "target_branch": "product/thpt-cov-p1-r1-contract-remediation",
+  "prompt_path": ".mke-agent/prompts/THPT_COV_P1_R1.md",
+  "commit_message": "fix(coverage): remediate THPT-COV-P1 contract audit defects",
   "allowed_prefixes": [
     "src/mke_product/coverage/",
     "tests/test_thpt_cov_p1_",
     "docs/acceptance/THPT_COV_P1"
   ],
-  "result": {
-    "task_id": "THPT-COV-P1-001",
-    "attempt": 1,
-    "started_at": "2026-10-03T09:24:00.000000+00:00",
-    "status": "PASS",
-    "finished_at": "2026-10-03T09:25:00.000000+00:00",
-    "stage": "complete",
-    "target_branch": "product/thpt-cov-p1-universal-core",
-    "commit_sha": "85e21b6823c6c56a4f349a1b5579a03695385b3a",
-    "error": null,
-    "changed_files": [
-      "src/mke_product/coverage/__init__.py",
-      "src/mke_product/coverage/adapters.py",
-      "src/mke_product/coverage/benchmark.py",
-      "src/mke_product/coverage/contracts.py",
-      "src/mke_product/coverage/legacy_quadratic.py",
-      "src/mke_product/coverage/registry.py",
-      "src/mke_product/coverage/service.py",
-      "tests/test_thpt_cov_p1_benchmark.py",
-      "tests/test_thpt_cov_p1_contracts.py",
-      "tests/test_thpt_cov_p1_legacy_quadratic.py",
-      "tests/test_thpt_cov_p1_registry.py"
-    ]
-  },
-  "started_at": "2026-10-03T09:24:00.000000+00:00",
-  "updated_at": "2026-10-03T09:30:00.000000+00:00"
+  "result": null
 }
