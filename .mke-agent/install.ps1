@@ -20,18 +20,23 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Step "Checking Python"
-$PythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
 $PythonPrefix = @()
-if (-not $PythonCmd) {
-    $PythonCmd = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($PythonCmd) {
-        $PythonPrefix = @("-3")
+$RepoVenvPython = Join-Path $RepoPath ".venv\\Scripts\\python.exe"
+if (Test-Path $RepoVenvPython) {
+    $PythonExe = $RepoVenvPython
+} else {
+    $PythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
+    if (-not $PythonCmd) {
+        $PythonCmd = Get-Command py.exe -ErrorAction SilentlyContinue
+        if ($PythonCmd) {
+            $PythonPrefix = @("-3")
+        }
     }
+    if (-not $PythonCmd) {
+        throw "Python 3 was not found in PATH."
+    }
+    $PythonExe = $PythonCmd.Source
 }
-if (-not $PythonCmd) {
-    throw "Python 3 was not found in PATH."
-}
-$PythonExe = $PythonCmd.Source
 
 Write-Step "Checking Antigravity CLI"
 $AgyCmd = Get-Command agy.exe -ErrorAction SilentlyContinue
