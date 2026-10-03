@@ -181,28 +181,29 @@
 }
 
 .metaValue {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
   background: var(--bg-surface, #ffffff);
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 3px;
   border: 1px solid var(--border-subtle, #e2e8f0);
   word-break: break-all;
 }
 
 .verifierText {
+  font-family: var(--font-sans);
   color: var(--text-primary, #1e293b);
   font-weight: 600;
 }
 
 .metaText {
+  font-family: var(--font-sans);
   color: var(--text-secondary, #475569);
-  font-family: var(--font-mono, monospace);
 }
 
 .scopeBadge {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
   padding: 0.1rem 0.4rem;
   background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
