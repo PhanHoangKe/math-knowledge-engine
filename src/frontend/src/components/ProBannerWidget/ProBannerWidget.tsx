@@ -1,7 +1,8 @@
 import React from 'react';
 import { usePreferences } from '../../state/preferences';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckSquare, faArrowRight, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faCheckSquare, faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import { MathLatex } from '../MathLatex/MathLatex';
 import styles from './ProBannerWidget.module.css';
 
 export interface ProBannerWidgetProps {
@@ -14,16 +15,16 @@ export const ProBannerWidget: React.FC<ProBannerWidgetProps> = ({ onOpenStepBySt
   return (
     <aside className={styles.proWidget} data-testid="pro-banner-widget">
       <div className={styles.widgetHeader}>
-        <h3 className={styles.widgetTitle}>{t('pro_widget_title') || 'Get help with that first step (and all the others)'}</h3>
+        <h3 className={styles.widgetTitle}>{t('pro_widget_title')}</h3>
       </div>
       <div className={styles.widgetBody}>
         <div className={styles.stepPreviewBox}>
           <span className={styles.stepTag}>STEP 1</span>
           <p className={styles.stepDesc}>
-            {t('pro_widget_desc') || 'Calculate the discriminant Δ and apply the quadratic formula to find all real roots:'}
+            {t('pro_widget_desc')}
           </p>
           <div className={styles.stepFormula}>
-            \Delta = b^2 - 4ac
+            <MathLatex latex="\Delta = b^2 - 4ac" displayMode />
           </div>
         </div>
         <button

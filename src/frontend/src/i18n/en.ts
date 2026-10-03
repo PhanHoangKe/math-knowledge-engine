@@ -166,6 +166,9 @@ export const en: Translations = {
   lbl_sum_of_roots: 'Sum of roots:',
   lbl_product_of_roots: 'Product of roots:',
   lbl_step_by_step_solution: 'Step-by-step solution',
+  pro_widget_title: 'Get help with that first step (and all the others)',
+  pro_widget_desc: 'Calculate the discriminant Δ and apply the quadratic formula to find all real roots:',
+
 
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 Distinct Real Roots',

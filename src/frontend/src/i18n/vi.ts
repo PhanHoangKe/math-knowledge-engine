@@ -164,6 +164,8 @@ export const vi = {
   lbl_sum_of_roots: 'Tổng các nghiệm (Sum of roots):',
   lbl_product_of_roots: 'Tích các nghiệm (Product of roots):',
   lbl_step_by_step_solution: 'Xem từng bước giải',
+  pro_widget_title: 'Nhận trợ giúp từng bước giải chi tiết',
+  pro_widget_desc: 'Tính biệt thức Δ và áp dụng công thức nghiệm tổng quát để tìm các nghiệm thực:',
 
 
   enum_out_TWO_DISTINCT_REAL_ROOTS: '2 nghiệm thực phân biệt',
