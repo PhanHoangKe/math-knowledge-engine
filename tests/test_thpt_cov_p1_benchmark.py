@@ -140,6 +140,22 @@ class TestBenchmarkMetricsAndRunner:
         assert metrics.false_verified_count == 1
         assert metrics.release_gate_passed is False
 
+    def test_derived_false_verified_when_flag_not_set(self):
+        # Even if is_false_verified=False is passed, metric derivation catches it
+        results = (
+            BenchmarkEvaluationResult(
+                case_id="c1",
+                is_correct=False,
+                verification_level=VerificationLevel.SYMBOLIC_VERIFIED,
+                disposition=VerificationDisposition.ACCEPTED,
+                is_false_verified=False,
+                latency_ms=10.0,
+            ),
+        )
+        metrics = calculate_benchmark_metrics(results)
+        assert metrics.false_verified_count == 1
+        assert metrics.release_gate_passed is False
+
     def test_latency_metrics_calculation(self):
         results = tuple(
             BenchmarkEvaluationResult(

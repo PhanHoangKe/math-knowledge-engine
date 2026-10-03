@@ -6,7 +6,7 @@ import statistics
 import time
 from enum import Enum
 from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mke_product.coverage.contracts import (
     ProblemIR,
@@ -112,6 +112,31 @@ class StructuredAnswerSpec(BaseModel):
     payload_pairs: Tuple[Tuple[str, str], ...] = Field(default_factory=tuple)
 
 
+class TupleSetAnswerSpec(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    answer_type: Literal[ExpectedAnswerType.TUPLE_SET] = ExpectedAnswerType.TUPLE_SET
+    tuples: Tuple[Tuple[str, ...], ...] = Field(default_factory=tuple)
+
+
+class MatrixAnswerSpec(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    answer_type: Literal[ExpectedAnswerType.MATRIX] = ExpectedAnswerType.MATRIX
+    rows: Tuple[Tuple[str, ...], ...] = Field(default_factory=tuple)
+
+
+class BooleanAnswerSpec(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    answer_type: Literal[ExpectedAnswerType.BOOLEAN] = ExpectedAnswerType.BOOLEAN
+    value: bool
+
+
+class StatisticalValueAnswerSpec(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    answer_type: Literal[ExpectedAnswerType.STATISTICAL_VALUE] = ExpectedAnswerType.STATISTICAL_VALUE
+    metric_name: str
+    numeric_value: str
+
+
 ExpectedAnswerSpec = Annotated[
     Union[
         ScalarAnswerSpec,
@@ -119,6 +144,10 @@ ExpectedAnswerSpec = Annotated[
         IntervalSetAnswerSpec,
         ExpressionAnswerSpec,
         StructuredAnswerSpec,
+        TupleSetAnswerSpec,
+        MatrixAnswerSpec,
+        BooleanAnswerSpec,
+        StatisticalValueAnswerSpec,
     ],
     Field(discriminator="answer_type"),
 ]
@@ -152,6 +181,15 @@ class BenchmarkCase(BaseModel):
     difficulty: BenchmarkDifficulty = BenchmarkDifficulty.MEDIUM
     tags: Tuple[str, ...] = Field(default_factory=tuple)
 
+    @model_validator(mode="after")
+    def validate_answer_type_consistency(self) -> BenchmarkCase:
+        if self.expected_answer.answer_type != self.expected_answer_type:
+            raise ValueError(
+                f"expected_answer_type mismatch: expected_answer.answer_type "
+                f"({self.expected_answer.answer_type.value!r}) != expected_answer_type ({self.expected_answer_type.value!r})"
+            )
+        return self
+
 
 # ---------------------------------------------------------------------------
 # Evaluation Results and Summary Metrics
@@ -165,7 +203,7 @@ class BenchmarkEvaluationResult(BaseModel):
     is_correct: bool
     verification_level: VerificationLevel
     disposition: VerificationDisposition
-    is_false_verified: bool
+    is_false_verified: bool = False
     latency_ms: float = Field(default=0.0, ge=0.0)
     actual_answer: str = ""
     error_message: Optional[str] = None
@@ -230,7 +268,12 @@ def calculate_benchmark_metrics(
     partial_count = sum(1 for r in results if r.verification_level == VerificationLevel.PARTIAL)
     unsupported_count = sum(1 for r in results if r.verification_level == VerificationLevel.UNSUPPORTED)
 
-    false_verified_count = sum(1 for r in results if r.is_false_verified)
+    # Derived false verification: not is_correct AND verification_level in (EXACT_VERIFIED, SYMBOLIC_VERIFIED)
+    false_verified_count = sum(
+        1 for r in results
+        if (not r.is_correct and r.verification_level in (VerificationLevel.EXACT_VERIFIED, VerificationLevel.SYMBOLIC_VERIFIED))
+        or r.is_false_verified
+    )
 
     latencies = sorted([r.latency_ms for r in results])
     median_lat = statistics.median(latencies) if latencies else 0.0

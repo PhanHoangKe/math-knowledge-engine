@@ -61,8 +61,8 @@ class DomainAdapter(ABC):
 
     @property
     @abstractmethod
-    def supported_problem_kinds(self) -> Set[ProblemKind]:
-        """Declared problem kinds supported by this adapter."""
+    def supported_problem_kinds(self) -> Tuple[ProblemKind, ...]:
+        """Declared immutable sequence of problem kinds supported by this adapter."""
         pass
 
     @abstractmethod

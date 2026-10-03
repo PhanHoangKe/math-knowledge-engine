@@ -481,7 +481,7 @@ class TestVerificationReportInvariants:
 
 
 # ---------------------------------------------------------------------------
-# Test BenchmarkCase Schemas
+# Test BenchmarkCase Schemas and Answer Types
 # ---------------------------------------------------------------------------
 
 class TestBenchmarkCaseContracts:
@@ -502,3 +502,66 @@ class TestBenchmarkCaseContracts:
         assert case.rights_status == BenchmarkRightsStatus.SOURCE_LOCATOR_ONLY
         assert case.source_type == BenchmarkSourceType.OFFICIAL_PUBLIC
         assert_recursively_immutable(case)
+
+    def test_problem_ir_with_provenance_is_recursively_immutable(self):
+        from mke_product.coverage.contracts import ProblemProvenance
+        prov = ProblemProvenance(
+            source_name="Ky Thi THPT 2024",
+            source_reference="Ma de 101 - Cau 32",
+            license_or_rights="PUBLIC",
+            citation_text="De thi tot nghiep THPT 2024 mon Toan",
+            tags=(("year", "2024"), ("grade", "12")),
+        )
+        ir = ProblemIR(
+            problem_id="p1_prov_001",
+            problem_kind=ProblemKind.ALGEBRA_EQUATION,
+            payload=SingleEquationPayload(left=Variable("x"), right=IntegerLiteral(0)),
+            provenance=prov,
+        )
+        assert_recursively_immutable(ir)
+        assert ir.provenance is not None
+        assert ir.provenance.source_name == "Ky Thi THPT 2024"
+
+    def test_all_nine_expected_answer_specs_supported(self):
+        from mke_product.coverage.benchmark import (
+            BooleanAnswerSpec,
+            ExpressionAnswerSpec,
+            FiniteSetAnswerSpec,
+            IntervalSetAnswerSpec,
+            MatrixAnswerSpec,
+            ScalarAnswerSpec,
+            StatisticalValueAnswerSpec,
+            StructuredAnswerSpec,
+            TupleSetAnswerSpec,
+        )
+
+        specs = [
+            (ExpectedAnswerType.SCALAR, ScalarAnswerSpec(value="5")),
+            (ExpectedAnswerType.FINITE_SET, FiniteSetAnswerSpec(elements=("1", "2"))),
+            (ExpectedAnswerType.INTERVAL_SET, IntervalSetAnswerSpec(intervals=("[0, 1)",))),
+            (ExpectedAnswerType.EXPRESSION, ExpressionAnswerSpec(expression_latex="2x + 1")),
+            (ExpectedAnswerType.STRUCTURED, StructuredAnswerSpec(payload_pairs=(("k", "v"),))),
+            (ExpectedAnswerType.TUPLE_SET, TupleSetAnswerSpec(tuples=(("1", "2"), ("3", "4")))),
+            (ExpectedAnswerType.MATRIX, MatrixAnswerSpec(rows=(("1", "0"), ("0", "1")))),
+            (ExpectedAnswerType.BOOLEAN, BooleanAnswerSpec(value=True)),
+            (ExpectedAnswerType.STATISTICAL_VALUE, StatisticalValueAnswerSpec(metric_name="mean", numeric_value="7.5")),
+        ]
+
+        assert len(specs) == 9
+
+        for ans_type, spec in specs:
+            case = BenchmarkCase(
+                case_id=f"case_{ans_type.value}",
+                expected_answer=spec,
+                expected_answer_type=ans_type,
+            )
+            assert case.expected_answer_type == ans_type
+            assert_recursively_immutable(case)
+
+    def test_benchmark_case_rejects_mismatched_answer_type(self):
+        with pytest.raises(ValidationError, match="expected_answer_type mismatch"):
+            BenchmarkCase(
+                case_id="case_mismatch",
+                expected_answer=ScalarAnswerSpec(value="5"),
+                expected_answer_type=ExpectedAnswerType.FINITE_SET,
+            )

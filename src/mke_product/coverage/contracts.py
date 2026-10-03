@@ -326,6 +326,17 @@ PROBLEM_KIND_TO_PAYLOAD_KIND: Dict[ProblemKind, PayloadKind] = {
 }
 
 
+class ProblemProvenance(BaseModel):
+    """Typed deeply immutable provenance metadata."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source_name: str = ""
+    source_reference: str = ""
+    license_or_rights: str = ""
+    citation_text: str = ""
+    tags: Tuple[Tuple[str, str], ...] = Field(default_factory=tuple)
+
+
 # ---------------------------------------------------------------------------
 # Universal ProblemIR Model
 # ---------------------------------------------------------------------------
@@ -346,7 +357,7 @@ class ProblemIR(BaseModel):
     payload: ProblemPayload = Field(..., description="Discriminated mathematical payload")
     ast_payload: Optional[ASTNode] = Field(default=None, description="Optional root AST node")
     raw_source_text: str = Field(default="", description="Provenance/display only. NEVER parsed by math authority.")
-    provenance: Optional[Dict[str, str]] = None  # Generic provenance citation metadata
+    provenance: Optional[ProblemProvenance] = None  # Typed immutable provenance metadata
     normalization_trace: Tuple[str, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")

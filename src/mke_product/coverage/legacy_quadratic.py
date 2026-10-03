@@ -79,8 +79,8 @@ class LegacyQuadraticAdapter(DomainAdapter):
         return self.ADAPTER_ID
 
     @property
-    def supported_problem_kinds(self) -> Set[ProblemKind]:
-        return {ProblemKind.ALGEBRA_EQUATION}
+    def supported_problem_kinds(self) -> Tuple[ProblemKind, ...]:
+        return (ProblemKind.ALGEBRA_EQUATION,)
 
     def _extract_coefficients_from_payload(self, ir: ProblemIR) -> Tuple[Rational, Rational, Rational]:
         """Extract canonical (a, b, c) in Q[x] from typed AST payload.
