@@ -14,6 +14,6 @@ $PythonExe = (Get-Command python.exe).Source
 if ($Stdio) {
     & $PythonExe $BridgeServer --stdio --repo $RepoPath --worktrees $WorktreesPath
 } else {
-    Write-Host "[MKE BRIDGE] Starting dual REST & MCP Bridge on http://$HostAddress:$Port ..." -ForegroundColor Cyan
+    Write-Host "[MKE BRIDGE] Starting dual REST & MCP Bridge on http://${HostAddress}:$Port ..." -ForegroundColor Cyan
     & $PythonExe $BridgeServer --port $Port --host $HostAddress --repo $RepoPath --worktrees $WorktreesPath
 }
