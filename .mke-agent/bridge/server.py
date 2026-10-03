@@ -12,8 +12,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
-from .models import BridgeTaskRequest, TaskStatus
-from .worker import TaskWorker, find_agy
+if __package__ or "." in __name__:
+    from .models import BridgeTaskRequest, TaskStatus
+    from .worker import TaskWorker, find_agy
+else:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from bridge.models import BridgeTaskRequest, TaskStatus
+    from bridge.worker import TaskWorker, find_agy
 
 MCP_TOOLS_SPEC = [
     {

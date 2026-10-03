@@ -14,7 +14,11 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from .models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
+if __package__ or "." in __name__:
+    from .models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
+else:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from bridge.models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
 
 BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{3,180}$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
