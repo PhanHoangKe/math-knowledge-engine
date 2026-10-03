@@ -12,6 +12,7 @@ from mke_product.coverage.contracts import (
     SolutionTrace,
     VerificationReport,
 )
+from mke_product.coverage.algebra_inequality import AlgebraPolynomialInequalityAdapter
 from mke_product.coverage.algebra_rational import AlgebraRationalAdapter
 from mke_product.coverage.legacy_quadratic import LegacyQuadraticAdapter
 from mke_product.coverage.registry import AdapterRegistry
@@ -35,6 +36,7 @@ class UniversalApplicationService:
             registry = AdapterRegistry()
             registry.register(LegacyQuadraticAdapter())
             registry.register(AlgebraRationalAdapter())
+            registry.register(AlgebraPolynomialInequalityAdapter())
         self._registry = registry
 
     @property

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from enum import Enum
 from typing import Annotated, Any, Dict, List, Literal, Optional, Sequence, Set, Tuple, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -446,6 +447,187 @@ class AllRealsExceptFiniteEntity(BaseModel):
         return len(self.excluded_points)
 
 
+
+def _decompose_int_squarefree(n: int) -> Tuple[int, int]:
+    """Decompose non-negative integer n into k^2 * d where d is squarefree."""
+    if n <= 0:
+        return 0, 0
+    k = 1
+    d = n
+    p = 2
+    while p * p <= d:
+        while d % (p * p) == 0:
+            k *= p
+            d //= (p * p)
+        p += 1
+    return k, d
+
+
+def _to_u_v_d(
+    ent: Union[RationalScalarEntity, RealQuadraticSurdEntity]
+) -> Tuple[Rational, Rational, int]:
+    """Convert rational or surd entity to canonical (u, v, d) where d is squarefree."""
+    if isinstance(ent, RationalScalarEntity):
+        return ent.to_rational, Rational(0, 1), 1
+    if isinstance(ent, RealQuadraticSurdEntity):
+        if ent.r <= 0 or ent.d <= 0:
+            raise ValueError(f"Invalid surd parameters: r={ent.r}, d={ent.d}")
+        u = Rational(ent.p, ent.r)
+        if ent.q == 0:
+            return u, Rational(0, 1), 1
+        v = Rational(ent.q, ent.r)
+        if v.is_zero:
+            return u, Rational(0, 1), 1
+        s = math.isqrt(ent.d)
+        if s * s == ent.d:
+            return u + v * Rational(s, 1), Rational(0, 1), 1
+        k, d_sqf = _decompose_int_squarefree(ent.d)
+        if d_sqf == 1:
+            return u + v * Rational(k, 1), Rational(0, 1), 1
+        return u, v * Rational(k, 1), d_sqf
+    raise TypeError(f"Unsupported algebraic entity: {type(ent).__name__}")
+
+
+def _compare_u_v_d(
+    u1: Rational, v1: Rational, d1: int,
+    u2: Rational, v2: Rational, d2: int,
+) -> int:
+    """Exact comparison of u1 + v1*sqrt(d1) and u2 + v2*sqrt(d2) with zero float.
+    
+    Returns -1 if val1 < val2, 0 if val1 == val2, 1 if val1 > val2.
+    """
+    if v1.is_zero and v2.is_zero:
+        if u1 < u2:
+            return -1
+        elif u1 > u2:
+            return 1
+        return 0
+
+    if v1.is_zero and not v2.is_zero:
+        w = u1 - u2
+        if v2.is_positive:
+            if not w.is_positive:
+                return -1
+            w_sq = w * w
+            surd_sq = v2 * v2 * Rational(d2, 1)
+            if w_sq < surd_sq:
+                return -1
+            elif w_sq > surd_sq:
+                return 1
+            return 0
+        else:
+            if not w.is_negative:
+                return 1
+            w_sq = w * w
+            surd_sq = v2 * v2 * Rational(d2, 1)
+            if w_sq > surd_sq:
+                return -1
+            elif w_sq < surd_sq:
+                return 1
+            return 0
+
+    if not v1.is_zero and v2.is_zero:
+        return -_compare_u_v_d(u2, v2, d2, u1, v1, d1)
+
+    if d1 == d2:
+        w = u1 - u2
+        v = v1 - v2
+        if v.is_zero:
+            if w < Rational(0, 1):
+                return -1
+            elif w > Rational(0, 1):
+                return 1
+            return 0
+        return _compare_u_v_d(w, Rational(0, 1), 1, Rational(0, 1), -v, d1)
+
+    # d1 != d2 (both > 1, squarefree)
+    u = u1 - u2
+    if v1.is_positive and v2.is_negative:
+        if not u.is_negative:
+            return 1
+        pos_v2 = -v2
+        base_s2 = v1 * v1 * Rational(d1, 1) + pos_v2 * pos_v2 * Rational(d2, 1)
+        cross_coeff = Rational(2, 1) * v1 * pos_v2
+        rem = u * u - base_s2
+        k_cross, d_cross = _decompose_int_squarefree(d1 * d2)
+        eff_cross = cross_coeff * Rational(k_cross, 1)
+        cmp_res = _compare_u_v_d(rem, Rational(0, 1), 1, Rational(0, 1), eff_cross, d_cross)
+        if cmp_res < 0:
+            return 1
+        elif cmp_res > 0:
+            return -1
+        return 0
+
+    if v1.is_negative and v2.is_positive:
+        return -_compare_u_v_d(u2, v2, d2, u1, v1, d1)
+
+    if v1.is_positive and v2.is_positive:
+        lhs_sign = _compare_u_v_d(u, v1, d1, Rational(0, 1), Rational(0, 1), 1)
+        if lhs_sign <= 0:
+            return -1
+        lhs_base = u * u + v1 * v1 * Rational(d1, 1)
+        lhs_cross = Rational(2, 1) * u * v1
+        rhs_val = v2 * v2 * Rational(d2, 1)
+        return _compare_u_v_d(lhs_base, lhs_cross, d1, rhs_val, Rational(0, 1), 1)
+
+    # Both negative: v1 < 0, v2 < 0
+    return _compare_u_v_d(-u2, -v2, d2, -u1, -v1, d1)
+
+
+def _compare_algebraic_entities(
+    e1: Union[RationalScalarEntity, RealQuadraticSurdEntity],
+    e2: Union[RationalScalarEntity, RealQuadraticSurdEntity],
+) -> int:
+    """Exact deterministic comparison of two algebraic root/scalar entities."""
+    u1, v1, d1 = _to_u_v_d(e1)
+    u2, v2, d2 = _to_u_v_d(e2)
+    return _compare_u_v_d(u1, v1, d1, u2, v2, d2)
+
+
+class RealIntervalEntity(BaseModel):
+    """Exact real interval [a, b], (a, b), [a, b), (a, b], (-inf, b], [a, +inf), or (-inf, +inf)."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    entity_kind: Literal["REAL_INTERVAL"] = "REAL_INTERVAL"
+    lower_bound: Optional[Union[RationalScalarEntity, RealQuadraticSurdEntity]] = None
+    upper_bound: Optional[Union[RationalScalarEntity, RealQuadraticSurdEntity]] = None
+    lower_closed: bool = False
+    upper_closed: bool = False
+
+    @model_validator(mode="after")
+    def validate_endpoints(self) -> RealIntervalEntity:
+        if self.lower_bound is None and self.lower_closed:
+            raise ValueError("Infinite lower endpoint must be open (lower_closed=False).")
+        if self.upper_bound is None and self.upper_closed:
+            raise ValueError("Infinite upper endpoint must be open (upper_closed=False).")
+        if self.lower_bound is not None and self.upper_bound is not None:
+            cmp = _compare_algebraic_entities(self.lower_bound, self.upper_bound)
+            if cmp > 0:
+                raise ValueError("Interval lower_bound cannot be strictly greater than upper_bound.")
+            if cmp == 0:
+                if not (self.lower_closed and self.upper_closed):
+                    raise ValueError("Degenerate interval [r, r] must be closed on both ends.")
+        return self
+
+    def to_latex(self) -> str:
+        left_bracket = "[" if self.lower_closed else "("
+        right_bracket = "]" if self.upper_closed else ")"
+        lb = "-\\infty" if self.lower_bound is None else (self.lower_bound.latex or str(self.lower_bound.to_rational if isinstance(self.lower_bound, RationalScalarEntity) else self.lower_bound))
+        ub = "+\\infty" if self.upper_bound is None else (self.upper_bound.latex or str(self.upper_bound.to_rational if isinstance(self.upper_bound, RationalScalarEntity) else self.upper_bound))
+        return f"{left_bracket}{lb}; {ub}{right_bracket}"
+
+
+class RealIntervalUnionEntity(BaseModel):
+    """Authoritative immutable real interval union solution set."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    entity_kind: Literal["REAL_INTERVAL_UNION"] = "REAL_INTERVAL_UNION"
+    intervals: Tuple[RealIntervalEntity, ...] = Field(default_factory=tuple)
+
+    def to_latex(self) -> str:
+        if not self.intervals:
+            return "\\emptyset"
+        return " \\cup ".join(i.to_latex() for i in self.intervals)
+
+
 SymbolicEntity = Union[
     RationalScalarEntity,
     RealQuadraticSurdEntity,
@@ -453,6 +635,7 @@ SymbolicEntity = Union[
     EmptyRealSolutionEntity,
     AllRealSolutionEntity,
     AllRealsExceptFiniteEntity,
+    RealIntervalUnionEntity,
 ]
 
 

@@ -59,6 +59,8 @@ from mke_product.coverage.contracts import (
     ProblemTarget,
     ProofObligationResult,
     RationalScalarEntity,
+    RealIntervalEntity,
+    RealIntervalUnionEntity,
     RealQuadraticSurdEntity,
     ResidualCheck,
     SingleEquationPayload,
@@ -72,6 +74,7 @@ from mke_product.coverage.contracts import (
     VerificationLevel,
     VerificationReport,
 )
+from mke_product.coverage.algebra_inequality import AlgebraPolynomialInequalityAdapter
 from mke_product.coverage.algebra_rational import AlgebraRationalAdapter
 from mke_product.coverage.legacy_quadratic import LegacyQuadraticAdapter
 from mke_product.coverage.registry import (
@@ -120,6 +123,8 @@ __all__ = [
     "ProblemIR",
     "RationalScalarEntity",
     "RealQuadraticSurdEntity",
+    "RealIntervalEntity",
+    "RealIntervalUnionEntity",
     "FiniteRootCollectionEntity",
     "EmptyRealSolutionEntity",
     "AllRealSolutionEntity",
@@ -140,6 +145,7 @@ __all__ = [
     "DomainAdapter",
     "LegacyQuadraticAdapter",
     "AlgebraRationalAdapter",
+    "AlgebraPolynomialInequalityAdapter",
     # Registry & Service
     "AdapterRegistry",
     "AdapterRegistryError",
