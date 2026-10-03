@@ -70,16 +70,6 @@ export const CoefficientEditorPanel: React.FC<CoefficientEditorPanelProps> = ({
     <div className={styles.card} data-testid="coefficient-editor-panel">
       <div className={styles.cardHeader}>
         <div className={styles.headerLeft}>
-          <svg
-            className={styles.editIcon}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            width="20"
-            height="20"
-            aria-hidden="true"
-          >
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
           <h2 className={styles.cardTitle}>{t('panel_coefficient_editor')}</h2>
         </div>
 
