@@ -3,8 +3,6 @@ import type { SolutionTrace, SolutionStep } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { TracePanel } from '../TracePanel/TracePanel';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faListCheck, faCircleInfo, faListOl } from '@fortawesome/free-solid-svg-icons';
 import styles from './TraceSummaryPod.module.css';
 
 export interface TraceSummaryPodProps {
@@ -23,9 +21,6 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <span className={styles.podIcon}>
-              <FontAwesomeIcon icon={faListCheck} />
-            </span>
             <div>
               <h2 className={styles.podTitle}>{t('pod_trace_title')}</h2>
               <span className={styles.stepCount}>
@@ -38,7 +33,6 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
 
         {/* Disclaimer */}
         <div className={styles.disclaimerBox} data-testid="trace-disclaimer">
-          <FontAwesomeIcon icon={faCircleInfo} className={styles.infoIcon} />
           <span className={styles.disclaimerText}>{t('lbl_trace_disclaimer')}</span>
         </div>
 
@@ -79,7 +73,6 @@ export const TraceSummaryPod: React.FC<TraceSummaryPodProps> = ({ trace }) => {
             aria-expanded={isExpanded}
             data-testid="toggle-trace-btn"
           >
-            <FontAwesomeIcon icon={faListOl} style={{ marginRight: 6 }} />
             {isExpanded
               ? t('btn_hide_full_trace')
               : t('btn_show_full_trace').replace('{count}', stepsCount.toString())}

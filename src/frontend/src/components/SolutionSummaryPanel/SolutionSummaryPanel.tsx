@@ -3,8 +3,6 @@ import type { VerifiedSolutionView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { SOLUTION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { MathLatex } from '../MathLatex/MathLatex';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquareCheck, faListCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SolutionSummaryPanel.module.css';
 
 export interface SolutionSummaryPanelProps {
@@ -36,7 +34,6 @@ export const SolutionSummaryPanel: React.FC<SolutionSummaryPanelProps> = ({
             onClick={onOpenStepByStep}
             data-testid="solution-step-by-step-btn"
           >
-            <FontAwesomeIcon icon={faSquareCheck} className={styles.stepBtnIcon} />
             <span>{t('lbl_step_by_step_solution') || 'Step-by-step solution'}</span>
           </button>
         )}

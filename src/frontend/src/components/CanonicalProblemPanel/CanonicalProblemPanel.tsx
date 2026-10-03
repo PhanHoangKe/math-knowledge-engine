@@ -126,7 +126,6 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
           {/* Technical Details Disclosure */}
           <details className={styles.technicalDetails} data-testid="canonical-technical-details">
             <summary className={styles.technicalSummary}>
-              <FontAwesomeIcon icon={faSliders} style={{ marginRight: 6 }} />
               {t('lbl_technical_details')}
             </summary>
             <div className={styles.idRow}>

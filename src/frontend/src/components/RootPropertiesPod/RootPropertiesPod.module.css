@@ -23,11 +23,6 @@
   gap: 0.5rem;
 }
 
-.headerIcon {
-  font-size: 0.85rem;
-  color: #ea580c;
-}
-
 .podTitle {
   font-family: var(--font-sans);
   font-size: 0.85rem;
@@ -99,24 +94,10 @@
 }
 
 .insightBullet {
-  color: #f96932;
+  color: var(--text-muted, #64748b);
   font-weight: bold;
   font-size: 1rem;
   line-height: 1.2;
-}
-
-.insightIconSuccess {
-  color: #16a34a;
-  font-size: 0.85rem;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.insightIconInfo {
-  color: #0284c7;
-  font-size: 0.85rem;
-  margin-top: 2px;
-  flex-shrink: 0;
 }
 
 .insightText {

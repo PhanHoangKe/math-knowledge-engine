@@ -9,8 +9,6 @@ import {
 } from '../../i18n/enumMappings';
 import { MethodKnowledgeSurface } from '../MethodKnowledgeSurface/MethodKnowledgeSurface';
 import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBullseye, faBookOpen, faListUl } from '@fortawesome/free-solid-svg-icons';
 import styles from './SelectedMethodPod.module.css';
 
 export interface SelectedMethodPodProps {
@@ -47,9 +45,6 @@ export const SelectedMethodPod: React.FC<SelectedMethodPodProps> = ({
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <span className={styles.podIcon}>
-              <FontAwesomeIcon icon={faBullseye} />
-            </span>
             <div>
               <h2 className={styles.podTitle}>{t('pod_method_title')}</h2>
               <span className={styles.methodTitle}>{selectedMethod.title_vi}</span>
@@ -98,7 +93,6 @@ export const SelectedMethodPod: React.FC<SelectedMethodPodProps> = ({
             aria-expanded={isKnowledgeExpanded}
             data-testid={`why-method-btn-${selectedMethod.method_id}`}
           >
-            <FontAwesomeIcon icon={faBookOpen} style={{ marginRight: 6 }} />
             {isKnowledgeExpanded ? t('btn_hide_knowledge') : t('btn_why_method')}
           </button>
 
@@ -109,7 +103,6 @@ export const SelectedMethodPod: React.FC<SelectedMethodPodProps> = ({
             aria-expanded={showAllMethods}
             data-testid="toggle-methods-btn"
           >
-            <FontAwesomeIcon icon={faListUl} style={{ marginRight: 6 }} />
             {showAllMethods
               ? t('btn_hide_all_methods')
               : t('btn_show_all_methods').replace('{count}', methods.length.toString())}

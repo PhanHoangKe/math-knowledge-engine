@@ -3,8 +3,6 @@ import type { CanonicalQuadraticProblemView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
 import { formatRational } from '../../utils/formatters';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBolt, faCheckDouble } from '@fortawesome/free-solid-svg-icons';
 import styles from './RootPropertiesPod.module.css';
 
 export interface RootPropertiesPodProps {
@@ -48,7 +46,6 @@ export const RootPropertiesPod: React.FC<RootPropertiesPodProps> = ({ quad }) =>
     <div className={styles.podCard} data-testid="root-properties-container">
       <div className={styles.podHeader}>
         <div className={styles.headerLeft}>
-          <FontAwesomeIcon icon={faBolt} className={styles.headerIcon} />
           <span className={styles.podTitle}>
             {lang === 'vi' ? 'Mẹo giải nhanh & Nhận xét (Định lý Viète)' : 'Quick Tips & Properties (Viète Theorem)'}
           </span>
@@ -83,11 +80,11 @@ export const RootPropertiesPod: React.FC<RootPropertiesPodProps> = ({ quad }) =>
         <div className={styles.insightsList}>
           {isSumCoeffZero && (
             <div className={styles.insightRow}>
-              <FontAwesomeIcon icon={faCheckDouble} className={styles.insightIconSuccess} />
+              <span className={styles.insightBullet}>•</span>
               <span className={styles.insightText}>
-                <strong>{lang === 'vi' ? 'Mẹo đặc biệt a + b + c = 0:' : 'Special Case a + b + c = 0:'}</strong>{' '}
+                <strong>{lang === 'vi' ? 'Trường hợp đặc biệt a + b + c = 0:' : 'Special Case a + b + c = 0:'}</strong>{' '}
                 {lang === 'vi'
-                  ? `Phương trình có ngay 2 nghiệm nhẩm: x₁ = 1 và x₂ = c/a = ${prodStr}`
+                  ? `Phương trình có 2 nghiệm nhẩm: x₁ = 1 và x₂ = c/a = ${prodStr}`
                   : `Roots can be directly derived: x₁ = 1 and x₂ = c/a = ${prodStr}`}
               </span>
             </div>
@@ -95,11 +92,11 @@ export const RootPropertiesPod: React.FC<RootPropertiesPodProps> = ({ quad }) =>
 
           {isDiffCoeffZero && (
             <div className={styles.insightRow}>
-              <FontAwesomeIcon icon={faCheckDouble} className={styles.insightIconSuccess} />
+              <span className={styles.insightBullet}>•</span>
               <span className={styles.insightText}>
-                <strong>{lang === 'vi' ? 'Mẹo đặc biệt a − b + c = 0:' : 'Special Case a − b + c = 0:'}</strong>{' '}
+                <strong>{lang === 'vi' ? 'Trường hợp đặc biệt a − b + c = 0:' : 'Special Case a − b + c = 0:'}</strong>{' '}
                 {lang === 'vi'
-                  ? `Phương trình có ngay 2 nghiệm nhẩm: x₁ = -1 và x₂ = -c/a = ${formatRational({ numerator: -prodNum, denominator: prodDen })}`
+                  ? `Phương trình có 2 nghiệm nhẩm: x₁ = -1 và x₂ = -c/a = ${formatRational({ numerator: -prodNum, denominator: prodDen })}`
                   : `Roots can be directly derived: x₁ = -1 and x₂ = -c/a = ${formatRational({ numerator: -prodNum, denominator: prodDen })}`}
               </span>
             </div>
@@ -107,9 +104,9 @@ export const RootPropertiesPod: React.FC<RootPropertiesPodProps> = ({ quad }) =>
 
           {isEvenB && !isSumCoeffZero && !isDiffCoeffZero && (
             <div className={styles.insightRow}>
-              <FontAwesomeIcon icon={faCheckDouble} className={styles.insightIconInfo} />
+              <span className={styles.insightBullet}>•</span>
               <span className={styles.insightText}>
-                <strong>{lang === 'vi' ? 'Mẹo hệ số b chẵn:' : 'Even b Coefficient Trick:'}</strong>{' '}
+                <strong>{lang === 'vi' ? 'Hệ số b chẵn:' : 'Even b Coefficient Trick:'}</strong>{' '}
                 {lang === 'vi'
                   ? `Hệ số b = ${bVal} là số chẵn. Có thể dùng biệt thức thu gọn Δ' = b'² − ac để tính toán nhanh hơn.`
                   : `Coefficient b = ${bVal} is even. You can use reduced discriminant Δ' = b'² − ac for faster calculation.`}

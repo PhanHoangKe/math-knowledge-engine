@@ -2,8 +2,6 @@ import React from 'react';
 import type { CanonicalQuadraticProblemView } from '../../api/contract';
 import { usePreferences } from '../../state/preferences';
 import { MathLatex } from '../MathLatex/MathLatex';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLightbulb, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import styles from './RelatedProblemsPod.module.css';
 
 export interface RelatedProblemsPodProps {
@@ -119,7 +117,6 @@ export const RelatedProblemsPod: React.FC<RelatedProblemsPodProps> = ({
     <div className={styles.podCard} data-testid="related-problems-pod">
       <div className={styles.podHeader}>
         <div className={styles.headerLeft}>
-          <FontAwesomeIcon icon={faLightbulb} className={styles.headerIcon} />
           <span className={styles.podTitle}>
             {lang === 'vi' ? 'Dạng bài liên quan & Luyện tập nhanh' : 'Related Problems & Quick Practice'}
           </span>
@@ -140,7 +137,6 @@ export const RelatedProblemsPod: React.FC<RelatedProblemsPodProps> = ({
                 <div className={styles.problemLatex}>
                   <MathLatex latex={item.latex} />
                 </div>
-                <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
               </div>
               <div className={styles.problemNote}>
                 {lang === 'vi' ? item.labelVi : item.labelEn}

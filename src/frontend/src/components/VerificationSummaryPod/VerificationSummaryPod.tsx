@@ -3,8 +3,6 @@ import type { VerificationCertificate, SolutionOutcome } from '../../api/contrac
 import { usePreferences } from '../../state/preferences';
 import { VERIFICATION_OUTCOME_I18N } from '../../i18n/enumMappings';
 import { VerificationPanel } from '../VerificationPanel/VerificationPanel';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShieldHalved, faSliders, faCircleCheck, faCircleXmark, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 import styles from './VerificationSummaryPod.module.css';
 
 export interface VerificationSummaryPodProps {
@@ -77,9 +75,6 @@ export const VerificationSummaryPod: React.FC<VerificationSummaryPodProps> = ({
       <div className={styles.summaryCard}>
         <div className={styles.cardHeader}>
           <div className={styles.headerLeft}>
-            <span className={styles.shieldIcon}>
-              <FontAwesomeIcon icon={faShieldHalved} />
-            </span>
             <div>
               <h2 className={styles.podTitle}>{t('pod_verification_title')}</h2>
               <span className={styles.verifierName}>
@@ -130,7 +125,6 @@ export const VerificationSummaryPod: React.FC<VerificationSummaryPodProps> = ({
         {/* Technical Details Disclosure */}
         <details className={styles.technicalDetails} data-testid="verification-technical-details">
           <summary className={styles.technicalSummary}>
-            <FontAwesomeIcon icon={faSliders} style={{ marginRight: 6 }} />
             {t('lbl_technical_details')}
           </summary>
           <div className={styles.metaGrid}>

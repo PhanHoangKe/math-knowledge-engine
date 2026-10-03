@@ -10,10 +10,6 @@ import { AlternateFormsPod } from '../AlternateFormsPod/AlternateFormsPod';
 import { VerificationSummaryPod } from '../VerificationSummaryPod/VerificationSummaryPod';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faChartLine,
-  faRulerHorizontal,
-  faCodeBranch,
-  faShieldHalved,
   faChevronDown,
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
@@ -51,7 +47,6 @@ export const ToolsTray: React.FC<ToolsTrayProps> = ({ quad, solution }) => {
             aria-expanded={activeTab === 'plot'}
             data-testid="toggle-tool-plot"
           >
-            <FontAwesomeIcon icon={faChartLine} className={styles.toolIcon} />
             <span>{t('lbl_root_plot') || 'Đồ thị Parabol'}</span>
             <FontAwesomeIcon
               icon={activeTab === 'plot' ? faChevronUp : faChevronDown}
@@ -68,7 +63,6 @@ export const ToolsTray: React.FC<ToolsTrayProps> = ({ quad, solution }) => {
             aria-expanded={activeTab === 'numberline'}
             data-testid="toggle-tool-numberline"
           >
-            <FontAwesomeIcon icon={faRulerHorizontal} className={styles.toolIcon} />
             <span>{t('lbl_number_line') || 'Trục số'}</span>
             <FontAwesomeIcon
               icon={activeTab === 'numberline' ? faChevronUp : faChevronDown}
@@ -85,7 +79,6 @@ export const ToolsTray: React.FC<ToolsTrayProps> = ({ quad, solution }) => {
             aria-expanded={activeTab === 'alternate'}
             data-testid="toggle-tool-alternate"
           >
-            <FontAwesomeIcon icon={faCodeBranch} className={styles.toolIcon} />
             <span>{t('lbl_alternate_forms') || 'Dạng tương đương'}</span>
             <FontAwesomeIcon
               icon={activeTab === 'alternate' ? faChevronUp : faChevronDown}
@@ -101,7 +94,6 @@ export const ToolsTray: React.FC<ToolsTrayProps> = ({ quad, solution }) => {
           aria-expanded={activeTab === 'verifier'}
           data-testid="toggle-tool-verifier"
         >
-          <FontAwesomeIcon icon={faShieldHalved} className={styles.toolIconSuccess} />
           <span>{t('pod_verification_title') || 'Chứng chỉ xác thực độc lập'}</span>
           <FontAwesomeIcon
             icon={activeTab === 'verifier' ? faChevronUp : faChevronDown}
