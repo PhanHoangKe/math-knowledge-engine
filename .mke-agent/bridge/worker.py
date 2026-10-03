@@ -1,6 +1,7 @@
 """Task execution engine for MKE Antigravity Bridge."""
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import re
@@ -10,15 +11,42 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 if __package__ or "." in __name__:
     from .models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
 else:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from bridge.models import BridgeTaskRecord, BridgeTaskRequest, TaskStatus, utc_now_iso
+
+
+def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
+    """Atomically writes JSON data to file_path using a temporary file in the same directory."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = file_path.parent / f".tmp_{file_path.name}.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}.tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+
+        for attempt in range(5):
+            try:
+                os.replace(temp_path, file_path)
+                break
+            except PermissionError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.02)
+    finally:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
 BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{3,180}$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -159,18 +187,112 @@ def cleanup_test_side_effects(worktree_path: Path, base_sha: str, allowed_prefix
 class TaskWorker:
     """Manages background task queue and worker execution."""
 
-    def __init__(self, repo_path: Path, worktree_root: Path) -> None:
+    def __init__(
+        self,
+        repo_path: Path,
+        worktree_root: Path,
+        state_dir: Optional[Path] = None,
+    ) -> None:
         self.repo_path = repo_path.resolve()
         self.worktree_root = worktree_root.resolve()
+        if state_dir is None:
+            self.state_dir = (self.repo_path / ".mke-agent" / "runtime" / "bridge-state").resolve()
+        else:
+            self.state_dir = Path(state_dir).resolve()
         self.tasks: Dict[str, BridgeTaskRecord] = {}
-        self._lock = threading.Lock()
+        self.corrupt_records: List[Dict[str, Any]] = []
+        self._lock = threading.RLock()
         self._active_thread: Optional[threading.Thread] = None
         self._cancel_flags: Dict[str, bool] = {}
+        self._recover_state()
+
+    def _task_file_path(self, task_id: str) -> Path:
+        safe_name = urllib.parse.quote(task_id, safe=".-_") + ".json"
+        return self.state_dir / safe_name
+
+    def _persist_task(self, record: BridgeTaskRecord) -> None:
+        with self._lock:
+            target = self._task_file_path(record.task_id)
+            _atomic_write_json(target, record.to_dict())
+
+    def _recover_state(self) -> None:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        json_files = sorted(self.state_dir.glob("*.json"))
+        loaded_records: List[BridgeTaskRecord] = []
+
+        for fpath in json_files:
+            if fpath.name.startswith(".tmp"):
+                continue
+            try:
+                raw_text = fpath.read_text(encoding="utf-8")
+                data = json.loads(raw_text)
+                if not isinstance(data, dict):
+                    raise ValueError(f"Task record JSON must be an object, got {type(data).__name__}")
+                record = BridgeTaskRecord.from_dict(data)
+
+                # Requirement 4:
+                # - SUCCESS/FAILED/CANCELLED remain terminal;
+                # - any persisted QUEUED or RUNNING task is recovered FAIL-CLOSED as FAILED;
+                # - recovered record gets finished_at and explicit error such as bridge restart/interruption;
+                # - never silently restart an orphaned Anty subprocess.
+                if record.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}:
+                    prev_status = record.status.value
+                    record.status = TaskStatus.FAILED
+                    if not record.finished_at:
+                        record.finished_at = utc_now_iso()
+                    interruption_msg = f"Recovered fail-closed after bridge restart/interruption while {prev_status}."
+                    if record.error:
+                        record.error = f"{interruption_msg} Prior error: {record.error}"
+                    else:
+                        record.error = interruption_msg
+                    self._persist_task(record)
+
+                loaded_records.append(record)
+
+            except Exception as exc:
+                # Requirement 6:
+                # - corrupt/unparseable task-state file must NOT crash Bridge startup;
+                # - quarantine/rename or skip it with diagnosable evidence;
+                # - expose diagnostic count/details through existing health information.
+                ts_str = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
+                quarantine_name = f"{fpath.name}.corrupt_{ts_str}"
+                quarantine_path = fpath.parent / quarantine_name
+                try:
+                    os.replace(fpath, quarantine_path)
+                except Exception:
+                    quarantine_path = fpath
+
+                self.corrupt_records.append({
+                    "file": fpath.name,
+                    "quarantined_as": quarantine_path.name,
+                    "error": str(exc),
+                    "timestamp": utc_now_iso(),
+                })
+
+        for cpath in sorted(self.state_dir.glob("*.corrupt*")):
+            if not any(c.get("quarantined_as") == cpath.name for c in self.corrupt_records):
+                self.corrupt_records.append({
+                    "file": cpath.name.split(".corrupt")[0],
+                    "quarantined_as": cpath.name,
+                    "error": "Previously quarantined corrupt state file",
+                    "timestamp": utc_now_iso(),
+                })
+
+        loaded_records.sort(key=lambda r: r.created_at or "")
+        with self._lock:
+            for rec in loaded_records:
+                if rec.task_id not in self.tasks:
+                    self.tasks[rec.task_id] = rec
+
+    def get_corrupt_records(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            return list(self.corrupt_records)
 
     def submit_task(self, req: BridgeTaskRequest) -> BridgeTaskRecord:
         with self._lock:
-            if req.task_id in self.tasks and self.tasks[req.task_id].status in {TaskStatus.QUEUED, TaskStatus.RUNNING}:
-                raise WorkerError(f"Task {req.task_id} is already in progress.")
+            task_file = self._task_file_path(req.task_id)
+            if req.task_id in self.tasks or task_file.exists():
+                raise WorkerError(f"Task '{req.task_id}' already exists.")
 
             record = BridgeTaskRecord(
                 task_id=req.task_id,
@@ -184,14 +306,27 @@ class TaskWorker:
             )
             self.tasks[req.task_id] = record
             self._cancel_flags[req.task_id] = False
+            self._persist_task(record)
 
         thread = threading.Thread(target=self._execute_task, args=(record,), daemon=True)
+        self._active_thread = thread
         thread.start()
         return record
 
     def get_task(self, task_id: str) -> Optional[BridgeTaskRecord]:
         with self._lock:
-            return self.tasks.get(task_id)
+            if task_id in self.tasks:
+                return self.tasks[task_id]
+            fpath = self._task_file_path(task_id)
+            if fpath.is_file():
+                try:
+                    data = json.loads(fpath.read_text(encoding="utf-8"))
+                    rec = BridgeTaskRecord.from_dict(data)
+                    self.tasks[task_id] = rec
+                    return rec
+                except Exception:
+                    return None
+            return None
 
     def list_tasks(self) -> List[BridgeTaskRecord]:
         with self._lock:
@@ -206,6 +341,7 @@ class TaskWorker:
             record.status = TaskStatus.CANCELLED
             record.finished_at = utc_now_iso()
             record.error = "Cancelled by user / client request."
+            self._persist_task(record)
             return True
 
     def _execute_task(self, record: BridgeTaskRecord) -> None:
@@ -213,6 +349,7 @@ class TaskWorker:
         record.status = TaskStatus.RUNNING
         record.started_at = utc_now_iso()
         record.stage = "setup-worktree"
+        self._persist_task(record)
 
         try:
             # 1. Validation
@@ -238,6 +375,7 @@ class TaskWorker:
 
             # 3. Agent Execution
             record.stage = "run-antigravity"
+            self._persist_task(record)
             agy_bin = find_agy()
             wrapper = (
                 "AUTOMATED MKE BRIDGE POLICY:\n"
@@ -259,9 +397,11 @@ class TaskWorker:
 
             # 4. Scope & Frontend Check
             record.stage = "scope-validation"
+            self._persist_task(record)
             all_changed = collect_changed_files(worktree_path, record.base_sha)
             validate_scope(all_changed, record.allowed_prefixes)
             record.changed_files = all_changed
+            self._persist_task(record)
 
             # 5. Validation profile
             py_bin = sys.executable
@@ -270,6 +410,7 @@ class TaskWorker:
                 # product build here can fail on unrelated baseline defects and falsely blame
                 # the automation change. Validate the control plane itself instead.
                 record.stage = "test-control-plane"
+                self._persist_task(record)
                 test_res = run_cmd(
                     [py_bin, "-m", "pytest", ".mke-agent/tests", "-q"],
                     cwd=worktree_path,
@@ -280,9 +421,11 @@ class TaskWorker:
                 record.changed_files = cleanup_test_side_effects(
                     worktree_path, record.base_sha, record.allowed_prefixes
                 )
+                self._persist_task(record)
             else:
                 # Product tasks keep the full fail-closed validation path.
                 record.stage = "prepare-frontend"
+                self._persist_task(record)
                 frontend_prep_tail = prepare_frontend(worktree_path)
 
                 # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
@@ -290,6 +433,7 @@ class TaskWorker:
                 validate_scope(post_build_changed, record.allowed_prefixes)
 
                 record.stage = "test-regression"
+                self._persist_task(record)
                 test_res = run_cmd(
                     [py_bin, "-m", "pytest", "tests/", "-q"],
                     cwd=worktree_path,
@@ -305,9 +449,11 @@ class TaskWorker:
                 record.changed_files = cleanup_test_side_effects(
                     worktree_path, record.base_sha, record.allowed_prefixes
                 )
+                self._persist_task(record)
 
             # 6. Commit & Push
             record.stage = "commit-push"
+            self._persist_task(record)
             git(worktree_path, "config", "user.name", "MKE Antigravity Bridge")
             git(worktree_path, "config", "user.email", "mke-bridge@local.invalid")
             git(worktree_path, "add", "-A")
@@ -326,6 +472,7 @@ class TaskWorker:
             git(worktree_path, "commit", "-m", record.commit_message)
             commit_sha = git(worktree_path, "rev-parse", "HEAD").stdout.strip()
             record.commit_sha = commit_sha
+            self._persist_task(record)
 
             git(worktree_path, "push", "--set-upstream", "origin", record.target_branch, timeout=300)
 
@@ -333,6 +480,7 @@ class TaskWorker:
             record.stage = "complete"
             record.status = TaskStatus.SUCCESS
             record.finished_at = utc_now_iso()
+            self._persist_task(record)
             git(self.repo_path, "worktree", "remove", "--force", str(worktree_path), check=False)
 
         except Exception as exc:
@@ -340,9 +488,11 @@ class TaskWorker:
                 record.status = TaskStatus.FAILED
                 record.error = str(exc)
             record.finished_at = utc_now_iso()
+            self._persist_task(record)
             git(self.repo_path, "worktree", "remove", "--force", str(worktree_path), check=False)
 
         finally:
+            self._persist_task(record)
             # Trigger callback webhook if registered
             if record.callback_url:
                 try:

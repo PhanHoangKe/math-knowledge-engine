@@ -163,6 +163,7 @@ def handle_mcp_call(worker: TaskWorker, tool_name: str, arguments: Dict[str, Any
         except Exception:
             agy_path = None
             agy_ok = False
+        corrupt_records = worker.get_corrupt_records() if hasattr(worker, "get_corrupt_records") else []
         return {
             "content": [
                 {
@@ -174,6 +175,8 @@ def handle_mcp_call(worker: TaskWorker, tool_name: str, arguments: Dict[str, Any
                         "agy_path": agy_path,
                         "repo_path": str(worker.repo_path),
                         "active_tasks_count": len([t for t in worker.list_tasks() if t.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}]),
+                        "corrupt_tasks_count": len(corrupt_records),
+                        "corrupt_tasks": corrupt_records,
                     }, indent=2),
                 }
             ]
@@ -241,6 +244,7 @@ def create_handler_class(worker: TaskWorker):
                 except Exception:
                     agy_path = None
                     agy_ok = False
+                corrupt_records = worker.get_corrupt_records() if hasattr(worker, "get_corrupt_records") else []
                 self._send_json(200, {
                     "service": "MKE Antigravity Bridge",
                     "status": "ok",
@@ -248,6 +252,9 @@ def create_handler_class(worker: TaskWorker):
                     "agy_path": agy_path,
                     "repo": str(worker.repo_path),
                     "total_tasks": len(worker.list_tasks()),
+                    "active_tasks_count": len([t for t in worker.list_tasks() if t.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}]),
+                    "corrupt_tasks_count": len(corrupt_records),
+                    "corrupt_tasks": corrupt_records,
                     "keep_awake": keep_awake_service.get_status(),
                 })
                 return
@@ -465,11 +472,13 @@ def main():
     parser.add_argument("--port", type=int, default=8765, help="HTTP/REST server port")
     parser.add_argument("--host", default="127.0.0.1", help="HTTP server host")
     parser.add_argument("--stdio", action="store_true", help="Run MCP stdio JSON-RPC server")
+    parser.add_argument("--state-dir", default=None, help="Directory to persist Bridge task state")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
     worktrees = Path(args.worktrees).resolve()
-    worker = TaskWorker(repo, worktrees)
+    state_dir = Path(args.state_dir).resolve() if args.state_dir else None
+    worker = TaskWorker(repo, worktrees, state_dir=state_dir)
 
     # Automatically start the 24/7 keep-awake anti-sleep daemon
     keep_awake_service.start()

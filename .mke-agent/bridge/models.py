@@ -56,3 +56,39 @@ class BridgeTaskRecord:
         data = asdict(self)
         data["status"] = self.status.value
         return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> BridgeTaskRecord:
+        if not isinstance(data, dict):
+            raise ValueError(f"Task record data must be a dict, got {type(data).__name__}")
+        if "task_id" not in data:
+            raise KeyError("Missing required field 'task_id'")
+
+        raw_status = data.get("status", TaskStatus.QUEUED.value)
+        if isinstance(raw_status, TaskStatus):
+            status = raw_status
+        elif isinstance(raw_status, str):
+            status = TaskStatus(raw_status)
+        else:
+            raise ValueError(f"Invalid status value: {raw_status}")
+
+        return cls(
+            task_id=str(data["task_id"]),
+            prompt=str(data.get("prompt", "")),
+            base_sha=str(data.get("base_sha", "")),
+            target_branch=str(data.get("target_branch", "")),
+            allowed_prefixes=list(data.get("allowed_prefixes") or []),
+            commit_message=str(data.get("commit_message", "")),
+            timeout_seconds=int(data.get("timeout_seconds", 900)),
+            status=status,
+            created_at=str(data.get("created_at") or utc_now_iso()),
+            started_at=data.get("started_at"),
+            finished_at=data.get("finished_at"),
+            commit_sha=data.get("commit_sha"),
+            stage=str(data.get("stage", "init")),
+            error=data.get("error"),
+            changed_files=list(data.get("changed_files") or []),
+            agent_output_tail=str(data.get("agent_output_tail") or ""),
+            test_output_tail=str(data.get("test_output_tail") or ""),
+            callback_url=data.get("callback_url"),
+        )
