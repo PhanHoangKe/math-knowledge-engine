@@ -79,26 +79,17 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
             <span className={styles.metaLabel}>{t('lbl_coefficients')}:</span>
             <div className={styles.coefficientsList}>
               {isQuadratic && quad ? (
-                <>
-                  <span className={styles.coeffTag}>
-                    <MathLatex latex={`a = ${formatRational(quad.a)}`} />
-                  </span>
-                  <span className={styles.coeffTag}>
-                    <MathLatex latex={`b = ${formatRational(quad.b)}`} />
-                  </span>
-                  <span className={styles.coeffTag}>
-                    <MathLatex latex={`c = ${formatRational(quad.c)}`} />
-                  </span>
-                </>
+                <span className={styles.coeffMath}>
+                  <MathLatex
+                    latex={`a = ${formatRational(quad.a)}, \\quad b = ${formatRational(quad.b)}, \\quad c = ${formatRational(quad.c)}`}
+                  />
+                </span>
               ) : degen ? (
-                <>
-                  <span className={styles.coeffTag}>
-                    <MathLatex latex={`b = ${formatRational(degen.b)}`} />
-                  </span>
-                  <span className={styles.coeffTag}>
-                    <MathLatex latex={`c = ${formatRational(degen.c)}`} />
-                  </span>
-                </>
+                <span className={styles.coeffMath}>
+                  <MathLatex
+                    latex={`b = ${formatRational(degen.b)}, \\quad c = ${formatRational(degen.c)}`}
+                  />
+                </span>
               ) : null}
             </div>
           </div>
@@ -111,28 +102,23 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({
                 <span className={styles.deltaValue}>
                   <MathLatex latex={`\\Delta = ${formatRational(quad.discriminant.value)}`} />
                 </span>
-                <div className={styles.deltaFlags}>
-                  {quad.discriminant.is_positive && (
-                    <span className={`${styles.flagBadge} ${styles.flagPositive}`}>
-                      {t('lbl_discriminant_positive')}
-                    </span>
-                  )}
-                  {quad.discriminant.is_zero && (
-                    <span className={`${styles.flagBadge} ${styles.flagZero}`}>
-                      {t('lbl_discriminant_zero')}
-                    </span>
-                  )}
-                  {quad.discriminant.is_negative && (
-                    <span className={`${styles.flagBadge} ${styles.flagNegative}`}>
-                      {t('lbl_discriminant_negative')}
-                    </span>
-                  )}
-                  {quad.discriminant.is_rational_square && (
-                    <span className={`${styles.flagBadge} ${styles.flagSquare}`}>
-                      {t('lbl_discriminant_perfect_square')}
-                    </span>
-                  )}
-                </div>
+                <span className={styles.deltaAnnotations}>
+                  (
+                  {[
+                    quad.discriminant.is_positive && t('lbl_discriminant_positive'),
+                    quad.discriminant.is_zero && t('lbl_discriminant_zero'),
+                    quad.discriminant.is_negative && t('lbl_discriminant_negative'),
+                    quad.discriminant.is_rational_square && t('lbl_discriminant_perfect_square'),
+                  ]
+                    .filter((flag): flag is string => Boolean(flag))
+                    .map((text, idx, arr) => (
+                      <React.Fragment key={text}>
+                        <span className={styles.flagText}>{text}</span>
+                        {idx < arr.length - 1 && <span className={styles.flagSeparator}> · </span>}
+                      </React.Fragment>
+                    ))}
+                  )
+                </span>
               </div>
             </div>
           )}
