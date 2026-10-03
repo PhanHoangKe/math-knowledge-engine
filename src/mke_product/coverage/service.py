@@ -12,6 +12,7 @@ from mke_product.coverage.contracts import (
     SolutionTrace,
     VerificationReport,
 )
+from mke_product.coverage.algebra_rational import AlgebraRationalAdapter
 from mke_product.coverage.legacy_quadratic import LegacyQuadraticAdapter
 from mke_product.coverage.registry import AdapterRegistry
 
@@ -33,6 +34,7 @@ class UniversalApplicationService:
         if registry is None:
             registry = AdapterRegistry()
             registry.register(LegacyQuadraticAdapter())
+            registry.register(AlgebraRationalAdapter())
         self._registry = registry
 
     @property

@@ -434,12 +434,25 @@ class AllRealSolutionEntity(BaseModel):
     explanation: str = "Phương trình nghiệm đúng với mọi x ∈ ℝ"
 
 
+class AllRealsExceptFiniteEntity(BaseModel):
+    """Represents identity with finite excluded points, e.g. ℝ \\ {x_1, x_2, ...}."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    entity_kind: Literal["ALL_REALS_EXCEPT_FINITE"] = "ALL_REALS_EXCEPT_FINITE"
+    excluded_points: Tuple[Union[RationalScalarEntity, RealQuadraticSurdEntity], ...] = Field(default_factory=tuple)
+    explanation: str = "Phương trình nghiệm đúng với mọi x ∈ ℝ loại trừ các điểm gián đoạn"
+
+    @property
+    def cardinality_excluded(self) -> int:
+        return len(self.excluded_points)
+
+
 SymbolicEntity = Union[
     RationalScalarEntity,
     RealQuadraticSurdEntity,
     FiniteRootCollectionEntity,
     EmptyRealSolutionEntity,
     AllRealSolutionEntity,
+    AllRealsExceptFiniteEntity,
 ]
 
 

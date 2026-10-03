@@ -33,6 +33,7 @@ from mke_product.coverage.benchmark import (
 )
 from mke_product.coverage.contracts import (
     AllRealSolutionEntity,
+    AllRealsExceptFiniteEntity,
     AssumptionSpec,
     CalculusOpKind,
     CalculusOperationPayload,
@@ -71,6 +72,7 @@ from mke_product.coverage.contracts import (
     VerificationLevel,
     VerificationReport,
 )
+from mke_product.coverage.algebra_rational import AlgebraRationalAdapter
 from mke_product.coverage.legacy_quadratic import LegacyQuadraticAdapter
 from mke_product.coverage.registry import (
     AdapterRegistry,
@@ -121,6 +123,7 @@ __all__ = [
     "FiniteRootCollectionEntity",
     "EmptyRealSolutionEntity",
     "AllRealSolutionEntity",
+    "AllRealsExceptFiniteEntity",
     "SymbolicEntity",
     "CandidateMetadata",
     "CandidateSolution",
@@ -136,6 +139,7 @@ __all__ = [
     "ExecutionOptions",
     "DomainAdapter",
     "LegacyQuadraticAdapter",
+    "AlgebraRationalAdapter",
     # Registry & Service
     "AdapterRegistry",
     "AdapterRegistryError",
