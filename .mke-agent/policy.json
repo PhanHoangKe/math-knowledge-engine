@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "control_branch": "automation/mke-agent-loop",
+  "poll_seconds": 60,
+  "agent_timeout_seconds": 3600,
+  "test_timeout_seconds": 2400,
+  "max_attempts_before_owner": 3,
+  "forbid_force_push": true,
+  "forbid_main_push": true,
+  "forbid_frontend_changes_by_default": true,
+  "require_baseline_regression": true,
+  "require_full_regression_after_agent": true,
+  "agent_git_operations": false
+}
