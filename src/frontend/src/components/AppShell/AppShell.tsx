@@ -336,7 +336,7 @@ export const AppShell: React.FC = () => {
 
                         {/* Powered by Engine Watermark */}
                         <div className={styles.engineWatermark}>
-                          <span>POWERED BY THE MATH KNOWLEDGE ENGINE (MKE)</span>
+                          <span>{t('lbl_powered_by')}</span>
                         </div>
                       </div>
                     );

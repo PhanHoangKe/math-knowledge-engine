@@ -159,6 +159,7 @@ export const en: Translations = {
   lbl_roots_list: 'Real Roots List',
   lbl_root_approx: 'Decimal Approximation',
   lbl_no_roots: 'Equation has no real roots in ℝ',
+  lbl_input: 'Input:',
   lbl_root_plot: 'Root plot:',
   lbl_alternate_forms: 'Alternate forms:',
   lbl_number_line: 'Number line:',
@@ -166,8 +167,8 @@ export const en: Translations = {
   lbl_sum_of_roots: 'Sum of roots:',
   lbl_product_of_roots: 'Product of roots:',
   lbl_step_by_step_solution: 'Step-by-step solution',
-  pro_widget_title: 'Get help with that first step (and all the others)',
-  pro_widget_desc: 'Calculate the discriminant Δ and apply the quadratic formula to find all real roots:',
+  lbl_download_page: 'Download Page',
+  lbl_powered_by: 'POWERED BY MATH KNOWLEDGE ENGINE (MKE)',
 
 
 

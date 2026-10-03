@@ -24,7 +24,7 @@ export const CanonicalProblemPanel: React.FC<CanonicalProblemPanelProps> = ({ pr
     <div className={styles.card} data-testid="canonical-problem-panel">
       <div className={styles.cardHeader}>
         <div className={styles.headerLeft}>
-          <span className={styles.podTitle}>Input:</span>
+          <span className={styles.podTitle}>{t('lbl_input')}</span>
           <span className={styles.categoryBadge}>{problem.category}</span>
         </div>
         <span className={styles.classificationBadge}>
