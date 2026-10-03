@@ -3,7 +3,7 @@
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   overflow: hidden;
   transition: all 0.2s ease;
 }
@@ -17,6 +17,17 @@
   border-bottom: 1px solid var(--col-pod-border, #e2e8f0);
 }
 
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.headerIcon {
+  font-size: 0.85rem;
+  color: #ea580c;
+}
+
 .podTitle {
   font-family: var(--font-sans);
   font-size: 0.85rem;
@@ -26,12 +37,92 @@
 }
 
 .podBody {
-  padding: 12px 18px;
+  padding: 14px 18px;
+}
+
+.vieteGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  .vieteGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.subPod {
+  background: var(--bg-subtle, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.subHeader {
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.subTitle {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary, #334155);
+}
+
+.subBody {
+  padding: 8px 12px;
+  font-size: 0.95rem;
   display: flex;
-  justify-content: flex-start;
   align-items: center;
 }
 
-.valueRow {
+.insightsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle, #edf2f7);
+  padding-top: 10px;
+}
+
+.insightRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  color: var(--text-secondary, #1e293b);
+  line-height: 1.45;
+}
+
+.insightBullet {
+  color: #f96932;
+  font-weight: bold;
   font-size: 1rem;
+  line-height: 1.2;
+}
+
+.insightIconSuccess {
+  color: #16a34a;
+  font-size: 0.85rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.insightIconInfo {
+  color: #0284c7;
+  font-size: 0.85rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.insightText {
+  flex: 1;
+}
+
+.insightText strong {
+  color: #0f172a;
 }

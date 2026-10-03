@@ -1,0 +1,98 @@
+.podCard {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.podHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--col-pod-header-bg, #f4f6f9);
+  border-bottom: 1px solid var(--col-pod-border, #e2e8f0);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.headerIcon {
+  font-size: 0.85rem;
+  color: #f59e0b;
+}
+
+.podTitle {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--col-pod-header-title, #4a709c);
+  letter-spacing: 0.01em;
+}
+
+.podBody {
+  padding: 12px 16px;
+}
+
+.problemsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.problemCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.problemCard:hover {
+  border-color: #f96932;
+  background: #fffaf8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(249, 105, 50, 0.1);
+}
+
+.problemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.problemLatex {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.actionArrow {
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.problemCard:hover .actionArrow {
+  color: #f96932;
+  transform: translateX(3px);
+}
+
+.problemNote {
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  color: var(--text-secondary, #334155);
+  line-height: 1.3;
+}

@@ -5,14 +5,12 @@ import { HeaderBar } from '../HeaderBar/HeaderBar';
 import { EquationInputShell } from '../EquationInputShell/EquationInputShell';
 import { WorkspaceEmptyState } from '../WorkspaceEmptyState/WorkspaceEmptyState';
 import { CanonicalProblemPanel } from '../CanonicalProblemPanel/CanonicalProblemPanel';
-import { RootPlotPod } from '../RootPlotPod/RootPlotPod';
-import { AlternateFormsPod } from '../AlternateFormsPod/AlternateFormsPod';
-import { NumberLinePod } from '../NumberLinePod/NumberLinePod';
 import { RootPropertiesPod } from '../RootPropertiesPod/RootPropertiesPod';
+import { RelatedProblemsPod } from '../RelatedProblemsPod/RelatedProblemsPod';
+import { ToolsTray } from '../ToolsTray/ToolsTray';
 import { MethodCatalogPanel } from '../MethodCatalogPanel/MethodCatalogPanel';
 import { SolutionSummaryPanel } from '../SolutionSummaryPanel/SolutionSummaryPanel';
 import { SelectedMethodPod } from '../SelectedMethodPod/SelectedMethodPod';
-import { VerificationSummaryPod } from '../VerificationSummaryPod/VerificationSummaryPod';
 import { TraceSummaryPod } from '../TraceSummaryPod/TraceSummaryPod';
 import { DegenerateSolutionPanel } from '../DegenerateSolutionPanel/DegenerateSolutionPanel';
 import { MethodNotExecutablePanel } from '../MethodNotExecutablePanel/MethodNotExecutablePanel';
@@ -172,15 +170,15 @@ export const AppShell: React.FC = () => {
 
               {lastAcceptedResponse?.response_status === 'SOLVED' && (() => {
                 const resp = lastAcceptedResponse as SolvedResponse;
+                const isQuadratic = resp.problem.problem_type === 'QUADRATIC';
+                const quad = isQuadratic ? (resp.problem as CanonicalQuadraticProblemView) : null;
                 return (
                   <div className={styles.solvedLayout} data-testid="solved-workspace">
                     <CanonicalProblemPanel problem={resp.problem} />
                     <SolutionSummaryPanel solution={resp.solution} />
-                    <VerificationSummaryPod
-                      certificate={resp.solution.certificate}
-                      verificationScope={resp.solution.verification_scope}
-                      solutionOutcome={resp.solution.outcome}
-                    />
+                    <div id="step-by-step-trace-section">
+                      <TraceSummaryPod trace={resp.solution.trace} />
+                    </div>
                     <SelectedMethodPod
                       methods={resp.available_methods}
                       selectedMethodId={resp.selected_method_id}
@@ -189,7 +187,17 @@ export const AppShell: React.FC = () => {
                       onToggleShowAllMethods={() => setShowAllMethods(!showAllMethods)}
                       isLoading={reactiveStatus === 'recomputing'}
                     />
-                    <TraceSummaryPod trace={resp.solution.trace} />
+                    {quad && <RootPropertiesPod quad={quad} />}
+                    {quad && (
+                      <RelatedProblemsPod
+                        quad={quad}
+                        onSelectEquation={(eq) => {
+                          setQuery(eq);
+                          submitRawSolve(eq);
+                        }}
+                      />
+                    )}
+                    <ToolsTray quad={quad} solution={resp.solution} />
                   </div>
                 );
               })()}
@@ -263,7 +271,7 @@ export const AppShell: React.FC = () => {
 
                     return (
                       <div className={styles.solvedLayout} data-testid="solved-workspace">
-                        {/* Pod 1: Canonical Problem / Input with Hover Action Bar & Integrated Coeff Editor */}
+                        {/* Khối 1: Đề bài (Canonical Problem) */}
                         <CanonicalProblemPanel
                           problem={resp.problem}
                           showCoeffEditor={showCoeffEditor}
@@ -282,32 +290,17 @@ export const AppShell: React.FC = () => {
                           }
                         />
 
-                        {/* Pod 2: Root Plot (if quadratic) */}
-                        {quad && <RootPlotPod quad={quad} roots={resp.solution.roots} />}
-
-                        {/* Pod 3: Alternate forms (if quadratic) */}
-                        {quad && <AlternateFormsPod quad={quad} roots={resp.solution.roots} />}
-
-                        {/* Pod 4: Number line (if quadratic) */}
-                        {quad && <NumberLinePod quad={quad} roots={resp.solution.roots} />}
-
-                        {/* Pod 5: Solution Summary & Roots */}
+                        {/* Khối 2: Lời giải từng bước & Kết quả (Step-by-Step Solution & Outcome) */}
                         <SolutionSummaryPanel
                           solution={resp.solution}
                           onOpenStepByStep={scrollToTrace}
                         />
 
-                        {/* Pod 6: Sum & Product of roots (if quadratic) */}
-                        {quad && <RootPropertiesPod quad={quad} />}
+                        <div id="step-by-step-trace-section">
+                          <TraceSummaryPod trace={resp.solution.trace} />
+                        </div>
 
-                        {/* Pod 7: Independent Verification Summary */}
-                        <VerificationSummaryPod
-                          certificate={resp.solution.certificate}
-                          verificationScope={resp.solution.verification_scope}
-                          solutionOutcome={resp.solution.outcome}
-                        />
-
-                        {/* Pod 8: Selected Method Summary + Expandable Catalog */}
+                        {/* Khối 3: Phương pháp giải (Solution Methods) */}
                         <SelectedMethodPod
                           methods={resp.available_methods}
                           selectedMethodId={resp.selected_method_id}
@@ -317,10 +310,22 @@ export const AppShell: React.FC = () => {
                           isLoading={reactiveStatus === 'recomputing'}
                         />
 
-                        {/* Pod 9: Step-by-Step Solution Trace */}
-                        <div id="step-by-step-trace-section">
-                          <TraceSummaryPod trace={resp.solution.trace} />
-                        </div>
+                        {/* Khối 4: Mẹo giải nhanh & Nhận xét (Quick Tips & Viète) */}
+                        {quad && <RootPropertiesPod quad={quad} />}
+
+                        {/* Khối 5: Dạng bài liên quan & Luyện tập nhanh (Related Problems) */}
+                        {quad && (
+                          <RelatedProblemsPod
+                            quad={quad}
+                            onSelectEquation={(eq) => {
+                              setQuery(eq);
+                              submitRawSolve(eq);
+                            }}
+                          />
+                        )}
+
+                        {/* Khối 6: Khay công cụ trực quan & Xác thực theo yêu cầu (On-Demand Visuals & Verifier) */}
+                        <ToolsTray quad={quad} solution={resp.solution} />
 
                         {/* Powered by Engine Watermark */}
                         <div className={styles.engineWatermark}>
