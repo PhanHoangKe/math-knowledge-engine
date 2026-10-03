@@ -64,6 +64,51 @@ def allowed_path(path: str, prefixes: List[str]) -> bool:
     return any(norm.startswith(p.replace("\\", "/")) for p in prefixes)
 
 
+def find_npm() -> str:
+    found = shutil.which("npm")
+    if found:
+        return found
+    raise WorkerError("npm is required for frontend build but was not found on PATH.")
+
+
+def prepare_frontend(worktree_path: Path, timeout: int = 600) -> str:
+    """Prepares frontend build artifacts if package-lock.json is present.
+
+    Fails closed if package-lock is present but npm is missing or commands fail.
+    Returns diagnostic output tail.
+    """
+    frontend_dir = worktree_path / "src" / "frontend"
+    lockfile = frontend_dir / "package-lock.json"
+    if not lockfile.is_file():
+        return "frontend package-lock absent; skipping frontend build preparation"
+
+    npm_bin = find_npm()
+    ci_res = run_cmd([npm_bin, "ci"], cwd=frontend_dir, timeout=timeout, check=True)
+    build_res = run_cmd([npm_bin, "run", "build"], cwd=frontend_dir, timeout=timeout, check=True)
+    combined = (ci_res.stdout + "\n" + ci_res.stderr + "\n" + build_res.stdout + "\n" + build_res.stderr).strip()
+    return combined[-8000:]
+
+
+def collect_changed_files(worktree_path: Path, base_sha: str) -> List[str]:
+    """Collects changed git-tracked and untracked (non-ignored) source files."""
+    changed = git(worktree_path, "diff", "--name-only", base_sha, check=True).stdout.splitlines()
+    untracked = git(worktree_path, "ls-files", "--others", "--exclude-standard", check=True).stdout.splitlines()
+    return sorted(set(p.strip().replace("\\", "/") for p in changed + untracked if p.strip()))
+
+
+def validate_scope(all_changed: List[str], allowed_prefixes: List[str]) -> None:
+    """Validates that modified files are within allowed prefixes and respect frontend freeze."""
+    if not all_changed:
+        raise WorkerError("Antigravity completed without modifying or creating any files.")
+
+    for path in all_changed:
+        norm = path.replace("\\", "/")
+        if norm.startswith("src/frontend/") or norm.startswith("ui/"):
+            raise WorkerError(f"Frontend freeze violation: {path} cannot be modified.")
+        if not allowed_path(norm, allowed_prefixes):
+            raise WorkerError(f"Scope violation: {path} is not in allowed_prefixes.")
+
+
 class TaskWorker:
     """Manages background task queue and worker execution."""
 
@@ -167,32 +212,41 @@ class TaskWorker:
 
             # 4. Scope & Frontend Check
             record.stage = "scope-validation"
-            changed = git(worktree_path, "diff", "--name-only", record.base_sha, check=True).stdout.splitlines()
-            untracked = git(worktree_path, "ls-files", "--others", "--exclude-standard", check=True).stdout.splitlines()
-            all_changed = sorted(set(p.strip() for p in changed + untracked if p.strip()))
-
-            if not all_changed:
-                raise WorkerError("Antigravity completed without modifying or creating any files.")
-
-            for path in all_changed:
-                if not allowed_path(path, record.allowed_prefixes):
-                    raise WorkerError(f"Scope violation: {path} is not in allowed_prefixes.")
-                if path.startswith("src/frontend/") or path.startswith("ui/"):
-                    raise WorkerError(f"Frontend freeze violation: {path} cannot be modified.")
-
+            all_changed = collect_changed_files(worktree_path, record.base_sha)
+            validate_scope(all_changed, record.allowed_prefixes)
             record.changed_files = all_changed
 
-            # 5. Full Regression Tests
+            # 5. Frontend Preparation & Full Regression Tests
+            record.stage = "prepare-frontend"
+            frontend_prep_tail = prepare_frontend(worktree_path)
+
+            # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
+            post_build_changed = collect_changed_files(worktree_path, record.base_sha)
+            validate_scope(post_build_changed, record.allowed_prefixes)
+
             record.stage = "test-regression"
             py_bin = sys.executable
             test_res = run_cmd([py_bin, "-m", "pytest", "tests/", "-q"], cwd=worktree_path, timeout=600, check=True)
-            record.test_output_tail = (test_res.stdout + "\n" + test_res.stderr)[-8000:]
+            prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
+            record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
 
             # 6. Commit & Push
             record.stage = "commit-push"
             git(worktree_path, "config", "user.name", "MKE Antigravity Bridge")
             git(worktree_path, "config", "user.email", "mke-bridge@local.invalid")
             git(worktree_path, "add", "-A")
+
+            # Verify that only allowed files are staged and no frontend files are committed
+            staged = git(worktree_path, "diff", "--cached", "--name-only", check=True).stdout.splitlines()
+            staged_paths = sorted(set(p.strip().replace("\\", "/") for p in staged if p.strip()))
+            if not staged_paths:
+                raise WorkerError("No staged changes to commit after test execution.")
+            for p in staged_paths:
+                if p.startswith("src/frontend/") or p.startswith("ui/"):
+                    raise WorkerError(f"Frontend freeze violation in staged files: {p} cannot be committed.")
+                if not allowed_path(p, record.allowed_prefixes):
+                    raise WorkerError(f"Scope violation in staged files: {p} is not in allowed_prefixes.")
+
             git(worktree_path, "commit", "-m", record.commit_message)
             commit_sha = git(worktree_path, "rev-parse", "HEAD").stdout.strip()
             record.commit_sha = commit_sha
