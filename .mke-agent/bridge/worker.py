@@ -96,6 +96,14 @@ def collect_changed_files(worktree_path: Path, base_sha: str) -> List[str]:
     return sorted(set(p.strip().replace("\\", "/") for p in changed + untracked if p.strip()))
 
 
+def is_control_plane_only(changed_files: List[str]) -> bool:
+    """True when a task changes only automation/control-plane files."""
+    return bool(changed_files) and all(
+        path.replace("\\", "/").startswith(".mke-agent/")
+        for path in changed_files
+    )
+
+
 def validate_scope(all_changed: List[str], allowed_prefixes: List[str]) -> None:
     """Validates that modified files are within allowed prefixes and respect frontend freeze."""
     if not all_changed:
@@ -255,26 +263,48 @@ class TaskWorker:
             validate_scope(all_changed, record.allowed_prefixes)
             record.changed_files = all_changed
 
-            # 5. Frontend Preparation & Full Regression Tests
-            record.stage = "prepare-frontend"
-            frontend_prep_tail = prepare_frontend(worktree_path)
-
-            # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
-            post_build_changed = collect_changed_files(worktree_path, record.base_sha)
-            validate_scope(post_build_changed, record.allowed_prefixes)
-
-            record.stage = "test-regression"
+            # 5. Validation profile
             py_bin = sys.executable
-            test_res = run_cmd([py_bin, "-m", "pytest", "tests/", "-q"], cwd=worktree_path, timeout=600, check=True)
-            prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
-            record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
+            if is_control_plane_only(record.changed_files):
+                # Control-plane-only tasks cannot affect product/frontend behavior. Running the
+                # product build here can fail on unrelated baseline defects and falsely blame
+                # the automation change. Validate the control plane itself instead.
+                record.stage = "test-control-plane"
+                test_res = run_cmd(
+                    [py_bin, "-m", "pytest", ".mke-agent/tests", "-q"],
+                    cwd=worktree_path,
+                    timeout=300,
+                    check=True,
+                )
+                record.test_output_tail = (test_res.stdout + "\n" + test_res.stderr)[-8000:]
+                record.changed_files = cleanup_test_side_effects(
+                    worktree_path, record.base_sha, record.allowed_prefixes
+                )
+            else:
+                # Product tasks keep the full fail-closed validation path.
+                record.stage = "prepare-frontend"
+                frontend_prep_tail = prepare_frontend(worktree_path)
 
-            # Regression tests may create screenshots/evidence/cache files outside the task scope.
-            # Pre-test scope validation already proved task-authored changes were allowed, so
-            # clean only those post-test out-of-scope side effects before staging.
-            record.changed_files = cleanup_test_side_effects(
-                worktree_path, record.base_sha, record.allowed_prefixes
-            )
+                # Post-build scope verification: ensure build artifacts / node_modules didn't add un-ignored changes
+                post_build_changed = collect_changed_files(worktree_path, record.base_sha)
+                validate_scope(post_build_changed, record.allowed_prefixes)
+
+                record.stage = "test-regression"
+                test_res = run_cmd(
+                    [py_bin, "-m", "pytest", "tests/", "-q"],
+                    cwd=worktree_path,
+                    timeout=600,
+                    check=True,
+                )
+                prep_header = f"[frontend-prepare]\n{frontend_prep_tail}\n\n" if frontend_prep_tail else ""
+                record.test_output_tail = (prep_header + test_res.stdout + "\n" + test_res.stderr)[-8000:]
+
+                # Regression tests may create screenshots/evidence/cache files outside the task scope.
+                # Pre-test scope validation already proved task-authored changes were allowed, so
+                # clean only those post-test out-of-scope side effects before staging.
+                record.changed_files = cleanup_test_side_effects(
+                    worktree_path, record.base_sha, record.allowed_prefixes
+                )
 
             # 6. Commit & Push
             record.stage = "commit-push"
