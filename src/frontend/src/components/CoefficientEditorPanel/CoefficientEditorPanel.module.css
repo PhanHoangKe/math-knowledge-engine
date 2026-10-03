@@ -129,20 +129,26 @@
   text-align: center;
   border-radius: 4px;
   box-sizing: border-box;
-  transition: all 0.12s ease;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #cbd5e1);
   color: var(--text-primary, #0f172a);
+  transition: all 0.12s ease;
+}
+
+.fractionInput:hover:not(:disabled):not(:focus) {
+  border-color: #94a3b8;
+}
+
+.fractionInput:focus {
+  background: #ffffff;
+  border-color: #ea580c;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
 }
 
 .numInput {
-  background: #eef6ff;
-  border: 1.5px solid #93c5fd;
-}
-
-.numInput:focus {
-  background: #ffffff;
-  border-color: #2563eb;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #cbd5e1);
 }
 
 .fractionBar {
@@ -154,16 +160,8 @@
 }
 
 .denInput {
-  background: #fefce8;
-  border: 1.5px dashed #d97706;
-}
-
-.denInput:focus {
-  background: #ffffff;
-  border-style: solid;
-  border-color: #d97706;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #cbd5e1);
 }
 
 .inputError {
